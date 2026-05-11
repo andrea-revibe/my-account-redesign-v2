@@ -59,6 +59,7 @@ When a card is **collapsed**, the customer sees:
 - A state chip on the right when relevant. Delivered orders carry a green "Delivered" chip (overrides the data's `state: 'close'`); cancelled orders carry a red "Cancelled" chip.
 - A tinted **status banner** with a leading condition phrase and a descriptive sentence (see §3, "Status banner").
 - The product image, name, and variant.
+- A muted `+ Warranty {currency} {amount}` line beneath the variant when the order carries a warranty add-on (omitted otherwise). Same treatment in the hero card's frosted product strip.
 - The amount paid.
 - The order ID.
 
@@ -69,7 +70,7 @@ below it the customer sees:
 - The status banner (long form), the **Shipping progress** sub-timeline (shipped only), and the courier card with the "Track" link.
 - The **Order details** collapse with phone, address, order date, and "Change address" / "Change phone number" actions while the order is in any in-progress state (`created` or `quality_check`).
 - The action row:
-  - `created` / `quality_check`: `Cancel order` + `Change order details` (the latter programmatically opens the Order details collapse via ref so the change-address / change-phone pills are immediately visible).
+  - `created` / `quality_check`: `Cancel order` + `Change order details` (the latter programmatically opens the Order details collapse via ref so the change-address / change-phone pills are immediately visible). On `created`, `Cancel order` opens the two-step cancellation bottom sheet (see §2.6); on `quality_check` the button is currently a visual stub.
   - shipped: `Receipt` + `Get help`.
 
 Past-order cards (delivered, cancelled) are a separate, simpler component
@@ -161,6 +162,51 @@ longer relevant. This avoids having "delivered" in two places at once.
 | delivered | Never | "Delivered" | "All done" | success | green "Delivered" | Yes (with completed copy) | No |
 | cancelled (any prior status) | Never | "Cancelled" | "Refund in progress" | danger | red "Cancelled" | No | No |
 
+### 2.6 Cancellation flow (created stage)
+
+`Cancel order` on a `created` order opens a bottom sheet (`CancelOrderSheet`)
+with a max-height of 92vh, a black-45% scrim, and a slide-up entrance.
+Dismissible by tapping the scrim, the X icon, or pressing `Escape`. Two steps:
+
+**Step 1 — Choose your refund.** Header (`Cancel order` + `#id`), then an
+order-summary card with the product strip and a line-item breakdown
+(`Product` + `Warranty` if present + `Total`), then two refund options as
+radio cards:
+
+- **Store credit** (recommended pill, success-tone) — full refund of the
+  order total, available instantly.
+- **Original payment method** — total minus a 5% processing fee, refunded
+  to the card in 5–10 business days. The fee is shown explicitly as a
+  negative line under the amount (e.g. `−AED 42.45 (5% processing fee)`).
+
+The `Continue` CTA is disabled until a method is picked. `Keep order` closes
+the sheet without changes.
+
+**Step 2 — Confirm cancellation.** A back arrow returns to step 1. Body shows
+a centered amount block (`You'll receive` / amount / destination / ETA copy).
+On `Original payment method` the block also carries a muted breakdown line
+(e.g. `Total AED 849 · −AED 42.45 fee`) between the headline figure and the
+destination.
+
+Beneath the amount block sits a neutral info-tone strip with method-specific
+copy to prevent wrong-method regret. `Store credit`: *"Store credit stays on
+Revibe. It won't be paid out to your bank account."* `Original payment method`:
+*"You're giving up {fee} to the processing fee. Choose Store credit for the
+full amount, instantly."* The store-credit copy intentionally doesn't nudge to
+the alternative — it's already the recommended option. Footer: `Back` + a
+danger-filled `Cancel order` CTA.
+
+The current prototype does **not** persist cancellation: tapping the final
+`Cancel order` simply closes the sheet (the order keeps its `created` state).
+Wiring this to flip `state` to `cancelled` and vary the cancelled-state banner
+copy by chosen refund method is a future step.
+
+The 5% fee, the recommendation, and the line-item split are prototype-only —
+production will need to read the eligibility window, fee rate, recommendation
+policy, and per-line-item amounts from the backend per order. Today only
+order `89712` carries `subtotal` + `warranty`; other orders fall back to
+`subtotal = total` with no warranty row.
+
 ---
 
 ## 3. UX decisions and rationale
@@ -235,7 +281,9 @@ Each order object carries:
 - **`address`** — the delivery address on the order (string, free text).
 - **`placedAt`** — the order timestamp shown on the summary screen (string, formatted).
 - **`quantity`** — number of items in the order (integer).
-- **`total`** — total amount paid (number, no currency symbol).
+- **`subtotal`** *(optional)* — product-only amount, no currency symbol. Used to render the line-item breakdown inside the cancellation sheet. When absent the sheet falls back to `subtotal = total`. Populated on every demo order today.
+- **`warranty`** *(optional)* — warranty add-on amount, no currency symbol. When present it renders both as a `+ Warranty` line on the OrderCard / HeroCard product strip and as an extra row in the cancellation sheet's breakdown; both are omitted when the field is absent. Populated on every demo order today (varied amounts so the pattern is visible across the list).
+- **`total`** — total amount paid (number, no currency symbol). When `subtotal` and `warranty` are both present, `total` should equal their sum.
 - **`currency`** — three-letter currency code (string, e.g. "AED").
 - **`customerName`** — the recipient's full name (string).
 
@@ -296,6 +344,7 @@ src/
     ├── StoreCreditsCard.jsx      Wallet balance card (gradient amount + clipboard icon; decorative)
     ├── OrderFilters.jsx          Search field + range dropdown + status chip row (controlled)
     ├── OrderCard.jsx             The expandable order card
+    ├── CancelOrderSheet.jsx      Two-step bottom sheet for cancelling a `created` order
     ├── StatusBanner.jsx          Tinted status banner with leading phrase + sentence
     ├── StatusTimeline.jsx        Horizontal 4-step timeline
     ├── ShippingSubTimeline.jsx   Vertical sub-status timeline

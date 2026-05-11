@@ -74,6 +74,14 @@ export default {
           from: { opacity: '0', transform: 'translateY(-6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        slideUp: {
+          from: { transform: 'translateY(100%)' },
+          to: { transform: 'translateY(0)' },
+        },
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
         heroPulse: {
           '0%': { boxShadow: '0 0 0 0 rgba(109,255,184,0.6)' },
           '100%': { boxShadow: '0 0 0 10px rgba(109,255,184,0)' },
@@ -81,6 +89,8 @@ export default {
       },
       animation: {
         slideDown: 'slideDown 0.3s ease',
+        slideUp: 'slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+        fadeIn: 'fadeIn 0.2s ease',
         heroPulse: 'heroPulse 1.6s ease-out infinite',
       },
     },

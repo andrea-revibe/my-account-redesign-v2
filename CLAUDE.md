@@ -4,10 +4,9 @@ Internal-demo prototype for the Revibe **My Account → Orders** area. Used to e
 
 ## Where to work
 
-All app code lives in **`order-redesign/`** — the repo root only holds docs. Always `cd order-redesign` before running any npm command.
+App code lives at the repo root.
 
 ```sh
-cd order-redesign
 npm install
 npm run dev      # http://localhost:5173 (Vite)
 npm run build
@@ -53,7 +52,7 @@ The leading phrase describes **condition** (`On track`, `Arriving today`, `All d
 - Component state stays in the component unless multiple components need it; lift to `App.jsx` and pass down (see filter state).
 - New status / sub-status / state? Edit `src/lib/statuses.js` only. The timeline, banner, header, and chips are all data-driven from there.
 - Tailwind: prefer the custom tokens (`brand`, `accent`, `success`, `progress`, `chip-*`, `searchBg`, `ink`, `muted`, `line`, `surface`) over arbitrary values. Slash-opacity (`bg-brand/10`) works on every token.
-- "Need a screenshot for verification" → use the playwright snippet pattern from prior turns: viewport 430×N, `deviceScaleFactor: 2`, `_snap.mjs` in `order-redesign/` (must be inside the project so the `playwright` import resolves).
+- "Need a screenshot for verification" → use the playwright snippet pattern from prior turns: viewport 430×N, `deviceScaleFactor: 2`, `_snap.mjs` at the repo root (must be inside the project so the `playwright` import resolves).
 
 ## Gotchas
 

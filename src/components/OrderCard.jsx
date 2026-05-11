@@ -20,6 +20,7 @@ import {
 } from '../lib/statuses'
 import StatusTimeline from './StatusTimeline'
 import ShippingSubTimeline from './ShippingSubTimeline'
+import CancelOrderSheet from './CancelOrderSheet'
 
 // Hardcoded so the demo lands on a real DHL test shipment regardless of the
 // placeholder tracking numbers in the mock data.
@@ -32,6 +33,7 @@ const DHL_TRACKING_URL =
 // courier card, Order details collapse, and the action row.
 export default function OrderCard({ order, defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
+  const [cancelOpen, setCancelOpen] = useState(false)
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
@@ -51,6 +53,9 @@ export default function OrderCard({ order, defaultExpanded = false }) {
   const desc = statusDescription(order)
   const isShipped = order.statusId === 'shipped'
   const showCancel = isInProgress
+  // Sheet flow is wired only for `created` for now. Quality-check keeps the
+  // visual cancel button as a stub until that stage gets its own design.
+  const cancelOpensSheet = order.statusId === 'created'
 
   const fullTimeline = (
     <div className="rounded-[14px] border border-line bg-surface p-3.5">
@@ -106,6 +111,11 @@ export default function OrderCard({ order, defaultExpanded = false }) {
             <div className="text-[12px] text-muted mt-0.5 truncate">
               {order.product.variant} · #{order.id}
             </div>
+            {order.warranty != null && (
+              <div className="text-[11.5px] text-muted mt-0.5 truncate">
+                + Warranty {order.currency} {order.warranty.toLocaleString()}
+              </div>
+            )}
           </div>
           <div className="text-[14.5px] font-bold text-ink whitespace-nowrap">
             {order.currency} {order.total.toLocaleString()}
@@ -165,7 +175,12 @@ export default function OrderCard({ order, defaultExpanded = false }) {
 
           <div className="flex gap-2">
             {showCancel ? (
-              <SecondaryBtn tone="danger" icon={X} label="Cancel order" />
+              <SecondaryBtn
+                tone="danger"
+                icon={X}
+                label="Cancel order"
+                onClick={cancelOpensSheet ? () => setCancelOpen(true) : undefined}
+              />
             ) : (
               <SecondaryBtn icon={Download} label="Receipt" />
             )}
@@ -183,6 +198,13 @@ export default function OrderCard({ order, defaultExpanded = false }) {
 
           {!isInProgress && fullTimeline}
         </div>
+      )}
+      {cancelOpensSheet && (
+        <CancelOrderSheet
+          order={order}
+          open={cancelOpen}
+          onClose={() => setCancelOpen(false)}
+        />
       )}
     </article>
   )
@@ -394,13 +416,15 @@ function PrimaryBtn({ icon: Icon, label, onClick, variant = 'filled' }) {
   )
 }
 
-function SecondaryBtn({ icon: Icon, label, tone }) {
+function SecondaryBtn({ icon: Icon, label, tone, onClick }) {
   const danger =
     tone === 'danger'
       ? 'text-danger border-[#f4c5cc] hover:bg-danger-bg'
       : 'text-ink border-line hover:bg-line-2'
   return (
     <button
+      type="button"
+      onClick={onClick}
       className={`flex-1 h-[42px] rounded-[10px] inline-flex items-center justify-center gap-1.5 bg-surface border font-semibold text-[13.5px] ${danger}`}
     >
       <Icon size={16} strokeWidth={1.75} />

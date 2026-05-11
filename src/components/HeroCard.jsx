@@ -76,6 +76,11 @@ export default function HeroCard({ order }) {
             <div className="text-[12px] opacity-75 mt-px truncate">
               {order.product.variant}
             </div>
+            {order.warranty != null && (
+              <div className="text-[11.5px] opacity-60 mt-px truncate">
+                + Warranty {order.currency} {order.warranty.toLocaleString()}
+              </div>
+            )}
           </div>
           <div className="ml-auto font-bold text-[15px]">
             {order.currency} {order.total.toLocaleString()}

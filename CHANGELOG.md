@@ -2,6 +2,20 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 6 (cancellation flow)
+
+### Added
+
+- **`CancelOrderSheet`** — two-step bottom sheet wired to the `Cancel order` button on `created` orders. Step 1 shows an order-summary card with a line-item breakdown (`Product` + `Warranty` if present + `Total`) and two refund options as radio cards: `Store credit` (recommended pill, full refund, instant) and `Original payment method` (total minus a 5% processing fee, refunded to the card in 5–10 business days, fee shown explicitly). Step 2 confirms the chosen amount and destination and exposes a danger-filled `Cancel order` CTA. Dismissible via scrim, X, `Escape`, or `Back`/`Keep order`. Confirmation does not yet persist a state change — the sheet just closes (option A from planning).
+- **`subtotal` + `warranty` fields on every demo order.** All five mock orders now carry a `subtotal` + `warranty` split (e.g. iPhone 12: 779 + 70 = 849; iPhone 7: 209 + 30 = 239). The fields remain optional in the order shape; rendering paths skip the warranty row/line when the field is absent.
+- **`+ Warranty {amount}` line on the product strip.** Both `OrderCard` (collapsed header strip) and `HeroCard` (frosted strip on the dark gradient) render a third line beneath the variant — `text-muted` on the light cards, `opacity-60` on the hero — when `order.warranty` is present. PastOrderCard is intentionally untouched (different one-row layout).
+- **`slideUp` + `fadeIn`** keyframes / animation utilities in `tailwind.config.js`, used by the sheet's panel and scrim respectively.
+
+### Changed
+
+- **`OrderCard`'s `Cancel order` button** is now wired up on `created` orders only (opens the sheet). On `quality_check` it remains a visual stub pending its own design pass. The internal `SecondaryBtn` helper now accepts `onClick` and sets `type="button"` so it can be safely placed inside other interactive contexts.
+- **Confirm-cancellation copy + amount card.** The shared warn-tone strip (`This can't be undone. Your order won't be processed.`) is replaced with a neutral info-tone strip (`border-line` / `bg-line-2` / `Info` icon) and method-specific copy. `Store credit`: *"Store credit stays on Revibe. It won't be paid out to your bank account."* `Original payment method`: *"You're giving up {currency} {fee} to the processing fee. Choose Store credit for the full amount, instantly."* The original-payment amount card also carries a small breakdown line (`Total {currency} {total} · −{currency} {fee} fee`) between the headline figure and the destination. Goal: reduce wrong-method regret at the final confirm.
+
 ## [Unreleased] — phase 5 (post-handoff iteration)
 
 ### Added
