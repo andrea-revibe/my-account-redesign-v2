@@ -22,6 +22,9 @@ import {
 const DHL_TRACKING_URL =
   'https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=3392654392'
 
+const REVIBE_CARE_ICON =
+  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+
 // Hero card pulls the most-active order to the very top of the list with a
 // dark gradient background. Inside-out structure: eyebrow → headline →
 // product strip → dot timeline → optional detailed-tracking expand → CTAs.
@@ -77,13 +80,26 @@ export default function HeroCard({ order }) {
               {order.product.variant}
             </div>
             {order.warranty != null && (
-              <div className="text-[11.5px] opacity-60 mt-px truncate">
-                + Warranty {order.currency} {order.warranty.toLocaleString()}
+              <div className="flex items-center gap-1 mt-px text-[11.5px] opacity-75">
+                <img
+                  src={REVIBE_CARE_ICON}
+                  alt=""
+                  className="w-3.5 h-3.5 object-contain shrink-0"
+                />
+                <span className="truncate">
+                  Revibe Care +{order.currency}{' '}
+                  {order.warranty.toLocaleString()}
+                </span>
               </div>
             )}
           </div>
-          <div className="ml-auto font-bold text-[15px]">
-            {order.currency} {order.total.toLocaleString()}
+          <div className="ml-auto text-right shrink-0">
+            <div className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-70 leading-none">
+              Total
+            </div>
+            <div className="mt-1 font-bold text-[15px] tabular-nums">
+              {order.currency} {order.total.toLocaleString()}
+            </div>
           </div>
         </div>
 

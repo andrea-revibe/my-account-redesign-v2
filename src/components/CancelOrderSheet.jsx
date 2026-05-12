@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { X, ChevronLeft, Info } from 'lucide-react'
 
+const REVIBE_CARE_ICON =
+  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+
 export default function CancelOrderSheet({ order, open, onClose }) {
   const [step, setStep] = useState('select')
   const [method, setMethod] = useState(null)
@@ -161,7 +164,16 @@ function SelectStep({
               />
               {warranty != null && (
                 <LineItem
-                  label="Warranty"
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <img
+                        src={REVIBE_CARE_ICON}
+                        alt=""
+                        className="w-3.5 h-3.5 object-contain shrink-0"
+                      />
+                      Revibe Care
+                    </span>
+                  }
                   value={`${currency} ${formatMoney(warranty)}`}
                 />
               )}

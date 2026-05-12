@@ -2,6 +2,14 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 7 (Revibe Care + total clarity)
+
+### Changed
+
+- **`Warranty` renamed to `Revibe Care` everywhere it surfaces.** OrderCard / HeroCard / PastOrderCard product strips and the cancellation sheet's line-item breakdown all read `Revibe Care` now, prefixed with the Revibe RE_CARE logo (`cdn.shopify.com/.../Revibe_logo_RE_CARE_Color_copy.png`) at ~14px next to the amount. The underlying `order.warranty` field is unchanged so the order shape stays backwards-compatible — only the user-facing copy and the icon are new.
+- **Order number moved out of the product strip and into a card eyebrow.** On `OrderCard`, the collapsed subtitle no longer reads `{variant} · #{id}` — `· #{id}` is dropped and the order number now sits in a small uppercase `Order · #{id}` eyebrow at the very top of the card. This mirrors the hero card's `Active order · #{id}` eyebrow pattern, and lets the product strip read as a clean three-line breakdown (Product / Revibe Care / Total) without competing metadata. `PastOrderCard` is unchanged — its `#{id}` already shares a line with the placed-date and there's no visual ambiguity to resolve.
+- **`TOTAL` caption above the bold amount in the product strip.** A tiny `TOTAL` label (uppercase, tracked, muted on light / 70% opacity on hero) now sits above the bold price on `OrderCard` and `HeroCard`. Goal: make it unambiguous that the bold figure is the sum of Product + Revibe Care, not the line price of the device alone. `PastOrderCard` skips the caption because nothing else on its row reads as a price.
+
 ## [Unreleased] — phase 6 (cancellation flow)
 
 ### Added

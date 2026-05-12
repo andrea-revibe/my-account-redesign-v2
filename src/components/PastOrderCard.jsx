@@ -1,5 +1,8 @@
 import { Download, AlertTriangle } from 'lucide-react'
 
+const REVIBE_CARE_ICON =
+  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+
 // Compact card for delivered / cancelled orders. Trades the full progress
 // stack for a one-row product summary plus a single contextual action.
 export default function PastOrderCard({ order }) {
@@ -33,6 +36,19 @@ export default function PastOrderCard({ order }) {
             </span>
             {placedShort} · #{order.id}
           </div>
+          {order.warranty != null && (
+            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted">
+              <img
+                src={REVIBE_CARE_ICON}
+                alt=""
+                className="w-3 h-3 object-contain shrink-0"
+              />
+              <span className="truncate">
+                Revibe Care +{order.currency}{' '}
+                {order.warranty.toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
         <div className="text-[13.5px] font-semibold text-ink whitespace-nowrap">
           {order.currency} {order.total.toLocaleString()}

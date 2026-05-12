@@ -54,14 +54,14 @@ and understand the state of each order without expanding anything.
 
 When a card is **collapsed**, the customer sees:
 
+- A small `ORDER · #{id}` eyebrow at the very top of the card so the order number is always visible without expanding (mirrors the hero card's `Active order · #{id}` eyebrow). The order ID is intentionally **not** repeated inside the product strip subtitle — keeping it in the eyebrow lets the product strip read as a clean Product → Revibe Care → Total breakdown.
 - A status icon + headline (e.g. "Out for delivery", "At quality check", "Delivered", "Cancelled").
 - A subline with the most relevant timestamp (forward-looking ETA when DHL provides one, otherwise the most recent status timestamp).
 - A state chip on the right when relevant. Delivered orders carry a green "Delivered" chip (overrides the data's `state: 'close'`); cancelled orders carry a red "Cancelled" chip.
 - A tinted **status banner** with a leading condition phrase and a descriptive sentence (see §3, "Status banner").
 - The product image, name, and variant.
-- A muted `+ Warranty {currency} {amount}` line beneath the variant when the order carries a warranty add-on (omitted otherwise). Same treatment in the hero card's frosted product strip.
-- The amount paid.
-- The order ID.
+- A muted `Revibe Care +{currency} {amount}` line beneath the variant when the order carries a Revibe Care add-on (omitted otherwise). Prefixed with the small Revibe Care RE_CARE logo so the add-on reads as a branded product, not a generic warranty fee. Same treatment in the hero card's frosted product strip (icon shown at higher opacity so it stays legible on the dark gradient) and on `PastOrderCard`.
+- A small uppercase `TOTAL` caption stacked above the bold amount on the right side of the product strip. The caption is what tells the customer the bold number is the sum of Product + Revibe Care rather than the line price of just the device. Same treatment on the hero card's frosted strip. `PastOrderCard` intentionally skips the caption — there's no other dollar amount competing on that row, so the price is already unambiguous.
 
 When a card is **expanded**, everything above remains visible at the top, and
 below it the customer sees:
@@ -170,7 +170,7 @@ Dismissible by tapping the scrim, the X icon, or pressing `Escape`. Two steps:
 
 **Step 1 — Choose your refund.** Header (`Cancel order` + `#id`), then an
 order-summary card with the product strip and a line-item breakdown
-(`Product` + `Warranty` if present + `Total`), then two refund options as
+(`Product` + `Revibe Care` if present + `Total`), then two refund options as
 radio cards:
 
 - **Store credit** (recommended pill, success-tone) — full refund of the
@@ -282,7 +282,7 @@ Each order object carries:
 - **`placedAt`** — the order timestamp shown on the summary screen (string, formatted).
 - **`quantity`** — number of items in the order (integer).
 - **`subtotal`** *(optional)* — product-only amount, no currency symbol. Used to render the line-item breakdown inside the cancellation sheet. When absent the sheet falls back to `subtotal = total`. Populated on every demo order today.
-- **`warranty`** *(optional)* — warranty add-on amount, no currency symbol. When present it renders both as a `+ Warranty` line on the OrderCard / HeroCard product strip and as an extra row in the cancellation sheet's breakdown; both are omitted when the field is absent. Populated on every demo order today (varied amounts so the pattern is visible across the list).
+- **`warranty`** *(optional)* — Revibe Care add-on amount, no currency symbol. The field name is kept as `warranty` for backwards compatibility with the order shape; only the user-facing copy changed. When present it renders as a `Revibe Care +{amount}` line (prefixed with the Revibe Care logo) on the OrderCard / HeroCard / PastOrderCard product strip and as a `Revibe Care` row in the cancellation sheet's breakdown; all of these are omitted when the field is absent. Populated on every demo order today (varied amounts so the pattern is visible across the list).
 - **`total`** — total amount paid (number, no currency symbol). When `subtotal` and `warranty` are both present, `total` should equal their sum.
 - **`currency`** — three-letter currency code (string, e.g. "AED").
 - **`customerName`** — the recipient's full name (string).
