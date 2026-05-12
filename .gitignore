@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local scratch scripts (e.g. playwright snap helpers)
+_*.mjs
