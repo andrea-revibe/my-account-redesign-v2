@@ -2,6 +2,22 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 10 (cancelled past orders redesign)
+
+### Added
+
+- **Refund-hero treatment for cancelled past orders in `PastOrderCard`.** The component now branches internally on `order.state`: delivered renders the unchanged one-row summary + `Download receipt` / `Raise a claim` footer; cancelled (`requested` / `refund_pending` / `refunded`) renders a dedicated compact card that leads with the refund as the visual hero. A `w-1` left accent strip carries the phase tone (warn amber for `requested`, brand purple for `refund_pending`, success green for `refunded`) — a deliberate departure from the all-red in-flight cancellation treatment so a completed refund reads as positive rather than alarming. The hero block surfaces the refund amount (`text-[28px]` tabular-nums) and destination chip (gradient brand→accent for wallet destinations, neutral for card). Expanded view adds a 3-step numbered dot stepper for refund progress (created-path cancellations skip `requested`, mirroring `cancellationStepsFor`), a line-item refund breakdown, a dimmed fulfilment trace ending in a red ✕ at the cancel point, and a two-action footer (`View refund details` + icon-only `Download receipt`). Always collapsed by default; no auto-expand.
+- **`refund` object on each cancelled mock order in `src/data/orders.js`.** `89499` (requested) → wallet destination; `89321` (refund_pending) → card destination (Visa ••4242); `89150` (refunded) → wallet destination with `fundsAvailable: 'Available now in your wallet'`. Each carries `amount`, `destination`, and a `breakdown` array of `{ label, amount }` summing to `amount`. `fundsAvailable` is only populated on the refunded order — `requested` and `refund_pending` make no ETA promise.
+
+### Changed
+
+- **Past-orders rendering in `App.jsx` simplified to a single component.** The ternary that routed cancelled past orders back through the full `OrderCard` (with its in-flight chrome, status banner, sub-timeline, courier banner, and order summary) is gone. The block is now `{past.map((o) => <PastOrderCard key={o.id} order={o} />)}`; `PastOrderCard` handles both delivered and cancelled branches internally.
+
+### Notes
+
+- `CancellationSubTimeline` is unchanged — it's still used by the in-flight `OrderCard` when `state === 'cancelled'` but the order is mid-fulfilment. Only past-order cancellation rendering moved.
+- `View refund details` and the icon-only `Download receipt` button are decorative (matching the existing pattern); spec for the refund-details destination (modal vs sheet vs route) is a follow-up.
+
 ## [Unreleased] — phase 9 (cancellation take-rate dissuade)
 
 ### Added

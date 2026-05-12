@@ -152,6 +152,14 @@ export const ORDERS = [
     cancellationTimeline: {
       requested: '6 May · 11:30 AM',
     },
+    refund: {
+      amount: 459,
+      destination: { kind: 'wallet', label: 'Revibe Wallet' },
+      breakdown: [
+        { label: 'iPhone SE', amount: 419 },
+        { label: 'Revibe Care', amount: 40 },
+      ],
+    },
     product: {
       name: 'iPhone SE',
       variant: 'Red · 64 GB · Good',
@@ -180,6 +188,14 @@ export const ORDERS = [
     },
     cancellationTimeline: {
       refund_pending: '28 Mar · 2:18 PM',
+    },
+    refund: {
+      amount: 349,
+      destination: { kind: 'card', label: 'Visa', last4: '4242' },
+      breakdown: [
+        { label: 'iPhone 8', amount: 309 },
+        { label: 'Revibe Care', amount: 40 },
+      ],
     },
     product: {
       name: 'iPhone 8',
@@ -212,6 +228,15 @@ export const ORDERS = [
       requested: '15 Mar · 3:42 PM',
       refund_pending: '16 Mar · 9:18 AM',
       refunded: '18 Mar · 11:00 AM',
+    },
+    refund: {
+      amount: 609,
+      destination: { kind: 'wallet', label: 'Revibe Wallet' },
+      breakdown: [
+        { label: 'iPhone X', amount: 549 },
+        { label: 'Revibe Care', amount: 60 },
+      ],
+      fundsAvailable: 'Available now in your wallet',
     },
     product: {
       name: 'iPhone X',

@@ -74,10 +74,32 @@ below it the customer sees:
   - shipped: `Receipt` + `Get help`.
 
 Past-order cards (delivered, cancelled) are a separate, simpler component
-(`PastOrderCard`):
+(`PastOrderCard`). It branches internally on `order.state`:
 
-- **Delivered** carries two pill actions, right-aligned: `Download receipt` + `Raise a claim`.
-- **Cancelled** carries no action row — the bottom border + button are removed entirely.
+- **Delivered** keeps its compact one-row product summary with two pill
+  actions, right-aligned: `Download receipt` + `Raise a claim`.
+- **Cancelled** renders the refund-hero redesign — a dedicated compact card
+  that leads with the **refund** as the visual hero rather than the
+  fulfilment journey. A `w-1` left accent strip carries the phase tone
+  (warn amber for `requested`, brand purple for `refund_pending`, success
+  green for `refunded`). The collapsed header shows a phase pill +
+  `#id · date`; below it sits a tinted hero block with the refund amount
+  (`text-[28px]` tabular-nums) and a destination chip — wallet destinations
+  get a brand→accent gradient chip (echoes the `GreetRow` credits pill);
+  card destinations get a neutral chip. Refunded orders surface a
+  `fundsAvailable` sub-copy line ("Available now in your wallet"); the two
+  earlier phases make no ETA promise. Expanded reveals a 3-step numbered
+  dot stepper for refund progress (created-path cancellations skip the
+  `requested` step, mirroring `cancellationStepsFor` in `statuses.js`), a
+  line-item refund breakdown, a dimmed fulfilment trace ending in a red
+  ✕ at the cancel point, and a two-action footer (`View refund details` +
+  icon-only `Download receipt`). Always collapsed by default; no
+  auto-expand.
+
+The full `OrderCard` chrome (status banner, sub-timeline, courier banner,
+order summary) is no longer rendered for cancelled past orders.
+`CancellationSubTimeline` is retained for in-flight orders that are
+mid-fulfilment with `state === 'cancelled'`.
 
 The **hero card** (active in-flight order, currently the out-for-delivery
 order) carries two stacked rows of full-width buttons beneath the headline,
@@ -160,7 +182,8 @@ longer relevant. This avoids having "delivered" in two places at once.
 | quality_check | If most in-flight | "At quality check" | "On track" (or "Taking longer than expected" if `delayed`) | brand / warn | none | No | No |
 | shipped (sub-status drives headline) | If most in-flight | sub-status label (e.g. "Out for delivery") | "On track" / "Arriving today" (out_for_delivery) | brand | none | Yes | Yes |
 | delivered | Never | "Delivered" | "All done" | success | green "Delivered" | Yes (with completed copy) | No |
-| cancelled (any prior status) | Never | "Cancelled" | "Refund in progress" | danger | red "Cancelled" | No | No |
+| cancelled — in flight (`state === 'cancelled'` + non-terminal `statusId`) | Never | "Cancelled" | "Refund in progress" | danger | red "Cancelled" | No | No |
+| cancelled — past order | Never | phase pill (`Cancellation requested` / `Refund pending` / `Refunded`) | n/a — `PastOrderCard` refund-hero block replaces the banner | warn / brand / success per phase | n/a (own card chrome) | No | No |
 
 ### 2.6 Cancellation flow (created stage)
 
@@ -382,7 +405,18 @@ Two related objects record when each milestone happened.
 - **`timeline`** is keyed by top-level status id. It carries the timestamp at which the order entered each top-level stage. Keys are populated as the order progresses, not all at once. A `created` order will have only `timeline.created`; a delivered order will have all four.
 - **`subTimeline`** is keyed by sub-status id. It carries the timestamp at which the parcel entered each sub-stage during the shipped phase. Only present on shipped (and later delivered) orders, and only as DHL emits each sub-status.
 
-### 4.5 Product fields
+### 4.5 Refund fields (cancelled past orders only)
+
+Cancelled past orders carry a `refund` object that drives `PastOrderCard`'s
+refund-hero treatment. In-flight cancelled orders (still mid-fulfilment) and
+non-cancelled orders do not need this field.
+
+- **`refund.amount`** — total refund amount, no currency symbol (number). Same currency as `order.total`.
+- **`refund.destination`** — where the refund is going. `{ kind: 'wallet', label: 'Revibe Wallet' }` for wallet refunds; `{ kind: 'card', label, last4 }` for card refunds.
+- **`refund.breakdown`** — array of `{ label, amount }` line items summing to `refund.amount`. Rendered in the expanded card's refund breakdown block.
+- **`refund.fundsAvailable`** *(optional, string)* — short status copy shown under the hero amount. Only surfaced on `refunded` orders today; future card-refund ETAs ("Expected by 22 May") could also populate it.
+
+### 4.6 Product fields
 
 Today an order has one product. The `product` object carries:
 

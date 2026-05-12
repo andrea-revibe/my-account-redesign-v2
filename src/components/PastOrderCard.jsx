@@ -1,14 +1,32 @@
-import { Download, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import {
+  ChevronDown,
+  Check,
+  Download,
+  AlertTriangle,
+  Wallet,
+  CreditCard,
+  Hourglass,
+  Receipt,
+  Sparkles,
+} from 'lucide-react'
+import { CANCELLATION_STATUSES, STATUSES } from '../lib/statuses'
 
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
 
-// Compact card for delivered / cancelled orders. Trades the full progress
-// stack for a one-row product summary plus a single contextual action.
+// Compact card for past orders. Delivered keeps its one-row treatment +
+// Download receipt / Raise a claim footer. Cancelled past orders
+// (requested / refund_pending / refunded) render the refund-hero card,
+// which leads with the refund amount and destination rather than the
+// fulfilment journey.
 export default function PastOrderCard({ order }) {
-  const isCancelled = order.state === 'cancelled'
-  const placedShort = (order.placedAtFull || order.placedAt || '').split(' · ')[0]
+  if (order.state === 'cancelled') return <CancelledOrderCard order={order} />
+  return <DeliveredOrderCard order={order} />
+}
 
+function DeliveredOrderCard({ order }) {
+  const placedShort = (order.placedAtFull || order.placedAt || '').split(' · ')[0]
   return (
     <article className="bg-surface rounded-card border border-line px-3.5 py-3">
       <div className="flex items-center gap-3">
@@ -24,15 +42,8 @@ export default function PastOrderCard({ order }) {
             {order.product.name}
           </div>
           <div className="mt-0.5 text-[11.5px] text-muted truncate">
-            <span
-              className={
-                'inline-flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-[0.04em] ' +
-                (isCancelled
-                  ? 'bg-danger-bg text-danger'
-                  : 'bg-success-bg text-success')
-              }
-            >
-              {isCancelled ? 'Cancelled' : 'Delivered'}
+            <span className="inline-flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-[0.04em] bg-success-bg text-success">
+              Delivered
             </span>
             {placedShort} · #{order.id}
           </div>
@@ -54,12 +65,10 @@ export default function PastOrderCard({ order }) {
           {order.currency} {order.total.toLocaleString()}
         </div>
       </div>
-      {!isCancelled && (
-        <div className="flex justify-end gap-2 mt-2.5 pt-2.5 border-t border-line-2">
-          <PastButton icon={Download} label="Download receipt" />
-          <PastButton icon={AlertTriangle} label="Raise a claim" />
-        </div>
-      )}
+      <div className="flex justify-end gap-2 mt-2.5 pt-2.5 border-t border-line-2">
+        <PastButton icon={Download} label="Download receipt" />
+        <PastButton icon={AlertTriangle} label="Raise a claim" />
+      </div>
     </article>
   )
 }
@@ -71,4 +80,360 @@ function PastButton({ icon: Icon, label }) {
       {label}
     </button>
   )
+}
+
+// Tone per cancellation phase. Deliberate departure from the in-flight
+// CancellationSubTimeline (which is all red): on past orders, a finished
+// refund should feel completed, not alarming.
+//   requested        → warn  (amber)  — provisional, awaiting supplier
+//   refund_pending   → brand (purple) — actively processing
+//   refunded         → success (green) — completed positive outcome
+function toneFor(id) {
+  if (id === 'refunded') return 'success'
+  if (id === 'refund_pending') return 'brand'
+  return 'warn'
+}
+
+const TONE = {
+  warn:    { text: 'text-warn',    bg: 'bg-warn',    softBg: 'bg-warn-bg',    softText: 'text-warn',    border: 'border-[#ffe3b8]' },
+  brand:   { text: 'text-brand',   bg: 'bg-brand',   softBg: 'bg-brand-bg',   softText: 'text-brand',   border: 'border-brand-bg2' },
+  success: { text: 'text-success', bg: 'bg-success', softBg: 'bg-success-bg', softText: 'text-success', border: 'border-[#c6ebd9]' },
+}
+
+function CancelledOrderCard({ order }) {
+  const [expanded, setExpanded] = useState(false)
+  const tone = toneFor(order.cancellationStatusId)
+
+  return (
+    <article className="bg-surface rounded-card border border-line overflow-hidden relative">
+      <span
+        aria-hidden
+        className={`absolute left-0 top-0 bottom-0 w-1 ${TONE[tone].bg}`}
+      />
+
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="w-full text-left pl-4 pr-3.5 py-3.5 flex flex-col gap-3"
+      >
+        <CollapsedHeader order={order} />
+        <RefundHero order={order} />
+        <ProductRow order={order} expanded={expanded} />
+      </button>
+
+      {expanded && (
+        <div className="pl-4 pr-3.5 pb-4 pt-0 flex flex-col gap-3.5 animate-slideDown">
+          <div className="px-1">
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2">
+              Refund progress
+            </div>
+            <RefundProgressDots order={order} />
+          </div>
+
+          <RefundBreakdown order={order} tone={tone} />
+
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10.5px] uppercase tracking-[0.06em] font-bold text-muted">
+              Order was
+            </span>
+            <FulfilmentTrace order={order} />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 h-[42px] rounded-[10px] bg-surface border border-line text-ink font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
+            >
+              View refund details
+            </button>
+            <button
+              type="button"
+              aria-label="Download receipt"
+              title="Download receipt"
+              className="w-[42px] h-[42px] rounded-[10px] bg-surface border border-line text-ink-2 inline-flex items-center justify-center hover:bg-line-2"
+            >
+              <Download size={16} strokeWidth={1.75} />
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function CollapsedHeader({ order }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <StatePill cancellationStatusId={order.cancellationStatusId} />
+      <span className="text-[11px] text-muted tabular-nums">
+        #{order.id} · {shortDate(order)}
+      </span>
+    </div>
+  )
+}
+
+function StatePill({ cancellationStatusId }) {
+  const tone = toneFor(cancellationStatusId)
+  const t = TONE[tone]
+  const label =
+    cancellationStatusId === 'requested'
+      ? 'Cancellation requested'
+      : cancellationStatusId === 'refund_pending'
+      ? 'Refund pending'
+      : 'Refunded'
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px] ${t.softBg} ${t.softText}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${t.bg}`} />
+      {label}
+    </span>
+  )
+}
+
+function RefundHero({ order }) {
+  const tone = toneFor(order.cancellationStatusId)
+  const t = TONE[tone]
+  const isRefunded = order.cancellationStatusId === 'refunded'
+  const dest = order.refund.destination
+  const isWallet = dest.kind === 'wallet'
+
+  const heroBg =
+    tone === 'success'
+      ? 'bg-gradient-to-br from-success-bg to-[#d4f0e3]'
+      : tone === 'brand'
+      ? 'bg-gradient-to-br from-brand-bg to-brand-bg2'
+      : 'bg-warn-bg'
+
+  const phaseTag =
+    order.cancellationStatusId === 'requested'
+      ? 'Requested'
+      : order.cancellationStatusId === 'refund_pending'
+      ? 'Processing'
+      : 'Complete'
+  const PhaseIcon =
+    order.cancellationStatusId === 'requested'
+      ? Hourglass
+      : order.cancellationStatusId === 'refund_pending'
+      ? Receipt
+      : Check
+
+  return (
+    <div className={`rounded-[14px] border p-3.5 ${heroBg} ${t.border}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+          {isRefunded ? 'Refunded' : 'Refund of'}
+        </div>
+        <span
+          className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 ${t.text}`}
+        >
+          <PhaseIcon size={11} strokeWidth={2} />
+          {phaseTag}
+        </span>
+      </div>
+      <div className={`mt-1 text-[28px] font-bold tabular-nums leading-none ${t.text}`}>
+        {order.currency} {order.refund.amount.toLocaleString()}
+      </div>
+      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
+        <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
+        <DestinationChip destination={dest} accent={isWallet} />
+      </div>
+      {isRefunded && order.refund.fundsAvailable && (
+        <div className="mt-2 text-[11.5px] text-success inline-flex items-center gap-1">
+          <Sparkles size={11} strokeWidth={2} />
+          {order.refund.fundsAvailable}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DestinationChip({ destination, accent }) {
+  const isWallet = destination.kind === 'wallet'
+  const Icon = isWallet ? Wallet : CreditCard
+  const label = isWallet
+    ? 'Revibe Wallet'
+    : `${destination.label} •• ${destination.last4}`
+  const tones = accent
+    ? 'bg-gradient-to-r from-brand to-accent text-white border-transparent'
+    : 'bg-surface text-ink border-line'
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5 ${tones}`}
+    >
+      <Icon size={12} strokeWidth={2} />
+      {label}
+    </span>
+  )
+}
+
+function ProductRow({ order, expanded }) {
+  return (
+    <div className="flex items-center gap-2.5 -mx-1 px-1">
+      <div className="w-8 h-10 rounded-[8px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
+        <img
+          src={order.product.image}
+          alt=""
+          className="max-w-full max-h-full object-contain"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-semibold text-ink truncate">
+          {order.product.name}
+        </div>
+        <div className="text-[11px] text-muted truncate">
+          {order.product.variant}
+        </div>
+      </div>
+      <span
+        aria-hidden
+        className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
+        style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
+      >
+        <ChevronDown size={12} strokeWidth={1.75} />
+      </span>
+    </div>
+  )
+}
+
+// Mirrors the created-path filter in statuses.js — orders cancelled at
+// 'created' skip the 'requested' phase because nothing's been pulled yet.
+function cancellationStepsFor(order) {
+  if (order.statusId === 'created') {
+    return CANCELLATION_STATUSES.filter((s) => s.id !== 'requested')
+  }
+  return CANCELLATION_STATUSES
+}
+
+function RefundProgressDots({ order }) {
+  const steps = cancellationStepsFor(order)
+  const curIdx = steps.findIndex((s) => s.id === order.cancellationStatusId)
+  const tone = toneFor(order.cancellationStatusId)
+  const t = TONE[tone]
+
+  return (
+    <div className="flex items-stretch gap-2">
+      {steps.map((s, i) => {
+        const reached = i <= curIdx
+        const current = i === curIdx
+        const fillBg = reached ? t.bg : 'bg-line-2'
+        const ringText = reached
+          ? current
+            ? `${t.bg} text-white`
+            : `bg-white border-2 ${t.text} ${t.text.replace('text-', 'border-')}`
+          : 'bg-white border border-line text-muted'
+
+        return (
+          <div key={s.id} className="flex-1 flex flex-col gap-1.5">
+            <div
+              className={`h-[5px] rounded-full ${fillBg} ${
+                current ? 'shadow-[0_0_0_3px_rgba(255,255,255,0.6)]' : ''
+              }`}
+            />
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`grid place-items-center w-5 h-5 rounded-full text-[10px] font-bold ${ringText}`}
+              >
+                {reached && !current ? (
+                  <Check size={9} strokeWidth={3} />
+                ) : (
+                  i + 1
+                )}
+              </span>
+              <span
+                className={`text-[11px] leading-[1.2] ${
+                  current
+                    ? `${t.text} font-bold`
+                    : reached
+                    ? 'text-ink font-semibold'
+                    : 'text-muted'
+                }`}
+              >
+                {shortLabel(s)}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function shortLabel(step) {
+  if (step.id === 'requested') return 'Requested'
+  if (step.id === 'refund_pending') return 'Pending'
+  return 'Refunded'
+}
+
+function RefundBreakdown({ order, tone }) {
+  const t = TONE[tone]
+  return (
+    <div className="rounded-[12px] border border-line-2 bg-[#fbfafd] p-3">
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-muted mb-2">
+        Refund breakdown
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {order.refund.breakdown.map((l) => (
+          <div
+            key={l.label}
+            className="flex justify-between text-[12.5px] text-ink-2"
+          >
+            <span>{l.label}</span>
+            <span className="tabular-nums">
+              {order.currency} {l.amount.toLocaleString()}
+            </span>
+          </div>
+        ))}
+        <div className="border-t border-dashed border-line my-1" />
+        <div className="flex justify-between items-baseline">
+          <span className="text-[12.5px] font-semibold text-ink">
+            Total refund
+          </span>
+          <span className={`text-[15px] font-bold tabular-nums ${t.text}`}>
+            {order.currency} {order.refund.amount.toLocaleString()}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FulfilmentTrace({ order }) {
+  const reachedIdx = STATUSES.findIndex((s) => s.id === order.statusId)
+  return (
+    <div className="flex items-center gap-1 opacity-55">
+      {STATUSES.map((s, i) => {
+        const reached = i <= reachedIdx
+        const last = reached && i === reachedIdx
+        return (
+          <div key={s.id} className="flex items-center gap-1">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                last ? 'bg-danger' : reached ? 'bg-ink-2' : 'bg-line'
+              }`}
+            />
+            <span
+              className={`text-[9.5px] uppercase tracking-[0.05em] ${
+                last
+                  ? 'text-danger font-bold'
+                  : reached
+                  ? 'text-ink-2'
+                  : 'text-muted'
+              }`}
+            >
+              {s.short}
+            </span>
+            {i < STATUSES.length - 1 && (
+              <span className="w-3 h-px bg-line ml-0.5" />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function shortDate(order) {
+  return (order.placedAtFull || order.placedAt || '').split(' · ')[0]
 }
