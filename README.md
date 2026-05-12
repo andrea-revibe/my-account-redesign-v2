@@ -35,6 +35,6 @@ npm run build    # production build into dist/
 
 Functional: the orders list, expand/collapse interactions, status communication, status filter chips, the status banner (with `delayed` and `statusMessage` overrides), the auto-expand-the-active-one rule.
 
-Decorative (visual placeholder, no logic): site-wide search, the date-range dropdown's effect on the list (plumbed but all mock orders fall inside any range), store credits, profile menu, language toggle, receipt / claim flows, the in-list "Find items" search field.
+Decorative (visual placeholder, no logic): site-wide search, the date-range dropdown's effect on the list (plumbed but all mock orders fall inside any range), the Revibe Wallet pill (the info tooltip is interactive but the balance is hardcoded), profile menu, language toggle, receipt / claim flows, the in-list "Find items" search field.
 
 See `docs/my-account-flow.md` § "Mocked vs production gap" for the full list of fakes.

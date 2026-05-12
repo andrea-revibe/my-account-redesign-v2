@@ -1,6 +1,5 @@
-// "My orders" + count + a tight gradient credits pill. Replaces the older
-// full-width StoreCreditsCard so the page can lead with content instead of
-// chrome.
+import WalletInfoTooltip, { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
+
 export default function GreetRow({
   totalOrders,
   activeOrders,
@@ -18,10 +17,22 @@ export default function GreetRow({
           {typeof activeOrders === 'number' && ` · ${activeOrders} active`}
         </div>
       </div>
-      <button className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-white text-[11.5px] font-semibold whitespace-nowrap shrink-0 shadow-sm2 bg-credits-pill">
-        <span className="w-1.5 h-1.5 rounded-full bg-white" />
-        {currency} {creditsAmount}
-      </button>
+      <div className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-full text-white text-[11.5px] font-semibold whitespace-nowrap shrink-0 shadow-sm2 bg-credits-pill">
+        <img
+          src={REVIBE_WALLET_ICON}
+          alt=""
+          aria-hidden
+          className="w-3.5 h-3.5 object-contain"
+          style={{ filter: 'brightness(0) invert(1)' }}
+        />
+        <span>Revibe Wallet</span>
+        <span aria-hidden className="opacity-70">·</span>
+        <span>{currency} {creditsAmount}</span>
+        <WalletInfoTooltip
+          align="right"
+          iconClassName="text-white/90 hover:text-white"
+        />
+      </div>
     </div>
   )
 }

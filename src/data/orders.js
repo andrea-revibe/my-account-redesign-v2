@@ -12,6 +12,8 @@ export const ORDERS = [
     placedAt: '28/04/2026 02:15 PM',
     placedAtFull: '28 Apr 2026 · 2:15 PM',
     estimatedDelivery: 'May 4',
+    shipDeadline: 'May 1',
+    shipDeadlineFull: 'Friday, 1 May',
     quantity: 1,
     subtotal: 779,
     warranty: 70,

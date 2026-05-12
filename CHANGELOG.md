@@ -2,6 +2,46 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 9 (cancellation take-rate dissuade)
+
+### Added
+
+- **Dissuade step in `CancelOrderSheet`** — a new middle step (`step === 'dissuade'`) that fires only when the user picks `Original payment method` AND the order is at `statusId === 'created'`. Three-block body: a centered hero card with the delivery promise (*"You're on track to receive your {product} by Monday, 4 May"*), a neutral info-tone strip warning that the item *may not be available to reorder later*, and a soft-green success-tone strip with `ShieldCheck` icon promising that *"If we don't ship by {shipDeadlineFull}, the {currency} {fee} processing fee is waived."* Footer carries two chunky 52px buttons: brand-filled `Keep my order` and outlined `Continue to cancel` that turns red on hover (`hover:bg-danger-bg hover:text-danger hover:border-danger`). For wallet refunds and non-created statuses the flow is unchanged.
+- **`shipDeadline` + `shipDeadlineFull` on `created` order `89712`** — pre-formatted strings (`"May 1"` / `"Friday, 1 May"`) for the latest acceptable ship date per the 1–3 working-day SLA. Mirrors the `placedAt` / `placedAtFull` pattern so the component never has to do working-day arithmetic. Only populated on the created order because the dissuade step only fires at `created`.
+- **`formatDeliveryDate(estimatedDelivery, placedAt)` helper in `CancelOrderSheet`** — parses the short `"May 4"` form using the year from `placedAt` and emits `Monday, 4 May` via `Intl.DateTimeFormat`. Used for the dissuade hero; also tolerates the existing `shipDeadlineFull` field as a pre-baked override.
+
+### Changed
+
+- **Flow shape for the original-payment + created path is now three steps:** Select → Dissuade → Confirm. Wallet and non-created paths keep the existing two-step flow (Select → Confirm). The order of escalation now matches the order of finality — the danger-filled `Cancel order` button on Confirm is the actual final action, instead of an earlier-screen commitment followed by a quiet text-link gate.
+- **Confirm-step nudge copy trimmed for the original-payment path.** Was *"You're giving up {fee} to the processing fee. Choose Revibe Wallet for the full amount, instantly."* Now: *"You're giving up {fee} to the processing fee."* Dropping the wallet pitch removes the double-nudge (Dissuade already had the wallet alternative in an earlier draft). The wallet-path info strip is unchanged.
+- **`Continue` on the Select step now routes by gate** — to Dissuade when `method === 'original' && statusId === 'created'`, otherwise straight to Confirm. **`Back` on Confirm mirrors the same gate** so the user retraces their actual path.
+
+### Removed
+
+- **Switch-to-Revibe-Wallet button on the dissuade step** (from an earlier draft that included it as a tertiary action). It overrode the method the user explicitly picked on Select and created a back-routing loop. The wallet alternative is still surfaced on Select (option 1, with the green "Full refund · available instantly" emphasis).
+
+## [Unreleased] — phase 8 (Revibe Wallet rebrand)
+
+### Added
+
+- **`WalletInfoTooltip` component** (`src/components/WalletInfoTooltip.jsx`) — shared tap-to-toggle tooltip used wherever "Revibe Wallet" is named. Exports the wallet icon constant (`REVIBE_WALLET_ICON`, `account.revibe.me/assets/icons/home/ic_wallet.svg`) and a default-exported component with `align` (`'center' | 'left' | 'right'`), `iconClassName` (so the `i` can be themed for light or dark backgrounds), and `stopPropagation` props. Tooltip body is `whitespace-normal` to wrap even when an ancestor sets `whitespace-nowrap` (e.g. the credits pill). Dismisses on outside click. Tooltip copy is verbatim: *"Store credits can be used to purchase items on Revibe. Credits can be used on any product and are combinable with any payment method. See more on credits terms & conditions."* — with `terms & conditions` rendered as a placeholder link.
+- **Wallet icon + info `i` on the `GreetRow` credits pill.** The top-of-page pill now reads `[wallet icon] Revibe Wallet · AED 384 [i]` instead of `● AED 384`. The pill's outer element switched from `<button>` to `<div>` so the nested info button is valid HTML; the wallet glyph is white-tinted (`filter: brightness(0) invert(1)`) to read on the gradient background. The tooltip is right-anchored under the pill so it stays inside the 430px viewport.
+- **Wallet icon + info `i` on the confirm step's destination line.** When the user picked the wallet option, the `back to your …` line inside the amount card now renders `[icon] Revibe Wallet [i]`. On the original-payment-method path the line is unchanged.
+
+### Changed
+
+- **"Store credit" → "Revibe Wallet" everywhere in the cancellation flow.** Both `CancelOrderSheet` steps: option title, amount line ("back to your Revibe Wallet"), confirm-step destination, and the info banner copy. Phrases that previously read *"Store credit stays on Revibe."* / *"Choose Store credit for the full amount, instantly."* now read *"Revibe Wallet credit stays on Revibe."* / *"Choose Revibe Wallet for the full amount, instantly."*. The internal method id (`method === 'store_credit'`) is unchanged.
+- **Wallet refund option restyled.** The `Recommended` pill is gone. The detail line (`Full refund · available instantly`) is now the visual emphasis: `text-success font-semibold` (green) instead of `text-muted`. Goal: keep the recommendation signal but anchor it on the concrete benefit rather than a meta-label.
+- **`RefundOption` outer element switched from `<button>` to `<div role="button">`.** Lets it nest the info-icon button (the wallet option's `WalletInfoTooltip`) as valid HTML. Keyboard activation (Enter / Space) preserved via `onKeyDown`.
+
+
+
+### Changed
+
+- **`Warranty` renamed to `Revibe Care` everywhere it surfaces.** OrderCard / HeroCard / PastOrderCard product strips and the cancellation sheet's line-item breakdown all read `Revibe Care` now, prefixed with the Revibe RE_CARE logo (`cdn.shopify.com/.../Revibe_logo_RE_CARE_Color_copy.png`) at ~14px next to the amount. The underlying `order.warranty` field is unchanged so the order shape stays backwards-compatible — only the user-facing copy and the icon are new.
+- **Order number moved out of the product strip and into a card eyebrow.** On `OrderCard`, the collapsed subtitle no longer reads `{variant} · #{id}` — `· #{id}` is dropped and the order number now sits in a small uppercase `Order · #{id}` eyebrow at the very top of the card. This mirrors the hero card's `Active order · #{id}` eyebrow pattern, and lets the product strip read as a clean three-line breakdown (Product / Revibe Care / Total) without competing metadata. `PastOrderCard` is unchanged — its `#{id}` already shares a line with the placed-date and there's no visual ambiguity to resolve.
+- **`TOTAL` caption above the bold amount in the product strip.** A tiny `TOTAL` label (uppercase, tracked, muted on light / 70% opacity on hero) now sits above the bold price on `OrderCard` and `HeroCard`. Goal: make it unambiguous that the bold figure is the sum of Product + Revibe Care, not the line price of the device alone. `PastOrderCard` skips the caption because nothing else on its row reads as a price.
+
 ## [Unreleased] — phase 6 (cancellation flow)
 
 ### Added

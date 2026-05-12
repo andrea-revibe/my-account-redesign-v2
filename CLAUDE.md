@@ -21,7 +21,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 ## Where things live
 
 - `src/App.jsx` — page composition; owns filter state (`activeStatus`, `activeRange`) and computes `activeId` for the auto-expand rule.
-- `src/components/` — one component per file. `OrderCard` contains its own sub-components (`SummaryHeader`, `ProductRow`, `OrderIdRow`).
+- `src/components/` — one component per file. `OrderCard` contains its own sub-components (`SummaryHeader`, `ProductRow`, `OrderIdRow`). `WalletInfoTooltip` is shared: anywhere "Revibe Wallet" is named (credits pill in `GreetRow`, refund option + confirm-step destination in `CancelOrderSheet`), reuse it instead of building another tooltip — it exports `REVIBE_WALLET_ICON` too.
 - `src/data/orders.js` — five mock orders covering all states. Optional fields: `delayed: true` triggers the warn-tone status banner; `statusMessage: '…'` overrides the banner body.
 - `src/lib/statuses.js` — single source of truth: top-level `STATUSES`, `SHIPPING_SUB_STATUSES`, `ORDER_STATES`, header chip overrides, status-banner copy + tone, `pickActiveOrderId(orders)`, and the `statusHeadline` / `statusSubline` / `statusIconFor` helpers.
 - `brief/` — source screenshots and the design-system reference.
@@ -59,7 +59,7 @@ The leading phrase describes **condition** (`On track`, `Arriving today`, `All d
 - **Tailwind name collisions.** `text-{name}` maps to either a fontSize or a color; defining `colors.page` and `fontSize.page` together silently produces white text. We've removed `colors.page`; don't reintroduce it. Same risk applies for any new token name.
 - **Prototype links.** `CourierBanner` hardcodes the DHL Express tracking URL to a known-good test shipment (`tracking-id=3392654392`). Don't template it on `order.trackingNumber` — the demo orders have placeholder numbers that won't resolve.
 - **Date filter is plumbed but inert with current data.** All five mock orders fall inside "Last 30 days," so chip and range changes filter the list visibly only for the status chips, not the range dropdown.
-- **Many things are visual placeholders.** Search field, store-credits card, profile menu, language toggle, "Download receipt", "Raise a claim" — all decorative. See `docs/my-account-flow.md` § "Mocked vs production gap" for the full list before assuming something is wired up.
+- **Many things are visual placeholders.** Search field, Revibe Wallet pill (balance hardcoded; only the info tooltip is interactive), profile menu, language toggle, "Download receipt", "Raise a claim" — all decorative. See `docs/my-account-flow.md` § "Mocked vs production gap" for the full list before assuming something is wired up.
 
 ## Doc update protocol
 

@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
-import { X, ChevronLeft, Info } from 'lucide-react'
+import { X, ChevronLeft, Info, ShieldCheck } from 'lucide-react'
+import WalletInfoTooltip, { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
+
+const REVIBE_CARE_ICON =
+  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
 
 export default function CancelOrderSheet({ order, open, onClose }) {
   const [step, setStep] = useState('select')
@@ -48,13 +52,19 @@ export default function CancelOrderSheet({ order, open, onClose }) {
         className="absolute inset-0 bg-black/45 animate-fadeIn"
       />
       <div className="relative w-full max-w-mobile bg-surface rounded-t-[22px] shadow-lg2 max-h-[92vh] flex flex-col animate-slideUp overflow-hidden">
-        {step === 'select' ? (
+        {step === 'select' && (
           <SelectStep
             order={order}
             method={method}
             setMethod={setMethod}
             onClose={onClose}
-            onContinue={() => setStep('confirm')}
+            onContinue={() => {
+              if (method === 'original' && order.statusId === 'created') {
+                setStep('dissuade')
+              } else {
+                setStep('confirm')
+              }
+            }}
             subtotal={subtotal}
             warranty={warranty}
             total={total}
@@ -62,12 +72,30 @@ export default function CancelOrderSheet({ order, open, onClose }) {
             refundOriginal={refundOriginal}
             currency={currency}
           />
-        ) : (
+        )}
+        {step === 'dissuade' && (
+          <DissuadeStep
+            order={order}
+            onBack={() => setStep('select')}
+            onClose={onClose}
+            onContinueToCancel={() => setStep('confirm')}
+            fee={fee}
+            currency={currency}
+          />
+        )}
+        {step === 'confirm' && (
           <ConfirmStep
             order={order}
             method={method}
-            onBack={() => setStep('select')}
+            onBack={() => {
+              if (method === 'original' && order.statusId === 'created') {
+                setStep('dissuade')
+              } else {
+                setStep('select')
+              }
+            }}
             onClose={onClose}
+            onConfirm={onClose}
             total={total}
             fee={fee}
             refundOriginal={refundOriginal}
@@ -161,7 +189,16 @@ function SelectStep({
               />
               {warranty != null && (
                 <LineItem
-                  label="Warranty"
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <img
+                        src={REVIBE_CARE_ICON}
+                        alt=""
+                        className="w-3.5 h-3.5 object-contain shrink-0"
+                      />
+                      Revibe Care
+                    </span>
+                  }
                   value={`${currency} ${formatMoney(warranty)}`}
                 />
               )}
@@ -180,10 +217,12 @@ function SelectStep({
             <RefundOption
               selected={method === 'store_credit'}
               onSelect={() => setMethod('store_credit')}
-              title="Store credit"
-              recommended
-              amountLine={`${currency} ${formatMoney(total)} back to your store credit`}
+              title="Revibe Wallet"
+              icon={REVIBE_WALLET_ICON}
+              info
+              amountLine={`${currency} ${formatMoney(total)} back to your Revibe Wallet`}
               detailLine="Full refund · available instantly"
+              detailHighlight
             />
             <RefundOption
               selected={method === 'original'}
@@ -212,6 +251,7 @@ function ConfirmStep({
   method,
   onBack,
   onClose,
+  onConfirm,
   total,
   fee,
   refundOriginal,
@@ -219,22 +259,19 @@ function ConfirmStep({
 }) {
   const isStoreCredit = method === 'store_credit'
   const amount = isStoreCredit ? total : refundOriginal
-  const destination = isStoreCredit ? 'store credit' : 'original payment method'
+  const destination = isStoreCredit ? 'Revibe Wallet' : 'original payment method'
   const eta = isStoreCredit
     ? 'Available instantly after cancellation.'
     : 'Refunded to your card in 5–10 business days.'
   const message = isStoreCredit ? (
     <>
-      <span className="font-semibold">Store credit stays on Revibe.</span> It
-      won't be paid out to your bank account.
+      <span className="font-semibold">Revibe Wallet credit stays on Revibe.</span>{' '}
+      It won't be paid out to your bank account.
     </>
   ) : (
-    <>
-      <span className="font-semibold">
-        You're giving up {currency} {formatMoney(fee)} to the processing fee.
-      </span>{' '}
-      Choose Store credit for the full amount, instantly.
-    </>
+    <span className="font-semibold">
+      You're giving up {currency} {formatMoney(fee)} to the processing fee.
+    </span>
   )
   return (
     <>
@@ -258,8 +295,22 @@ function ConfirmStep({
               {formatMoney(fee)} fee
             </div>
           )}
-          <div className="mt-1 text-[13px] text-ink-2">
-            back to your {destination}
+          <div className="mt-1 text-[13px] text-ink-2 flex items-center justify-center gap-1.5 flex-wrap">
+            <span>back to your</span>
+            {isStoreCredit ? (
+              <>
+                <img
+                  src={REVIBE_WALLET_ICON}
+                  alt=""
+                  aria-hidden
+                  className="w-4 h-4 object-contain"
+                />
+                <span className="text-ink font-semibold">Revibe Wallet</span>
+                <WalletInfoTooltip />
+              </>
+            ) : (
+              <span>{destination}</span>
+            )}
           </div>
           <div className="mt-3 text-[12px] text-muted">{eta}</div>
         </div>
@@ -276,10 +327,93 @@ function ConfirmStep({
         <FooterBtn variant="secondary" onClick={onBack}>
           Back
         </FooterBtn>
-        <FooterBtn variant="danger" onClick={onClose}>
+        <FooterBtn variant="danger" onClick={onConfirm}>
           Cancel order
         </FooterBtn>
       </SheetFooter>
+    </>
+  )
+}
+
+function DissuadeStep({
+  order,
+  onBack,
+  onClose,
+  onContinueToCancel,
+  fee,
+  currency,
+}) {
+  const deliveryDate =
+    formatDeliveryDate(order.estimatedDelivery, order.placedAt) ||
+    order.estimatedDelivery
+  const shipDeadlineFull =
+    order.shipDeadlineFull ||
+    formatDeliveryDate(order.shipDeadline, order.placedAt) ||
+    order.shipDeadline
+  return (
+    <>
+      <SheetHeader
+        title="Cancel this order?"
+        subtitle={`#${order.id}`}
+        onBack={onBack}
+        onClose={onClose}
+      />
+      <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-4">
+        <div className="rounded-[16px] border border-line bg-canvas p-5 text-center">
+          <div className="text-[12.5px] text-ink-2 leading-[1.4]">
+            You're on track to receive your{' '}
+            <span className="font-semibold text-ink">{order.product.name}</span>{' '}
+            by
+          </div>
+          <div className="mt-2 text-[24px] font-bold text-ink tracking-[-0.01em]">
+            {deliveryDate}
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5 rounded-[12px] border border-line bg-line-2 p-3 text-[12.5px] text-ink leading-[1.45]">
+          <Info
+            size={16}
+            strokeWidth={1.75}
+            className="text-muted shrink-0 mt-px"
+          />
+          <span>
+            If you cancel,{' '}
+            <span className="font-semibold">
+              this item may not be available to reorder later.
+            </span>
+          </span>
+        </div>
+        <div className="flex items-start gap-2.5 rounded-[12px] border border-success/30 bg-success-bg p-3 text-[12.5px] text-ink leading-[1.45]">
+          <ShieldCheck
+            size={16}
+            strokeWidth={1.75}
+            className="text-success shrink-0 mt-px"
+          />
+          <span>
+            If we don't ship by{' '}
+            <span className="font-semibold">{shipDeadlineFull}</span>, the{' '}
+            <span className="font-semibold">
+              {currency} {formatMoney(fee)}
+            </span>{' '}
+            processing fee is waived.
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-line bg-surface">
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full h-[52px] rounded-[12px] inline-flex items-center justify-center gap-1.5 bg-brand text-white border border-brand font-semibold text-[14.5px]"
+        >
+          Keep my order
+        </button>
+        <button
+          type="button"
+          onClick={onContinueToCancel}
+          className="w-full h-[52px] rounded-[12px] inline-flex items-center justify-center bg-surface text-ink border border-line font-semibold text-[14.5px] transition-colors hover:bg-danger-bg hover:text-danger hover:border-danger"
+        >
+          Continue to cancel
+        </button>
+      </div>
     </>
   )
 }
@@ -316,16 +450,27 @@ function RefundOption({
   selected,
   onSelect,
   title,
-  recommended,
+  icon,
+  info,
   amountLine,
   detailLine,
+  detailHighlight,
 }) {
+  const handleKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect()
+    }
+  }
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={handleKey}
       aria-pressed={selected}
-      className={`text-left rounded-[14px] border-2 px-3.5 py-3 flex items-start gap-3 transition-colors ${
+      className={`text-left rounded-[14px] border-2 px-3.5 py-3 flex items-start gap-3 transition-colors cursor-pointer ${
         selected
           ? 'border-brand bg-brand-bg/40'
           : 'border-line bg-surface hover:bg-line-2/40'
@@ -340,20 +485,28 @@ function RefundOption({
         {selected && <span className="w-2 h-2 rounded-full bg-brand" />}
       </span>
       <span className="flex-1 min-w-0">
-        <span className="flex items-center gap-2 flex-wrap">
-          <span className="text-[14px] font-semibold text-ink">{title}</span>
-          {recommended && (
-            <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-[0.06em] px-1.5 py-0.5 rounded-full bg-success-bg text-success">
-              Recommended
-            </span>
+        <span className="flex items-center gap-1.5 flex-wrap">
+          {icon && (
+            <img
+              src={icon}
+              alt=""
+              aria-hidden
+              className="w-4 h-4 object-contain shrink-0"
+            />
           )}
+          <span className="text-[14px] font-semibold text-ink">{title}</span>
+          {info && <WalletInfoTooltip stopPropagation />}
         </span>
         <span className="block mt-1 text-[13px] text-ink">{amountLine}</span>
-        <span className="block mt-0.5 text-[11.5px] text-muted">
+        <span
+          className={`block mt-0.5 text-[11.5px] ${
+            detailHighlight ? 'text-success font-semibold' : 'text-muted'
+          }`}
+        >
           {detailLine}
         </span>
       </span>
-    </button>
+    </div>
   )
 }
 
@@ -385,4 +538,16 @@ function FooterBtn({ variant, disabled, onClick, children }) {
 
 function formatMoney(n) {
   return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)
+}
+
+function formatDeliveryDate(estimatedDelivery, placedAt) {
+  if (!estimatedDelivery) return null
+  const yearMatch = placedAt && placedAt.match(/(\d{4})/)
+  const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear()
+  const date = new Date(`${estimatedDelivery}, ${year}`)
+  if (Number.isNaN(date.getTime())) return null
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' })
+  const day = date.getDate()
+  const month = date.toLocaleDateString('en-US', { month: 'long' })
+  return `${weekday}, ${day} ${month}`
 }

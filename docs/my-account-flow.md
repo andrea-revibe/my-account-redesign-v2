@@ -20,8 +20,8 @@ the order is still actionable, track the parcel via the courier).
 
 This prototype is intentionally narrow: only the orders list and the
 expand/collapse interactions are functional. Everything around it (search,
-filters, store credits, profile menu, language toggle) is decorative — present
-for visual fidelity but not wired up.
+filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
+— present for visual fidelity but not wired up.
 
 **In scope**
 
@@ -37,7 +37,7 @@ for visual fidelity but not wired up.
 - Authentication, real backend, real customer data.
 - Site-wide search and the in-list "Find items" search field.
 - Date-range dropdown effect on the list (logic is wired but all mock orders fall inside every range).
-- The store-credits card (purely visual; the gradient amount and clipboard icon are decorative).
+- The Revibe Wallet pill in `GreetRow` (purely visual; the balance is a hardcoded prop and the info tooltip is the only interactive part).
 - Right-to-left and Arabic localisation.
 - Receipt-download flow and claims flow.
 - Real courier tracking — the "Track order" button hardcodes a known-good DHL Express test shipment so the demo always lands on a real tracking page.
@@ -54,14 +54,14 @@ and understand the state of each order without expanding anything.
 
 When a card is **collapsed**, the customer sees:
 
+- A small `ORDER · #{id}` eyebrow at the very top of the card so the order number is always visible without expanding (mirrors the hero card's `Active order · #{id}` eyebrow). The order ID is intentionally **not** repeated inside the product strip subtitle — keeping it in the eyebrow lets the product strip read as a clean Product → Revibe Care → Total breakdown.
 - A status icon + headline (e.g. "Out for delivery", "At quality check", "Delivered", "Cancelled").
 - A subline with the most relevant timestamp (forward-looking ETA when DHL provides one, otherwise the most recent status timestamp).
 - A state chip on the right when relevant. Delivered orders carry a green "Delivered" chip (overrides the data's `state: 'close'`); cancelled orders carry a red "Cancelled" chip.
 - A tinted **status banner** with a leading condition phrase and a descriptive sentence (see §3, "Status banner").
 - The product image, name, and variant.
-- A muted `+ Warranty {currency} {amount}` line beneath the variant when the order carries a warranty add-on (omitted otherwise). Same treatment in the hero card's frosted product strip.
-- The amount paid.
-- The order ID.
+- A muted `Revibe Care +{currency} {amount}` line beneath the variant when the order carries a Revibe Care add-on (omitted otherwise). Prefixed with the small Revibe Care RE_CARE logo so the add-on reads as a branded product, not a generic warranty fee. Same treatment in the hero card's frosted product strip (icon shown at higher opacity so it stays legible on the dark gradient) and on `PastOrderCard`.
+- A small uppercase `TOTAL` caption stacked above the bold amount on the right side of the product strip. The caption is what tells the customer the bold number is the sum of Product + Revibe Care rather than the line price of just the device. Same treatment on the hero card's frosted strip. `PastOrderCard` intentionally skips the caption — there's no other dollar amount competing on that row, so the price is already unambiguous.
 
 When a card is **expanded**, everything above remains visible at the top, and
 below it the customer sees:
@@ -166,46 +166,115 @@ longer relevant. This avoids having "delivered" in two places at once.
 
 `Cancel order` on a `created` order opens a bottom sheet (`CancelOrderSheet`)
 with a max-height of 92vh, a black-45% scrim, and a slide-up entrance.
-Dismissible by tapping the scrim, the X icon, or pressing `Escape`. Two steps:
+Dismissible by tapping the scrim, the X icon, or pressing `Escape`.
+
+The flow is two steps for the wallet path and three steps for the
+original-payment path. The extra middle step is a take-rate-protection
+"dissuade" screen that fires only when both conditions hold:
+`method === 'original'` **and** `statusId === 'created'`.
+
+```
+              Select
+                │
+                │  method === 'original' && statusId === 'created'
+                ├──────────────────────────────► Dissuade ──► Confirm
+                │                                   ▲ back       │
+                │                                   │            │
+                └──── wallet or other paths ──────► Confirm ─────┴──► close
+```
 
 **Step 1 — Choose your refund.** Header (`Cancel order` + `#id`), then an
 order-summary card with the product strip and a line-item breakdown
-(`Product` + `Warranty` if present + `Total`), then two refund options as
+(`Product` + `Revibe Care` if present + `Total`), then two refund options as
 radio cards:
 
-- **Store credit** (recommended pill, success-tone) — full refund of the
-  order total, available instantly.
+- **Revibe Wallet** (wallet icon + tap-toggle info `i`, success-tone detail
+  line) — full refund of the order total, available instantly. The
+  recommendation is no longer signalled with a `Recommended` pill; instead
+  the "Full refund · available instantly" detail line is rendered in
+  `text-success font-semibold` so the concrete benefit carries the emphasis.
+  The `i` opens a tooltip explaining that wallet credits can be used on any
+  product and are combinable with any payment method, with a placeholder
+  `terms & conditions` link. Same tooltip surfaces wherever "Revibe Wallet"
+  is named (credits pill in `GreetRow`, confirm-step destination line) — all
+  driven by the shared `WalletInfoTooltip` component.
 - **Original payment method** — total minus a 5% processing fee, refunded
   to the card in 5–10 business days. The fee is shown explicitly as a
   negative line under the amount (e.g. `−AED 42.45 (5% processing fee)`).
 
 The `Continue` CTA is disabled until a method is picked. `Keep order` closes
-the sheet without changes.
+the sheet without changes. `Continue` routes to **Dissuade** when the
+original-payment + created gate fires, otherwise straight to **Confirm**.
 
-**Step 2 — Confirm cancellation.** A back arrow returns to step 1. Body shows
-a centered amount block (`You'll receive` / amount / destination / ETA copy).
-On `Original payment method` the block also carries a muted breakdown line
-(e.g. `Total AED 849 · −AED 42.45 fee`) between the headline figure and the
-destination.
+**Step 2 (original + created only) — Cancel this order?** A retention screen
+designed to give the user a reason to wait rather than cancel. Three blocks
+stacked in a single-column body:
+
+1. A centered hero card with the delivery promise: *"You're on track to
+   receive your {product name} by"* + a large weekday-formatted
+   `estimatedDelivery` (e.g. `Monday, 4 May`). The weekday is computed in
+   `formatDeliveryDate(estimatedDelivery, placedAt)`, which parses the
+   short form (`"May 4"`) using the year from `placedAt` and emits
+   `weekday, day month` via `Intl.DateTimeFormat`.
+2. A neutral info-tone strip warning that the item *may not be available to
+   reorder later*. Scarcity, not "this is irreversible" — the cancellation
+   itself is fully reversible at `created`; the real risk is item supply.
+3. A soft-green success-tone strip with `ShieldCheck` icon framing the
+   protection: *"If we don't ship by {order.shipDeadlineFull}, the {currency}
+   {fee} processing fee is waived."* Anchored on the **shipping** deadline,
+   not delivery, because Revibe controls ship time but couriers can always
+   add delivery delays — shipping is the commitment the company can
+   actually defend.
+
+Footer has two equal-height chunky buttons (52px, `rounded-[12px]`,
+`text-[14.5px]`): a brand-filled `Keep my order` and an outlined
+`Continue to cancel` that turns red on hover (`hover:bg-danger-bg
+hover:text-danger hover:border-danger`). The earlier draft had a third
+muted text link with the same label and an extra `Switch to Revibe Wallet`
+button — both were dropped. The wallet switch overrode the user's earlier
+method choice (paternalistic) and the muted Continue link buried the
+forward path; promoting it to a real button with a red hover state is
+clearer about consequence without alarming the default state.
+
+The dissuade step does not show the refund amount or breakdown — those
+live one screen later on Confirm, which keeps Dissuade emotional/decisional
+and Confirm transactional. `Back` returns to Select; the `X` and `Keep my
+order` both close the sheet.
+
+**Step 3 — Confirm cancellation.** A back arrow returns to the previous step
+(Dissuade if the user came through it, otherwise Select). Body shows a
+centered amount block (`You'll receive` / amount / destination / ETA copy).
+On the wallet path the destination line reads `back to your [wallet icon]
+Revibe Wallet [i]`, with the same shared info tooltip. On `Original payment
+method` the block also carries a muted breakdown line (e.g. `Total AED 849 ·
+−AED 42.45 fee`) between the headline figure and the destination, and the
+destination line stays as plain "original payment method" text.
 
 Beneath the amount block sits a neutral info-tone strip with method-specific
-copy to prevent wrong-method regret. `Store credit`: *"Store credit stays on
-Revibe. It won't be paid out to your bank account."* `Original payment method`:
-*"You're giving up {fee} to the processing fee. Choose Store credit for the
-full amount, instantly."* The store-credit copy intentionally doesn't nudge to
-the alternative — it's already the recommended option. Footer: `Back` + a
-danger-filled `Cancel order` CTA.
+copy. `Revibe Wallet`: *"Revibe Wallet credit stays on Revibe. It won't be
+paid out to your bank account."* `Original payment method`: *"You're giving
+up {fee} to the processing fee."* The original-payment copy is intentionally
+trimmed to a pure fee reminder — the earlier wallet pitch (*"Choose Revibe
+Wallet for the full amount, instantly."*) was removed when Dissuade was
+introduced, because doing the wallet upsell twice in a row in the same flow
+felt like the company was reluctant to let the user leave. Footer: `Back` +
+a danger-filled `Cancel order` CTA. This is the only step on the
+original-payment path where the destructive action carries danger styling —
+the order of escalation now matches the order of finality.
 
 The current prototype does **not** persist cancellation: tapping the final
 `Cancel order` simply closes the sheet (the order keeps its `created` state).
 Wiring this to flip `state` to `cancelled` and vary the cancelled-state banner
 copy by chosen refund method is a future step.
 
-The 5% fee, the recommendation, and the line-item split are prototype-only —
-production will need to read the eligibility window, fee rate, recommendation
-policy, and per-line-item amounts from the backend per order. Today only
-order `89712` carries `subtotal` + `warranty`; other orders fall back to
-`subtotal = total` with no warranty row.
+The 5% fee, the 1–3 working-day shipping policy (which sets `shipDeadline`),
+the success-tone recommendation styling, and the line-item split are all
+prototype-only — production will need to read the eligibility window, fee
+rate, ship SLA, recommendation policy, and per-line-item amounts from the
+backend per order. Today only order `89712` carries `subtotal` + `warranty`
++ `shipDeadline`; other orders fall back to `subtotal = total` with no
+warranty row, and the dissuade step never fires for them because they're
+past the `created` stage.
 
 ---
 
@@ -282,7 +351,7 @@ Each order object carries:
 - **`placedAt`** — the order timestamp shown on the summary screen (string, formatted).
 - **`quantity`** — number of items in the order (integer).
 - **`subtotal`** *(optional)* — product-only amount, no currency symbol. Used to render the line-item breakdown inside the cancellation sheet. When absent the sheet falls back to `subtotal = total`. Populated on every demo order today.
-- **`warranty`** *(optional)* — warranty add-on amount, no currency symbol. When present it renders both as a `+ Warranty` line on the OrderCard / HeroCard product strip and as an extra row in the cancellation sheet's breakdown; both are omitted when the field is absent. Populated on every demo order today (varied amounts so the pattern is visible across the list).
+- **`warranty`** *(optional)* — Revibe Care add-on amount, no currency symbol. The field name is kept as `warranty` for backwards compatibility with the order shape; only the user-facing copy changed. When present it renders as a `Revibe Care +{amount}` line (prefixed with the Revibe Care logo) on the OrderCard / HeroCard / PastOrderCard product strip and as a `Revibe Care` row in the cancellation sheet's breakdown; all of these are omitted when the field is absent. Populated on every demo order today (varied amounts so the pattern is visible across the list).
 - **`total`** — total amount paid (number, no currency symbol). When `subtotal` and `warranty` are both present, `total` should equal their sum.
 - **`currency`** — three-letter currency code (string, e.g. "AED").
 - **`customerName`** — the recipient's full name (string).
@@ -303,6 +372,8 @@ Two parallel fields describe where the order is.
 - **`trackingNumber`** — courier-issued tracking number, shown in the order summary (string).
 - **`trackingUrl`** — gates whether the "Track order" CTA renders (truthy → render). The CTA's `href` itself is **hardcoded** to a known-good DHL Express test shipment so the demo always lands on a real tracking page; the per-order URL is ignored. Production should template `tracking-id` on `order.trackingNumber`.
 - **`estimatedDelivery`** — DHL's forward-looking ETA, used as the collapsed-card subline when present (string, free-text date). **Optional** — DHL doesn't always communicate this. Code paths must handle absence gracefully.
+- **`shipDeadline`** *(optional, string)* — the latest shipping date allowed by the Revibe 1–3 working-day ship SLA, short form (e.g. `"May 1"`). Surfaced only on the dissuade step of the cancellation flow (see §2.6). Today only populated on `89712` (the `created` order) because dissuade only fires at `created`.
+- **`shipDeadlineFull`** *(optional, string)* — the human-readable long form of `shipDeadline` (e.g. `"Friday, 1 May"`), embedded into the fee-waiver copy on the dissuade step. The pair mirrors the `placedAt` / `placedAtFull` pattern: a short machine-ish form and a pre-formatted long form, so the component never has to do working-day arithmetic.
 
 ### 4.4 Timeline fields
 
@@ -441,7 +512,7 @@ What looks real in the prototype but is faked:
 - **Single carrier.** Code is generalised but mock data uses DHL only. Adding a second carrier requires no code change.
 - **Single-item orders.** The product object is a single entry. Multi-item orders need a `products[]` array and a layout adjustment.
 - **Download receipt, Raise a claim.** Buttons are present but do nothing. Each needs its own flow / page.
-- **Site-wide search, in-list "Find items" search, store-credits card.** Visual placeholders, no logic. The store credits voucher code "copy" icon doesn't actually copy.
+- **Site-wide search, in-list "Find items" search, Revibe Wallet pill.** Visual placeholders, no logic. The wallet balance is a hardcoded prop; the wallet info tooltip's `terms & conditions` link goes nowhere (`href="#"`).
 - **Date-range dropdown.** Logic is wired (parses `placedAt`, filters by cutoff) but visibly inert because all five mock orders fall inside every range. Status chips do filter the list.
 - **Inter font.** Production is Graphik; we substituted Inter via Google Fonts because Graphik is licensed.
 - **Brand assets.** Local copies in `public/` rather than CDN-served.

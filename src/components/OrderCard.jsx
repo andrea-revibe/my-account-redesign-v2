@@ -27,6 +27,9 @@ import CancelOrderSheet from './CancelOrderSheet'
 const DHL_TRACKING_URL =
   'https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=3392654392'
 
+const REVIBE_CARE_ICON =
+  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+
 // Inline-expandable order card. Collapsed view leads with status, an ETA
 // block (for created / quality_check states), the dot timeline, and a
 // product strip. Expanding reveals the long-form banner, sub-timeline,
@@ -80,6 +83,9 @@ export default function OrderCard({ order, defaultExpanded = false }) {
         aria-expanded={expanded}
         className="w-full text-left flex flex-col gap-3 px-4 py-3.5"
       >
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted -mb-1.5">
+          Order · #{order.id}
+        </div>
         <SummaryHeader order={order} expanded={expanded} />
 
         {showEta && (
@@ -109,16 +115,29 @@ export default function OrderCard({ order, defaultExpanded = false }) {
               {order.product.name}
             </div>
             <div className="text-[12px] text-muted mt-0.5 truncate">
-              {order.product.variant} · #{order.id}
+              {order.product.variant}
             </div>
             {order.warranty != null && (
-              <div className="text-[11.5px] text-muted mt-0.5 truncate">
-                + Warranty {order.currency} {order.warranty.toLocaleString()}
+              <div className="flex items-center gap-1 mt-0.5 text-[11.5px] text-muted">
+                <img
+                  src={REVIBE_CARE_ICON}
+                  alt=""
+                  className="w-3.5 h-3.5 object-contain shrink-0"
+                />
+                <span className="truncate">
+                  Revibe Care +{order.currency}{' '}
+                  {order.warranty.toLocaleString()}
+                </span>
               </div>
             )}
           </div>
-          <div className="text-[14.5px] font-bold text-ink whitespace-nowrap">
-            {order.currency} {order.total.toLocaleString()}
+          <div className="text-right shrink-0">
+            <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted leading-none">
+              Total
+            </div>
+            <div className="mt-1 text-[14.5px] font-bold text-ink whitespace-nowrap tabular-nums">
+              {order.currency} {order.total.toLocaleString()}
+            </div>
           </div>
         </div>
       </button>
