@@ -82,19 +82,23 @@ Past-order cards (delivered, cancelled) are a separate, simpler component
   that leads with the **refund** as the visual hero rather than the
   fulfilment journey. A `w-1` left accent strip carries the phase tone
   (warn amber for `requested`, brand purple for `refund_pending`, success
-  green for `refunded`). The collapsed header shows a phase pill +
-  `#id · date`; below it sits a tinted hero block with the refund amount
+  green for `refunded`). A small uppercase `Order · #{id}` eyebrow sits at
+  the very top (mirroring the `OrderCard` pattern); the phase pill sits on
+  its own row below; then a tinted hero block with the refund amount
   (`text-[28px]` tabular-nums) and a destination chip — wallet destinations
   get a brand→accent gradient chip (echoes the `GreetRow` credits pill);
   card destinations get a neutral chip. Refunded orders surface a
   `fundsAvailable` sub-copy line ("Available now in your wallet"); the two
   earlier phases make no ETA promise. Expanded reveals a 3-step numbered
   dot stepper for refund progress (created-path cancellations skip the
-  `requested` step, mirroring `cancellationStepsFor` in `statuses.js`), a
-  line-item refund breakdown, a dimmed fulfilment trace ending in a red
-  ✕ at the cancel point, and a two-action footer (`View refund details` +
-  icon-only `Download receipt`). Always collapsed by default; no
-  auto-expand.
+  `requested` step, mirroring `cancellationStepsFor` in `statuses.js`).
+  Each reached/current step carries the timestamp it entered that phase
+  underneath its label (sourced from
+  `order.cancellationTimeline[step.id]`); upcoming steps render the label
+  only. Then a line-item refund breakdown, a dimmed fulfilment trace
+  ending in a red ✕ at the cancel point, and a two-action footer
+  (`View refund details` + icon-only `Download receipt`). Always
+  collapsed by default; no auto-expand.
 
 The full `OrderCard` chrome (status banner, sub-timeline, courier banner,
 order summary) is no longer rendered for cancelled past orders.

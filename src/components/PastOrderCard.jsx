@@ -115,9 +115,10 @@ function CancelledOrderCard({ order }) {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full text-left pl-4 pr-3.5 py-3.5 flex flex-col gap-3"
+        className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
-        <CollapsedHeader order={order} />
+        <OrderEyebrow id={order.id} />
+        <StatePill cancellationStatusId={order.cancellationStatusId} />
         <RefundHero order={order} />
         <ProductRow order={order} expanded={expanded} />
       </button>
@@ -162,13 +163,10 @@ function CancelledOrderCard({ order }) {
   )
 }
 
-function CollapsedHeader({ order }) {
+function OrderEyebrow({ id }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <StatePill cancellationStatusId={order.cancellationStatusId} />
-      <span className="text-[11px] text-muted tabular-nums">
-        #{order.id} · {shortDate(order)}
-      </span>
+    <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
+      Order · #{id}
     </div>
   )
 }
@@ -184,7 +182,7 @@ function StatePill({ cancellationStatusId }) {
       : 'Refunded'
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px] ${t.softBg} ${t.softText}`}
+      className={`self-start inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px] ${t.softBg} ${t.softText}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${t.bg}`} />
       {label}
@@ -323,6 +321,7 @@ function RefundProgressDots({ order }) {
             ? `${t.bg} text-white`
             : `bg-white border-2 ${t.text} ${t.text.replace('text-', 'border-')}`
           : 'bg-white border border-line text-muted'
+        const ts = reached ? order.cancellationTimeline?.[s.id] : null
 
         return (
           <div key={s.id} className="flex-1 flex flex-col gap-1.5">
@@ -331,9 +330,9 @@ function RefundProgressDots({ order }) {
                 current ? 'shadow-[0_0_0_3px_rgba(255,255,255,0.6)]' : ''
               }`}
             />
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-start gap-1.5">
               <span
-                className={`grid place-items-center w-5 h-5 rounded-full text-[10px] font-bold ${ringText}`}
+                className={`grid place-items-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 ${ringText}`}
               >
                 {reached && !current ? (
                   <Check size={9} strokeWidth={3} />
@@ -341,17 +340,24 @@ function RefundProgressDots({ order }) {
                   i + 1
                 )}
               </span>
-              <span
-                className={`text-[11px] leading-[1.2] ${
-                  current
-                    ? `${t.text} font-bold`
-                    : reached
-                    ? 'text-ink font-semibold'
-                    : 'text-muted'
-                }`}
-              >
-                {shortLabel(s)}
-              </span>
+              <div className="min-w-0 flex flex-col gap-0.5">
+                <span
+                  className={`text-[11px] leading-[1.2] ${
+                    current
+                      ? `${t.text} font-bold`
+                      : reached
+                      ? 'text-ink font-semibold'
+                      : 'text-muted'
+                  }`}
+                >
+                  {shortLabel(s)}
+                </span>
+                {ts && (
+                  <span className="text-[10px] leading-[1.2] text-muted tabular-nums">
+                    {ts}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )
@@ -434,6 +440,3 @@ function FulfilmentTrace({ order }) {
   )
 }
 
-function shortDate(order) {
-  return (order.placedAtFull || order.placedAt || '').split(' · ')[0]
-}
