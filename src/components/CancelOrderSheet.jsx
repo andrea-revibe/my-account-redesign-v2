@@ -5,9 +5,15 @@ import WalletInfoTooltip, { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
 
+// Statuses where the dissuade screen fires on the original-payment path.
+// At these stages the order hasn't shipped yet, so the ship-deadline fee
+// waiver still has meaning; shipped/delivered cancellations skip it.
+const DISSUADE_STATUSES = new Set(['created', 'quality_check'])
+
 export default function CancelOrderSheet({ order, open, onClose }) {
   const [step, setStep] = useState('select')
   const [method, setMethod] = useState(null)
+  const dissuadeEligible = DISSUADE_STATUSES.has(order.statusId)
 
   useEffect(() => {
     if (!open) return
@@ -59,7 +65,7 @@ export default function CancelOrderSheet({ order, open, onClose }) {
             setMethod={setMethod}
             onClose={onClose}
             onContinue={() => {
-              if (method === 'original' && order.statusId === 'created') {
+              if (method === 'original' && dissuadeEligible) {
                 setStep('dissuade')
               } else {
                 setStep('confirm')
@@ -88,7 +94,7 @@ export default function CancelOrderSheet({ order, open, onClose }) {
             order={order}
             method={method}
             onBack={() => {
-              if (method === 'original' && order.statusId === 'created') {
+              if (method === 'original' && dissuadeEligible) {
                 setStep('dissuade')
               } else {
                 setStep('select')

@@ -20,6 +20,7 @@ import {
 } from '../lib/statuses'
 import StatusTimeline from './StatusTimeline'
 import ShippingSubTimeline from './ShippingSubTimeline'
+import CancellationSubTimeline from './CancellationSubTimeline'
 import CancelOrderSheet from './CancelOrderSheet'
 
 // Hardcoded so the demo lands on a real DHL test shipment regardless of the
@@ -45,20 +46,18 @@ export default function OrderCard({ order, defaultExpanded = false }) {
     if (detailsRef.current) detailsRef.current.open = true
   }
 
+  const isCancelled = order.state === 'cancelled'
   const isInProgress =
     (order.statusId === 'created' || order.statusId === 'quality_check') &&
-    order.state !== 'cancelled'
+    !isCancelled
   const showEta = isInProgress
-  // Main-card dot timeline only renders for shipped orders. For created /
-  // quality_check it lives inside the expanded view (above Order details)
-  // so the same progression isn't shown twice.
-  const showTimeline = order.state !== 'cancelled' && !isInProgress
+  // Main-card dot timeline only renders for shipped / delivered / cancelled
+  // orders. For created / quality_check it lives inside the expanded view
+  // (above Order details) so the same progression isn't shown twice.
+  const showTimeline = !isInProgress
   const desc = statusDescription(order)
   const isShipped = order.statusId === 'shipped'
   const showCancel = isInProgress
-  // Sheet flow is wired only for `created` for now. Quality-check keeps the
-  // visual cancel button as a stub until that stage gets its own design.
-  const cancelOpensSheet = order.statusId === 'created'
 
   const fullTimeline = (
     <div className="rounded-[14px] border border-line bg-surface p-3.5">
@@ -146,6 +145,8 @@ export default function OrderCard({ order, defaultExpanded = false }) {
         <div className="px-4 py-4 flex flex-col gap-3.5 border-t border-line bg-canvas animate-slideDown">
           {!showEta && <StatusBannerInline desc={desc} />}
 
+          {isCancelled && <CancellationSubTimeline order={order} />}
+
           {isShipped && (
             <div className="rounded-[14px] border border-line bg-surface p-3.5">
               <h4 className="m-0 mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted">
@@ -193,32 +194,38 @@ export default function OrderCard({ order, defaultExpanded = false }) {
           />
 
           <div className="flex gap-2">
-            {showCancel ? (
-              <SecondaryBtn
-                tone="danger"
-                icon={X}
-                label="Cancel order"
-                onClick={cancelOpensSheet ? () => setCancelOpen(true) : undefined}
-              />
-            ) : (
-              <SecondaryBtn icon={Download} label="Receipt" />
-            )}
-            {isInProgress ? (
-              <PrimaryBtn
-                icon={Settings2}
-                label="Change order details"
-                variant="outline"
-                onClick={openDetails}
-              />
-            ) : (
+            {isCancelled ? (
               <PrimaryBtn icon={MessageSquareText} label="Get help" />
+            ) : (
+              <>
+                {showCancel ? (
+                  <SecondaryBtn
+                    tone="danger"
+                    icon={X}
+                    label="Cancel order"
+                    onClick={() => setCancelOpen(true)}
+                  />
+                ) : (
+                  <SecondaryBtn icon={Download} label="Receipt" />
+                )}
+                {isInProgress ? (
+                  <PrimaryBtn
+                    icon={Settings2}
+                    label="Change order details"
+                    variant="outline"
+                    onClick={openDetails}
+                  />
+                ) : (
+                  <PrimaryBtn icon={MessageSquareText} label="Get help" />
+                )}
+              </>
             )}
           </div>
 
-          {!isInProgress && fullTimeline}
+          {!isInProgress && !isCancelled && fullTimeline}
         </div>
       )}
-      {cancelOpensSheet && (
+      {showCancel && (
         <CancelOrderSheet
           order={order}
           open={cancelOpen}
@@ -271,8 +278,12 @@ function DotBar({ order }) {
       {STATUSES.map((s, i) => {
         const done = i < cur
         const current = i === cur
-        const reached = done || current
+        // On cancelled the timeline is frozen — the cancel point is marked
+        // with an ✕ instead of treated as "current and progressing".
+        const reached = cancelled ? done : done || current
+        const cancelPoint = cancelled && current
         const tone = cancelled ? 'danger' : delivered ? 'success' : 'brand'
+        const showHalo = current && !cancelled
         return (
           <div
             key={s.id}
@@ -282,7 +293,7 @@ function DotBar({ order }) {
               <span
                 aria-hidden
                 className={`absolute top-[9px] right-1/2 w-full h-[2px] ${
-                  reached
+                  reached || cancelPoint
                     ? tone === 'danger'
                       ? 'bg-danger'
                       : tone === 'success'
@@ -294,24 +305,30 @@ function DotBar({ order }) {
             )}
             <span
               className={`relative z-10 grid place-items-center w-[18px] h-[18px] rounded-full border-2 ${
-                reached
+                reached || cancelPoint
                   ? tone === 'danger'
                     ? 'bg-danger border-danger text-white'
                     : tone === 'success'
                       ? 'bg-success border-success text-white'
                       : 'bg-brand border-brand text-white'
                   : 'bg-surface border-line text-muted'
-              } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
+              } ${showHalo ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
             >
-              {done && <Check size={10} strokeWidth={3} />}
+              {cancelPoint ? (
+                <X size={10} strokeWidth={3} />
+              ) : done ? (
+                <Check size={10} strokeWidth={3} />
+              ) : null}
             </span>
             <span
               className={`mt-1.5 text-[10.5px] text-center leading-[1.2] font-medium ${
-                current
-                  ? 'text-ink font-bold'
-                  : reached
-                    ? 'text-ink'
-                    : 'text-muted'
+                cancelPoint
+                  ? 'text-danger font-bold'
+                  : current
+                    ? 'text-ink font-bold'
+                    : reached
+                      ? 'text-ink'
+                      : 'text-muted'
               }`}
             >
               {s.short}

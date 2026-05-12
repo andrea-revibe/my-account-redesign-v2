@@ -19,7 +19,35 @@ import {
   Package,
   PackageCheck,
   XCircle,
+  Hourglass,
+  Wallet,
+  CircleDollarSign,
 } from 'lucide-react'
+
+// Sub-statuses that apply only while `state === 'cancelled'`. The `requested`
+// step only fires on the quality_check path — at QC the supplier still needs
+// to confirm the unit isn't already packed. created cancellations skip
+// straight to `refund_pending` because nothing is in motion yet.
+export const CANCELLATION_STATUSES = [
+  {
+    id: 'requested',
+    label: 'Requested',
+    headline: 'Cancellation requested',
+    icon: Hourglass,
+  },
+  {
+    id: 'refund_pending',
+    label: 'Refund pending',
+    headline: 'Refund pending',
+    icon: Wallet,
+  },
+  {
+    id: 'refunded',
+    label: 'Refunded',
+    headline: 'Refunded',
+    icon: CircleDollarSign,
+  },
+]
 
 export const SHIPPING_SUB_STATUSES = [
   {
@@ -70,6 +98,23 @@ export function subProgressIndex(currentSubStatusId) {
   return i // -1 if not provided — caller handles
 }
 
+export function cancellationProgressIndex(currentCancellationStatusId) {
+  const i = CANCELLATION_STATUSES.findIndex(
+    (s) => s.id === currentCancellationStatusId,
+  )
+  return i // -1 if not provided
+}
+
+// Cancelled orders carry their fulfilment `statusId` frozen at the cancel
+// point. The created-stage cancellation path skips the `requested` phase
+// because there's no supplier check needed (nothing's been pulled yet).
+export function cancellationStepsFor(order) {
+  if (order.statusId === 'created') {
+    return CANCELLATION_STATUSES.filter((s) => s.id !== 'requested')
+  }
+  return CANCELLATION_STATUSES
+}
+
 // Returns the status banner shown at the top of an expanded order card:
 // a tinted box with a colored leading phrase and an explanatory sentence.
 // Defaults are status-driven; `order.delayed` flips the tone to warn and
@@ -78,12 +123,32 @@ export function subProgressIndex(currentSubStatusId) {
 // underlying status).
 export function statusDescription(order) {
   if (order.state === 'cancelled') {
+    const phase = order.cancellationStatusId
+    if (phase === 'requested') {
+      return {
+        tone: 'danger',
+        lead: 'Cancellation requested',
+        body:
+          order.statusMessage ??
+          "We're confirming with the supplier that this unit hasn't been packed yet. This usually takes a few hours.",
+      }
+    }
+    if (phase === 'refunded') {
+      return {
+        tone: 'success',
+        lead: 'Refund complete',
+        body:
+          order.statusMessage ??
+          'Your refund has been issued. Funds may take a few business days to land depending on your payment method.',
+      }
+    }
+    // refund_pending or unspecified — the historical default.
     return {
       tone: 'danger',
-      lead: 'Refund in progress',
+      lead: 'Refund pending',
       body:
         order.statusMessage ??
-        'Your order was cancelled. Any payment will be refunded to your original payment method.',
+        'Your cancellation has been accepted. Your refund is being processed and will land shortly.',
     }
   }
 
@@ -101,6 +166,12 @@ export function statusDescription(order) {
     lead: base.lead,
     body: order.statusMessage ?? base.body,
   }
+}
+
+function lastTimelineEntry(map) {
+  if (!map) return null
+  const keys = Object.keys(map)
+  return keys.length ? map[keys[keys.length - 1]] : null
 }
 
 function descriptionKey(order) {
@@ -186,7 +257,12 @@ export function pickActiveOrderId(orders) {
 // Headline shown in the collapsed-card header. Sub-status takes precedence
 // while shipping so the customer sees "Out for delivery" instead of "Shipped".
 export function statusHeadline(order) {
-  if (order.state === 'cancelled') return 'Cancelled'
+  if (order.state === 'cancelled') {
+    const phase = CANCELLATION_STATUSES.find(
+      (s) => s.id === order.cancellationStatusId,
+    )
+    return phase ? phase.headline : 'Cancelled'
+  }
   if (order.statusId === 'delivered') return 'Delivered'
   if (order.statusId === 'shipped') {
     const sub = SHIPPING_SUB_STATUSES.find((s) => s.id === order.subStatusId)
@@ -201,9 +277,11 @@ export function statusHeadline(order) {
 // phrased to fit the state.
 export function statusSubline(order) {
   if (order.state === 'cancelled') {
-    const keys = Object.keys(order.timeline || {})
-    const last = keys[keys.length - 1]
-    return last ? `Last update ${order.timeline[last]}` : null
+    const ts =
+      order.cancellationTimeline?.[order.cancellationStatusId] ??
+      lastTimelineEntry(order.cancellationTimeline) ??
+      lastTimelineEntry(order.timeline)
+    return ts ? `Updated ${ts}` : null
   }
   if (order.statusId === 'delivered' && order.timeline?.delivered) {
     return order.timeline.delivered
@@ -228,6 +306,15 @@ export function statusSubline(order) {
 // Cancelled goes red, delivered green, everything in-progress is brand purple.
 export function statusIconFor(order) {
   if (order.state === 'cancelled') {
+    if (order.cancellationStatusId === 'refunded') {
+      return { Icon: CircleDollarSign, bg: 'bg-green-50', fg: 'text-success' }
+    }
+    if (order.cancellationStatusId === 'refund_pending') {
+      return { Icon: Wallet, bg: 'bg-red-50', fg: 'text-chip-danger' }
+    }
+    if (order.cancellationStatusId === 'requested') {
+      return { Icon: Hourglass, bg: 'bg-red-50', fg: 'text-chip-danger' }
+    }
     return { Icon: XCircle, bg: 'bg-red-50', fg: 'text-chip-danger' }
   }
   if (order.statusId === 'delivered') {

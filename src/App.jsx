@@ -134,9 +134,13 @@ export default function App() {
               <>
                 <SectionLabel title="Past orders" count={past.length} />
                 <div className="px-4 flex flex-col gap-3">
-                  {past.map((o) => (
-                    <PastOrderCard key={o.id} order={o} />
-                  ))}
+                  {past.map((o) =>
+                    o.state === 'cancelled' ? (
+                      <OrderCard key={o.id} order={o} />
+                    ) : (
+                      <PastOrderCard key={o.id} order={o} />
+                    ),
+                  )}
                 </div>
               </>
             )}
