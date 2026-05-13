@@ -22,7 +22,7 @@ npm run build    # production build into dist/
 
 ## Where things live
 
-- `src/App.jsx` — page composition.
+- `src/App.jsx` — page composition; routes each order to one of three cards (`InProgressCard` for created/QC, `OrderCard` for shipped + in-flight cancelled, `PastOrderCard` for delivered + cancelled-past).
 - `src/components/` — UI components, one per file.
 - `src/data/orders.js` — mock orders. Swap for an API call to ship for real.
 - `src/lib/statuses.js` — single source of truth for top-level statuses, shipping sub-statuses, header chips, status-banner copy + tone, and the auto-expand rule (`pickActiveOrderId`).

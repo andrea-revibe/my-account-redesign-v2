@@ -48,60 +48,94 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 
 ### 2.1 What the customer sees
 
-A vertical list of orders, newest first. Each order is rendered as a card. The
-card always shows a compact summary header so the customer can scan the list
-and understand the state of each order without expanding anything.
+A vertical list of orders, newest first. Each order is rendered as a card.
+There are now **three card components** — `InProgressCard`, `OrderCard`,
+and `PastOrderCard` — chosen by `App.jsx` based on `statusId` + `state`.
+All three share the same chrome family (left accent strip, `Order · #{id}`
+eyebrow, state pill, tinted hero block, compact product row) so the list
+reads as one consistent set; they differ in what the hero leads with and
+which actions hang off the bottom.
 
-When a card is **collapsed**, the customer sees:
+| Card | Used for | Hero leads with | Expandable? |
+|---|---|---|---|
+| `InProgressCard` | non-cancelled `created` / `quality_check` | `Delivery by` + ETA | yes |
+| `OrderCard` | non-cancelled `shipped`; in-flight cancellations mid-fulfilment | status icon + headline + ETA | yes |
+| `PastOrderCard` (delivered) | `statusId === 'delivered'` (non-cancelled) | `Delivered on` + date | no |
+| `PastOrderCard` (cancelled past) | `state === 'cancelled' && cancellationStatusId === 'refunded'` (and the refund-hero variant for `requested` / `refund_pending` while in the open list) | `Refund of` / `Refunded` + amount | yes |
+
+#### Created and quality_check (`InProgressCard`)
+
+When **collapsed**, the customer sees:
+
+- A small `Order · #{id}` eyebrow at the very top.
+- The state pill (`Order placed` for `created`, `Quality check` for `quality_check`) with a `Package` / `ShieldCheck` icon, on its own row beneath the eyebrow. Constant brand-purple tone regardless of `delayed`.
+- A brand-purple gradient hero block (`from-brand-bg to-brand-bg2`) carrying `Delivery by` eyebrow on the left + an `On track` tag (with `Zap` icon) on the right; a `text-[26px]` headline using `order.estimatedDeliveryLong || order.estimatedDelivery`; the body sentence from `statusDescription(order).body` underneath; and a `Delivering to [Home]` chip below. When `order.delayed === true` the right-side tag swaps to `Clock` icon + `Taking longer than expected` (still brand-purple, not warn — see §3, "Delayed quality_check stays brand"), and the body sentence pulls the delay-flavored copy from `DELAYED_BODY[statusId]`.
+- A compact product row (image / name / variant / `Revibe Care +{currency} {amount}` line / total / chevron). The chevron is decorative; the whole header is one tap target.
+
+When **expanded**, everything above remains visible and below it appears:
+
+- A horizontal `Timeline` dot row (Placed → QC → Shipped → Delivered). Each reached / current step renders the date and time it entered that stage on two lines below the label, sourced from `order.timeline[stepId]`; upcoming steps render the label only. The vertical "Full timeline" that lived in the previous chrome is gone — its content is folded into the dates-under-dots row.
+- The `Order details` collapse with delivery address, phone, and order date, plus `Change address` and `Change phone number` pills. The `Change details` action programmatically opens the collapse via ref so the pills are immediately visible.
+- A two-action footer: `Cancel order` (danger outline) + `Change details` (brand outline). On `created`, `Cancel order` opens the cancellation bottom sheet (see §2.6); on `quality_check` it's currently a visual stub.
+
+#### Shipped, in-flight cancellations mid-fulfilment (`OrderCard`)
+
+`OrderCard` is the older chrome retained for shipped orders and for
+in-flight cancellations that are still mid-fulfilment with
+`state === 'cancelled'`. When **collapsed**, the customer sees:
 
 - A small `ORDER · #{id}` eyebrow at the very top of the card so the order number is always visible without expanding (mirrors the hero card's `Active order · #{id}` eyebrow). The order ID is intentionally **not** repeated inside the product strip subtitle — keeping it in the eyebrow lets the product strip read as a clean Product → Revibe Care → Total breakdown.
-- A status icon + headline (e.g. "Out for delivery", "At quality check", "Delivered", "Cancelled").
+- A status icon + headline (e.g. "Out for delivery", "Cancelled").
 - A subline with the most relevant timestamp (forward-looking ETA when DHL provides one, otherwise the most recent status timestamp).
-- A state chip on the right when relevant. Delivered orders carry a green "Delivered" chip (overrides the data's `state: 'close'`); cancelled orders carry a red "Cancelled" chip.
-- A tinted **status banner** with a leading condition phrase and a descriptive sentence (see §3, "Status banner").
-- The product image, name, and variant.
-- A muted `Revibe Care +{currency} {amount}` line beneath the variant when the order carries a Revibe Care add-on (omitted otherwise). Prefixed with the small Revibe Care RE_CARE logo so the add-on reads as a branded product, not a generic warranty fee. Same treatment in the hero card's frosted product strip (icon shown at higher opacity so it stays legible on the dark gradient) and on `PastOrderCard`.
-- A small uppercase `TOTAL` caption stacked above the bold amount on the right side of the product strip. The caption is what tells the customer the bold number is the sum of Product + Revibe Care rather than the line price of just the device. Same treatment on the hero card's frosted strip. `PastOrderCard` intentionally skips the caption — there's no other dollar amount competing on that row, so the price is already unambiguous.
+- A state chip on the right when relevant. Cancelled orders carry a red "Cancelled" chip.
+- A horizontal four-step **dot timeline** above the product strip.
+- The product image, name, variant, `Revibe Care +{currency} {amount}` line (when the order carries a Revibe Care add-on, prefixed with the small Revibe Care RE_CARE logo), and an uppercase `TOTAL` caption above the bold amount on the right.
 
-When a card is **expanded**, everything above remains visible at the top, and
-below it the customer sees:
+When **expanded**, everything above remains visible and below it the customer sees:
 
-- For created / quality_check orders, the four-step **Full timeline** comes first — there is no in-card dot timeline above the product strip for these states, so the expanded timeline is the only one shown. For shipped orders the in-card dot timeline stays and the Full timeline sits at the very bottom of the expanded view (kept for parity).
 - The status banner (long form), the **Shipping progress** sub-timeline (shipped only), and the courier card with the "Track" link.
-- The **Order details** collapse with phone, address, order date, and "Change address" / "Change phone number" actions while the order is in any in-progress state (`created` or `quality_check`).
-- The action row:
-  - `created` / `quality_check`: `Cancel order` + `Change order details` (the latter programmatically opens the Order details collapse via ref so the change-address / change-phone pills are immediately visible). On `created`, `Cancel order` opens the two-step cancellation bottom sheet (see §2.6); on `quality_check` the button is currently a visual stub.
-  - shipped: `Receipt` + `Get help`.
+- The **Order details** collapse with phone, address, and order date.
+- The action row: shipped → `Receipt` + `Get help`; in-flight cancelled → `Get help`.
+- The four-step **Full timeline** at the very bottom.
 
-Past-order cards (delivered, cancelled) are a separate, simpler component
-(`PastOrderCard`). It branches internally on `order.state`:
+#### Delivered (`PastOrderCard` → `DeliveredOrderCard`)
 
-- **Delivered** keeps its compact one-row product summary with two pill
-  actions, right-aligned: `Download receipt` + `Raise a claim`.
-- **Cancelled** renders the refund-hero redesign — a dedicated compact card
-  that leads with the **refund** as the visual hero rather than the
-  fulfilment journey. A `w-1` left accent strip carries the phase tone
-  (warn amber for `requested`, brand purple for `refund_pending`, success
-  green for `refunded`). A small uppercase `Order · #{id}` eyebrow sits at
-  the very top (mirroring the `OrderCard` pattern); the phase pill sits on
-  its own row below; then a tinted hero block with the refund amount
-  (`text-[28px]` tabular-nums) and a destination chip — wallet destinations
-  get a brand→accent gradient chip (echoes the `GreetRow` credits pill);
-  card destinations get a neutral chip. Refunded orders surface a
-  `fundsAvailable` sub-copy line ("Available now in your wallet"); the two
-  earlier phases make no ETA promise. Expanded reveals a 3-step numbered
-  dot stepper for refund progress (created-path cancellations skip the
-  `requested` step, mirroring `cancellationStepsFor` in `statuses.js`).
-  Each reached/current step carries the timestamp it entered that phase
-  underneath its label (sourced from
-  `order.cancellationTimeline[step.id]`); upcoming steps render the label
-  only. Then a dimmed fulfilment trace ending in a red ✕ at the cancel
-  point, and a two-action footer (`View refund details` + icon-only
-  `Download receipt`). Tapping `View refund details` opens the
-  `RefundDetailsSheet` bottom sheet, which is the canonical surface for
-  the line-item breakdown (product + Revibe Care line items → subtotal →
-  fee (card refunds only) → total refund). Always collapsed by default;
-  no auto-expand.
+The delivered card is **not expandable** — there is no chevron and no
+expanded body. It carries the same chrome family as the in-progress and
+refunded cards but with success-green tones and a date-led hero:
+
+- A `w-1` left success-green strip.
+- A `Order · #{id}` eyebrow.
+- A success-tinted `Delivered` state pill (`PackageCheck` icon).
+- A success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (or the date part of `order.timeline.delivered` as a fallback); a `Delivered to [Home]` chip below.
+- A compact product row that surfaces image / name / variant / `Revibe Care +{currency} {amount}` line / total. The Revibe Care line and total are deliberately retained on this card (the refunded card omits both, since its hero already carries the money story) — they're the obvious differentiation between "this finished happily" and "this got refunded".
+- The existing right-aligned chip-style footer with `Download receipt` + `Raise a claim`, separated by a top dashed border.
+
+#### Past cancelled (`PastOrderCard` → `CancelledOrderCard`)
+
+The refund-hero card leads with the **refund** as the visual hero rather
+than the fulfilment journey. A `w-1` left accent strip carries the phase
+tone (warn amber for `requested`, brand purple for `refund_pending`,
+success green for `refunded`). A small uppercase `Order · #{id}` eyebrow
+sits at the very top; the phase pill sits on its own row below; then a
+tinted hero block with the refund amount (`text-[28px]` tabular-nums) and
+a destination chip — wallet destinations get a brand→accent gradient chip
+(echoes the `GreetRow` credits pill); card destinations get a neutral
+chip. Refunded orders surface a `fundsAvailable` sub-copy line ("Available
+now in your wallet"); the two earlier phases make no ETA promise.
+
+Expanded reveals a 3-step numbered dot stepper for refund progress
+(created-path cancellations skip the `requested` step, mirroring
+`cancellationStepsFor` in `statuses.js`). Each reached/current step
+carries the timestamp it entered that phase underneath its label (sourced
+from `order.cancellationTimeline[step.id]`); upcoming steps render the
+label only. Then a dimmed fulfilment trace ending in a red ✕ at the
+cancel point, and a two-action footer (`View refund details` + icon-only
+`Download receipt`). Tapping `View refund details` opens the
+`RefundDetailsSheet` bottom sheet, which is the canonical surface for the
+line-item breakdown (product + Revibe Care line items → subtotal → fee
+(card refunds only) → total refund). Always collapsed by default; no
+auto-expand.
 
 The full `OrderCard` chrome (status banner, sub-timeline, courier banner,
 order summary) is no longer rendered for cancelled past orders.
@@ -183,14 +217,14 @@ longer relevant. This avoids having "delivered" in two places at once.
 
 ### 2.5 Per-state behaviour cheat sheet
 
-| Top-level state | Auto-expanded | Headline copy | Status banner lead | Banner tone | Header chip | Courier banner | Sub-timeline |
-|---|---|---|---|---|---|---|---|
-| created | If most in-flight | "Order placed" | "On track" | brand | none | No | No |
-| quality_check | If most in-flight | "At quality check" | "On track" (or "Taking longer than expected" if `delayed`) | brand / warn | none | No | No |
-| shipped (sub-status drives headline) | If most in-flight | sub-status label (e.g. "Out for delivery") | "On track" / "Arriving today" (out_for_delivery) | brand | none | Yes | Yes |
-| delivered | Never | "Delivered" | "All done" | success | green "Delivered" | Yes (with completed copy) | No |
-| cancelled — in flight (`state === 'cancelled'` + non-terminal `statusId`) | Never | "Cancelled" | "Refund in progress" | danger | red "Cancelled" | No | No |
-| cancelled — past order | Never | phase pill (`Cancellation requested` / `Refund pending` / `Refunded`) | n/a — `PastOrderCard` refund-hero block replaces the banner | warn / brand / success per phase | n/a (own card chrome) | No | No |
+| Top-level state | Card | Auto-expanded | Hero / headline | Tone | Hero tag | Footer actions |
+|---|---|---|---|---|---|---|
+| created | `InProgressCard` | If most in-flight | `Delivery by` + ETA (`estimatedDeliveryLong`) | brand | "On track" (Zap) | `Cancel order` + `Change details` |
+| quality_check | `InProgressCard` | If most in-flight | `Delivery by` + ETA | brand (always — even when `delayed`, see §3) | "On track" (Zap) or "Taking longer than expected" (Clock) when `delayed` | `Cancel order` + `Change details` |
+| shipped (sub-status drives headline) | `OrderCard` | If most in-flight | status icon + sub-status label (e.g. "Out for delivery") + `Delivery by` ETA subtitle | brand | banner-driven ("On track" / "Arriving today") | `Receipt` + `Get help` |
+| delivered | `PastOrderCard` (delivered branch) | Never (no expand) | `Delivered on` + `deliveredOnLong` | success | "Complete" (Check) | `Download receipt` + `Raise a claim` |
+| cancelled — in flight (`state === 'cancelled'` + non-terminal `statusId`) | `OrderCard` | Never | "Cancelled" + status banner | danger | n/a | `Get help` |
+| cancelled — past order | `PastOrderCard` (cancelled branch) | Never | `Refund of` / `Refunded` + amount | warn / brand / success per phase | "Requested" / "Processing" / "Complete" | `View refund details` + icon-only `Download receipt` |
 
 ### 2.6 Cancellation flow (created stage)
 
@@ -344,6 +378,18 @@ purple for in-flight, green for delivered). `order.statusMessage` overrides
 the body string in any branch — that's the production hook for ad-hoc
 backend-injected updates without changing status.
 
+**Delayed quality_check stays brand.** `InProgressCard` deliberately ignores
+`statusDescription`'s warn tone for the in-progress hero — even when
+`delayed: true`, the hero gradient, headline color, accent strip, and state
+pill stay brand-purple. The delay signal is preserved in two subtler ways:
+the right-side tag swaps `Zap`/"On track" for `Clock`/"Taking longer than
+expected" (still brand-coloured), and the body sentence pulls the
+delay-flavored copy from `DELAYED_BODY[statusId]`. This was a product
+decision — the warn-amber treatment felt overly alarming for a normal QC
+slowdown and broke visual cohesion with the other in-progress cards. The
+full warn-amber treatment still exists for `OrderCard`'s shipped cards via
+`statusDescription`.
+
 **Delivered chip overrides the data's `state: 'close'`.** Delivered orders carry
 `state: 'close'` in the data, but customers see a green "Delivered" pill instead
 of the orange "Close" pill. The override lives in `OrderCard`'s `SummaryHeader`
@@ -402,6 +448,8 @@ Two parallel fields describe where the order is.
 - **`trackingNumber`** — courier-issued tracking number, shown in the order summary (string).
 - **`trackingUrl`** — gates whether the "Track order" CTA renders (truthy → render). The CTA's `href` itself is **hardcoded** to a known-good DHL Express test shipment so the demo always lands on a real tracking page; the per-order URL is ignored. Production should template `tracking-id` on `order.trackingNumber`.
 - **`estimatedDelivery`** — DHL's forward-looking ETA, used as the collapsed-card subline when present (string, free-text date). **Optional** — DHL doesn't always communicate this. Code paths must handle absence gracefully.
+- **`estimatedDeliveryLong`** *(optional, string)* — the human-readable long form of `estimatedDelivery` (e.g. `"Monday, 4 May"`), used as the big `text-[26px]` headline inside `InProgressCard`'s hero block. Mirrors the `placedAt` / `placedAtFull` and `shipDeadline` / `shipDeadlineFull` pattern: a short machine-ish form and a pre-formatted long form, so the component never has to do weekday arithmetic. The hero falls back to `estimatedDelivery` (short form) when this is absent. Populated today on `89712` and `89510`.
+- **`deliveredOnLong`** *(optional, string)* — long-form delivery date (e.g. `"Wednesday, 15 April"`) used as the big headline inside the redesigned delivered card's hero block. Falls back to the date part of `order.timeline.delivered` (split on ` · `) when absent. Populated today on `89657`.
 - **`shipDeadline`** *(optional, string)* — the latest shipping date allowed by the Revibe 1–3 working-day ship SLA, short form (e.g. `"May 1"`). Surfaced only on the dissuade step of the cancellation flow (see §2.6). Today only populated on `89712` (the `created` order) because dissuade only fires at `created`.
 - **`shipDeadlineFull`** *(optional, string)* — the human-readable long form of `shipDeadline` (e.g. `"Friday, 1 May"`), embedded into the fee-waiver copy on the dissuade step. The pair mirrors the `placedAt` / `placedAtFull` pattern: a short machine-ish form and a pre-formatted long form, so the component never has to do working-day arithmetic.
 
@@ -457,7 +505,9 @@ src/
     ├── FiltersRow.jsx            Filters icon + profile chip
     ├── StoreCreditsCard.jsx      Wallet balance card (gradient amount + clipboard icon; decorative)
     ├── OrderFilters.jsx          Search field + range dropdown + status chip row (controlled)
-    ├── OrderCard.jsx             The expandable order card
+    ├── OrderCard.jsx             Expandable order card; today only renders shipped + in-flight cancelled mid-fulfilment
+    ├── InProgressCard.jsx        Expandable card for non-cancelled created/quality_check (refund-hero chrome family)
+    ├── PastOrderCard.jsx         Past-orders card; branches on `order.state` into delivered (no expand) and cancelled-past variants
     ├── CancelOrderSheet.jsx      Two-step bottom sheet for cancelling a `created` order
     ├── RefundDetailsSheet.jsx    Bottom sheet for the past cancelled card's `View refund details` action
     ├── StatusBanner.jsx          Tinted status banner with leading phrase + sentence

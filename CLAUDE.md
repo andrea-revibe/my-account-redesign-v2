@@ -20,15 +20,20 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 
 ## Where things live
 
-- `src/App.jsx` — page composition; owns filter state (`activeStatus`, `activeRange`) and computes `activeId` for the auto-expand rule.
-- `src/components/` — one component per file. `OrderCard` contains its own sub-components (`SummaryHeader`, `ProductRow`, `OrderIdRow`). `WalletInfoTooltip` is shared: anywhere "Revibe Wallet" is named (credits pill in `GreetRow`, refund option + confirm-step destination in `CancelOrderSheet`), reuse it instead of building another tooltip — it exports `REVIBE_WALLET_ICON` too.
-- `src/data/orders.js` — five mock orders covering all states. Optional fields: `delayed: true` triggers the warn-tone status banner; `statusMessage: '…'` overrides the banner body.
+- `src/App.jsx` — page composition; owns filter state (`activeStatus`, `activeRange`) and computes `activeId` for the auto-expand rule. Routes orders to one of three cards (see Mental models → "Card routing").
+- `src/components/` — one component per file. `OrderCard` contains its own sub-components (`SummaryHeader`, `ProductRow`, `OrderIdRow`). `InProgressCard` and `PastOrderCard` (delivered + cancelled-past variants) carry the newer "refund-hero family" chrome — share a left accent strip + `Order · #id` eyebrow + state pill row + tinted hero block + compact product row, differing in tone/headline/footer per state. `WalletInfoTooltip` is shared: anywhere "Revibe Wallet" is named (credits pill in `GreetRow`, refund option + confirm-step destination in `CancelOrderSheet`), reuse it instead of building another tooltip — it exports `REVIBE_WALLET_ICON` too.
+- `src/data/orders.js` — seven mock orders covering all states. Optional fields: `delayed: true` triggers the warn-tone status banner (`OrderCard` only — `InProgressCard` ignores it for the hero, see Mental models); `statusMessage: '…'` overrides the banner body; `estimatedDeliveryLong` / `deliveredOnLong` give the hero its long-form date headline.
 - `src/lib/statuses.js` — single source of truth: top-level `STATUSES`, `SHIPPING_SUB_STATUSES`, `ORDER_STATES`, header chip overrides, status-banner copy + tone, `pickActiveOrderId(orders)`, and the `statusHeadline` / `statusSubline` / `statusIconFor` helpers.
 - `brief/` — source screenshots and the design-system reference.
 - `docs/my-account-flow.md` — living doc of the orders flow (product + eng audience).
 - `CHANGELOG.md` — change history, phase by phase.
 
 ## Mental models worth knowing
+
+**Card routing.** Three card components, picked in `App.jsx`:
+- `InProgressCard` — non-cancelled `created` / `quality_check`. Brand-purple chrome, `Delivery by` ETA hero, `Cancel order` + `Change details` actions.
+- `OrderCard` — non-cancelled `shipped`; in-flight cancelled mid-fulfilment. Older chrome (status icon + headline + sub-timeline + courier banner).
+- `PastOrderCard` — `statusId === 'delivered'` (delivered branch, no expand) and `state === 'cancelled' && cancellationStatusId === 'refunded'` (cancelled-past refund-hero variant). Same component, two render branches based on `order.state`.
 
 **Two-tier status.** Top-level progression (`created → quality_check → shipped → delivered`) drives the horizontal timeline. While `statusId === 'shipped'`, the order also carries a `subStatusId` that drives the vertical sub-timeline. There is intentionally no `delivered` sub-status.
 
@@ -42,9 +47,11 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 
 The leading phrase describes **condition** (`On track`, `Arriving today`, `All done`), never the process step — that's already in the card header.
 
-**Auto-expand rule.** Everything collapses by default. `pickActiveOrderId(orders)` returns the id of the single most-in-flight order (highest `progressIndex × 10 + subProgressIndex`); `App.jsx` passes `defaultExpanded` to that one card only. Returns `null` when nothing is in flight.
+**Delayed QC keeps brand-purple in `InProgressCard`.** The `delayed: true` → warn tone above is honoured by `OrderCard` (shipped) but **not** by `InProgressCard` (created/QC). For QC, the hero stays brand-purple even when delayed; the only delay signal is the right-side tag swapping `Zap`/"On track" for `Clock`/"Taking longer than expected" (still brand-coloured) and the body sentence pulling delay-flavored copy from `DELAYED_BODY[statusId]`. Product decision — warn-amber felt overly alarming for a normal QC slowdown.
 
-**`OrderCard` tap target.** The whole collapsed header — including the status banner — is one button. The chevron is decorative.
+**Auto-expand rule.** Everything collapses by default. `pickActiveOrderId(orders)` returns the id of the single most-in-flight order (highest `progressIndex × 10 + subProgressIndex`); `App.jsx` passes `defaultExpanded` to that one card only. Returns `null` when nothing is in flight. The delivered card never expands (no chevron, no body); auto-expand only applies to `InProgressCard` / `OrderCard` / `PastOrderCard`'s cancelled branch.
+
+**Whole header is the tap target.** On `OrderCard` and `InProgressCard`, the whole collapsed header — including the status banner / hero block — is one button. The chevron is decorative.
 
 ## Conventions
 

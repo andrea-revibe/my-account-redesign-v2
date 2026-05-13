@@ -9,6 +9,8 @@ import {
   Hourglass,
   Receipt,
   Sparkles,
+  Home,
+  PackageCheck,
 } from 'lucide-react'
 import { CANCELLATION_STATUSES, STATUSES } from '../lib/statuses'
 import RefundDetailsSheet from './RefundDetailsSheet'
@@ -27,50 +29,101 @@ export default function PastOrderCard({ order }) {
 }
 
 function DeliveredOrderCard({ order }) {
-  const placedShort = (order.placedAtFull || order.placedAt || '').split(' · ')[0]
   return (
-    <article className="bg-surface rounded-card border border-line px-3.5 py-3">
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-[46px] rounded-[10px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
-          <img
-            src={order.product.image}
-            alt={order.product.name}
-            className="max-w-full max-h-full object-contain"
-          />
+    <article className="bg-surface rounded-card border border-line overflow-hidden relative">
+      <span
+        aria-hidden
+        className="absolute left-0 top-0 bottom-0 w-1 bg-success"
+      />
+      <div className="pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3">
+        <OrderEyebrow id={order.id} />
+        <DeliveredStatePill />
+        <DeliveredHero order={order} />
+        <DeliveredProductRow order={order} />
+        <div className="flex justify-end gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
+          <PastButton icon={Download} label="Download receipt" />
+          <PastButton icon={AlertTriangle} label="Raise a claim" />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-[13.5px] font-semibold text-ink truncate">
-            {order.product.name}
-          </div>
-          <div className="mt-0.5 text-[11.5px] text-muted truncate">
-            <span className="inline-flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-[0.04em] bg-success-bg text-success">
-              Delivered
+      </div>
+    </article>
+  )
+}
+
+function DeliveredStatePill() {
+  return (
+    <span className="self-start inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px] bg-success-bg text-success">
+      <PackageCheck size={11} strokeWidth={2} />
+      Delivered
+    </span>
+  )
+}
+
+function DeliveredHero({ order }) {
+  const headline =
+    order.deliveredOnLong ||
+    (order.timeline?.delivered ? order.timeline.delivered.split(' · ')[0] : '')
+  return (
+    <div className="rounded-[14px] border p-3.5 bg-gradient-to-br from-success-bg to-[#d4f0e3] border-[#c6ebd9]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+          Delivered on
+        </div>
+        <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-success">
+          <Check size={11} strokeWidth={2.5} />
+          Complete
+        </span>
+      </div>
+      <div className="mt-1 text-[26px] font-bold leading-[1.05] tracking-[-0.01em] text-success">
+        {headline}
+      </div>
+      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
+        <span>Delivered to</span>
+        <span className="inline-flex items-center rounded-full border bg-surface text-ink border-line font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5">
+          <Home size={12} strokeWidth={2} />
+          Home
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function DeliveredProductRow({ order }) {
+  return (
+    <div className="flex items-center gap-2.5 -mx-1 px-1">
+      <div className="w-8 h-10 rounded-[8px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
+        <img
+          src={order.product.image}
+          alt=""
+          className="max-w-full max-h-full object-contain"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-semibold text-ink truncate">
+          {order.product.name}
+        </div>
+        <div className="text-[11px] text-muted truncate">
+          {order.product.variant}
+        </div>
+        {order.warranty != null && (
+          <div className="flex items-center gap-1 mt-0.5 text-[10.5px] text-muted">
+            <img
+              src={REVIBE_CARE_ICON}
+              alt=""
+              className="w-2.5 h-2.5 object-contain shrink-0"
+            />
+            <span className="truncate">
+              Revibe Care +{order.currency}{' '}
+              {order.warranty.toLocaleString()}
             </span>
-            {placedShort} · #{order.id}
           </div>
-          {order.warranty != null && (
-            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted">
-              <img
-                src={REVIBE_CARE_ICON}
-                alt=""
-                className="w-3 h-3 object-contain shrink-0"
-              />
-              <span className="truncate">
-                Revibe Care +{order.currency}{' '}
-                {order.warranty.toLocaleString()}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="text-[13.5px] font-semibold text-ink whitespace-nowrap">
+        )}
+      </div>
+      <div className="text-right shrink-0">
+        <div className="text-[13px] font-semibold text-ink tabular-nums whitespace-nowrap">
           {order.currency} {order.total.toLocaleString()}
         </div>
       </div>
-      <div className="flex justify-end gap-2 mt-2.5 pt-2.5 border-t border-line-2">
-        <PastButton icon={Download} label="Download receipt" />
-        <PastButton icon={AlertTriangle} label="Raise a claim" />
-      </div>
-    </article>
+    </div>
   )
 }
 

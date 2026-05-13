@@ -4,6 +4,7 @@ import GreetRow from './components/GreetRow'
 import OrderFilters from './components/OrderFilters'
 import HeroCard from './components/HeroCard'
 import OrderCard from './components/OrderCard'
+import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
 import ChatFab from './components/ChatFab'
 import { ORDERS } from './data/orders'
@@ -127,17 +128,27 @@ export default function App() {
                   count={inFlight.length}
                 />
                 <div className="px-4 flex flex-col gap-3">
-                  {inFlight.map((o) =>
-                    isInFlightCancellation(o) ? (
-                      <PastOrderCard key={o.id} order={o} />
-                    ) : (
+                  {inFlight.map((o) => {
+                    if (isInFlightCancellation(o)) {
+                      return <PastOrderCard key={o.id} order={o} />
+                    }
+                    if (o.statusId === 'created' || o.statusId === 'quality_check') {
+                      return (
+                        <InProgressCard
+                          key={o.id}
+                          order={o}
+                          defaultExpanded={!showHero && o.id === activeId}
+                        />
+                      )
+                    }
+                    return (
                       <OrderCard
                         key={o.id}
                         order={o}
                         defaultExpanded={!showHero && o.id === activeId}
                       />
-                    ),
-                  )}
+                    )
+                  })}
                 </div>
               </>
             )}
