@@ -31,6 +31,7 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 - Auto-expand rule: only the single most in-flight order is expanded by default; the rest collapse.
 - Status chip row that filters the list (`All / In progress / Delivered / Cancelled`).
 - Status banner with `delayed` and `statusMessage` overrides.
+- **Change-of-mind returns flow** — 9-step mobile overlay launched from the `Raise a claim` button on delivered past orders (see §2.7). Other claim types (faulty / damaged / missing / other) are stubbed on the entry screen.
 
 **Out of scope (faked or stubbed)**
 
@@ -39,8 +40,9 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 - Date-range dropdown effect on the list (logic is wired but all mock orders fall inside every range).
 - The Revibe Wallet pill in `GreetRow` (purely visual; the balance is a hardcoded prop and the info tooltip is the only interactive part).
 - Right-to-left and Arabic localisation.
-- Receipt-download flow and claims flow.
+- Receipt-download flow. Claims flow exists for change-of-mind returns only (see §2.7); other claim types are stubbed.
 - Real courier tracking — the "Track order" button hardcodes a known-good DHL Express test shipment so the demo always lands on a real tracking page.
+- Return-claim submission — Step 8's Submit advances to a confirmation screen with a generated ref number but does not persist anything.
 
 ---
 
@@ -340,6 +342,118 @@ backend per order. Today only order `89712` carries `subtotal` + `warranty`
 warranty row, and the dissuade step never fires for them because they're
 past the `created` stage.
 
+### 2.7 Change-of-mind returns flow
+
+The `Raise a claim` button on the delivered `PastOrderCard` launches a
+nine-step full-screen overlay (`src/components/ClaimFlow/ClaimFlow.jsx`)
+for raising a change-of-mind return. Other claim types (faulty / damaged
+/ missing / other) appear on the entry screen but route to a placeholder
+note rather than their own flows — out of scope for this build.
+
+The flow's visual chrome is deliberately distinct from the order-card
+family: white surface, segmented top progress bar (`bg-brand` for reached
+segments, `bg-line` for upcoming) + `Step X of 9` caption, sticky bottom
+action bar with the only filled brand-purple `Continue` button, and
+line-bordered cards that gain a `border-brand bg-brand-bg/30` treatment
+when selected. Tinted hero blocks are reserved for one place — the Step 5
+device-prep warn callout — so the user can feel the visual shift between
+"informational" (account cards) and "doing a task" (the flow) without
+leaving the design system.
+
+**Mount + state.** `App.jsx` owns `claimFlowOrderId`. The overlay is
+rendered conditionally (`{claimFlowOrderId !== null && <ClaimFlow ... />}`),
+so closing it unmounts the reducer state — the brief explicitly forbids
+session persistence. The reducer (`flowReducer.js`) takes the entry
+`orderId` as its initialiser argument: when launched from a specific
+order, `initialState(initialOrderId)` pre-seeds `claimType:
+'change_of_mind'`, `orderId`, and `step: 2` so the user lands on the
+order picker with that order pre-selected and can back-step to Step 1 if
+they want to confirm the claim type. Launching with `null` (e.g. from a
+hypothetical top-level entry) starts at Step 1.
+
+**Step-by-step.**
+
+1. **Claim type.** Five vertical option rows. Selecting `Return an item
+   (change of mind)` advances. The four out-of-scope options show an
+   inline note explaining they aren't part of this build.
+2. **Order selection.** `groupOrdersByEligibility(ORDERS)` (see §4.7)
+   splits the list into eligible (full-colour, tappable) and ineligible
+   (collapsed below, greyed, not tappable). Eligible cards show
+   `Eligible to return until {date}` in a success-tone chip; ineligible
+   cards show the reason inline (`Cancelled before delivery`, `Delivered
+   more than 10 days ago`, `Already refunded`, `Not yet delivered`).
+3. **Product & quantity.** Single-product card with a stepper bounded by
+   `order.quantity`. When `quantity === 1` the stepper is suppressed and
+   the card shows `Returning 1 of 1` — spec asks for an explicit
+   pre-confirm rather than a noop control.
+4. **Reason (optional).** Five radio options. `Other` reveals a 200-char
+   `textarea`. The sticky bar renders a `Skip` button alongside
+   `Continue` — both advance, since the step is optional.
+5. **Device preparation (gated).** Two stacked radio cards. Option A
+   (`I've factory reset the device`, recommended pill) carries an
+   `iPhone` / `Android` OS-tabs control, a collapsible numbered reset
+   instructions list per OS, and a required confirmation checkbox.
+   Option B (`Provide unlock credentials`) carries the same OS tabs, an
+   email field, a password field with show/hide toggle, and the
+   encryption-disclosure note. `canAdvance` returns false until one
+   complete option is filled. A `If you leave this flow, you'll need to
+   start over` hint sits below.
+6. **Return method.** Three placeholder options (Courier pickup,
+   Drop-off, In-store) with timeline + cost notes. Courier pickup
+   reveals an inline `Pickup address` textarea; the address must be
+   non-empty before Continue enables.
+7. **Refund method.** Two stacked refund cards built off
+   `refundBreakdown(order, units, method)` (see §4.7). Wallet card:
+   `recommended` success pill + full amount + wallet-info tooltip
+   reusing the shared `WalletInfoTooltip` + `REVIBE_WALLET_ICON`.
+   Original-payment card: net amount with the gross shown struck-through
+   and the 10% restocking fee broken out explicitly. The card label uses
+   `order.paymentMethod.brand` + `last4`.
+8. **Review & submit.** Sectioned summary with an inline `Edit` link per
+   section dispatching `GO_TO_STEP` to jump back to the originating
+   step. Device-prep is masked to `Factory reset confirmed` /
+   `Credentials provided` — credentials are never displayed in plain
+   text. The refund block shows the final net the user receives. The
+   sticky bar swaps `Continue` for a success-tone `Submit return
+   request`.
+9. **Confirmation.** `generateClaimRef()` produces a `RET-XXXXXXXX`
+   reference shown with a `Copy` button. Next-steps list:
+   `Check your inbox` (email instructions stub), `Expected refund`
+   (amount + destination + method-keyed timeline), `Device preparation`
+   (reinforcement of the commitment from Step 5). Two footer buttons:
+   `Track this return` (stub) + `Back to my account` (closes overlay).
+
+**Eligibility logic** (`eligibilityFor(order, today)` in
+`src/lib/returns.js`):
+
+1. `state === 'cancelled'` → ineligible. `cancellationStatusId ===
+   'refunded'` → "Already refunded"; otherwise → "Cancelled before
+   delivery".
+2. `statusId !== 'delivered'` → "Not yet delivered".
+3. Delivery date unknown (no `deliveredOn` and no parseable
+   `timeline.delivered`) → "Delivery date unknown".
+4. `now > deliveredOn + 10 days` → "Delivered more than 10 days ago".
+5. `order.returnedAt` set (future hook, not populated today) → "Already
+   returned".
+6. Otherwise → eligible, with `untilDate = deliveredOn + 10 days`.
+
+The eligibility check prefers the new `deliveredOn` ISO field
+(`'2026-05-08'`) and falls back to parsing the date portion of
+`timeline.delivered` against the year from `placedAt`.
+
+**Refund math** (`refundBreakdown(order, units, method)`):
+
+- `unitPrice` from `order.unitPrice` (falls back to `subtotal`, then
+  `total`).
+- `gross = unitPrice * units`.
+- Wallet: `fee = 0`, `net = gross`.
+- Original payment: `fee = round(gross * 0.10)`, `net = gross - fee`.
+
+**Submission is a stub.** Step 8's submit calls
+`dispatch({ type: 'SUBMIT', value: generateClaimRef() })` which just
+advances to Step 9. No persistence, no API call. The flow has no
+backend hook today.
+
 ---
 
 ## 3. UX decisions and rationale
@@ -483,6 +597,19 @@ Today an order has one product. The `product` object carries:
 
 Multi-item orders are out of scope for the prototype.
 
+### 4.7 Returns-flow fields (delivered orders only)
+
+Optional fields populated only on the demo order that's wired up as
+eligible for change-of-mind return today (`89657`). Other orders fall
+back to `subtotal`/`total` for refund math and render as ineligible in
+the order picker, so absence is benign.
+
+- **`deliveredOn`** *(optional, string)* — ISO date (`'2026-05-08'`) used as the canonical delivery date for the 10-day return-window check in `eligibilityFor`. Code falls back to parsing `timeline.delivered` when absent (less robust — only present-year dates resolve correctly).
+- **`unitPrice`** *(optional, number)* — per-unit price used by `refundBreakdown` to compute `gross = unitPrice * units` for partial returns. Falls back to `subtotal` (then `total`) when absent, which means single-unit orders compute correctly without the field but multi-unit returns will over-refund unless `unitPrice` is set.
+- **`paymentMethod`** *(optional, object)* — `{ type, brand, last4 }`. Surfaced on Step 7 of the returns flow (`Visa •• 4242` label on the original-payment refund card) and on Steps 8 & 9 (Review + Confirmation). When absent the original-payment card label falls back to a generic `Card •• 0000`.
+- **`deviceOs`** *(optional, string, `'ios' | 'android'`)* — seeds Step 5's OS-tabs control (factory-reset instructions + credentials field labels). Defaults to `'ios'` when absent.
+- **`returnedAt`** *(future hook, not populated today)* — when set, makes the order ineligible for change-of-mind return with reason `Already returned`.
+
 ---
 
 ## 5. Component architecture
@@ -491,13 +618,14 @@ Multi-item orders are out of scope for the prototype.
 
 ```
 src/
-├── App.jsx                       Page composition; owns filter state + active-id wiring
+├── App.jsx                       Page composition; owns filter state + active-id wiring + claimFlowOrderId
 ├── main.jsx                      Vite entry point
 ├── index.css                     Tailwind directives + base styles
 ├── data/
 │   └── orders.js                 Mock orders array
 ├── lib/
-│   └── statuses.js               Top-level + sub-status definitions, status-banner copy + tone, pickActiveOrderId, helpers
+│   ├── statuses.js               Top-level + sub-status definitions, status-banner copy + tone, pickActiveOrderId, helpers
+│   └── returns.js                Return-eligibility logic, refund math, formatting helpers, claim-ref generator
 └── components/
     ├── PromoBar.jsx              Magenta promo strip at the top
     ├── Header.jsx                Logo, language, profile, wishlist, bag
@@ -515,7 +643,22 @@ src/
     ├── ShippingSubTimeline.jsx   Vertical sub-status timeline
     ├── CourierBanner.jsx         Tracking banner with "Track order" + "Need help with delivery?" CTAs
     ├── OrderSummary.jsx          Summary table inside the expanded card
-    └── ChatFab.jsx               Floating chat-with-support button
+    ├── ChatFab.jsx               Floating chat-with-support button
+    └── ClaimFlow/                Change-of-mind returns flow (see §2.7)
+        ├── ClaimFlow.jsx         Overlay shell: useReducer, sticky header + progress, step router, sticky action bar
+        ├── flowReducer.js        State shape, action creators, canAdvance(state, order) per-step validation
+        ├── ProgressBar.jsx       Segmented 9-step progress bar + "Step X of 9" caption
+        ├── StickyActionBar.jsx   Sticky bottom button bar (Continue / Submit / optional secondary)
+        ├── StepHeading.jsx       Shared 24px step heading + 13.5px muted subtitle
+        ├── Step1ClaimType.jsx    Five claim-type options; only "change of mind" advances
+        ├── Step2OrderSelection.jsx Eligible cards + collapsible ineligible group with reasons
+        ├── Step3ProductQuantity.jsx Product card + quantity stepper (or "Returning 1 of 1" when quantity is 1)
+        ├── Step4Reason.jsx       Optional reason radio + free-text reveal on "Other"
+        ├── Step5DevicePrep.jsx   Gated: factory-reset path (OS tabs + instructions + checkbox) or credentials path
+        ├── Step6ReturnMethod.jsx Return method radios with conditional address textarea
+        ├── Step7RefundMethod.jsx Wallet vs original-payment refund cards with the 10% fee broken out
+        ├── Step8Review.jsx       Sectioned summary with per-section Edit links jumping to that step
+        └── Step9Confirmation.jsx Success state with claim ref + Copy + next-steps list
 ```
 
 ### 5.2 Component tree
@@ -605,7 +748,8 @@ What looks real in the prototype but is faked:
 - **`estimatedDelivery` format.** Currently a freeform string (`"Wed, 29 Apr 2026"`). DHL's real shape may include time windows and structured data; we'll need to revisit when integrating.
 - **Single carrier.** Code is generalised but mock data uses DHL only. Adding a second carrier requires no code change.
 - **Single-item orders.** The product object is a single entry. Multi-item orders need a `products[]` array and a layout adjustment.
-- **Download receipt, Raise a claim.** Buttons are present but do nothing. Each needs its own flow / page.
+- **Download receipt.** Buttons are present but do nothing. Production needs a receipt-render endpoint.
+- **Raise a claim** on delivered orders launches the change-of-mind returns flow (§2.7). The flow is fully interactive end-to-end but does not persist submissions — Step 8's submit advances to Step 9 with a client-generated `RET-XXXXXXXX` reference. Production needs the submission endpoint, real return-shipping rules, the 4 non-change-of-mind claim branches, and a `returnedAt` flag on the order so a returned item drops out of the eligibility picker.
 - **Site-wide search, in-list "Find items" search, Revibe Wallet pill.** Visual placeholders, no logic. The wallet balance is a hardcoded prop; the wallet info tooltip's `terms & conditions` link goes nowhere (`href="#"`).
 - **Date-range dropdown.** Logic is wired (parses `placedAt`, filters by cutoff) but visibly inert because all five mock orders fall inside every range. Status chips do filter the list.
 - **Inter font.** Production is Graphik; we substituted Inter via Google Fonts because Graphik is licensed.
@@ -627,8 +771,11 @@ Items deliberately parked rather than built.
 - **Returned and refunded states.** Not modelled. Likely additions to `ORDER_STATES` plus their own banner copy.
 - **Re-order CTA on delivered orders.** Common pattern; not currently present.
 - **Forward-looking ETA inside `CourierBanner`.** Currently the banner copy is generic; the ETA shows in the collapsed-card subline only. Could surface in both places.
-- **Claim flow, receipt download.** Each is a stubbed button today.
-- **Multi-item orders.** Layout change needed to render multiple `ProductRow`s.
+- **Receipt download.** Stubbed button today; the returns flow is built (see §2.7).
+- **Returns flow — branches beyond change-of-mind.** Faulty / damaged / missing / other are stubbed on Step 1 with an inline note. Each needs its own diagnostic path before reaching the device-prep + return-method + refund stages.
+- **Returns flow — submission persistence.** Step 8's submit is a no-op. Wire it to an endpoint that creates a real claim and links the `returnedAt` flag on the order so the picker hides it next time.
+- **Returns flow — top-level entry.** Today the only entry point is the delivered card's `Raise a claim`. A "Return an item" entry from My Account (passing `null` as `initialOrderId`) lands the user at Step 1 with no order pre-selected — the reducer's `initialState(null)` branch already supports this.
+- **Multi-item orders.** Layout change needed to render multiple `ProductRow`s. The returns flow already accommodates partial returns via `Step3ProductQuantity`'s stepper, but the underlying order shape carries a single `product` — multi-product orders will need a `products[]` array and per-line selection in Step 3.
 - **Order list grouping ("In progress" / "Completed" sections).** Considered, set aside in favour of the chip-based filter. Worth revisiting if the list gets long.
 
 ---
@@ -642,6 +789,7 @@ named section here as part of the same commit:
 - Changing the order shape (including new optional fields like `delayed`, `statusMessage`) → §4.
 - Changing the auto-expand rule, banner visibility, status-banner copy/tone, or chip override rules → §2.5, §3.
 - Adding or removing a component → §5.1, §5.2.
+- Changing the returns flow (eligibility rules, refund math, the step sequence, device-prep gating, entry-point wiring) → §2.7, §4.7. New optional fields used by the returns flow also go in §4.7.
 - Resolving an item from §8 → move it out of §8 and integrate the description into the relevant earlier section.
 
 Reference [`CHANGELOG.md`](../CHANGELOG.md) for change history; this document
