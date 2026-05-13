@@ -7,6 +7,7 @@ import OrderCard from './components/OrderCard'
 import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
 import ChatFab from './components/ChatFab'
+import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
 
@@ -57,6 +58,7 @@ function matchesRange(order, rangeId, now) {
 export default function App() {
   const [activeStatus, setActiveStatus] = useState('all')
   const [activeRange, setActiveRange] = useState('3m')
+  const [claimFlowOrderId, setClaimFlowOrderId] = useState(null)
 
   // Counts are computed off the date-range-filtered set so the chip badges
   // stay accurate when the user widens / narrows the date window.
@@ -158,7 +160,11 @@ export default function App() {
                 <SectionLabel title="Past orders" count={past.length} />
                 <div className="px-4 flex flex-col gap-3">
                   {past.map((o) => (
-                    <PastOrderCard key={o.id} order={o} />
+                    <PastOrderCard
+                      key={o.id}
+                      order={o}
+                      onRaiseClaim={setClaimFlowOrderId}
+                    />
                   ))}
                 </div>
               </>
@@ -168,6 +174,12 @@ export default function App() {
 
         <ChatFab />
       </div>
+      {claimFlowOrderId !== null && (
+        <ClaimFlow
+          initialOrderId={claimFlowOrderId}
+          onClose={() => setClaimFlowOrderId(null)}
+        />
+      )}
     </div>
   )
 }

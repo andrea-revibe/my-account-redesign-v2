@@ -23,12 +23,12 @@ const REVIBE_CARE_ICON =
 // (requested / refund_pending / refunded) render the refund-hero card,
 // which leads with the refund amount and destination rather than the
 // fulfilment journey.
-export default function PastOrderCard({ order }) {
+export default function PastOrderCard({ order, onRaiseClaim }) {
   if (order.state === 'cancelled') return <CancelledOrderCard order={order} />
-  return <DeliveredOrderCard order={order} />
+  return <DeliveredOrderCard order={order} onRaiseClaim={onRaiseClaim} />
 }
 
-function DeliveredOrderCard({ order }) {
+function DeliveredOrderCard({ order, onRaiseClaim }) {
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
       <span
@@ -42,7 +42,11 @@ function DeliveredOrderCard({ order }) {
         <DeliveredProductRow order={order} />
         <div className="flex justify-end gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
           <PastButton icon={Download} label="Download receipt" />
-          <PastButton icon={AlertTriangle} label="Raise a claim" />
+          <PastButton
+            icon={AlertTriangle}
+            label="Raise a claim"
+            onClick={() => onRaiseClaim?.(order.id)}
+          />
         </div>
       </div>
     </article>
@@ -127,9 +131,13 @@ function DeliveredProductRow({ order }) {
   )
 }
 
-function PastButton({ icon: Icon, label }) {
+function PastButton({ icon: Icon, label, onClick }) {
   return (
-    <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-line bg-surface text-[12px] font-medium text-ink hover:bg-line-2">
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-line bg-surface text-[12px] font-medium text-ink hover:bg-line-2"
+    >
       <Icon size={13} strokeWidth={1.75} className="opacity-75" />
       {label}
     </button>
