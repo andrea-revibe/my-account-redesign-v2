@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { CANCELLATION_STATUSES, STATUSES } from '../lib/statuses'
+import RefundDetailsSheet from './RefundDetailsSheet'
 
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
@@ -102,6 +103,7 @@ const TONE = {
 
 function CancelledOrderCard({ order }) {
   const [expanded, setExpanded] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const tone = toneFor(order.cancellationStatusId)
 
   return (
@@ -132,8 +134,6 @@ function CancelledOrderCard({ order }) {
             <RefundProgressDots order={order} />
           </div>
 
-          <RefundBreakdown order={order} tone={tone} />
-
           <div className="flex items-center justify-between px-1">
             <span className="text-[10.5px] uppercase tracking-[0.06em] font-bold text-muted">
               Order was
@@ -144,6 +144,7 @@ function CancelledOrderCard({ order }) {
           <div className="flex gap-2">
             <button
               type="button"
+              onClick={() => setDetailsOpen(true)}
               className="flex-1 h-[42px] rounded-[10px] bg-surface border border-line text-ink font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
             >
               View refund details
@@ -159,6 +160,12 @@ function CancelledOrderCard({ order }) {
           </div>
         </div>
       )}
+
+      <RefundDetailsSheet
+        order={order}
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+      />
     </article>
   )
 }
@@ -370,39 +377,6 @@ function shortLabel(step) {
   if (step.id === 'requested') return 'Requested'
   if (step.id === 'refund_pending') return 'Pending'
   return 'Refunded'
-}
-
-function RefundBreakdown({ order, tone }) {
-  const t = TONE[tone]
-  return (
-    <div className="rounded-[12px] border border-line-2 bg-[#fbfafd] p-3">
-      <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-muted mb-2">
-        Refund breakdown
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {order.refund.breakdown.map((l) => (
-          <div
-            key={l.label}
-            className="flex justify-between text-[12.5px] text-ink-2"
-          >
-            <span>{l.label}</span>
-            <span className="tabular-nums">
-              {order.currency} {l.amount.toLocaleString()}
-            </span>
-          </div>
-        ))}
-        <div className="border-t border-dashed border-line my-1" />
-        <div className="flex justify-between items-baseline">
-          <span className="text-[12.5px] font-semibold text-ink">
-            Total refund
-          </span>
-          <span className={`text-[15px] font-bold tabular-nums ${t.text}`}>
-            {order.currency} {order.refund.amount.toLocaleString()}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function FulfilmentTrace({ order }) {

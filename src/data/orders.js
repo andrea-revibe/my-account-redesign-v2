@@ -153,6 +153,7 @@ export const ORDERS = [
       requested: '6 May · 11:30 AM',
     },
     refund: {
+      subtotal: 459,
       amount: 459,
       destination: { kind: 'wallet', label: 'Revibe Wallet' },
       breakdown: [
@@ -190,7 +191,9 @@ export const ORDERS = [
       refund_pending: '28 Mar · 2:18 PM',
     },
     refund: {
-      amount: 349,
+      subtotal: 349,
+      fee: { label: 'Processing fee', rate: 0.05, amount: 17.45 },
+      amount: 331.55,
       destination: { kind: 'card', label: 'Visa', last4: '4242' },
       breakdown: [
         { label: 'iPhone 8', amount: 309 },
@@ -230,6 +233,7 @@ export const ORDERS = [
       refunded: '18 Mar · 11:00 AM',
     },
     refund: {
+      subtotal: 609,
       amount: 609,
       destination: { kind: 'wallet', label: 'Revibe Wallet' },
       breakdown: [

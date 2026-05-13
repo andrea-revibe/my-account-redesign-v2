@@ -95,10 +95,13 @@ Past-order cards (delivered, cancelled) are a separate, simpler component
   Each reached/current step carries the timestamp it entered that phase
   underneath its label (sourced from
   `order.cancellationTimeline[step.id]`); upcoming steps render the label
-  only. Then a line-item refund breakdown, a dimmed fulfilment trace
-  ending in a red ✕ at the cancel point, and a two-action footer
-  (`View refund details` + icon-only `Download receipt`). Always
-  collapsed by default; no auto-expand.
+  only. Then a dimmed fulfilment trace ending in a red ✕ at the cancel
+  point, and a two-action footer (`View refund details` + icon-only
+  `Download receipt`). Tapping `View refund details` opens the
+  `RefundDetailsSheet` bottom sheet, which is the canonical surface for
+  the line-item breakdown (product + Revibe Care line items → subtotal →
+  fee (card refunds only) → total refund). Always collapsed by default;
+  no auto-expand.
 
 The full `OrderCard` chrome (status banner, sub-timeline, courier banner,
 order summary) is no longer rendered for cancelled past orders.
@@ -415,9 +418,11 @@ Cancelled past orders carry a `refund` object that drives `PastOrderCard`'s
 refund-hero treatment. In-flight cancelled orders (still mid-fulfilment) and
 non-cancelled orders do not need this field.
 
-- **`refund.amount`** — total refund amount, no currency symbol (number). Same currency as `order.total`.
+- **`refund.subtotal`** — pre-fee refund amount, no currency symbol (number). Sum of `refund.breakdown` line items.
+- **`refund.fee`** *(optional, object)* — `{ label, rate, amount }`. Present only on card refunds (5% processing fee applied at cancellation per the `CancelOrderSheet` policy). Absent on wallet refunds. `rate` is the decimal (e.g. `0.05` → rendered as `(5%)` next to the label); `amount` is the currency value subtracted from `subtotal` to arrive at `amount`.
+- **`refund.amount`** — **net** refund amount actually sent to the destination (number). Equals `subtotal - fee.amount` when a fee is present, otherwise `subtotal`. This is what the hero displays.
 - **`refund.destination`** — where the refund is going. `{ kind: 'wallet', label: 'Revibe Wallet' }` for wallet refunds; `{ kind: 'card', label, last4 }` for card refunds.
-- **`refund.breakdown`** — array of `{ label, amount }` line items summing to `refund.amount`. Rendered in the expanded card's refund breakdown block.
+- **`refund.breakdown`** — array of `{ label, amount }` line items summing to `refund.subtotal`. Rendered inside `RefundDetailsSheet`.
 - **`refund.fundsAvailable`** *(optional, string)* — short status copy shown under the hero amount. Only surfaced on `refunded` orders today; future card-refund ETAs ("Expected by 22 May") could also populate it.
 
 ### 4.6 Product fields
@@ -454,6 +459,7 @@ src/
     ├── OrderFilters.jsx          Search field + range dropdown + status chip row (controlled)
     ├── OrderCard.jsx             The expandable order card
     ├── CancelOrderSheet.jsx      Two-step bottom sheet for cancelling a `created` order
+    ├── RefundDetailsSheet.jsx    Bottom sheet for the past cancelled card's `View refund details` action
     ├── StatusBanner.jsx          Tinted status banner with leading phrase + sentence
     ├── StatusTimeline.jsx        Horizontal 4-step timeline
     ├── ShippingSubTimeline.jsx   Vertical sub-status timeline
