@@ -2,6 +2,24 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 13 (cancel-flow polish + keep-my-order undo)
+
+### Added
+
+- **`KeepOrderSheet` component** (`src/components/KeepOrderSheet.jsx`) — single-step bottom sheet that lets a customer reverse an in-flight cancellation. Header (`Keep your order?` + `#id`), a brand-tinted hero card with a `RotateCcw` icon and the line *"Your {product name} will continue through fulfilment as if it was never cancelled."*, plus — only on `refund_pending` — a neutral info-tone strip noting that the pending refund (amount + destination) will be cancelled. Footer pairs an outlined `No, continue cancellation` with a brand-filled `Yes, keep my order`. Matches `CancelOrderSheet`'s chrome (`bg-black/45` scrim, `slideUp` panel, `Escape` to close, body-scroll lock). Submit is a stub — both buttons close the sheet, no state mutation (see §7 of `docs/my-account-flow.md`).
+- **`I want to keep my order` CTA on cancelled-in-flight `PastOrderCard`s.** A new full-width brand-purple primary button sits **above** the `View refund details` / `Download receipt` action row inside the expanded body of the cancelled refund-hero card, gated on `cancellationStatusId === 'requested' || cancellationStatusId === 'refund_pending'`. The `refunded` past-orders branch never shows the button — once the refund has landed, the undo affordance is gone. Clicking the CTA opens `KeepOrderSheet`.
+- **`paymentMethod` on in-flight orders `89712` and `89510`.** The created iPhone 12 now carries `{ type: 'card', brand: 'Visa', last4: '4242' }`; the delayed quality-check iPhone 11 carries `{ type: 'card', brand: 'Mastercard', last4: '8210' }`. Previously only the delivered order `89657` carried `paymentMethod` (for the returns flow); the field is now also consumed by `CancelOrderSheet` so the original-payment refund option can name the card the money is going back to.
+
+### Changed
+
+- **`CancelOrderSheet` names the card on the original-payment refund option.** The amount line on Step 1's `Original payment method` card now reads `{currency} {amount} back to {brand} •• {last4}` (e.g. `AED 806.55 back to Visa •• 4242`), driven by `order.paymentMethod`. Falls back to `back to your card` when `paymentMethod` is absent so non-populated orders still render. Step 3 (Confirm) mirrors the change: the `back to your …` destination line under the headline amount now reads `back to your {brand} •• {last4}` instead of the generic `back to your original payment method`. Wallet path is unchanged.
+- **Dissuade step's fee-waiver sentence anchors on delivery, not shipping.** The success-tone shield strip on Step 2 now reads *"If we don't **deliver** by {order.estimatedDeliveryLong}, the {fee} processing fee is waived."* (was *"If we don't ship by {shipDeadlineFull}…"*). Falls back to `estimatedDelivery` when the long form is absent. The `shipDeadline*` fields are no longer read by the cancel UI; the data is left in place for now in case a hybrid sentence ("ship within 3 working days, deliver by …") returns in a later phase. The local helper variable was renamed `shipDeadlineFull → deliveryDeadlineFull` to match.
+
+### Notes
+
+- Keep-my-order submit is a prototype stub by design — the order shape today has no transition to flip `state` back from `cancelled` to `open`, and `cancellationStatusId` / `cancellationTimeline` would need clean teardown rules. Tracked in §7 of `docs/my-account-flow.md`.
+- The button only surfaces on `requested` and `refund_pending` cards because at `refunded` the money has already left the company; reversal there is a different business operation (re-charging the customer) and out of scope for this demo.
+
 ## [Unreleased] — phase 12 (change-of-mind returns flow)
 
 ### Added

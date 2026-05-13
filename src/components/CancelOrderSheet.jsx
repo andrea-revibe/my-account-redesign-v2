@@ -44,6 +44,7 @@ export default function CancelOrderSheet({ order, open, onClose }) {
   const fee = Math.round(total * 0.05 * 100) / 100
   const refundOriginal = Math.round((total - fee) * 100) / 100
   const currency = order.currency
+  const cardLabel = formatCardLabel(order.paymentMethod)
 
   return (
     <div
@@ -77,6 +78,7 @@ export default function CancelOrderSheet({ order, open, onClose }) {
             fee={fee}
             refundOriginal={refundOriginal}
             currency={currency}
+            cardLabel={cardLabel}
           />
         )}
         {step === 'dissuade' && (
@@ -106,6 +108,7 @@ export default function CancelOrderSheet({ order, open, onClose }) {
             fee={fee}
             refundOriginal={refundOriginal}
             currency={currency}
+            cardLabel={cardLabel}
           />
         )}
       </div>
@@ -160,6 +163,7 @@ function SelectStep({
   fee,
   refundOriginal,
   currency,
+  cardLabel,
 }) {
   return (
     <>
@@ -234,7 +238,7 @@ function SelectStep({
               selected={method === 'original'}
               onSelect={() => setMethod('original')}
               title="Original payment method"
-              amountLine={`${currency} ${formatMoney(refundOriginal)} back to your card`}
+              amountLine={`${currency} ${formatMoney(refundOriginal)} back to ${cardLabel}`}
               detailLine={`−${currency} ${formatMoney(fee)} (5% processing fee) · 5–10 business days`}
             />
           </div>
@@ -262,10 +266,11 @@ function ConfirmStep({
   fee,
   refundOriginal,
   currency,
+  cardLabel,
 }) {
   const isStoreCredit = method === 'store_credit'
   const amount = isStoreCredit ? total : refundOriginal
-  const destination = isStoreCredit ? 'Revibe Wallet' : 'original payment method'
+  const destination = isStoreCredit ? 'Revibe Wallet' : cardLabel
   const eta = isStoreCredit
     ? 'Available instantly after cancellation.'
     : 'Refunded to your card in 5–10 business days.'
@@ -352,10 +357,10 @@ function DissuadeStep({
   const deliveryDate =
     formatDeliveryDate(order.estimatedDelivery, order.placedAt) ||
     order.estimatedDelivery
-  const shipDeadlineFull =
-    order.shipDeadlineFull ||
-    formatDeliveryDate(order.shipDeadline, order.placedAt) ||
-    order.shipDeadline
+  const deliveryDeadlineFull =
+    order.estimatedDeliveryLong ||
+    formatDeliveryDate(order.estimatedDelivery, order.placedAt) ||
+    order.estimatedDelivery
   return (
     <>
       <SheetHeader
@@ -395,8 +400,8 @@ function DissuadeStep({
             className="text-success shrink-0 mt-px"
           />
           <span>
-            If we don't ship by{' '}
-            <span className="font-semibold">{shipDeadlineFull}</span>, the{' '}
+            If we don't deliver by{' '}
+            <span className="font-semibold">{deliveryDeadlineFull}</span>, the{' '}
             <span className="font-semibold">
               {currency} {formatMoney(fee)}
             </span>{' '}
@@ -544,6 +549,11 @@ function FooterBtn({ variant, disabled, onClick, children }) {
 
 function formatMoney(n) {
   return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)
+}
+
+function formatCardLabel(pm) {
+  if (pm && pm.brand && pm.last4) return `${pm.brand} •• ${pm.last4}`
+  return 'your card'
 }
 
 function formatDeliveryDate(estimatedDelivery, placedAt) {

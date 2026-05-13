@@ -265,8 +265,12 @@ radio cards:
   is named (credits pill in `GreetRow`, confirm-step destination line) — all
   driven by the shared `WalletInfoTooltip` component.
 - **Original payment method** — total minus a 5% processing fee, refunded
-  to the card in 5–10 business days. The fee is shown explicitly as a
-  negative line under the amount (e.g. `−AED 42.45 (5% processing fee)`).
+  to the card in 5–10 business days. The amount line names the actual card
+  the money is going back to (`{currency} {amount} back to {brand} •• {last4}`,
+  e.g. `AED 806.55 back to Visa •• 4242`), driven by `order.paymentMethod`.
+  When the order has no `paymentMethod` the line falls back to a generic
+  `back to your card`. The fee is shown explicitly as a negative line under
+  the amount (e.g. `−AED 42.45 (5% processing fee)`).
 
 The `Continue` CTA is disabled until a method is picked. `Keep order` closes
 the sheet without changes. `Continue` routes to **Dissuade** when the
@@ -286,11 +290,16 @@ stacked in a single-column body:
    reorder later*. Scarcity, not "this is irreversible" — the cancellation
    itself is fully reversible at `created`; the real risk is item supply.
 3. A soft-green success-tone strip with `ShieldCheck` icon framing the
-   protection: *"If we don't ship by {order.shipDeadlineFull}, the {currency}
-   {fee} processing fee is waived."* Anchored on the **shipping** deadline,
-   not delivery, because Revibe controls ship time but couriers can always
-   add delivery delays — shipping is the commitment the company can
-   actually defend.
+   protection: *"If we don't deliver by {order.estimatedDeliveryLong}, the
+   {currency} {fee} processing fee is waived."* Anchored on the **delivery**
+   date the user is staring at on the hero one line above — same date, same
+   commitment, no extra concept to introduce. Earlier drafts anchored this
+   on the ship deadline (`shipDeadlineFull`) because Revibe controls ship
+   time directly; that's still legible as a business defence but reads as
+   procedural to the customer, who only cares about when the box lands.
+   Falls back to `estimatedDelivery` (short form) when the long form is
+   absent. The `shipDeadline*` fields are kept in the data shape but are no
+   longer read by this UI.
 
 Footer has two equal-height chunky buttons (52px, `rounded-[12px]`,
 `text-[14.5px]`): a brand-filled `Keep my order` and an outlined
@@ -314,7 +323,9 @@ On the wallet path the destination line reads `back to your [wallet icon]
 Revibe Wallet [i]`, with the same shared info tooltip. On `Original payment
 method` the block also carries a muted breakdown line (e.g. `Total AED 849 ·
 −AED 42.45 fee`) between the headline figure and the destination, and the
-destination line stays as plain "original payment method" text.
+destination line names the same card as Step 1 — `back to your {brand} ••
+{last4}` (e.g. `back to your Visa •• 4242`), falling back to `back to your
+your card` when `order.paymentMethod` is absent.
 
 Beneath the amount block sits a neutral info-tone strip with method-specific
 copy. `Revibe Wallet`: *"Revibe Wallet credit stays on Revibe. It won't be
@@ -333,14 +344,46 @@ The current prototype does **not** persist cancellation: tapping the final
 Wiring this to flip `state` to `cancelled` and vary the cancelled-state banner
 copy by chosen refund method is a future step.
 
-The 5% fee, the 1–3 working-day shipping policy (which sets `shipDeadline`),
-the success-tone recommendation styling, and the line-item split are all
-prototype-only — production will need to read the eligibility window, fee
-rate, ship SLA, recommendation policy, and per-line-item amounts from the
-backend per order. Today only order `89712` carries `subtotal` + `warranty`
-+ `shipDeadline`; other orders fall back to `subtotal = total` with no
-warranty row, and the dissuade step never fires for them because they're
-past the `created` stage.
+The 5% fee, the success-tone recommendation styling, and the line-item split
+are all prototype-only — production will need to read the eligibility window,
+fee rate, recommendation policy, and per-line-item amounts from the backend
+per order. The dissuade step fires for both `created` and `quality_check`
+orders (`DISSUADE_STATUSES = new Set(['created', 'quality_check'])` inside
+`CancelOrderSheet.jsx`); both in-flight demo orders (`89712`, `89510`) carry
+`subtotal`, `warranty`, `estimatedDeliveryLong`, and `paymentMethod`, so the
+full flow exercises end-to-end on either. Orders past quality_check
+(`shipped`, `delivered`) don't surface a `Cancel order` button and never
+enter this sheet.
+
+### 2.6.1 Keep-my-order undo (in-flight cancellations)
+
+Once an order has been cancelled but the refund hasn't landed yet (so the
+card lives in the `In progress` section as a `PastOrderCard` refund-hero
+variant — `cancellationStatusId` is `requested` or `refund_pending`), the
+expanded view carries a primary brand-purple `I want to keep my order`
+button stacked **above** the existing `View refund details` + icon-only
+`Download receipt` row. The button is gated on those two cancellation
+states only; on `refunded` (past-orders section) the affordance disappears,
+because the money has already left the company and reversing is no longer
+a simple cancel-the-cancellation operation.
+
+Tapping it opens `KeepOrderSheet` (`src/components/KeepOrderSheet.jsx`),
+a single-step confirm sheet:
+
+- Header: `Keep your order?` + `#id`, X to dismiss.
+- Hero card: brand-tinted `RotateCcw` icon over the line *"Your {product}
+  will continue through fulfilment as if it was never cancelled."*
+- On `refund_pending` only, a neutral info strip names the pending refund
+  that will be cancelled: *"Your pending refund of {amount} will be
+  cancelled — no money will be returned to your {destination}."* On
+  `requested` this strip is suppressed (no refund has been issued yet, so
+  there's nothing to retract).
+- Footer: outlined `No, continue cancellation` and brand-filled
+  `Yes, keep my order`.
+
+Submit is a stub: both footer buttons just close the sheet. See §7 — the
+order shape today has no transition to flip `state` back from `cancelled`
+to `open` and to clean up `cancellationStatusId` / `cancellationTimeline`.
 
 ### 2.7 Change-of-mind returns flow
 
@@ -606,7 +649,7 @@ the order picker, so absence is benign.
 
 - **`deliveredOn`** *(optional, string)* — ISO date (`'2026-05-08'`) used as the canonical delivery date for the 10-day return-window check in `eligibilityFor`. Code falls back to parsing `timeline.delivered` when absent (less robust — only present-year dates resolve correctly).
 - **`unitPrice`** *(optional, number)* — per-unit price used by `refundBreakdown` to compute `gross = unitPrice * units` for partial returns. Falls back to `subtotal` (then `total`) when absent, which means single-unit orders compute correctly without the field but multi-unit returns will over-refund unless `unitPrice` is set.
-- **`paymentMethod`** *(optional, object)* — `{ type, brand, last4 }`. Surfaced on Step 7 of the returns flow (`Visa •• 4242` label on the original-payment refund card) and on Steps 8 & 9 (Review + Confirmation). When absent the original-payment card label falls back to a generic `Card •• 0000`.
+- **`paymentMethod`** *(optional, object)* — `{ type, brand, last4 }`. Originally introduced for the returns flow (Step 7's `Visa •• 4242` label on the original-payment refund card, plus Steps 8 & 9), now also consumed by `CancelOrderSheet`'s `Original payment method` option on Step 1 and the destination line on Step 3 — see §2.6. Populated today on the delivered `89657` (Visa 4242) plus the two in-flight `89712` (Visa 4242) and `89510` (Mastercard 8210); the third in-flight demo order, `89499`, is already cancelled so the cancel flow never opens for it. When absent the labels fall back to a generic `your card` (cancel flow) / `Card •• 0000` (returns flow).
 - **`deviceOs`** *(optional, string, `'ios' | 'android'`)* — seeds Step 5's OS-tabs control (factory-reset instructions + credentials field labels). Defaults to `'ios'` when absent.
 - **`returnedAt`** *(future hook, not populated today)* — when set, makes the order ineligible for change-of-mind return with reason `Already returned`.
 
@@ -636,7 +679,8 @@ src/
     ├── OrderCard.jsx             Expandable order card; today only renders shipped + in-flight cancelled mid-fulfilment
     ├── InProgressCard.jsx        Expandable card for non-cancelled created/quality_check (refund-hero chrome family)
     ├── PastOrderCard.jsx         Past-orders card; branches on `order.state` into delivered (no expand) and cancelled-past variants
-    ├── CancelOrderSheet.jsx      Two-step bottom sheet for cancelling a `created` order
+    ├── CancelOrderSheet.jsx      Two- or three-step bottom sheet for cancelling a created / quality_check order
+    ├── KeepOrderSheet.jsx        Single-step confirm sheet for reversing an in-flight cancellation
     ├── RefundDetailsSheet.jsx    Bottom sheet for the past cancelled card's `View refund details` action
     ├── StatusBanner.jsx          Tinted status banner with leading phrase + sentence
     ├── StatusTimeline.jsx        Horizontal 4-step timeline
@@ -750,6 +794,7 @@ What looks real in the prototype but is faked:
 - **Single-item orders.** The product object is a single entry. Multi-item orders need a `products[]` array and a layout adjustment.
 - **Download receipt.** Buttons are present but do nothing. Production needs a receipt-render endpoint.
 - **Raise a claim** on delivered orders launches the change-of-mind returns flow (§2.7). The flow is fully interactive end-to-end but does not persist submissions — Step 8's submit advances to Step 9 with a client-generated `RET-XXXXXXXX` reference. Production needs the submission endpoint, real return-shipping rules, the 4 non-change-of-mind claim branches, and a `returnedAt` flag on the order so a returned item drops out of the eligibility picker.
+- **`I want to keep my order` on in-flight cancelled cards** (§2.6.1) opens `KeepOrderSheet`'s confirm step; tapping `Yes, keep my order` just closes the sheet — `state` stays `cancelled` and the `cancellationStatusId` / `cancellationTimeline` are untouched. Production needs a reverse-cancellation endpoint, the rules for which cancellation phases are still reversible (e.g. refund_pending becomes irreversible the moment funds are released to the processor), and a state-machine transition that lifts the order back to its pre-cancellation `state` while clearing the cancellation fields cleanly.
 - **Site-wide search, in-list "Find items" search, Revibe Wallet pill.** Visual placeholders, no logic. The wallet balance is a hardcoded prop; the wallet info tooltip's `terms & conditions` link goes nowhere (`href="#"`).
 - **Date-range dropdown.** Logic is wired (parses `placedAt`, filters by cutoff) but visibly inert because all five mock orders fall inside every range. Status chips do filter the list.
 - **Inter font.** Production is Graphik; we substituted Inter via Google Fonts because Graphik is licensed.
