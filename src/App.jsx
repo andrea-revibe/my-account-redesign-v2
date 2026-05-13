@@ -21,13 +21,28 @@ function parsePlacedAt(s) {
   return new Date(y, m - 1, d, hh, mm).getTime()
 }
 
+// A cancelled order is still "in flight" until the refund actually lands.
+// Requested / refund_pending sit in the open section; refunded drops to past.
+function isInFlightCancellation(order) {
+  return (
+    order.state === 'cancelled' &&
+    order.cancellationStatusId !== 'refunded'
+  )
+}
+
+function isOpen(order) {
+  return (
+    (order.state !== 'cancelled' && order.statusId !== 'delivered') ||
+    isInFlightCancellation(order)
+  )
+}
+
 function matchesStatus(order, status) {
   if (status === 'all') return true
   if (status === 'cancelled') return order.state === 'cancelled'
   if (status === 'delivered')
     return order.statusId === 'delivered' && order.state !== 'cancelled'
-  if (status === 'in_progress')
-    return order.state !== 'cancelled' && order.statusId !== 'delivered'
+  if (status === 'in_progress') return isOpen(order)
   return true
 }
 
@@ -52,9 +67,7 @@ export default function App() {
   const counts = useMemo(
     () => ({
       all: dateFiltered.length,
-      in_progress: dateFiltered.filter(
-        (o) => o.state !== 'cancelled' && o.statusId !== 'delivered',
-      ).length,
+      in_progress: dateFiltered.filter(isOpen).length,
       delivered: dateFiltered.filter(
         (o) => o.statusId === 'delivered' && o.state !== 'cancelled',
       ).length,
@@ -79,14 +92,9 @@ export default function App() {
     activeStatus !== 'delivered'
 
   const inFlight = filtered.filter(
-    (o) =>
-      o.state !== 'cancelled' &&
-      o.statusId !== 'delivered' &&
-      (!showHero || o.id !== activeId),
+    (o) => isOpen(o) && (!showHero || o.id !== activeId),
   )
-  const past = filtered.filter(
-    (o) => o.statusId === 'delivered' || o.state === 'cancelled',
-  )
+  const past = filtered.filter((o) => !isOpen(o))
 
   return (
     <div className="min-h-full flex justify-center">
@@ -119,13 +127,17 @@ export default function App() {
                   count={inFlight.length}
                 />
                 <div className="px-4 flex flex-col gap-3">
-                  {inFlight.map((o) => (
-                    <OrderCard
-                      key={o.id}
-                      order={o}
-                      defaultExpanded={!showHero && o.id === activeId}
-                    />
-                  ))}
+                  {inFlight.map((o) =>
+                    isInFlightCancellation(o) ? (
+                      <PastOrderCard key={o.id} order={o} />
+                    ) : (
+                      <OrderCard
+                        key={o.id}
+                        order={o}
+                        defaultExpanded={!showHero && o.id === activeId}
+                      />
+                    ),
+                  )}
                 </div>
               </>
             )}
