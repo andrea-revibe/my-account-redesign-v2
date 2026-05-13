@@ -25,13 +25,14 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 
 **In scope**
 
-- Order list with five demo orders, one per top-level state plus a cancelled order.
+- Order list with eight demo orders, covering every top-level state plus a cancelled-past order and one delivered order carrying an in-flight return claim.
 - Per-order collapsed summary card with status banner.
 - Per-order expanded view with full timeline, courier banner, sub-timeline, and order summary.
 - Auto-expand rule: only the single most in-flight order is expanded by default; the rest collapse.
 - Status chip row that filters the list (`All / In progress / Delivered / Cancelled`).
 - Status banner with `delayed` and `statusMessage` overrides.
 - **Change-of-mind returns flow** — 9-step mobile overlay launched from the `Raise a claim` button on delivered past orders (see §2.7). Other claim types (faulty / damaged / missing / other) are stubbed on the entry screen.
+- **Claim card** — a fourth card type (`ClaimCard`) that tracks a submitted return through seven states (claim created → pending collection → under collection → in transit → under quality check → ready for refund → refunded). Replaces the delivered card for any order carrying a `claim` field. See §2.8.
 
 **Out of scope (faked or stubbed)**
 
@@ -51,19 +52,21 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 ### 2.1 What the customer sees
 
 A vertical list of orders, newest first. Each order is rendered as a card.
-There are now **three card components** — `InProgressCard`, `OrderCard`,
-and `PastOrderCard` — chosen by `App.jsx` based on `statusId` + `state`.
-All three share the same chrome family (left accent strip, `Order · #{id}`
-eyebrow, state pill, tinted hero block, compact product row) so the list
-reads as one consistent set; they differ in what the hero leads with and
-which actions hang off the bottom.
+There are now **four card components** — `InProgressCard`, `OrderCard`,
+`PastOrderCard`, and `ClaimCard` — chosen by `App.jsx` based on `statusId`
++ `state` + the presence of an `order.claim` field. All share the same
+chrome family (left accent strip, `Order · #{id}` eyebrow, state pill,
+tinted hero block, compact product row) so the list reads as one
+consistent set; they differ in what the hero leads with and which actions
+hang off the bottom.
 
 | Card | Used for | Hero leads with | Expandable? |
 |---|---|---|---|
 | `InProgressCard` | non-cancelled `created` / `quality_check` | `Delivery by` + ETA | yes |
 | `OrderCard` | non-cancelled `shipped`; in-flight cancellations mid-fulfilment | status icon + headline + ETA | yes |
-| `PastOrderCard` (delivered) | `statusId === 'delivered'` (non-cancelled) | `Delivered on` + date | no |
+| `PastOrderCard` (delivered) | `statusId === 'delivered'` (non-cancelled, no claim attached) | `Delivered on` + date | no |
 | `PastOrderCard` (cancelled past) | `state === 'cancelled' && cancellationStatusId === 'refunded'` (and the refund-hero variant for `requested` / `refund_pending` while in the open list) | `Refund of` / `Refunded` + amount | yes |
+| `ClaimCard` | any order carrying an `order.claim` field — replaces the delivered card. Lives in **In progress** while the claim is active; drops to **Past orders** once `claimStatusId === 'refunded'` | `Claim` + status label + claim ref + expected refund | yes |
 
 #### Created and quality_check (`InProgressCard`)
 
@@ -497,6 +500,99 @@ The eligibility check prefers the new `deliveredOn` ISO field
 advances to Step 9. No persistence, no API call. The flow has no
 backend hook today.
 
+### 2.8 Claim card (return tracking)
+
+Once a return claim exists for an order, the delivered `PastOrderCard` is
+replaced by `ClaimCard` — a fourth card type that tracks the claim
+through seven states and surfaces the summary captured during the
+returns flow.
+
+**State machine.**
+
+```mermaid
+stateDiagram-v2
+    [*] --> claim_created: Step 8 Submit (today: seeded directly on mock orders)
+    claim_created --> pending_collection
+    pending_collection --> under_collection
+    under_collection --> in_transit
+    in_transit --> under_qc
+    under_qc --> ready_for_refund
+    ready_for_refund --> refunded
+    refunded --> [*]
+```
+
+The seven states live in `CLAIM_STATUSES` inside `src/lib/claims.js` —
+add, rename, or reorder steps there and the card picks them up. The
+prototype today renders one mock claim, seeded on order `89219` in the
+`under_qc` state (see §4.8); rebuilding additional mock claims for
+design review is a matter of attaching extra `claim` objects to other
+delivered orders.
+
+**Tone progression.** The card's left accent strip, state pill, hero
+block, and 7-step progress dots all share a tone driven by
+`claimToneFor(claimStatusId)`:
+
+- `claim_created` → `pending_collection` → `under_collection` → `in_transit` → `under_qc` → **warn (amber)** — the unit is leaving the customer or undergoing verification, an unresolved state.
+- `ready_for_refund` → **brand (purple)** — the payout is being staged, which is the same "active processing" tone the refund-hero card uses for `refund_pending`.
+- `refunded` → **success (green)** — terminal, the money has moved.
+
+This piggybacks the existing `warn` / `brand` / `success` tokens — no
+new colour was added — and matches the convention `PastOrderCard` uses
+for its cancelled-past variants, so the language reads as one system.
+
+**Collapsed view.**
+
+- Left accent strip (tone-driven).
+- `Order · #{id}` eyebrow.
+- State pill with the current status's `headline` and a tone-coloured dot (`Pending collection`, `Under Quality Check`, etc.).
+- A tinted hero block carrying: `Claim` eyebrow on the left + a tone-coloured phase tag on the right (icon + label — `Submitted` / `Awaiting pickup` / `Collected` / `On the way` / `In review` / `Processing` / `Complete`); the status headline as a `text-[22px]` headline in the tone colour; a sub-line with the `claim.claimRef` (tabular-nums) and the most recent timeline timestamp; then, separated by a faint divider, an `Expected refund` (or `Refunded` once terminal) eyebrow + destination chip on the left and the net refund amount in `text-[22px]` tabular-nums on the right. The destination chip reuses the brand→accent gradient treatment when the refund is wallet-bound (echoes the `GreetRow` credits pill) and a neutral chip when the refund goes back to the original card.
+- A compact product row (image / name / variant / `Revibe Care +{currency} {amount}` line / total / chevron). The chevron is decorative; the whole header is one tap target.
+
+**Expanded view.**
+
+1. A 7-step horizontal dot timeline using `CLAIM_STATUSES`. Reached/current dots are filled in the tone colour with the same `shadow-[0_0_0_4px_rgb(255,242,221)]` glow on the current step that `InProgressCard` uses for its top-level timeline. Each reached step renders its date and time on two lines below the label, sourced from `claim.timeline[step.id]`.
+2. A small `Original order — Delivered {date}` trace line (the underlying order's `deliveredOnLong`, or the date part of `timeline.delivered`) so the customer keeps context that the delivery itself was completed.
+3. A two-action footer: `View claim details` (opens `ClaimDetailsSheet`) + icon-only `Download receipt` (decorative).
+
+**Claim details sheet.** `ClaimDetailsSheet`
+(`src/components/ClaimDetailsSheet.jsx`) is a bottom sheet mirroring
+`RefundDetailsSheet`'s chrome (`bg-black/45` scrim, slide-up panel,
+`Escape` to close, body-scroll lock). It carries two cards:
+
+- **Summary** — the read-only set of choices captured during the returns flow: reason (mapped via `REASON_LABELS`; falls back to the free-text `otherText` when the user picked `Other`), units (e.g. `1 of 1`), device preparation (masked to `Factory reset confirmed` / `Credentials provided` — never plain credentials), return method (with the pickup address shown underneath when the method is `courier`), refund destination (wallet icon or card chip + `Includes 10% restocking fee` sub-copy when method is `original`), and `Submitted` timestamp.
+- **Refund** — `Expected refund` (or `Refunded` once terminal) row with the net amount in `text-[18px]` tabular-nums. Original-payment refunds also show a small `Gross ... · Restocking fee − ...` line so the math is visible.
+
+The summary content used to live inline inside the expanded card; it
+was pulled into the sheet so the expanded body stays focused on
+progress and the underlying order context, with the full breakdown one
+tap away.
+
+**Section placement.** `App.jsx` routes orders based on claim state:
+
+- `hasActiveClaim(order)` returns true when an order has a `claim` field whose `claimStatusId !== 'refunded'`. Such orders are included in `isOpen` and surface in the **In progress** section, regardless of the underlying order's `statusId` (which stays `delivered`).
+- `isClaimRefunded(order)` returns true for refunded claims; these surface in the **Past orders** section.
+
+Filter counts reflect the same rules — an in-flight claim counts toward
+the `in_progress` chip and is excluded from `delivered`; a refunded
+claim counts toward `delivered` (the underlying order was delivered and
+the journey is complete). No new filter chip was added for claims;
+revisit when more than one or two claim cards routinely show at once.
+
+**Auto-expand rule.** `ClaimCard` does not currently participate in
+`pickActiveOrderId`. Fulfilment in-flight orders still win the
+auto-expand slot when both are present; claim cards collapse by
+default. If a customer-research pass shows users want their active
+claim opened on land, extend the rank function in `src/lib/statuses.js`
+to consider `claimProgressIndex` from `src/lib/claims.js`.
+
+**Source of truth.** `src/lib/claims.js` owns the status list, tone
+mapping, progress index, phase tag, headline + sub-line resolution, and
+the summary-label maps (`REASON_LABELS`, `RETURN_METHOD_LABELS`,
+`reasonText`, `devicePrepText`, `refundMethodLabel`). Edit copy or add a
+new claim state here, not in the components. Submission persistence is
+still out of scope — Step 9 of `ClaimFlow` generates a claim ref and
+ends, and the prototype's `order.claim` data is hand-seeded.
+
 ---
 
 ## 3. UX decisions and rationale
@@ -653,6 +749,25 @@ the order picker, so absence is benign.
 - **`deviceOs`** *(optional, string, `'ios' | 'android'`)* — seeds Step 5's OS-tabs control (factory-reset instructions + credentials field labels). Defaults to `'ios'` when absent.
 - **`returnedAt`** *(future hook, not populated today)* — when set, makes the order ineligible for change-of-mind return with reason `Already returned`.
 
+### 4.8 Claim fields (orders with an active or completed return)
+
+Optional object populated on a delivered order to drive `ClaimCard` (§2.8).
+Today only `89219` carries one (`under_qc` state) for design review.
+Production will write this object when the returns flow's Step 8 submit is
+wired up to persist.
+
+- **`claim.claimRef`** — `RET-XXXXXXXX` reference shown on the card hero and in the details sheet header. Generated by `generateClaimRef()` in `src/lib/returns.js`.
+- **`claim.claimStatusId`** — one of `claim_created`, `pending_collection`, `under_collection`, `in_transit`, `under_qc`, `ready_for_refund`, `refunded`. Drives the tone, hero copy, progress dot index, and section routing in `App.jsx`.
+- **`claim.type`** — claim type id (today only `change_of_mind`).
+- **`claim.submittedAt`** — human-readable timestamp for the `Submitted` row in `ClaimDetailsSheet`.
+- **`claim.units`** — integer; matches the value chosen at Step 3 of the returns flow.
+- **`claim.reason`** — `{ value, otherText }` where `value` is one of the keys of `REASON_LABELS` (`no_fit`, `better_option`, `changed_mind`, `mistake`, `other`); `otherText` is populated only when `value === 'other'`.
+- **`claim.devicePrep`** — `{ option, os }` where `option` is `'reset'` or `'credentials'` and `os` is `'ios'` or `'android'`. Surfaced as the masked `Factory reset confirmed` / `Credentials provided` row; raw credentials are intentionally not persisted.
+- **`claim.returnMethod`** — `{ id, address }` where `id` is one of the keys of `RETURN_METHOD_LABELS` (`courier`, `dropoff`, `store`). `address` is the pickup address typed at Step 6 when `id === 'courier'`; empty string otherwise.
+- **`claim.refundMethod`** — `'wallet'` or `'original'`. Drives the destination chip on the hero and the `Includes 10% restocking fee` sub-copy in the details sheet when `original`.
+- **`claim.expectedRefund`** — `{ gross, fee, net, rate }`, pre-computed at submission time so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. `fee` is `0` on wallet refunds; on original-payment refunds it's `gross * 0.10` per the 10% restocking-fee rule in `src/lib/returns.js`.
+- **`claim.timeline`** — map keyed by `claimStatusId` carrying the timestamp at which the claim entered each phase. Populated progressively as the claim moves; the card renders the date/time under each reached dot.
+
 ---
 
 ## 5. Component architecture
@@ -668,7 +783,8 @@ src/
 │   └── orders.js                 Mock orders array
 ├── lib/
 │   ├── statuses.js               Top-level + sub-status definitions, status-banner copy + tone, pickActiveOrderId, helpers
-│   └── returns.js                Return-eligibility logic, refund math, formatting helpers, claim-ref generator
+│   ├── returns.js                Return-eligibility logic, refund math, formatting helpers, claim-ref generator
+│   └── claims.js                 Claim-state list, tone map, progress index, headline/sub-line, summary-label maps for ClaimCard
 └── components/
     ├── PromoBar.jsx              Magenta promo strip at the top
     ├── Header.jsx                Logo, language, profile, wishlist, bag
@@ -679,6 +795,8 @@ src/
     ├── OrderCard.jsx             Expandable order card; today only renders shipped + in-flight cancelled mid-fulfilment
     ├── InProgressCard.jsx        Expandable card for non-cancelled created/quality_check (refund-hero chrome family)
     ├── PastOrderCard.jsx         Past-orders card; branches on `order.state` into delivered (no expand) and cancelled-past variants
+    ├── ClaimCard.jsx             Expandable card for orders carrying a `claim` field — tracks the 7-state return journey
+    ├── ClaimDetailsSheet.jsx     Bottom sheet opened by ClaimCard's `View claim details` action — Summary + Refund cards
     ├── CancelOrderSheet.jsx      Two- or three-step bottom sheet for cancelling a created / quality_check order
     ├── KeepOrderSheet.jsx        Single-step confirm sheet for reversing an in-flight cancellation
     ├── RefundDetailsSheet.jsx    Bottom sheet for the past cancelled card's `View refund details` action
@@ -794,6 +912,7 @@ What looks real in the prototype but is faked:
 - **Single-item orders.** The product object is a single entry. Multi-item orders need a `products[]` array and a layout adjustment.
 - **Download receipt.** Buttons are present but do nothing. Production needs a receipt-render endpoint.
 - **Raise a claim** on delivered orders launches the change-of-mind returns flow (§2.7). The flow is fully interactive end-to-end but does not persist submissions — Step 8's submit advances to Step 9 with a client-generated `RET-XXXXXXXX` reference. Production needs the submission endpoint, real return-shipping rules, the 4 non-change-of-mind claim branches, and a `returnedAt` flag on the order so a returned item drops out of the eligibility picker.
+- **`ClaimCard` is data-only** (§2.8). The card renders entirely off the `order.claim` object — one mock claim is hand-seeded on order `89219` for design review. Step 9 of `ClaimFlow` still does not persist, so submitting a return through the flow does not create a `ClaimCard` in the list. Production needs: (a) the submission endpoint writing the `claim` object back to the order; (b) a webhook or polling mechanism to move the claim through the 7 states as the warehouse handles the unit; (c) the `View claim details` and icon-only `Download receipt` buttons wired (today both are decorative); (d) a `Cancel claim` action — currently no in-flight cancellation affordance exists for a submitted return.
 - **`I want to keep my order` on in-flight cancelled cards** (§2.6.1) opens `KeepOrderSheet`'s confirm step; tapping `Yes, keep my order` just closes the sheet — `state` stays `cancelled` and the `cancellationStatusId` / `cancellationTimeline` are untouched. Production needs a reverse-cancellation endpoint, the rules for which cancellation phases are still reversible (e.g. refund_pending becomes irreversible the moment funds are released to the processor), and a state-machine transition that lifts the order back to its pre-cancellation `state` while clearing the cancellation fields cleanly.
 - **Site-wide search, in-list "Find items" search, Revibe Wallet pill.** Visual placeholders, no logic. The wallet balance is a hardcoded prop; the wallet info tooltip's `terms & conditions` link goes nowhere (`href="#"`).
 - **Date-range dropdown.** Logic is wired (parses `placedAt`, filters by cutoff) but visibly inert because all five mock orders fall inside every range. Status chips do filter the list.
@@ -835,6 +954,7 @@ named section here as part of the same commit:
 - Changing the auto-expand rule, banner visibility, status-banner copy/tone, or chip override rules → §2.5, §3.
 - Adding or removing a component → §5.1, §5.2.
 - Changing the returns flow (eligibility rules, refund math, the step sequence, device-prep gating, entry-point wiring) → §2.7, §4.7. New optional fields used by the returns flow also go in §4.7.
+- Changing claim-state behavior (the 7 states, tone mapping, hero copy, summary fields, section routing) → §2.8, §4.8. Edit data in `src/lib/claims.js`, not in `ClaimCard.jsx`.
 - Resolving an item from §8 → move it out of §8 and integrate the description into the relevant earlier section.
 
 Reference [`CHANGELOG.md`](../CHANGELOG.md) for change history; this document
