@@ -6,10 +6,12 @@ import HeroCard from './components/HeroCard'
 import OrderCard from './components/OrderCard'
 import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
+import ClaimCard from './components/ClaimCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
+import { hasActiveClaim, isClaimRefunded } from './lib/claims'
 
 const RANGE_DAYS = { '30d': 30, '3m': 90, '1y': 365, all: Infinity }
 
@@ -32,7 +34,10 @@ function isInFlightCancellation(order) {
   )
 }
 
+// A delivered order with an active claim is "open" again — the customer is
+// tracking a return-in-progress. Refunded claims drop back to past.
 function isOpen(order) {
+  if (hasActiveClaim(order)) return true
   return (
     (order.state !== 'cancelled' && order.statusId !== 'delivered') ||
     isInFlightCancellation(order)
@@ -43,7 +48,11 @@ function matchesStatus(order, status) {
   if (status === 'all') return true
   if (status === 'cancelled') return order.state === 'cancelled'
   if (status === 'delivered')
-    return order.statusId === 'delivered' && order.state !== 'cancelled'
+    return (
+      order.statusId === 'delivered' &&
+      order.state !== 'cancelled' &&
+      !hasActiveClaim(order)
+    )
   if (status === 'in_progress') return isOpen(order)
   return true
 }
@@ -72,7 +81,10 @@ export default function App() {
       all: dateFiltered.length,
       in_progress: dateFiltered.filter(isOpen).length,
       delivered: dateFiltered.filter(
-        (o) => o.statusId === 'delivered' && o.state !== 'cancelled',
+        (o) =>
+          o.statusId === 'delivered' &&
+          o.state !== 'cancelled' &&
+          !hasActiveClaim(o),
       ).length,
       cancelled: dateFiltered.filter((o) => o.state === 'cancelled').length,
     }),
@@ -131,6 +143,9 @@ export default function App() {
                 />
                 <div className="px-4 flex flex-col gap-3">
                   {inFlight.map((o) => {
+                    if (hasActiveClaim(o)) {
+                      return <ClaimCard key={o.id} order={o} />
+                    }
                     if (isInFlightCancellation(o)) {
                       return <PastOrderCard key={o.id} order={o} />
                     }
@@ -159,13 +174,18 @@ export default function App() {
               <>
                 <SectionLabel title="Past orders" count={past.length} />
                 <div className="px-4 flex flex-col gap-3">
-                  {past.map((o) => (
-                    <PastOrderCard
-                      key={o.id}
-                      order={o}
-                      onRaiseClaim={setClaimFlowOrderId}
-                    />
-                  ))}
+                  {past.map((o) => {
+                    if (isClaimRefunded(o)) {
+                      return <ClaimCard key={o.id} order={o} />
+                    }
+                    return (
+                      <PastOrderCard
+                        key={o.id}
+                        order={o}
+                        onRaiseClaim={setClaimFlowOrderId}
+                      />
+                    )
+                  })}
                 </div>
               </>
             )}
