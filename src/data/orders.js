@@ -25,6 +25,7 @@ export const ORDERS = [
     courier: null,
     trackingNumber: null,
     customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
     timeline: {
       created: '28 Apr · 2:15 PM',
     },
@@ -55,6 +56,7 @@ export const ORDERS = [
     courier: null,
     trackingNumber: null,
     customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Mastercard', last4: '8210' },
     timeline: {
       created: '22 Apr · 11:02 AM',
       quality_check: '24 Apr · 9:18 AM',

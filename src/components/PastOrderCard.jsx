@@ -11,9 +11,11 @@ import {
   Sparkles,
   Home,
   PackageCheck,
+  RotateCcw,
 } from 'lucide-react'
 import { CANCELLATION_STATUSES, STATUSES } from '../lib/statuses'
 import RefundDetailsSheet from './RefundDetailsSheet'
+import KeepOrderSheet from './KeepOrderSheet'
 
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
@@ -165,7 +167,11 @@ const TONE = {
 function CancelledOrderCard({ order }) {
   const [expanded, setExpanded] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [keepOpen, setKeepOpen] = useState(false)
   const tone = toneFor(order.cancellationStatusId)
+  const canKeep =
+    order.cancellationStatusId === 'requested' ||
+    order.cancellationStatusId === 'refund_pending'
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
@@ -202,6 +208,17 @@ function CancelledOrderCard({ order }) {
             <FulfilmentTrace order={order} />
           </div>
 
+          {canKeep && (
+            <button
+              type="button"
+              onClick={() => setKeepOpen(true)}
+              className="h-[44px] rounded-[10px] bg-brand text-white border border-brand font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5"
+            >
+              <RotateCcw size={15} strokeWidth={1.75} />
+              I want to keep my order
+            </button>
+          )}
+
           <div className="flex gap-2">
             <button
               type="button"
@@ -227,6 +244,13 @@ function CancelledOrderCard({ order }) {
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
       />
+      {canKeep && (
+        <KeepOrderSheet
+          order={order}
+          open={keepOpen}
+          onClose={() => setKeepOpen(false)}
+        />
+      )}
     </article>
   )
 }
