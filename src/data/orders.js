@@ -156,6 +156,7 @@ export const ORDERS = [
     statusId: 'quality_check',
     state: 'cancelled',
     cancellationStatusId: 'requested',
+    cancellationRef: '4BTb2x',
     courier: null,
     trackingNumber: '25193220',
     customerName: 'Andrea Grossi',
@@ -196,6 +197,7 @@ export const ORDERS = [
     statusId: 'created',
     state: 'cancelled',
     cancellationStatusId: 'refund_pending',
+    cancellationRef: '4BTb2x',
     courier: null,
     trackingNumber: null,
     customerName: 'Andrea Grossi',
@@ -203,6 +205,7 @@ export const ORDERS = [
       created: '28 Mar · 2:15 PM',
     },
     cancellationTimeline: {
+      requested: '28 Mar · 2:16 PM',
       refund_pending: '28 Mar · 2:18 PM',
     },
     refund: {
@@ -236,6 +239,7 @@ export const ORDERS = [
     statusId: 'quality_check',
     state: 'cancelled',
     cancellationStatusId: 'refunded',
+    cancellationRef: '4BTb2x',
     courier: null,
     trackingNumber: null,
     customerName: 'Andrea Grossi',

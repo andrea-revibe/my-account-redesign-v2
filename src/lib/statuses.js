@@ -32,18 +32,21 @@ export const CANCELLATION_STATUSES = [
   {
     id: 'requested',
     label: 'Requested',
+    shortLabel: 'Requested',
     headline: 'Cancellation requested',
     icon: Hourglass,
   },
   {
     id: 'refund_pending',
     label: 'Refund pending',
+    shortLabel: 'Pending',
     headline: 'Refund pending',
     icon: Wallet,
   },
   {
     id: 'refunded',
     label: 'Refunded',
+    shortLabel: 'Refunded',
     headline: 'Refunded',
     icon: CircleDollarSign,
   },
@@ -105,13 +108,11 @@ export function cancellationProgressIndex(currentCancellationStatusId) {
   return i // -1 if not provided
 }
 
-// Cancelled orders carry their fulfilment `statusId` frozen at the cancel
-// point. The created-stage cancellation path skips the `requested` phase
-// because there's no supplier check needed (nothing's been pulled yet).
-export function cancellationStepsFor(order) {
-  if (order.statusId === 'created') {
-    return CANCELLATION_STATUSES.filter((s) => s.id !== 'requested')
-  }
+// All cancellation paths render the same three steps. The created-stage
+// path moves through `requested` instantly (no supplier check needed); the
+// quality_check path waits on supplier confirmation. Either way the
+// customer sees the same step labels.
+export function cancellationStepsFor() {
   return CANCELLATION_STATUSES
 }
 

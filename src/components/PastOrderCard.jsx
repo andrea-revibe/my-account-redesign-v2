@@ -13,7 +13,7 @@ import {
   PackageCheck,
   RotateCcw,
 } from 'lucide-react'
-import { CANCELLATION_STATUSES, STATUSES } from '../lib/statuses'
+import { cancellationStepsFor } from '../lib/statuses'
 import RefundDetailsSheet from './RefundDetailsSheet'
 import KeepOrderSheet from './KeepOrderSheet'
 
@@ -196,16 +196,9 @@ function CancelledOrderCard({ order }) {
         <div className="pl-4 pr-3.5 pb-4 pt-0 flex flex-col gap-3.5 animate-slideDown">
           <div className="px-1">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2">
-              Refund progress
+              Cancellation progress
             </div>
             <RefundProgressDots order={order} />
-          </div>
-
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[10.5px] uppercase tracking-[0.06em] font-bold text-muted">
-              Order was
-            </span>
-            <FulfilmentTrace order={order} />
           </div>
 
           {canKeep && (
@@ -313,7 +306,7 @@ function RefundHero({ order }) {
     <div className={`rounded-[14px] border p-3.5 ${heroBg} ${t.border}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
-          {isRefunded ? 'Refunded' : 'Refund of'}
+          Cancellation{order.cancellationRef ? ` · #${order.cancellationRef}` : ''}
         </div>
         <span
           className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 ${t.text}`}
@@ -321,6 +314,9 @@ function RefundHero({ order }) {
           <PhaseIcon size={11} strokeWidth={2} />
           {phaseTag}
         </span>
+      </div>
+      <div className="mt-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+        {isRefunded ? 'Refunded' : 'Refund of'}
       </div>
       <div className={`mt-1 text-[28px] font-bold tabular-nums leading-none ${t.text}`}>
         {order.currency} {order.refund.amount.toLocaleString()}
@@ -387,15 +383,6 @@ function ProductRow({ order, expanded }) {
   )
 }
 
-// Mirrors the created-path filter in statuses.js — orders cancelled at
-// 'created' skip the 'requested' phase because nothing's been pulled yet.
-function cancellationStepsFor(order) {
-  if (order.statusId === 'created') {
-    return CANCELLATION_STATUSES.filter((s) => s.id !== 'requested')
-  }
-  return CANCELLATION_STATUSES
-}
-
 function RefundProgressDots({ order }) {
   const steps = cancellationStepsFor(order)
   const curIdx = steps.findIndex((s) => s.id === order.cancellationStatusId)
@@ -443,7 +430,7 @@ function RefundProgressDots({ order }) {
                     : 'text-muted'
               }`}
             >
-              {shortLabel(s)}
+              {s.shortLabel}
             </span>
             {ts && (
               <span className="mt-1 text-[10.5px] leading-tight text-muted tabular-nums">
@@ -454,47 +441,6 @@ function RefundProgressDots({ order }) {
         )
       })}
     </ol>
-  )
-}
-
-function shortLabel(step) {
-  if (step.id === 'requested') return 'Requested'
-  if (step.id === 'refund_pending') return 'Pending'
-  return 'Refunded'
-}
-
-function FulfilmentTrace({ order }) {
-  const reachedIdx = STATUSES.findIndex((s) => s.id === order.statusId)
-  return (
-    <div className="flex items-center gap-1 opacity-55">
-      {STATUSES.map((s, i) => {
-        const reached = i <= reachedIdx
-        const last = reached && i === reachedIdx
-        return (
-          <div key={s.id} className="flex items-center gap-1">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                last ? 'bg-danger' : reached ? 'bg-ink-2' : 'bg-line'
-              }`}
-            />
-            <span
-              className={`text-[9.5px] uppercase tracking-[0.05em] ${
-                last
-                  ? 'text-danger font-bold'
-                  : reached
-                  ? 'text-ink-2'
-                  : 'text-muted'
-              }`}
-            >
-              {s.short}
-            </span>
-            {i < STATUSES.length - 1 && (
-              <span className="w-3 h-px bg-line ml-0.5" />
-            )}
-          </div>
-        )
-      })}
-    </div>
   )
 }
 

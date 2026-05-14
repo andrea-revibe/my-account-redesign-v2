@@ -65,7 +65,7 @@ hang off the bottom.
 | `InProgressCard` | non-cancelled `created` / `quality_check` | `Delivery by` + ETA | yes |
 | `OrderCard` | non-cancelled `shipped`; in-flight cancellations mid-fulfilment | status icon + headline + ETA | yes |
 | `PastOrderCard` (delivered) | `statusId === 'delivered'` (non-cancelled, no claim attached) | `Delivered on` + date | no |
-| `PastOrderCard` (cancelled past) | `state === 'cancelled' && cancellationStatusId === 'refunded'` (and the refund-hero variant for `requested` / `refund_pending` while in the open list) | `Refund of` / `Refunded` + amount | yes |
+| `PastOrderCard` (cancelled past) | `state === 'cancelled' && cancellationStatusId === 'refunded'` (and the refund-hero variant for `requested` / `refund_pending` while in the open list) | `Cancellation · #{cancellationRef}` eyebrow + refund amount | yes |
 | `ClaimCard` | any order carrying an `order.claim` field — replaces the delivered card. Lives in **In progress** while the claim is active; drops to **Past orders** once `claimStatusId === 'refunded'` | `Claim` + status label + claim ref + expected refund | yes |
 
 #### Created and quality_check (`InProgressCard`)
@@ -123,20 +123,28 @@ than the fulfilment journey. A `w-1` left accent strip carries the phase
 tone (warn amber for `requested`, brand purple for `refund_pending`,
 success green for `refunded`). A small uppercase `Order · #{id}` eyebrow
 sits at the very top; the phase pill sits on its own row below; then a
-tinted hero block with the refund amount (`text-[28px]` tabular-nums) and
-a destination chip — wallet destinations get a brand→accent gradient chip
-(echoes the `GreetRow` credits pill); card destinations get a neutral
-chip. Refunded orders surface a `fundsAvailable` sub-copy line ("Available
-now in your wallet"); the two earlier phases make no ETA promise.
+tinted hero block whose internal eyebrow reads `Cancellation · #{cancellationRef}`
+(parallel to `ClaimCard`'s `Claim · {type}` eyebrow — this is the
+source-labelling that lets customers tell a cancellation refund apart
+from a claim refund at a glance). Below that, a smaller `Refund of` /
+`Refunded` label sits above the refund amount (`text-[28px]`
+tabular-nums) and a destination chip — wallet destinations get a
+brand→accent gradient chip (echoes the `GreetRow` credits pill); card
+destinations get a neutral chip. Refunded orders surface a
+`fundsAvailable` sub-copy line ("Available now in your wallet"); the two
+earlier phases make no ETA promise.
 
-Expanded reveals a 3-step numbered dot stepper for refund progress
-(created-path cancellations skip the `requested` step, mirroring
-`cancellationStepsFor` in `statuses.js`). Each reached/current step
-carries the timestamp it entered that phase underneath its label (sourced
-from `order.cancellationTimeline[step.id]`); upcoming steps render the
-label only. Then a dimmed fulfilment trace ending in a red ✕ at the
-cancel point, and a two-action footer (`View refund details` + icon-only
-`Download receipt`). Tapping `View refund details` opens the
+Expanded reveals a 3-step numbered dot stepper titled "Cancellation
+progress" (mirrors `ClaimCard`'s "Claim progress" header for symmetry).
+Both cancellation paths render the same three steps (`Requested` /
+`Pending` / `Refunded`); the difference is timing — on the created-stage
+path the `requested` step ticks over instantly (no supplier check
+needed), while on the quality_check path it waits on supplier
+confirmation. Each reached/current step carries the timestamp it entered
+that phase underneath its label (sourced from
+`order.cancellationTimeline[step.id]`); upcoming steps render the label
+only. Followed by a two-action footer (`View refund details` +
+icon-only `Download receipt`). Tapping `View refund details` opens the
 `RefundDetailsSheet` bottom sheet, which is the canonical surface for the
 line-item breakdown (product + Revibe Care line items → subtotal → fee
 (card refunds only) → total refund). Always collapsed by default; no
