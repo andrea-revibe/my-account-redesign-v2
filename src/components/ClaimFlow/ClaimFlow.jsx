@@ -12,6 +12,7 @@ import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
 import Step1ClaimType from './Step1ClaimType'
 import Step2Reason from './Step2Reason'
+import Step2IssueDetails from './Step2IssueDetails'
 import Step3DevicePrep from './Step3DevicePrep'
 import Step4PickupDetails from './Step4PickupDetails'
 import Step5RefundMethod from './Step5RefundMethod'
@@ -103,7 +104,10 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
           {state.step === 1 && (
             <Step1ClaimType state={state} dispatch={dispatch} />
           )}
-          {state.step === 2 && (
+          {state.step === 2 && state.claimType === 'issue' && (
+            <Step2IssueDetails state={state} dispatch={dispatch} />
+          )}
+          {state.step === 2 && state.claimType !== 'issue' && (
             <Step2Reason state={state} dispatch={dispatch} />
           )}
           {state.step === 3 && (
@@ -137,9 +141,15 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
             primaryVariant={primaryVariant}
             primaryDisabled={!canAdvance(state)}
             onPrimary={handlePrimary}
-            secondaryLabel={state.step === 2 ? 'Skip' : null}
+            secondaryLabel={
+              state.step === 2 && state.claimType === 'change_of_mind'
+                ? 'Skip'
+                : null
+            }
             onSecondary={
-              state.step === 2 ? () => dispatch({ type: 'NEXT' }) : null
+              state.step === 2 && state.claimType === 'change_of_mind'
+                ? () => dispatch({ type: 'NEXT' })
+                : null
             }
           />
         )}

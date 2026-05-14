@@ -14,6 +14,7 @@ import {
   claimPhaseTag,
   claimStatusHeadline,
   claimStatusSubline,
+  claimTypeLabel,
   refundMethodLabel,
 } from '../lib/claims'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
@@ -131,7 +132,7 @@ function ClaimHero({ order, claim, tone }) {
     <div className={`rounded-[14px] border p-3.5 ${t.heroBg} ${t.border}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
-          Claim
+          Claim · {claimTypeLabel(claim)}
         </div>
         <span
           className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 ${t.text}`}

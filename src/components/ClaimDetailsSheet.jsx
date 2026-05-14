@@ -4,6 +4,7 @@ import {
   reasonText,
   devicePrepText,
   refundMethodLabel,
+  claimTypeLabel,
 } from '../lib/claims'
 
 // Bottom sheet surfacing the full set of choices captured during the
@@ -67,6 +68,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
 
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           <SectionCard title="Summary">
+            <Row label="Claim type" value={claimTypeLabel(claim)} />
             <Row label="Reason" value={reasonText(claim)} />
             <Row label="Device preparation" value={devicePrepText(claim)} />
             <Row label="Pickup address" value={pickup.address || '—'} />
