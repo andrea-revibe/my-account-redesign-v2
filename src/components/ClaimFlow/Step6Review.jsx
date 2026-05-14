@@ -1,4 +1,4 @@
-import { Pencil, CreditCard } from 'lucide-react'
+import { Pencil, CreditCard, MapPin, Mail, Phone } from 'lucide-react'
 import StepHeading from './StepHeading'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 
@@ -10,13 +10,7 @@ const REASON_LABELS = {
   other: 'Other',
 }
 
-const RETURN_METHOD_LABELS = {
-  courier: 'Courier pickup',
-  dropoff: 'Drop-off at partner location',
-  store: 'In-store return',
-}
-
-export default function Step8Review({ state, dispatch, order }) {
+export default function Step6Review({ state, dispatch, order }) {
   if (!order) return null
   const currency = order.currency
   const refund = refundBreakdown(order, state.units, state.refundMethod)
@@ -31,7 +25,6 @@ export default function Step8Review({ state, dispatch, order }) {
       ? 'Factory reset confirmed'
       : 'Credentials provided'
 
-  const returnMethod = RETURN_METHOD_LABELS[state.returnMethod.id]
   const refundMethodLabel =
     state.refundMethod === 'wallet'
       ? 'Revibe Wallet'
@@ -47,7 +40,10 @@ export default function Step8Review({ state, dispatch, order }) {
       />
 
       <div className="px-4 flex flex-col gap-3">
-        <Section title="Order" onEdit={() => goTo(2)}>
+        <div className="rounded-[14px] border border-line bg-surface px-3.5 py-3">
+          <h3 className="m-0 mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+            Item
+          </h3>
           <div className="flex items-center gap-3">
             <div className="w-11 h-13 rounded-[10px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
               <img
@@ -68,16 +64,9 @@ export default function Step8Review({ state, dispatch, order }) {
               </div>
             </div>
           </div>
-        </Section>
+        </div>
 
-        <Section title="Returning" onEdit={() => goTo(3)}>
-          <KeyValue
-            label="Units"
-            value={`${state.units} of ${order.quantity || 1}`}
-          />
-        </Section>
-
-        <Section title="Reason" onEdit={() => goTo(4)}>
+        <Section title="Reason" onEdit={() => goTo(2)}>
           <div
             className={`text-[13.5px] ${
               state.reason.value ? 'text-ink' : 'text-muted italic'
@@ -87,20 +76,32 @@ export default function Step8Review({ state, dispatch, order }) {
           </div>
         </Section>
 
-        <Section title="Device preparation" onEdit={() => goTo(5)}>
+        <Section title="Device preparation" onEdit={() => goTo(3)}>
           <div className="text-[13.5px] text-ink">{devicePrep}</div>
         </Section>
 
-        <Section title="Return method" onEdit={() => goTo(6)}>
-          <div className="text-[13.5px] text-ink">{returnMethod}</div>
-          {state.returnMethod.id === 'courier' && state.returnMethod.address && (
-            <div className="text-[12px] text-muted mt-1 whitespace-pre-line">
-              {state.returnMethod.address}
-            </div>
-          )}
+        <Section title="Pickup details" onEdit={() => goTo(4)}>
+          <div className="flex flex-col gap-2">
+            <PickupRow
+              Icon={MapPin}
+              label="Address"
+              value={state.pickupDetails.address}
+              multiline
+            />
+            <PickupRow
+              Icon={Mail}
+              label="Email"
+              value={state.pickupDetails.email}
+            />
+            <PickupRow
+              Icon={Phone}
+              label="Phone"
+              value={state.pickupDetails.phone}
+            />
+          </div>
         </Section>
 
-        <Section title="Refund" onEdit={() => goTo(7)}>
+        <Section title="Refund" onEdit={() => goTo(5)}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[13.5px] text-ink flex items-center gap-1.5">
@@ -134,6 +135,26 @@ export default function Step8Review({ state, dispatch, order }) {
   )
 }
 
+function PickupRow({ Icon, label, value, multiline }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <Icon size={13} strokeWidth={1.75} className="text-ink-2 mt-1 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
+          {label}
+        </div>
+        <div
+          className={`text-[13.5px] text-ink leading-[1.4] ${
+            multiline ? 'whitespace-pre-line break-words' : 'truncate'
+          }`}
+        >
+          {value || '—'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Section({ title, onEdit, children }) {
   return (
     <div className="rounded-[14px] border border-line bg-surface px-3.5 py-3">
@@ -151,17 +172,6 @@ function Section({ title, onEdit, children }) {
         </button>
       </div>
       {children}
-    </div>
-  )
-}
-
-function KeyValue({ label, value }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[13px] text-muted">{label}</span>
-      <span className="text-[13.5px] font-semibold text-ink tabular-nums">
-        {value}
-      </span>
     </div>
   )
 }

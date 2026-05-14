@@ -3,7 +3,7 @@ import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 
-export default function Step7RefundMethod({ state, dispatch, order }) {
+export default function Step5RefundMethod({ state, dispatch, order }) {
   if (!order) return null
   const currency = order.currency
   const wallet = refundBreakdown(order, state.units, 'wallet')

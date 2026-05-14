@@ -2,6 +2,49 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 16 (Step 4 → pickup address & contact)
+
+### Changed
+
+- **Step 4 of the returns flow is now `Pickup address & contact`** instead of `How will you return it?`. The three method options (Courier pickup, Drop-off, In-store) are gone — courier pickup is the only supported path today, so the step instead surfaces the three contact fields the courier needs: delivery address, email, and phone. Each row shows the seeded value from the order and opens a single-field bottom sheet on tap for editing; the bottom-sheet pattern matches `CancelOrderSheet` / `ClaimDetailsSheet`. A brand-tinted `Courier pickup · Pickup within 2 business days` banner sits above the rows so the method is still made explicit. `canAdvance` for the step now requires all three fields non-empty.
+- **State slice renamed `returnMethod` → `pickupDetails`.** Shape was `{ id, address }`, now `{ address, email, phone }`. The reducer's `SET_RETURN_METHOD` action is renamed to `SET_PICKUP_DETAILS`. `initialState(orderId)` now imports `ORDERS` so it can pre-seed the slice from `order.address` / `order.email` / `order.phone`.
+- **`Step6Review`'s `Return method` section → `Pickup details`.** Replaced the single-line method label with three icon-prefixed rows (address / email / phone). The `Edit` link still jumps back to Step 4 via `GO_TO_STEP`.
+- **`ClaimDetailsSheet`'s `Return method` row → three rows (`Pickup address` / `Pickup email` / `Pickup phone`).** `RETURN_METHOD_LABELS` removed from `src/lib/claims.js` (was only consumed here and by the now-removed Step6 local map).
+
+### Added
+
+- **`email` field on every order in `src/data/orders.js`.** Set to `andrea.grossi@example.com` for all eight orders so the new Step 4 has a real value to display. Documented alongside `phone` and `address` in `docs/my-account-flow.md` § 4.1.
+
+### Renamed
+
+- `Step4ReturnMethod.jsx` → `Step4PickupDetails.jsx`. `ClaimFlow.jsx` import + step-router updated.
+
+### Notes
+
+- The seeded claim on order `89219` was updated from `returnMethod: { id: 'courier', address }` to `pickupDetails: { address, email, phone }` so it stays consistent with the new shape — the `ClaimCard` for that order keeps rendering the same way.
+- `docs/my-account-flow.md` § 2.7 / § 4.1 / § 4.8 / § 5.1 updated.
+
+## [Unreleased] — phase 15 (returns-flow simplification)
+
+### Changed
+
+- **Returns flow is now seven steps instead of nine.** Old Step 2 (order selection) and Step 3 (product & quantity) are gone — the flow now goes `Claim type → Reason → Device prep → Return method → Refund method → Review → Confirmation`. Rationale: the delivered card is product-specific (the future multi-product order shape will render one delivered card per product line — see `docs/my-account-flow.md` § 8 "Multi-item orders"), so the item being returned is already named by the entry point. Order selection and per-line quantity inside the flow were re-asking a question the user had implicitly already answered.
+- **The flow always starts at Step 1.** Previously `initialState(initialOrderId)` started the user at Step 2 (order picker) when an order was passed in, and only fell back to Step 1 for a hypothetical top-level entry. Now Step 1 is always shown; the `claimType` is still pre-seeded to `'change_of_mind'` from a delivered-card entry so confirming Step 1 lands the user directly on the reason step.
+- **`Step6Review` (renamed from `Step8Review`) gains a read-only `Item` block.** Since there's no longer an explicit order/product step the user can `Edit` back to, the item being returned is shown at the top of the review as context, not as an editable section. The remaining five `Section` blocks (Reason / Device preparation / Return method / Refund) still expose per-section `Edit` links via `GO_TO_STEP`.
+
+### Removed
+
+- **`Step2OrderSelection.jsx` and `Step3ProductQuantity.jsx`.** Deleted. Their state in the reducer (`SET_ORDER`, `SET_UNITS` actions) is also gone — `units` stays in state pinned at `1` so `refundBreakdown(order, units, method)` keeps its multi-unit-ready signature. The `groupOrdersByEligibility` helper in `src/lib/returns.js` is currently unused but kept for the eventual top-level "Return an item" entry (§ 8).
+- **`canAdvance(state, order)` second argument.** The only branch that read `order` was Step 3's quantity check. Signature is now `canAdvance(state)`.
+
+### Renamed
+
+- Step files renumbered to match their new position: `Step4Reason → Step2Reason`, `Step5DevicePrep → Step3DevicePrep`, `Step6ReturnMethod → Step4ReturnMethod`, `Step7RefundMethod → Step5RefundMethod`, `Step8Review → Step6Review`, `Step9Confirmation → Step7Confirmation`. Default export names updated to match. The number in `StepN*.jsx` is intended to track the step's position in the flow, per the convention noted in `CLAUDE.md`.
+
+### Docs
+
+- **`docs/my-account-flow.md` § 2.7** rewritten for the seven-step shape: nine → seven, step-by-step list reflects the new sequence, `Mount + state` paragraph updated to note that the flow always starts at Step 1 and that the entry-point card is product-specific. The "Step 5 device-prep warn callout" reference becomes "Step 3"; the "Step 8 submit advances to Step 9" reference becomes "Step 6 → Step 7". § 4.7 and § 4.8 step-number references updated (`paymentMethod` Step 7 → Step 5; `deviceOs` Step 5 → Step 3; `claim.returnMethod` Step 6 → Step 4; `claim.units` reframed as always-1-today). § 5.1 file tree updated. § 7 / § 8 step-number references updated; "Multi-item orders" entry reframed to reflect that partial-quantity returns are not currently supported.
+
 ## [Unreleased] — phase 14 (claim-tracking card)
 
 ### Added

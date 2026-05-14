@@ -9,7 +9,7 @@ const REASONS = [
   { id: 'other', label: 'Other' },
 ]
 
-export default function Step4Reason({ state, dispatch }) {
+export default function Step2Reason({ state, dispatch }) {
   const { value, otherText } = state.reason
 
   return (
