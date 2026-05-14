@@ -9,8 +9,8 @@ export default function Step7Confirmation({ state, order, onClose }) {
   const currency = order.currency
   const timeline =
     state.refundMethod === 'wallet'
-      ? 'Refund lands in your Revibe Wallet within 1 hour of receipt.'
-      : `Refund returns to your card in 5–10 business days after receipt.`
+      ? 'Lands in your Revibe Wallet within 1 hour once return is complete.'
+      : 'Returns to your card in 5–10 business days once return is complete.'
   const devicePrepLine =
     state.devicePrep.option === 'reset'
       ? 'You confirmed the device is factory reset.'

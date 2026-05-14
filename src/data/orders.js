@@ -315,7 +315,7 @@ export const ORDERS = [
         phone: '+971 50 559 5034',
       },
       refundMethod: 'original',
-      expectedRefund: { gross: 519, fee: 51.9, net: 467.1, rate: 0.10 },
+      expectedRefund: { itemTotal: 519, warranty: 60, gross: 579, fee: 57.9, net: 521.1, rate: 0.10 },
       timeline: {
         claim_created: '28 Apr · 2:10 PM',
         pending_collection: '28 Apr · 2:11 PM',

@@ -2,6 +2,29 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 18 (refund-timeline anchor parity)
+
+### Changed
+
+- **Step 5 + Step 7 refund-timeline copy anchored to `once return is complete`.** Both refund cards (Step 5) and both timeline strings (Step 7) now end in the same phrase verbatim — fixes the implicit ambiguity that the card clock starts at submit.
+- **Step 5 original-payment card: dropped the ETA pill chrome** in favour of plain `Clock` icon + inline text, matching the wallet card's treatment. `whitespace-nowrap` on both lines keeps them single-line at 430px.
+
+### Notes
+
+- `docs/my-account-flow.md` § 2.7 updated for the new wording + dropped pill.
+
+## [Unreleased] — phase 17 (Step 5 refund picker aligned with cancellation)
+
+### Changed
+
+- **Step 5 refund picker visually + behaviourally mirrors the cancellation sheet.** Wallet card: `Recommended` pill removed, success-green tagline carries the recommendation. Original-payment card: inline breakdown table (`Product` + `Revibe Care` when present + `Subtotal` + red `Restocking fee (10%)`) below the headline, ETA pill underneath.
+- **`refundBreakdown(order, units, method)` in `src/lib/returns.js` now refunds Revibe Care.** Return shape: `{ itemTotal, warranty, gross, fee, net, rate }` with `gross = itemTotal + warranty`; the 10% fee applies to warranty-inclusive gross. Bumps the eligible iPhone 13 (`89657`) refund: AED 939 → 1,029 wallet, 845.10 → 926.10 card.
+
+### Notes
+
+- Seeded claim on `89219` `expectedRefund` recomputed to `{ itemTotal: 519, warranty: 60, gross: 579, fee: 57.9, net: 521.1, rate: 0.10 }`. `ClaimCard` / `ClaimDetailsSheet` read fields directly — no component changes.
+- `docs/my-account-flow.md` § 2.7 (Step 5 + refund math) updated.
+
 ## [Unreleased] — phase 16 (Step 4 → pickup address & contact)
 
 ### Changed

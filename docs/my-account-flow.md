@@ -446,12 +446,22 @@ shape), so the order being returned is unambiguous from the entry point.
    the rows so the method is still made explicit. All three fields
    must be non-empty before Continue enables.
 5. **Refund method.** Two stacked refund cards built off
-   `refundBreakdown(order, units, method)` (see §4.7). Wallet card:
-   `recommended` success pill + full amount + wallet-info tooltip
-   reusing the shared `WalletInfoTooltip` + `REVIBE_WALLET_ICON`.
-   Original-payment card: net amount with the gross shown struck-through
-   and the 10% restocking fee broken out explicitly. The card label uses
-   `order.paymentMethod.brand` + `last4`.
+   `refundBreakdown(order, units, method)` (see §4.7). Visually aligned
+   with the cancellation sheet's refund picker so the two refund-choice
+   surfaces feel like siblings. Wallet card: full amount + wallet-info
+   tooltip reusing the shared `WalletInfoTooltip` + `REVIBE_WALLET_ICON`,
+   with a success-green semibold tagline `Full refund · instantly once
+   return is complete` (no `Recommended` pill — the green tagline is the
+   recommendation). Original-payment card: net amount in the headline,
+   then an inline breakdown table separated by a dashed divider —
+   `Product` + `Revibe Care` (only when `order.warranty > 0`) +
+   `Subtotal` + a `Restocking fee (10%)` row rendered in red
+   (`text-danger font-semibold`). Below the breakdown, an ETA line with
+   a clock icon reads `5–10 business days once return is complete` —
+   same shape (icon + inline text) as the wallet tagline, neutral tone,
+   so both cards anchor the refund clock to the same trigger event. Both
+   anchor lines use `whitespace-nowrap` so they stay on one line at
+   430px. The card label uses `order.paymentMethod.brand` + `last4`.
 6. **Review & submit.** Sectioned summary with an inline `Edit` link per
    section dispatching `GO_TO_STEP` to jump back to the originating
    step. A read-only `Item` block at the top shows the product + order
@@ -489,9 +499,16 @@ The eligibility check prefers the new `deliveredOn` ISO field
 
 - `unitPrice` from `order.unitPrice` (falls back to `subtotal`, then
   `total`).
-- `gross = unitPrice * units`.
+- `itemTotal = unitPrice * units`.
+- `warranty = order.warranty ?? 0` (Revibe Care is refunded on
+  change-of-mind, matching the cancellation flow).
+- `gross = itemTotal + warranty`.
 - Wallet: `fee = 0`, `net = gross`.
 - Original payment: `fee = round(gross * 0.10)`, `net = gross - fee`.
+
+The returned shape is `{ itemTotal, warranty, gross, fee, net, rate }`;
+Step 5 uses `itemTotal` / `warranty` to render the line-by-line
+breakdown on the original-payment card.
 
 **Submission is a stub.** Step 6's submit calls
 `dispatch({ type: 'SUBMIT', value: generateClaimRef() })` which just
