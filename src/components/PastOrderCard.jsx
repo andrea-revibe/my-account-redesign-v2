@@ -13,7 +13,7 @@ import {
   PackageCheck,
   RotateCcw,
 } from 'lucide-react'
-import { CANCELLATION_STATUSES } from '../lib/statuses'
+import { cancellationStepsFor } from '../lib/statuses'
 import RefundDetailsSheet from './RefundDetailsSheet'
 import KeepOrderSheet from './KeepOrderSheet'
 
@@ -196,7 +196,7 @@ function CancelledOrderCard({ order }) {
         <div className="pl-4 pr-3.5 pb-4 pt-0 flex flex-col gap-3.5 animate-slideDown">
           <div className="px-1">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2">
-              Refund progress
+              Cancellation progress
             </div>
             <RefundProgressDots order={order} />
           </div>
@@ -306,7 +306,7 @@ function RefundHero({ order }) {
     <div className={`rounded-[14px] border p-3.5 ${heroBg} ${t.border}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
-          {isRefunded ? 'Refunded' : 'Refund of'}
+          Cancellation{order.cancellationRef ? ` · #${order.cancellationRef}` : ''}
         </div>
         <span
           className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 ${t.text}`}
@@ -314,6 +314,9 @@ function RefundHero({ order }) {
           <PhaseIcon size={11} strokeWidth={2} />
           {phaseTag}
         </span>
+      </div>
+      <div className="mt-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+        {isRefunded ? 'Refunded' : 'Refund of'}
       </div>
       <div className={`mt-1 text-[28px] font-bold tabular-nums leading-none ${t.text}`}>
         {order.currency} {order.refund.amount.toLocaleString()}
@@ -380,15 +383,6 @@ function ProductRow({ order, expanded }) {
   )
 }
 
-// Mirrors the created-path filter in statuses.js — orders cancelled at
-// 'created' skip the 'requested' phase because nothing's been pulled yet.
-function cancellationStepsFor(order) {
-  if (order.statusId === 'created') {
-    return CANCELLATION_STATUSES.filter((s) => s.id !== 'requested')
-  }
-  return CANCELLATION_STATUSES
-}
-
 function RefundProgressDots({ order }) {
   const steps = cancellationStepsFor(order)
   const curIdx = steps.findIndex((s) => s.id === order.cancellationStatusId)
@@ -436,7 +430,7 @@ function RefundProgressDots({ order }) {
                     : 'text-muted'
               }`}
             >
-              {shortLabel(s)}
+              {s.shortLabel}
             </span>
             {ts && (
               <span className="mt-1 text-[10.5px] leading-tight text-muted tabular-nums">
@@ -448,11 +442,5 @@ function RefundProgressDots({ order }) {
       })}
     </ol>
   )
-}
-
-function shortLabel(step) {
-  if (step.id === 'requested') return 'Requested'
-  if (step.id === 'refund_pending') return 'Pending'
-  return 'Refunded'
 }
 

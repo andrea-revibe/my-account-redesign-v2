@@ -4,6 +4,17 @@ Internal demo project. Format roughly follows [Keep a Changelog](https://keepach
 
 ## [Unreleased] — phase 22 (cancelled-card cleanup)
 
+### Added
+
+- **`cancellationRef` field on cancelled orders.** Mock data seeds `'4BTb2x'` on all three cancelled orders (89499 / 89321 / 89150) — illustrative demo ref, not unique-per-order.
+- **`shortLabel` field on `CANCELLATION_STATUSES`.** Lets `cancellationStepsFor` swap the dot-stepper label cleanly (`Auto-accepted` on the created path, canonical labels on the QC path) without a per-component label table.
+
+### Changed
+
+- **Cancellation cards now source-label every variant.** `RefundHero` eyebrow reads `Cancellation · #{cancellationRef}` (parallel to `ClaimCard`'s `Claim · {type}`) so customers can tell a cancellation refund apart from a claim refund at a glance — the previous `Refund of` / `Refunded` micro-label moved one row down as a secondary label above the amount. Expanded-section header relabeled `Refund progress` → `Cancellation progress` for symmetry with `Claim progress`.
+- **`cancellationStepsFor` stops hiding `requested` on the created path.** Both paths now render the same three steps (`Requested` / `Pending` / `Refunded`) with the canonical `Requested` label — on the created path the step just ticks over instantly because there's no supplier check. The helper no longer branches on `statusId`. Mock order 89321's `cancellationTimeline` gained a `requested` timestamp so the step has something to render under it.
+- **Local `cancellationStepsFor` / `shortLabel` in `PastOrderCard.jsx` removed.** Both now come from `statuses.js`, eliminating the duplicate.
+
 ### Removed
 
 - **`FulfilmentTrace` row from the expanded cancelled `PastOrderCard`.** The dimmed `Order was · Placed · Quality Check · Shipped · Delivered` mini-trace (ending in a red ✕ at the cancel point) is gone for all three cancellation phases (`requested` / `refund_pending` / `refunded`). The Refund progress dots remain. `STATUSES` import dropped from `PastOrderCard.jsx`.
