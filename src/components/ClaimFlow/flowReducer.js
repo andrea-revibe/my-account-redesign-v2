@@ -1,11 +1,18 @@
-export const TOTAL_STEPS = 9
+import { ORDERS } from '../../data/orders'
+
+export const TOTAL_STEPS = 7
 
 export function initialState(initialOrderId = null) {
-  // Entering from a specific order pre-seeds the claim type and lands the
-  // user on Step 2 with that order selected — they can still back-step to
-  // Step 1 to confirm the claim type.
+  // Entering from a specific delivered product card pre-seeds the order and
+  // claim type, but the user still starts on Step 1 to confirm what kind of
+  // claim they're raising. Step 4 (pickup details) is also pre-seeded from
+  // the order's contact info so the user only needs to edit fields that are
+  // out of date.
+  const order = initialOrderId
+    ? ORDERS.find((o) => o.id === initialOrderId)
+    : null
   return {
-    step: initialOrderId ? 2 : 1,
+    step: 1,
     claimType: initialOrderId ? 'change_of_mind' : null,
     orderId: initialOrderId,
     units: 1,
@@ -17,7 +24,11 @@ export function initialState(initialOrderId = null) {
       email: '',
       password: '',
     },
-    returnMethod: { id: null, address: '' },
+    pickupDetails: {
+      address: order?.address || '',
+      email: order?.email || '',
+      phone: order?.phone || '',
+    },
     refundMethod: null,
     claimRef: null,
   }
@@ -27,23 +38,14 @@ export function flowReducer(state, action) {
   switch (action.type) {
     case 'SET_CLAIM_TYPE':
       return { ...state, claimType: action.value }
-    case 'SET_ORDER':
-      // Reset downstream selections that depend on the order.
-      return {
-        ...state,
-        orderId: action.value,
-        units: 1,
-      }
-    case 'SET_UNITS':
-      return { ...state, units: action.value }
     case 'SET_REASON':
       return { ...state, reason: { ...state.reason, ...action.value } }
     case 'SET_DEVICE_PREP':
       return { ...state, devicePrep: { ...state.devicePrep, ...action.value } }
-    case 'SET_RETURN_METHOD':
+    case 'SET_PICKUP_DETAILS':
       return {
         ...state,
-        returnMethod: { ...state.returnMethod, ...action.value },
+        pickupDetails: { ...state.pickupDetails, ...action.value },
       }
     case 'SET_REFUND_METHOD':
       return { ...state, refundMethod: action.value }
@@ -61,34 +63,30 @@ export function flowReducer(state, action) {
 }
 
 // Per-step validation. Returns true when the user can advance from `state.step`.
-export function canAdvance(state, orderForFlow) {
+export function canAdvance(state) {
   switch (state.step) {
     case 1:
       return state.claimType === 'change_of_mind'
     case 2:
-      return Boolean(state.orderId)
-    case 3: {
-      const maxUnits = orderForFlow?.quantity || 1
-      return state.units >= 1 && state.units <= maxUnits
-    }
-    case 4:
       return true
-    case 5: {
+    case 3: {
       const dp = state.devicePrep
       if (dp.option === 'reset') return dp.resetConfirmed === true
       if (dp.option === 'credentials')
         return dp.email.trim().length > 0 && dp.password.length > 0
       return false
     }
-    case 6: {
-      const rm = state.returnMethod
-      if (!rm.id) return false
-      if (rm.id === 'courier' && rm.address.trim().length === 0) return false
-      return true
+    case 4: {
+      const pd = state.pickupDetails
+      return (
+        pd.address.trim().length > 0 &&
+        pd.email.trim().length > 0 &&
+        pd.phone.trim().length > 0
+      )
     }
-    case 7:
+    case 5:
       return state.refundMethod === 'wallet' || state.refundMethod === 'original'
-    case 8:
+    case 6:
       return true
     default:
       return false

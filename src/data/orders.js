@@ -8,6 +8,7 @@ export const ORDERS = [
   {
     id: '89712',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '28/04/2026 02:15 PM',
     placedAtFull: '28 Apr 2026 · 2:15 PM',
@@ -38,6 +39,7 @@ export const ORDERS = [
   {
     id: '89510',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '22/04/2026 11:02 AM',
     placedAtFull: '22 Apr 2026 · 11:02 AM',
@@ -70,6 +72,7 @@ export const ORDERS = [
   {
     id: '89643',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '18/04/2026 04:39 PM',
     placedAtFull: '18 Apr 2026 · 4:39 PM',
@@ -106,6 +109,7 @@ export const ORDERS = [
   {
     id: '89657',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '03/05/2026 07:09 PM',
     placedAtFull: '3 May 2026 · 7:09 PM',
@@ -140,6 +144,7 @@ export const ORDERS = [
   {
     id: '89499',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '03/05/2026 10:14 AM',
     placedAtFull: '3 May 2026 · 10:14 AM',
@@ -179,6 +184,7 @@ export const ORDERS = [
   {
     id: '89321',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '28/03/2026 02:15 PM',
     placedAtFull: '28 Mar 2026 · 2:15 PM',
@@ -218,6 +224,7 @@ export const ORDERS = [
   {
     id: '89150',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '12/03/2026 09:30 AM',
     placedAtFull: '12 Mar 2026 · 9:30 AM',
@@ -263,6 +270,7 @@ export const ORDERS = [
   {
     id: '89219',
     phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
     placedAt: '26/03/2026 08:33 AM',
     placedAtFull: '26 Mar 2026 · 8:33 AM',
@@ -294,19 +302,20 @@ export const ORDERS = [
       image: '/iphone-midnight.png',
     },
     claim: {
-      claimRef: 'RET-J3W9C5VR',
+      claimRef: 'IXipP8',
       claimStatusId: 'under_qc',
       type: 'change_of_mind',
       submittedAt: '28 Apr 2026 · 2:10 PM',
       units: 1,
       reason: { value: 'no_fit', otherText: '' },
       devicePrep: { option: 'credentials', os: 'android' },
-      returnMethod: {
-        id: 'courier',
+      pickupDetails: {
         address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
       },
       refundMethod: 'original',
-      expectedRefund: { gross: 519, fee: 51.9, net: 467.1, rate: 0.10 },
+      expectedRefund: { itemTotal: 519, warranty: 60, gross: 579, fee: 57.9, net: 521.1, rate: 0.10 },
       timeline: {
         claim_created: '28 Apr · 2:10 PM',
         pending_collection: '28 Apr · 2:11 PM',

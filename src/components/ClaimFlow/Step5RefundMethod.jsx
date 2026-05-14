@@ -1,9 +1,12 @@
-import { CreditCard } from 'lucide-react'
+import { CreditCard, Clock } from 'lucide-react'
 import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 
-export default function Step7RefundMethod({ state, dispatch, order }) {
+const REVIBE_CARE_ICON =
+  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+
+export default function Step5RefundMethod({ state, dispatch, order }) {
   if (!order) return null
   const currency = order.currency
   const wallet = refundBreakdown(order, state.units, 'wallet')
@@ -21,7 +24,6 @@ export default function Step7RefundMethod({ state, dispatch, order }) {
           onSelect={() =>
             dispatch({ type: 'SET_REFUND_METHOD', value: 'wallet' })
           }
-          recommended
           title={
             <span className="flex items-center gap-1.5">
               <img
@@ -35,9 +37,11 @@ export default function Step7RefundMethod({ state, dispatch, order }) {
             </span>
           }
           amount={`${currency} ${formatMoney(wallet.net)}`}
-          amountHint="Full refund · no fees"
-          detail="Available in your wallet within 1 hour."
-        />
+        >
+          <div className="mt-2 text-[12.5px] font-semibold text-success leading-[1.4] whitespace-nowrap">
+            Full refund · instantly once return is complete
+          </div>
+        </RefundCard>
         <RefundCard
           selected={state.refundMethod === 'original'}
           onSelect={() =>
@@ -53,30 +57,49 @@ export default function Step7RefundMethod({ state, dispatch, order }) {
             </span>
           }
           amount={`${currency} ${formatMoney(original.net)}`}
-          amountHint={
-            <>
-              <span className="line-through text-muted">
-                {currency} {formatMoney(original.gross)}
-              </span>{' '}
-              · −{currency} {formatMoney(original.fee)} (10% restocking fee)
-            </>
-          }
-          detail="Returns to your card in 5–10 business days."
-        />
+        >
+          <div className="mt-3 pt-3 border-t border-dashed border-line flex flex-col gap-1.5">
+            <BreakdownRow
+              label="Product"
+              value={`${currency} ${formatMoney(original.itemTotal)}`}
+            />
+            {original.warranty > 0 && (
+              <BreakdownRow
+                label={
+                  <span className="inline-flex items-center gap-1.5">
+                    <img
+                      src={REVIBE_CARE_ICON}
+                      alt=""
+                      aria-hidden
+                      className="w-3.5 h-3.5 object-contain shrink-0"
+                    />
+                    Revibe Care
+                  </span>
+                }
+                value={`${currency} ${formatMoney(original.warranty)}`}
+              />
+            )}
+            <BreakdownRow
+              label="Subtotal"
+              value={`${currency} ${formatMoney(original.gross)}`}
+            />
+            <BreakdownRow
+              label="Restocking fee (10%)"
+              value={`−${currency} ${formatMoney(original.fee)}`}
+              tone="danger"
+            />
+          </div>
+          <div className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2 leading-[1.4] whitespace-nowrap">
+            <Clock size={12} strokeWidth={2} className="text-ink-2 shrink-0" />
+            5–10 business days once return is complete
+          </div>
+        </RefundCard>
       </div>
     </>
   )
 }
 
-function RefundCard({
-  selected,
-  onSelect,
-  recommended,
-  title,
-  amount,
-  amountHint,
-  detail,
-}) {
+function RefundCard({ selected, onSelect, title, amount, children }) {
   return (
     <button
       type="button"
@@ -96,21 +119,24 @@ function RefundCard({
           {selected && <span className="w-2 h-2 rounded-full bg-brand" />}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="text-[14.5px] font-semibold text-ink">{title}</div>
-            {recommended && (
-              <span className="inline-flex items-center rounded-full bg-success-bg text-success font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
-                Recommended
-              </span>
-            )}
-          </div>
+          <div className="text-[14.5px] font-semibold text-ink">{title}</div>
           <div className="mt-2 text-[22px] font-bold text-ink tabular-nums leading-none">
             {amount}
           </div>
-          <div className="mt-1 text-[12px] text-muted">{amountHint}</div>
-          <div className="mt-2 text-[12px] text-ink-2">{detail}</div>
+          {children}
         </div>
       </div>
     </button>
+  )
+}
+
+function BreakdownRow({ label, value, tone }) {
+  const valueClass =
+    tone === 'danger' ? 'text-danger font-semibold' : 'text-ink'
+  return (
+    <div className="flex items-center justify-between text-[12.5px]">
+      <span className="text-ink-2">{label}</span>
+      <span className={`tabular-nums ${valueClass}`}>{value}</span>
+    </div>
   )
 }

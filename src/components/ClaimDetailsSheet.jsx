@@ -4,13 +4,12 @@ import {
   reasonText,
   devicePrepText,
   refundMethodLabel,
-  RETURN_METHOD_LABELS,
 } from '../lib/claims'
 
 // Bottom sheet surfacing the full set of choices captured during the
-// raise-a-claim flow: reason, units, device prep, return method (with
-// pickup address when courier), refund destination, and expected refund.
-// Mirrors the layering of RefundDetailsSheet so the two feel like siblings.
+// raise-a-claim flow: reason, device prep, pickup details (address +
+// email + phone), refund destination, and expected refund. Mirrors the
+// layering of RefundDetailsSheet so the two feel like siblings.
 export default function ClaimDetailsSheet({ order, open, onClose }) {
   useEffect(() => {
     if (!open) return
@@ -30,7 +29,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
 
   const claim = order.claim
   const { currency } = order
-  const returnLabel = RETURN_METHOD_LABELS[claim.returnMethod?.id]
+  const pickup = claim.pickupDetails || {}
   const isWallet = claim.refundMethod === 'wallet'
 
   return (
@@ -69,20 +68,10 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           <SectionCard title="Summary">
             <Row label="Reason" value={reasonText(claim)} />
-            <Row
-              label="Units"
-              value={`${claim.units} of ${order.quantity || 1}`}
-            />
             <Row label="Device preparation" value={devicePrepText(claim)} />
-            <Row
-              label="Return method"
-              value={returnLabel || 'Not selected'}
-              sub={
-                claim.returnMethod?.id === 'courier'
-                  ? claim.returnMethod.address
-                  : null
-              }
-            />
+            <Row label="Pickup address" value={pickup.address || '—'} />
+            <Row label="Pickup email" value={pickup.email || '—'} />
+            <Row label="Pickup phone" value={pickup.phone || '—'} />
             <Row
               label="Refund destination"
               value={

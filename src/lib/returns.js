@@ -81,16 +81,18 @@ export function groupOrdersByEligibility(orders, today = new Date()) {
 export function refundBreakdown(order, units, method) {
   const u = Math.max(1, Math.min(units, order.quantity || 1))
   const unitPrice = order.unitPrice ?? order.subtotal ?? order.total
-  const gross = unitPrice * u
+  const itemTotal = unitPrice * u
+  const warranty = order.warranty ?? 0
+  const gross = itemTotal + warranty
   if (method === 'wallet') {
-    return { gross, fee: 0, net: gross, rate: 0 }
+    return { itemTotal, warranty, gross, fee: 0, net: gross, rate: 0 }
   }
   if (method === 'original') {
     const fee = Math.round(gross * RESTOCKING_FEE_RATE * 100) / 100
     const net = Math.round((gross - fee) * 100) / 100
-    return { gross, fee, net, rate: RESTOCKING_FEE_RATE }
+    return { itemTotal, warranty, gross, fee, net, rate: RESTOCKING_FEE_RATE }
   }
-  return { gross, fee: 0, net: gross, rate: 0 }
+  return { itemTotal, warranty, gross, fee: 0, net: gross, rate: 0 }
 }
 
 export function formatMoney(n) {
@@ -117,10 +119,5 @@ export function formatShortDate(date) {
 }
 
 export function generateClaimRef() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let out = ''
-  for (let i = 0; i < 8; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return `RET-${out}`
+  return 'IXipP8'
 }

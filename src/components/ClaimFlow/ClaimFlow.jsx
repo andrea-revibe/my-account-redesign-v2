@@ -11,14 +11,12 @@ import { generateClaimRef } from '../../lib/returns'
 import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
 import Step1ClaimType from './Step1ClaimType'
-import Step2OrderSelection from './Step2OrderSelection'
-import Step3ProductQuantity from './Step3ProductQuantity'
-import Step4Reason from './Step4Reason'
-import Step5DevicePrep from './Step5DevicePrep'
-import Step6ReturnMethod from './Step6ReturnMethod'
-import Step7RefundMethod from './Step7RefundMethod'
-import Step8Review from './Step8Review'
-import Step9Confirmation from './Step9Confirmation'
+import Step2Reason from './Step2Reason'
+import Step3DevicePrep from './Step3DevicePrep'
+import Step4PickupDetails from './Step4PickupDetails'
+import Step5RefundMethod from './Step5RefundMethod'
+import Step6Review from './Step6Review'
+import Step7Confirmation from './Step7Confirmation'
 
 export default function ClaimFlow({ initialOrderId, onClose }) {
   const [state, dispatch] = useReducer(
@@ -47,7 +45,7 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
   )
 
   const isConfirmation = state.step === TOTAL_STEPS && state.claimRef
-  const isReview = state.step === 8
+  const isReview = state.step === 6
 
   const handlePrimary = () => {
     if (isReview) {
@@ -106,36 +104,26 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
             <Step1ClaimType state={state} dispatch={dispatch} />
           )}
           {state.step === 2 && (
-            <Step2OrderSelection state={state} dispatch={dispatch} />
+            <Step2Reason state={state} dispatch={dispatch} />
           )}
           {state.step === 3 && (
-            <Step3ProductQuantity
-              state={state}
-              dispatch={dispatch}
-              order={order}
-            />
+            <Step3DevicePrep state={state} dispatch={dispatch} order={order} />
           )}
           {state.step === 4 && (
-            <Step4Reason state={state} dispatch={dispatch} />
+            <Step4PickupDetails state={state} dispatch={dispatch} />
           )}
           {state.step === 5 && (
-            <Step5DevicePrep state={state} dispatch={dispatch} order={order} />
-          )}
-          {state.step === 6 && (
-            <Step6ReturnMethod state={state} dispatch={dispatch} />
-          )}
-          {state.step === 7 && (
-            <Step7RefundMethod
+            <Step5RefundMethod
               state={state}
               dispatch={dispatch}
               order={order}
             />
           )}
-          {state.step === 8 && (
-            <Step8Review state={state} dispatch={dispatch} order={order} />
+          {state.step === 6 && (
+            <Step6Review state={state} dispatch={dispatch} order={order} />
           )}
           {isConfirmation && (
-            <Step9Confirmation
+            <Step7Confirmation
               state={state}
               order={order}
               onClose={onClose}
@@ -147,11 +135,11 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
           <StickyActionBar
             primaryLabel={primaryLabel}
             primaryVariant={primaryVariant}
-            primaryDisabled={!canAdvance(state, order)}
+            primaryDisabled={!canAdvance(state)}
             onPrimary={handlePrimary}
-            secondaryLabel={state.step === 4 ? 'Skip' : null}
+            secondaryLabel={state.step === 2 ? 'Skip' : null}
             onSecondary={
-              state.step === 4 ? () => dispatch({ type: 'NEXT' }) : null
+              state.step === 2 ? () => dispatch({ type: 'NEXT' }) : null
             }
           />
         )}

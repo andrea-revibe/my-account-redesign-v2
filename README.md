@@ -24,7 +24,7 @@ npm run build    # production build into dist/
 
 - `src/App.jsx` — page composition; routes each order to one of three cards (`InProgressCard` for created/QC, `OrderCard` for shipped + in-flight cancelled, `PastOrderCard` for delivered + cancelled-past). Also owns the `claimFlowOrderId` entry state for the returns flow overlay.
 - `src/components/` — UI components, one per file.
-- `src/components/ClaimFlow/` — the nine-step change-of-mind returns flow (launched from `Raise a claim` on delivered past orders). See `docs/my-account-flow.md` § 2.7.
+- `src/components/ClaimFlow/` — the seven-step change-of-mind returns flow (launched from `Raise a claim` on delivered past orders). See `docs/my-account-flow.md` § 2.7.
 - `src/data/orders.js` — mock orders. Swap for an API call to ship for real.
 - `src/lib/statuses.js` — single source of truth for top-level statuses, shipping sub-statuses, header chips, status-banner copy + tone, and the auto-expand rule (`pickActiveOrderId`).
 - `src/lib/returns.js` — single source of truth for return eligibility, refund math, and formatting helpers used by the returns flow.

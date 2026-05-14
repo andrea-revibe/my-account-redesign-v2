@@ -26,7 +26,7 @@ const RESET_STEPS = {
   ],
 }
 
-export default function Step5DevicePrep({ state, dispatch, order }) {
+export default function Step3DevicePrep({ state, dispatch, order }) {
   const dp = state.devicePrep
   const defaultOs = order?.deviceOs || 'ios'
   const os = dp.os || defaultOs

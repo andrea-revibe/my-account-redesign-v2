@@ -123,7 +123,7 @@ export function claimStatusSubline(claim) {
   return null
 }
 
-// Labels duplicated from Step8Review so the ClaimCard summary stays
+// Labels duplicated from Step6Review so the ClaimCard summary stays
 // readable without importing from the flow components.
 export const REASON_LABELS = {
   no_fit: "Didn't suit my needs",
@@ -131,12 +131,6 @@ export const REASON_LABELS = {
   changed_mind: 'Changed my mind',
   mistake: 'Ordered by mistake',
   other: 'Other',
-}
-
-export const RETURN_METHOD_LABELS = {
-  courier: 'Courier pickup',
-  dropoff: 'Drop-off at partner location',
-  store: 'In-store return',
 }
 
 export function reasonText(claim) {
