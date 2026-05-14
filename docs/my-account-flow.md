@@ -134,9 +134,8 @@ Expanded reveals a 3-step numbered dot stepper for refund progress
 `cancellationStepsFor` in `statuses.js`). Each reached/current step
 carries the timestamp it entered that phase underneath its label (sourced
 from `order.cancellationTimeline[step.id]`); upcoming steps render the
-label only. Then a dimmed fulfilment trace ending in a red ✕ at the
-cancel point, and a two-action footer (`View refund details` + icon-only
-`Download receipt`). Tapping `View refund details` opens the
+label only. Followed by a two-action footer (`View refund details` +
+icon-only `Download receipt`). Tapping `View refund details` opens the
 `RefundDetailsSheet` bottom sheet, which is the canonical surface for the
 line-item breakdown (product + Revibe Care line items → subtotal → fee
 (card refunds only) → total refund). Always collapsed by default; no

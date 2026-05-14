@@ -13,7 +13,7 @@ import {
   PackageCheck,
   RotateCcw,
 } from 'lucide-react'
-import { CANCELLATION_STATUSES, STATUSES } from '../lib/statuses'
+import { CANCELLATION_STATUSES } from '../lib/statuses'
 import RefundDetailsSheet from './RefundDetailsSheet'
 import KeepOrderSheet from './KeepOrderSheet'
 
@@ -199,13 +199,6 @@ function CancelledOrderCard({ order }) {
               Refund progress
             </div>
             <RefundProgressDots order={order} />
-          </div>
-
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[10.5px] uppercase tracking-[0.06em] font-bold text-muted">
-              Order was
-            </span>
-            <FulfilmentTrace order={order} />
           </div>
 
           {canKeep && (
@@ -461,40 +454,5 @@ function shortLabel(step) {
   if (step.id === 'requested') return 'Requested'
   if (step.id === 'refund_pending') return 'Pending'
   return 'Refunded'
-}
-
-function FulfilmentTrace({ order }) {
-  const reachedIdx = STATUSES.findIndex((s) => s.id === order.statusId)
-  return (
-    <div className="flex items-center gap-1 opacity-55">
-      {STATUSES.map((s, i) => {
-        const reached = i <= reachedIdx
-        const last = reached && i === reachedIdx
-        return (
-          <div key={s.id} className="flex items-center gap-1">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                last ? 'bg-danger' : reached ? 'bg-ink-2' : 'bg-line'
-              }`}
-            />
-            <span
-              className={`text-[9.5px] uppercase tracking-[0.05em] ${
-                last
-                  ? 'text-danger font-bold'
-                  : reached
-                  ? 'text-ink-2'
-                  : 'text-muted'
-              }`}
-            >
-              {s.short}
-            </span>
-            {i < STATUSES.length - 1 && (
-              <span className="w-3 h-px bg-line ml-0.5" />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 

@@ -2,6 +2,12 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 22 (cancelled-card cleanup)
+
+### Removed
+
+- **`FulfilmentTrace` row from the expanded cancelled `PastOrderCard`.** The dimmed `Order was · Placed · Quality Check · Shipped · Delivered` mini-trace (ending in a red ✕ at the cancel point) is gone for all three cancellation phases (`requested` / `refund_pending` / `refunded`). The Refund progress dots remain. `STATUSES` import dropped from `PastOrderCard.jsx`.
+
 ## [Unreleased] — phase 21 (returns flow: issue branch math + Step 6 polish + packing gate)
 
 ### Added
