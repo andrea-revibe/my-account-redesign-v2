@@ -302,7 +302,7 @@ export const ORDERS = [
       image: '/iphone-midnight.png',
     },
     claim: {
-      claimRef: 'RET-J3W9C5VR',
+      claimRef: 'IXipP8',
       claimStatusId: 'under_qc',
       type: 'change_of_mind',
       submittedAt: '28 Apr 2026 · 2:10 PM',

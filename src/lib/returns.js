@@ -119,10 +119,5 @@ export function formatShortDate(date) {
 }
 
 export function generateClaimRef() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let out = ''
-  for (let i = 0; i < 8; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return `RET-${out}`
+  return 'IXipP8'
 }

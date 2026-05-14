@@ -2,6 +2,14 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 19 (review wallet treatment + ref + claim details polish)
+
+### Changed
+
+- **Step 6 review: refund row now mirrors Step 5's wallet treatment** — when `refundMethod === 'wallet'`, the row renders the wallet icon + `Revibe Wallet` label + `WalletInfoTooltip` (i). Card path is unchanged.
+- **Claim reference is now a fixed `IXipP8`** instead of a generated `RET-XXXXXXXX`. `generateClaimRef()` returns the literal string; mock `claimRef` on the seeded past-order claim aligned to match. Demo-only change so screenshots stay stable.
+- **`ClaimDetailsSheet`: dropped the `Units` row** from the Summary section. Stub `units` field on `order.claim` is still in the data shape but no longer surfaced anywhere.
+
 ## [Unreleased] — phase 18 (refund-timeline anchor parity)
 
 ### Changed

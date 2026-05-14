@@ -1,5 +1,6 @@
 import { Pencil, CreditCard, MapPin, Mail, Phone } from 'lucide-react'
 import StepHeading from './StepHeading'
+import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 
 const REASON_LABELS = {
@@ -105,14 +106,27 @@ export default function Step6Review({ state, dispatch, order }) {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[13.5px] text-ink flex items-center gap-1.5">
-                {state.refundMethod === 'original' && (
-                  <CreditCard
-                    size={13}
-                    strokeWidth={1.75}
-                    className="text-ink-2"
-                  />
+                {state.refundMethod === 'wallet' ? (
+                  <>
+                    <img
+                      src={REVIBE_WALLET_ICON}
+                      alt=""
+                      aria-hidden
+                      className="w-3.5 h-3.5 object-contain"
+                    />
+                    <span>Revibe Wallet</span>
+                    <WalletInfoTooltip stopPropagation />
+                  </>
+                ) : (
+                  <>
+                    <CreditCard
+                      size={13}
+                      strokeWidth={1.75}
+                      className="text-ink-2"
+                    />
+                    {refundMethodLabel}
+                  </>
                 )}
-                {refundMethodLabel}
               </div>
               {state.refundMethod === 'original' && (
                 <div className="text-[11.5px] text-muted mt-0.5">

@@ -7,7 +7,7 @@ import {
 } from '../lib/claims'
 
 // Bottom sheet surfacing the full set of choices captured during the
-// raise-a-claim flow: reason, units, device prep, pickup details (address +
+// raise-a-claim flow: reason, device prep, pickup details (address +
 // email + phone), refund destination, and expected refund. Mirrors the
 // layering of RefundDetailsSheet so the two feel like siblings.
 export default function ClaimDetailsSheet({ order, open, onClose }) {
@@ -68,10 +68,6 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           <SectionCard title="Summary">
             <Row label="Reason" value={reasonText(claim)} />
-            <Row
-              label="Units"
-              value={`${claim.units} of ${order.quantity || 1}`}
-            />
             <Row label="Device preparation" value={devicePrepText(claim)} />
             <Row label="Pickup address" value={pickup.address || '—'} />
             <Row label="Pickup email" value={pickup.email || '—'} />
