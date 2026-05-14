@@ -18,11 +18,11 @@ const TYPES = [
     inScope: true,
   },
   {
-    id: 'faulty',
+    id: 'issue',
     label: 'Faulty product',
     sub: 'Device not working as expected',
     icon: AlertTriangle,
-    inScope: false,
+    inScope: true,
   },
   {
     id: 'damaged',

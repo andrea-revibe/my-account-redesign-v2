@@ -3,6 +3,10 @@
 
 export const RETURN_WINDOW_DAYS = 10
 export const RESTOCKING_FEE_RATE = 0.10
+// Flat Wallet bonus paid when the customer accepts store credit on an
+// issue (faulty product) claim. Acts as the equivalent of the
+// change-of-mind "fee waived on Wallet" — incentivises store credit.
+export const ISSUE_WALLET_BONUS = 100
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -78,21 +82,54 @@ export function groupOrdersByEligibility(orders, today = new Date()) {
   return { eligible, ineligible }
 }
 
-export function refundBreakdown(order, units, method) {
+// `claimType` controls the fee + bonus rules:
+//   change_of_mind: Wallet 100%, Card −10% restocking fee.
+//   issue:          Wallet 100% + flat AED 100 bonus, Card 100% (no fee).
+// Defaults to change_of_mind so existing callers keep working.
+export function refundBreakdown(order, units, method, claimType = 'change_of_mind') {
   const u = Math.max(1, Math.min(units, order.quantity || 1))
   const unitPrice = order.unitPrice ?? order.subtotal ?? order.total
   const itemTotal = unitPrice * u
   const warranty = order.warranty ?? 0
   const gross = itemTotal + warranty
+  const isIssue = claimType === 'issue'
   if (method === 'wallet') {
-    return { itemTotal, warranty, gross, fee: 0, net: gross, rate: 0 }
+    const bonus = isIssue ? ISSUE_WALLET_BONUS : 0
+    return {
+      itemTotal,
+      warranty,
+      gross,
+      fee: 0,
+      bonus,
+      net: gross + bonus,
+      rate: 0,
+    }
   }
   if (method === 'original') {
+    if (isIssue) {
+      return {
+        itemTotal,
+        warranty,
+        gross,
+        fee: 0,
+        bonus: 0,
+        net: gross,
+        rate: 0,
+      }
+    }
     const fee = Math.round(gross * RESTOCKING_FEE_RATE * 100) / 100
     const net = Math.round((gross - fee) * 100) / 100
-    return { itemTotal, warranty, gross, fee, net, rate: RESTOCKING_FEE_RATE }
+    return {
+      itemTotal,
+      warranty,
+      gross,
+      fee,
+      bonus: 0,
+      net,
+      rate: RESTOCKING_FEE_RATE,
+    }
   }
-  return { itemTotal, warranty, gross, fee: 0, net: gross, rate: 0 }
+  return { itemTotal, warranty, gross, fee: 0, bonus: 0, net: gross, rate: 0 }
 }
 
 export function formatMoney(n) {

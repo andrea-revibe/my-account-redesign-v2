@@ -147,6 +147,17 @@ export function devicePrepText(claim) {
   return 'Not provided'
 }
 
+export const CLAIM_TYPE_LABELS = {
+  change_of_mind: 'Change of mind',
+  issue: 'Issue',
+}
+
+export function claimTypeLabel(typeOrClaim) {
+  const type =
+    typeof typeOrClaim === 'string' ? typeOrClaim : typeOrClaim?.type
+  return CLAIM_TYPE_LABELS[type] || 'Claim'
+}
+
 export function refundMethodLabel(claim, order) {
   if (claim?.refundMethod === 'wallet') return 'Revibe Wallet'
   if (claim?.refundMethod === 'original') {

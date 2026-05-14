@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import { CheckCircle2, Copy, Check, Mail, Clock, ShieldCheck } from 'lucide-react'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
+import { claimTypeLabel } from '../../lib/claims'
 
 export default function Step7Confirmation({ state, order, onClose }) {
   const [copied, setCopied] = useState(false)
   if (!order) return null
-  const refund = refundBreakdown(order, state.units, state.refundMethod)
+  const refund = refundBreakdown(
+    order,
+    state.units,
+    state.refundMethod,
+    state.claimType,
+  )
   const currency = order.currency
   const timeline =
     state.refundMethod === 'wallet'
@@ -31,7 +37,10 @@ export default function Step7Confirmation({ state, order, onClose }) {
         <h1 className="m-0 text-[24px] leading-[1.15] font-bold text-ink tracking-[-0.01em]">
           Your return request is in
         </h1>
-        <p className="mt-2 text-[13.5px] leading-[1.45] text-muted">
+        <div className="mt-3 inline-flex items-center rounded-full bg-brand-bg text-brand font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px]">
+          {claimTypeLabel(state.claimType)}
+        </div>
+        <p className="mt-3 text-[13.5px] leading-[1.45] text-muted">
           We'll email you the next steps shortly.
         </p>
       </div>

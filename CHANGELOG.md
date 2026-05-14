@@ -2,6 +2,52 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 21 (returns flow: issue branch math + Step 6 polish + packing gate)
+
+### Added
+
+- **Issue-aware refund math.** `refundBreakdown(order, units, method, claimType)` now takes a fourth argument. `issue` branch: Wallet adds a flat `ISSUE_WALLET_BONUS` (AED 100), card has no restocking fee. `change_of_mind` branch unchanged (Wallet 100%, card −10%). Return shape gained a `bonus` field.
+- **Step 6: `Issue` section** replaces the `Reason` section when `claimType === 'issue'`. Shows category label + description + attachment chip; Edit deep-links back to Step 2.
+- **Packing-confirmation gate above Submit** on Step 6 for both branches. Copy:
+  - `change_of_mind`: "I have packed the device properly in its original box."
+  - `issue`: "I have packed the device properly and performed the necessary testing." (Merges the legacy "testing performed" gate with the packing acknowledgement.)
+  - Submit stays disabled until checked. Fixes the legacy issue-flow bug where the form submitted even when the customer ticked "I have not done the necessary testing".
+
+### Changed
+
+- **Step 5 subtitle, Wallet card, and original-payment card** all branch on `claimType`:
+  - Issue + Wallet: shows an accent-tinted `+AED 100 bonus` chip + green tagline `Full refund + bonus · instantly once return is complete`.
+  - Issue + original payment: drops the inline breakdown table and the −10% fee row; ETA line reads `Full refund · 5–10 business days once return is complete`.
+  - Change-of-mind: unchanged.
+- **Step 6 refund row** shows `Includes AED 100 bonus` (accent tone) for issue+Wallet, `Includes 10% restocking fee` (muted) for change-of-mind+original, nothing otherwise.
+- **`flowReducer`** gained `packingConfirmed: false` and `SET_PACKING_CONFIRMED`; `canAdvance(step === 6)` now requires it.
+- **Step 7 confirmation** passes `state.claimType` into `refundBreakdown` so the displayed refund matches the branch.
+
+### Notes
+
+- `docs/my-account-flow.md` § 2.7 updated (Step 5 + Step 6 + refund math) and § 4.8 (claim shape gains optional `bonus` on `expectedRefund`).
+- Issue-branch claim card still uses change_of_mind mock data; seeding a dedicated issue mock claim was deferred — flag if you want it in the demo.
+
+## [Unreleased] — phase 20 (returns flow: issue branch skeleton)
+
+### Added
+
+- **Returns flow now branches on `claimType` at Step 2.** New `Step2IssueDetails` (category dropdown + required description + fake attachment slot) is rendered when `state.claimType === 'issue'`; `Step2Reason` continues to render for `change_of_mind`. Steps 3–7 remain shared.
+- **New issue category list** (battery / software / physical / screen / charger / overheating / camera) mirrors the legacy form.
+- **Faulty product tile in Step 1 is now in-scope** (`id: 'issue'`). Other non-change-of-mind tiles (damaged / missing / other) remain stubs.
+- **`claimTypeLabel()` + `CLAIM_TYPE_LABELS` in `src/lib/claims.js`.** Used by `Step7Confirmation` (label chip below the success headline), `ClaimCard` (hero eyebrow now reads `Claim · Change of mind` / `Claim · Issue`), and `ClaimDetailsSheet` (new `Claim type` row).
+
+### Changed
+
+- **Step 1 no longer auto-selects a claim type when entering from an order card.** `initialState(initialOrderId)` always returns `claimType: null`; pickup-detail prefill from the order is preserved.
+- **`flowReducer`** gained `issueDetails: { category, description, attachmentName }` and `SET_ISSUE_DETAILS`. `canAdvance` now branches at Step 1 (accepts `issue`) and Step 2 (requires category + description + attachment for the issue branch).
+- **`ClaimFlow` sticky-bar `Skip` action is scoped to change-of-mind only** — the issue branch's Step 2 is fully required.
+
+### Notes
+
+- Phase 1 of a two-phase rollout. Phase 2 will add the issue-specific refund math (no restocking fee, AED 100 Wallet bonus), the issue section in Step 6 Review, and the merged packing/testing submission gate.
+- `docs/my-account-flow.md` § 2.7 updated with the new branch topology.
+
 ## [Unreleased] — phase 19 (review wallet treatment + ref + claim details polish)
 
 ### Changed

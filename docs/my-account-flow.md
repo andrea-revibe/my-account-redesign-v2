@@ -31,7 +31,7 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 - Auto-expand rule: only the single most in-flight order is expanded by default; the rest collapse.
 - Status chip row that filters the list (`All / In progress / Delivered / Cancelled`).
 - Status banner with `delayed` and `statusMessage` overrides.
-- **Change-of-mind returns flow** — 7-step mobile overlay launched from the `Raise a claim` button on delivered past orders (see §2.7). Other claim types (faulty / damaged / missing / other) are stubbed on the entry screen.
+- **Returns flow** — 7-step mobile overlay launched from the `Raise a claim` button on delivered past orders (see §2.7). Two branches wired: change of mind and faulty product (issue). Damaged / missing / wrong device / other remain stubbed on the entry screen.
 - **Claim card** — a fourth card type (`ClaimCard`) that tracks a submitted return through seven states (claim created → pending collection → under collection → in transit → under quality check → ready for refund → refunded). Replaces the delivered card for any order carrying a `claim` field. See §2.8.
 
 **Out of scope (faked or stubbed)**
@@ -41,7 +41,7 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 - Date-range dropdown effect on the list (logic is wired but all mock orders fall inside every range).
 - The Revibe Wallet pill in `GreetRow` (purely visual; the balance is a hardcoded prop and the info tooltip is the only interactive part).
 - Right-to-left and Arabic localisation.
-- Receipt-download flow. Claims flow exists for change-of-mind returns only (see §2.7); other claim types are stubbed.
+- Receipt-download flow. Claims flow covers change-of-mind and issue (faulty product) branches (see §2.7); the other three claim types are stubbed.
 - Real courier tracking — the "Track order" button hardcodes a known-good DHL Express test shipment so the demo always lands on a real tracking page.
 - Return-claim submission — Step 6's Submit advances to a confirmation screen with a generated ref number but does not persist anything.
 
@@ -388,13 +388,25 @@ Submit is a stub: both footer buttons just close the sheet. See §7 — the
 order shape today has no transition to flip `state` back from `cancelled`
 to `open` and to clean up `cancellationStatusId` / `cancellationTimeline`.
 
-### 2.7 Change-of-mind returns flow
+### 2.7 Returns flow
 
 The `Raise a claim` button on the delivered `PastOrderCard` launches a
-seven-step full-screen overlay (`src/components/ClaimFlow/ClaimFlow.jsx`)
-for raising a change-of-mind return. Other claim types (faulty / damaged
-/ missing / other) appear on the entry screen but route to a placeholder
-note rather than their own flows — out of scope for this build.
+seven-step full-screen overlay (`src/components/ClaimFlow/ClaimFlow.jsx`).
+Two branches are wired today — **change of mind** and **issue (faulty
+product)** — and diverge only at Step 2; Steps 1 and 3–7 are shared.
+Damaged in transit / missing items / wrong device / other appear on the
+entry screen but route to a placeholder note rather than their own flows
+— out of scope for this build.
+
+**Branching topology** (see also the per-step description below):
+
+```
+Step 1: Claim type picker                — shared
+   ├─ change_of_mind  → Step 2: Reason (optional)
+   └─ issue           → Step 2: Issue details (required)
+                          (category + description + attachment)
+Steps 3–7                                — shared
+```
 
 The flow's visual chrome is deliberately distinct from the order-card
 family: white surface, segmented top progress bar (`bg-brand` for reached
@@ -410,23 +422,32 @@ leaving the design system.
 rendered conditionally (`{claimFlowOrderId !== null && <ClaimFlow ... />}`),
 so closing it unmounts the reducer state — the brief explicitly forbids
 session persistence. The reducer (`flowReducer.js`) takes the entry
-`orderId` as its initialiser argument and always starts at Step 1; when
-launched from a specific delivered product card,
-`initialState(initialOrderId)` pre-seeds `claimType: 'change_of_mind'`
-and `orderId` so confirming Step 1 advances straight to the reason step
-without an explicit order picker. The delivered card is product-specific
-(one card per product line — see §4.7 / §8 on the future multi-product
-shape), so the order being returned is unambiguous from the entry point.
+`orderId` as its initialiser argument and always starts at Step 1 with
+`claimType: null`; the user picks change of mind or issue every time.
+`orderId` is carried through so the order being returned is unambiguous
+from the entry point (the delivered card is product-specific — see §4.7
+/ §8 on the future multi-product shape), and pickup-contact fields are
+pre-seeded from the order so the user typically just confirms.
 
 **Step-by-step.**
 
-1. **Claim type.** Five vertical option rows. Selecting `Return an item
-   (change of mind)` advances. The four out-of-scope options show an
-   inline note explaining they aren't part of this build. The entry
-   point pre-selects this option but the user still confirms it.
-2. **Reason (optional).** Five radio options. `Other` reveals a 200-char
-   `textarea`. The sticky bar renders a `Skip` button alongside
-   `Continue` — both advance, since the step is optional.
+1. **Claim type.** Five vertical option rows; nothing is pre-selected.
+   `Return an item (change of mind)` → `claimType: 'change_of_mind'`,
+   `Faulty product` → `claimType: 'issue'`. Damaged / missing / other
+   render an inline `not part of this build` note. `canAdvance` requires
+   one of the two in-scope options.
+2. **Reason or issue details (branches on `claimType`).**
+   - `change_of_mind` → **Reason (optional).** Five radio options.
+     `Other` reveals a 200-char textarea. The sticky bar renders a `Skip`
+     alongside `Continue`; both advance.
+   - `issue` → **Issue details (required).** Vertical category list
+     (battery / software / physical / screen / charger / overheating /
+     camera), a required free-text description (500-char max), and a
+     **fake** attachment slot (clicking the dashed drop-zone stubs in a
+     filename; the prototype has no real file picker). A warn-tinted
+     banner reinforces that attachments are required. `Skip` is hidden;
+     `canAdvance` requires category + non-empty description + a stubbed
+     filename.
 3. **Device preparation (gated).** Two stacked radio cards. Option A
    (`I've factory reset the device`, recommended pill) carries an
    `iPhone` / `Android` OS-tabs control, a collapsible numbered reset
@@ -446,30 +467,46 @@ shape), so the order being returned is unambiguous from the entry point.
    the rows so the method is still made explicit. All three fields
    must be non-empty before Continue enables.
 5. **Refund method.** Two stacked refund cards built off
-   `refundBreakdown(order, units, method)` (see §4.7). Visually aligned
-   with the cancellation sheet's refund picker so the two refund-choice
-   surfaces feel like siblings. Wallet card: full amount + wallet-info
-   tooltip reusing the shared `WalletInfoTooltip` + `REVIBE_WALLET_ICON`,
-   with a success-green semibold tagline `Full refund · instantly once
-   return is complete` (no `Recommended` pill — the green tagline is the
-   recommendation). Original-payment card: net amount in the headline,
-   then an inline breakdown table separated by a dashed divider —
-   `Product` + `Revibe Care` (only when `order.warranty > 0`) +
-   `Subtotal` + a `Restocking fee (10%)` row rendered in red
-   (`text-danger font-semibold`). Below the breakdown, an ETA line with
-   a clock icon reads `5–10 business days once return is complete` —
-   same shape (icon + inline text) as the wallet tagline, neutral tone,
-   so both cards anchor the refund clock to the same trigger event. Both
-   anchor lines use `whitespace-nowrap` so they stay on one line at
-   430px. The card label uses `order.paymentMethod.brand` + `last4`.
+   `refundBreakdown(order, units, method, claimType)` (see §4.7). Visually
+   aligned with the cancellation sheet's refund picker so the two
+   refund-choice surfaces feel like siblings. Branches on `claimType`:
+   - **change_of_mind.** Wallet card: full amount + wallet-info tooltip
+     (`WalletInfoTooltip` + `REVIBE_WALLET_ICON`), with a success-green
+     tagline `Full refund · instantly once return is complete`.
+     Original-payment card: net amount in the headline, then an inline
+     breakdown table — `Product` + `Revibe Care` (when `order.warranty
+     > 0`) + `Subtotal` + a red `Restocking fee (10%)` row — then a
+     clock-icon ETA line `5–10 business days once return is complete`.
+   - **issue.** Wallet card: net amount (= gross + AED 100 bonus) + an
+     accent-tinted `+AED 100 bonus` chip + tagline `Full refund + bonus
+     · instantly once return is complete`. Original-payment card: full
+     net (no fee), no breakdown table, tagline `Full refund · 5–10
+     business days once return is complete`. The card label uses
+     `order.paymentMethod.brand` + `last4` in both branches.
+
+   Both branches keep `whitespace-nowrap` on anchor lines and the same
+   visual chrome — only the math and the secondary copy diverge.
 6. **Review & submit.** Sectioned summary with an inline `Edit` link per
    section dispatching `GO_TO_STEP` to jump back to the originating
    step. A read-only `Item` block at the top shows the product + order
-   ID (not editable — the item is fixed by the entry point). Device-prep
-   is masked to `Factory reset confirmed` / `Credentials provided` —
-   credentials are never displayed in plain text. The refund block shows
-   the final net the user receives. The sticky bar swaps `Continue` for
-   a success-tone `Submit return request`.
+   ID (not editable — the item is fixed by the entry point).
+   - For `change_of_mind`, the second section is **Reason** (text or
+     "Not provided").
+   - For `issue`, it is **Issue** (category label + description +
+     attachment chip).
+   Device-prep is masked to `Factory reset confirmed` / `Credentials
+   provided` — credentials are never displayed in plain text. The refund
+   block surfaces the final net + an explanatory line: `Includes 10%
+   restocking fee` for change-of-mind + original payment, or `Includes
+   AED 100 bonus` (accent tone) for issue + Wallet. A **packing
+   confirmation** checkbox card sits below the Refund section and gates
+   `canAdvance` for the step — Submit stays disabled until the user
+   confirms they've packed the device. Copy varies by branch: change of
+   mind asks for proper packing only; issue merges packing with the
+   "necessary testing" acknowledgement (replacing the legacy
+   double-checkbox bug where ticking "I have *not* done the testing"
+   still let the form submit). The sticky bar swaps `Continue` for a
+   success-tone `Submit return request`.
 7. **Confirmation.** `generateClaimRef()` produces a `RET-XXXXXXXX`
    reference shown with a `Copy` button. Next-steps list:
    `Check your inbox` (email instructions stub), `Expected refund`
@@ -495,20 +532,32 @@ The eligibility check prefers the new `deliveredOn` ISO field
 (`'2026-05-08'`) and falls back to parsing the date portion of
 `timeline.delivered` against the year from `placedAt`.
 
-**Refund math** (`refundBreakdown(order, units, method)`):
+**Refund math** (`refundBreakdown(order, units, method, claimType)`,
+defaults to `change_of_mind`):
 
 - `unitPrice` from `order.unitPrice` (falls back to `subtotal`, then
   `total`).
 - `itemTotal = unitPrice * units`.
-- `warranty = order.warranty ?? 0` (Revibe Care is refunded on
-  change-of-mind, matching the cancellation flow).
+- `warranty = order.warranty ?? 0` (Revibe Care is refunded on both
+  branches, matching the cancellation flow).
 - `gross = itemTotal + warranty`.
-- Wallet: `fee = 0`, `net = gross`.
-- Original payment: `fee = round(gross * 0.10)`, `net = gross - fee`.
+- **change_of_mind**
+  - Wallet: `fee = 0`, `bonus = 0`, `net = gross`.
+  - Original payment: `fee = round(gross * 0.10)`, `bonus = 0`,
+    `net = gross - fee`.
+- **issue**
+  - Wallet: `fee = 0`, `bonus = ISSUE_WALLET_BONUS` (flat AED 100),
+    `net = gross + bonus`.
+  - Original payment: `fee = 0`, `bonus = 0`, `net = gross`.
 
-The returned shape is `{ itemTotal, warranty, gross, fee, net, rate }`;
-Step 5 uses `itemTotal` / `warranty` to render the line-by-line
-breakdown on the original-payment card.
+The `bonus` field is always present in the return shape (0 when no
+bonus applies) so consumers don't need null-guards.
+
+The returned shape is `{ itemTotal, warranty, gross, fee, bonus, net,
+rate }`; Step 5 uses `itemTotal` / `warranty` to render the line-by-line
+breakdown on the change-of-mind original-payment card, and `bonus` to
+render the `+AED 100 bonus` chip + Step 6 explanatory line on the issue
+branch.
 
 **Submission is a stub.** Step 6's submit calls
 `dispatch({ type: 'SUBMIT', value: generateClaimRef() })` which just
@@ -774,14 +823,15 @@ wired up to persist.
 
 - **`claim.claimRef`** — `RET-XXXXXXXX` reference shown on the card hero and in the details sheet header. Generated by `generateClaimRef()` in `src/lib/returns.js`.
 - **`claim.claimStatusId`** — one of `claim_created`, `pending_collection`, `under_collection`, `in_transit`, `under_qc`, `ready_for_refund`, `refunded`. Drives the tone, hero copy, progress dot index, and section routing in `App.jsx`.
-- **`claim.type`** — claim type id (today only `change_of_mind`).
+- **`claim.type`** — claim type id, one of `change_of_mind` or `issue`. Drives the `Claim type` row in `ClaimDetailsSheet`, the hero eyebrow on `ClaimCard` (`Claim · Change of mind` / `Claim · Issue`), and the label chip on `Step7Confirmation`. Resolved via `claimTypeLabel()` in `src/lib/claims.js`.
+- **`claim.issueDetails`** *(optional, issue branch only)* — `{ category, description, attachmentName }`. `category` is one of `battery` / `software` / `physical` / `screen` / `charger` / `overheating` / `camera`; `description` is the customer's free-text; `attachmentName` is a stub filename today (no real upload — see §7).
 - **`claim.submittedAt`** — human-readable timestamp for the `Submitted` row in `ClaimDetailsSheet`.
 - **`claim.units`** — integer. Today the returns flow always submits `1` (each delivered product card represents a single returnable unit — the quantity-selector step was removed in phase 15). Kept as an integer so the field is multi-unit-ready when the order shape gains per-product-line cards.
 - **`claim.reason`** — `{ value, otherText }` where `value` is one of the keys of `REASON_LABELS` (`no_fit`, `better_option`, `changed_mind`, `mistake`, `other`); `otherText` is populated only when `value === 'other'`.
 - **`claim.devicePrep`** — `{ option, os }` where `option` is `'reset'` or `'credentials'` and `os` is `'ios'` or `'android'`. Surfaced as the masked `Factory reset confirmed` / `Credentials provided` row; raw credentials are intentionally not persisted.
 - **`claim.pickupDetails`** — `{ address, email, phone }`, the three contact fields captured at Step 4. All three are non-empty by the time a claim is submitted (the step's `canAdvance` requires it). Returns are always picked up by courier today, so there's no method discriminator on the object.
 - **`claim.refundMethod`** — `'wallet'` or `'original'`. Drives the destination chip on the hero and the `Includes 10% restocking fee` sub-copy in the details sheet when `original`.
-- **`claim.expectedRefund`** — `{ gross, fee, net, rate }`, pre-computed at submission time so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. `fee` is `0` on wallet refunds; on original-payment refunds it's `gross * 0.10` per the 10% restocking-fee rule in `src/lib/returns.js`.
+- **`claim.expectedRefund`** — `{ gross, fee, bonus, net, rate }`, pre-computed at submission time so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. Math depends on `claim.type` — see "Refund math" in §2.7. `bonus` is the optional flat Wallet bonus on issue claims (AED 100); `0` elsewhere.
 - **`claim.timeline`** — map keyed by `claimStatusId` carrying the timestamp at which the claim entered each phase. Populated progressively as the claim moves; the card renders the date/time under each reached dot.
 
 ---
@@ -822,19 +872,20 @@ src/
     ├── CourierBanner.jsx         Tracking banner with "Track order" + "Need help with delivery?" CTAs
     ├── OrderSummary.jsx          Summary table inside the expanded card
     ├── ChatFab.jsx               Floating chat-with-support button
-    └── ClaimFlow/                Change-of-mind returns flow (see §2.7)
-        ├── ClaimFlow.jsx         Overlay shell: useReducer, sticky header + progress, step router, sticky action bar
-        ├── flowReducer.js        State shape, action creators, canAdvance(state) per-step validation
+    └── ClaimFlow/                Returns flow — change of mind + issue branches (see §2.7)
+        ├── ClaimFlow.jsx         Overlay shell: useReducer, sticky header + progress, step router (picks Step 2 by claimType), sticky action bar
+        ├── flowReducer.js        State shape, action creators, canAdvance(state) per-step validation (Step 2 branches on claimType)
         ├── ProgressBar.jsx       Segmented 7-step progress bar + "Step X of 7" caption
         ├── StickyActionBar.jsx   Sticky bottom button bar (Continue / Submit / optional secondary)
         ├── StepHeading.jsx       Shared 24px step heading + 13.5px muted subtitle
-        ├── Step1ClaimType.jsx    Five claim-type options; only "change of mind" advances
-        ├── Step2Reason.jsx       Optional reason radio + free-text reveal on "Other"
+        ├── Step1ClaimType.jsx    Five claim-type options; change-of-mind and issue advance, the other three stub
+        ├── Step2Reason.jsx       change_of_mind branch — optional reason radio + free-text reveal on "Other"
+        ├── Step2IssueDetails.jsx issue branch — required category list + description textarea + fake attachment slot
         ├── Step3DevicePrep.jsx   Gated: factory-reset path (OS tabs + instructions + checkbox) or credentials path
         ├── Step4PickupDetails.jsx Pickup address + email + phone, each editable in a single-field bottom sheet
         ├── Step5RefundMethod.jsx Wallet vs original-payment refund cards with the 10% fee broken out
         ├── Step6Review.jsx       Read-only item block + sectioned summary with per-section Edit links jumping to that step
-        └── Step7Confirmation.jsx Success state with claim ref + Copy + next-steps list
+        └── Step7Confirmation.jsx Success state with claim ref + Copy + next-steps list + claim-type chip
 ```
 
 ### 5.2 Component tree
@@ -925,7 +976,7 @@ What looks real in the prototype but is faked:
 - **Single carrier.** Code is generalised but mock data uses DHL only. Adding a second carrier requires no code change.
 - **Single-item orders.** The product object is a single entry. Multi-item orders need a `products[]` array and a layout adjustment.
 - **Download receipt.** Buttons are present but do nothing. Production needs a receipt-render endpoint.
-- **Raise a claim** on delivered orders launches the change-of-mind returns flow (§2.7). The flow is fully interactive end-to-end but does not persist submissions — Step 6's submit advances to Step 7 with a client-generated `RET-XXXXXXXX` reference. Production needs the submission endpoint, real return-shipping rules, the 4 non-change-of-mind claim branches, and a `returnedAt` flag on the order so a returned item drops out of the eligibility picker.
+- **Raise a claim** on delivered orders launches the returns flow (§2.7). The change-of-mind and issue (faulty product) branches are fully interactive end-to-end but do not persist submissions — Step 6's submit advances to Step 7 with the fixed demo `IXipP8` reference. Production needs the submission endpoint, real return-shipping rules, real file upload for the issue branch's attachment (currently a stubbed filename), the 3 remaining claim branches (damaged / missing / wrong device), and a `returnedAt` flag on the order so a returned item drops out of the eligibility picker.
 - **`ClaimCard` is data-only** (§2.8). The card renders entirely off the `order.claim` object — one mock claim is hand-seeded on order `89219` for design review. Step 7 of `ClaimFlow` still does not persist, so submitting a return through the flow does not create a `ClaimCard` in the list. Production needs: (a) the submission endpoint writing the `claim` object back to the order; (b) a webhook or polling mechanism to move the claim through the 7 states as the warehouse handles the unit; (c) the `View claim details` and icon-only `Download receipt` buttons wired (today both are decorative); (d) a `Cancel claim` action — currently no in-flight cancellation affordance exists for a submitted return.
 - **`I want to keep my order` on in-flight cancelled cards** (§2.6.1) opens `KeepOrderSheet`'s confirm step; tapping `Yes, keep my order` just closes the sheet — `state` stays `cancelled` and the `cancellationStatusId` / `cancellationTimeline` are untouched. Production needs a reverse-cancellation endpoint, the rules for which cancellation phases are still reversible (e.g. refund_pending becomes irreversible the moment funds are released to the processor), and a state-machine transition that lifts the order back to its pre-cancellation `state` while clearing the cancellation fields cleanly.
 - **Site-wide search, in-list "Find items" search, Revibe Wallet pill.** Visual placeholders, no logic. The wallet balance is a hardcoded prop; the wallet info tooltip's `terms & conditions` link goes nowhere (`href="#"`).

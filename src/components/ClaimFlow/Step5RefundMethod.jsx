@@ -1,4 +1,4 @@
-import { CreditCard, Clock } from 'lucide-react'
+import { CreditCard, Clock, Sparkles } from 'lucide-react'
 import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
@@ -9,14 +9,19 @@ const REVIBE_CARE_ICON =
 export default function Step5RefundMethod({ state, dispatch, order }) {
   if (!order) return null
   const currency = order.currency
-  const wallet = refundBreakdown(order, state.units, 'wallet')
-  const original = refundBreakdown(order, state.units, 'original')
+  const claimType = state.claimType
+  const isIssue = claimType === 'issue'
+  const wallet = refundBreakdown(order, state.units, 'wallet', claimType)
+  const original = refundBreakdown(order, state.units, 'original', claimType)
+  const subtitle = isIssue
+    ? `Two options — Wallet adds an AED ${wallet.bonus} bonus, card refunds the full amount.`
+    : 'Two options — Wallet refunds you 100%, card has a 10% restocking fee.'
 
   return (
     <>
       <StepHeading
         title="How would you like your refund?"
-        subtitle="Two options — Wallet refunds you 100%, card has a 10% restocking fee."
+        subtitle={subtitle}
       />
       <div className="px-4 flex flex-col gap-2.5">
         <RefundCard
@@ -38,8 +43,16 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
           }
           amount={`${currency} ${formatMoney(wallet.net)}`}
         >
+          {isIssue && wallet.bonus > 0 && (
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-accent/15 text-accent font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
+              <Sparkles size={10} strokeWidth={2} />
+              +{currency} {formatMoney(wallet.bonus)} bonus
+            </div>
+          )}
           <div className="mt-2 text-[12.5px] font-semibold text-success leading-[1.4] whitespace-nowrap">
-            Full refund · instantly once return is complete
+            {isIssue
+              ? `Full refund + bonus · instantly once return is complete`
+              : 'Full refund · instantly once return is complete'}
           </div>
         </RefundCard>
         <RefundCard
@@ -58,40 +71,44 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
           }
           amount={`${currency} ${formatMoney(original.net)}`}
         >
-          <div className="mt-3 pt-3 border-t border-dashed border-line flex flex-col gap-1.5">
-            <BreakdownRow
-              label="Product"
-              value={`${currency} ${formatMoney(original.itemTotal)}`}
-            />
-            {original.warranty > 0 && (
+          {!isIssue && (
+            <div className="mt-3 pt-3 border-t border-dashed border-line flex flex-col gap-1.5">
               <BreakdownRow
-                label={
-                  <span className="inline-flex items-center gap-1.5">
-                    <img
-                      src={REVIBE_CARE_ICON}
-                      alt=""
-                      aria-hidden
-                      className="w-3.5 h-3.5 object-contain shrink-0"
-                    />
-                    Revibe Care
-                  </span>
-                }
-                value={`${currency} ${formatMoney(original.warranty)}`}
+                label="Product"
+                value={`${currency} ${formatMoney(original.itemTotal)}`}
               />
-            )}
-            <BreakdownRow
-              label="Subtotal"
-              value={`${currency} ${formatMoney(original.gross)}`}
-            />
-            <BreakdownRow
-              label="Restocking fee (10%)"
-              value={`−${currency} ${formatMoney(original.fee)}`}
-              tone="danger"
-            />
-          </div>
+              {original.warranty > 0 && (
+                <BreakdownRow
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <img
+                        src={REVIBE_CARE_ICON}
+                        alt=""
+                        aria-hidden
+                        className="w-3.5 h-3.5 object-contain shrink-0"
+                      />
+                      Revibe Care
+                    </span>
+                  }
+                  value={`${currency} ${formatMoney(original.warranty)}`}
+                />
+              )}
+              <BreakdownRow
+                label="Subtotal"
+                value={`${currency} ${formatMoney(original.gross)}`}
+              />
+              <BreakdownRow
+                label="Restocking fee (10%)"
+                value={`−${currency} ${formatMoney(original.fee)}`}
+                tone="danger"
+              />
+            </div>
+          )}
           <div className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2 leading-[1.4] whitespace-nowrap">
             <Clock size={12} strokeWidth={2} className="text-ink-2 shrink-0" />
-            5–10 business days once return is complete
+            {isIssue
+              ? 'Full refund · 5–10 business days once return is complete'
+              : '5–10 business days once return is complete'}
           </div>
         </RefundCard>
       </div>
