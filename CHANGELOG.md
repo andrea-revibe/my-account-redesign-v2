@@ -2,6 +2,20 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 23 (history thread on layered cards)
+
+### Added
+
+- **`HistoryThread` component.** A horizontal chip row of past events (Placed · Cancel rejected · Delivered etc.) with an inline detail panel that slides open when a chip is tapped — one open at a time, `Close ×` collapses. Used inside the expanded body of `ClaimCard` (in-progress + refunded) and the cancelled `PastOrderCard` for refund-pending and refunded states. Implements Variant C's "Active hero + history thread" pattern from the design handoff.
+- **`getHistoryEvents(order, mode)` in `src/lib/events.js`.** Derives the chip list from existing `timeline`, `cancellationTimeline`, and the new `cancellationRejection` field; honours an explicit `order.events` override when present.
+- **Two layered mock orders.** `89815` (cancel rejected → delivered → claim under QC, lives in In progress) and `89200` (same path closed with refund, lives in Past orders) exercise the new thread end to end.
+- **Optional `cancellationTimeline.rejected` + `cancellationRejection: { ref, reason }` fields.** Documented in `docs/my-account-flow.md` §4.5; let a rejected cancellation survive as a danger-tone chip with real explanation copy.
+
+### Changed
+
+- **ClaimCard `Original order` line replaced by the history thread.** Single-line `OriginalOrderTrace` ("Original order — Delivered 8 May") is gone; the thread shows the same delivery date plus any cancellation events that preceded it, and lets the customer drill into each.
+- **Cancelled `PastOrderCard` expanded body** gains a single-chip history (`Placed`) on `refund_pending` / `refunded` states; the `requested` state is intentionally left alone (only one event, no thread needed).
+
 ## [Unreleased] — phase 22 (cancelled-card cleanup)
 
 ### Added

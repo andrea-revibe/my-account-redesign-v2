@@ -48,6 +48,7 @@ One-liners. Expand each in `docs/my-account-flow.md` if you need the why.
 - **Auto-expand.** Everything collapses by default. `pickActiveOrderId` returns the single most-in-flight order; only that card auto-expands. Delivered never expands.
 - **Whole header is the tap target.** Chevrons on `OrderCard` / `InProgressCard` are decorative.
 - **Returns flow.** Overlay launched from `Raise a claim` on the delivered `PastOrderCard`. State in one `useReducer`; no session persistence (closing unmounts). Pre-seeded to `change_of_mind` so Step 1 advances straight to Step 2. Eligibility + refund math in `src/lib/returns.js`. Chrome is deliberately checkout-style, **not** the order-card chrome family.
+- **History thread.** On layered cards (`ClaimCard`, cancelled `PastOrderCard` in `refund_pending` / `refunded`), past events render as compact chips under the active hero; tapping a chip expands its detail inline (one open at a time). Derived in `src/lib/events.js` from `timeline` / `cancellationTimeline` / `cancellationRejection`. The active event lives in the hero and is excluded from the thread. Chip click handlers `stopPropagation` because the card header is one big tap target.
 
 ## Conventions
 
