@@ -401,19 +401,27 @@ request was rejected (the order had already shipped, for example), the
 rejection survives as a past event on whatever card the order eventually
 routes to — most commonly a `ClaimCard` once the customer raised a
 post-delivery return. The rejection is represented inside the expanded
-body's history thread as a danger-tone `Cancel rejected` chip; tapping it
-expands an inline detail panel that names the rejection ref and the
-reason copy from `order.cancellationRejection`. The optional data fields
+body's history thread as a neutral `Cancel rejected` row in the
+vertical timeline; tapping it expands the detail panel that names the
+rejection ref and the reason copy from `order.cancellationRejection`. The
+optional data fields
 (`cancellationTimeline.rejected`, `cancellationRejection`) are documented
 in §4.5.
 
-**History thread on cancelled refund cards.** Once a cancellation has
-progressed past `requested` (so the card sits in `refund_pending` or
-`refunded`), the expanded body shows a single-chip `History · 1 earlier
-event` thread with the `Placed` event. The `requested` state itself
-keeps the original single-event layout — there's no past context to
-surface yet. Both branches are driven by `getHistoryEvents(order,
-'cancellation')` in `src/lib/events.js`.
+**History thread on cancelled refund cards.** All cancelled past
+states (`requested`, `refund_pending`, `refunded`) now render the
+`HistoryThread` in the expanded body. In `requested` the cancellation
+itself is the active hero, so the thread carries just `Order placed`.
+Once the order moves past `requested` (`refund_pending` /
+`refunded`), the thread also carries `Cancellation requested` as a
+second past event. Driven by `getHistoryEvents(order, 'cancellation')`
+in `src/lib/events.js`.
+
+**History thread on delivered close cards.** `DeliveredOrderCard`
+renders a single-row `HistoryThread` (mode `'delivered'`) carrying
+just the `Order placed` event. Delivery is the active hero on this
+card, so it is intentionally absent from the thread; the row sits
+between the product row and the footer buttons, collapsed by default.
 
 ### 2.7 Returns flow
 
@@ -661,7 +669,7 @@ for its cancelled-past variants, so the language reads as one system.
 **Expanded view.**
 
 1. A 7-step horizontal dot timeline using `CLAIM_STATUSES`. Reached/current dots are filled in the tone colour with the same `shadow-[0_0_0_4px_rgb(255,242,221)]` glow on the current step that `InProgressCard` uses for its top-level timeline. Each reached step renders its date and time on two lines below the label, sourced from `claim.timeline[step.id]`.
-2. A `History` thread (`HistoryThread`) — compact horizontal chips for the order's past events (Placed, Cancellation requested / rejected, Delivered) derived in `src/lib/events.js` via `getHistoryEvents(order, 'claim')`. Each chip expands an inline tone-tinted detail panel; only one chip is open at a time, tap the chip again or the `Close ×` affordance to collapse. The active claim is the hero, so it never appears as a chip. Replaces the single-line "Original order — Delivered {date}" trace that lived here previously: the thread is layered enough to show a cancel-rejected + delivered history together, while the trace could only carry the delivery date.
+2. A `History` thread (`HistoryThread`) — a compact `History · N earlier events` toggle (chevron-rotated) that is **collapsed by default**. Expanding it reveals a vertical, minimalistic timeline of the order's past events (Placed → Cancellation requested / rejected → Delivered → Evidence resubmitted) derived in `src/lib/events.js` via `getHistoryEvents(order, 'claim')`. Rows render chronologically with the latest event at the bottom; each row is a small tone-coloured dot/glyph on a `bg-line` vertical rail, with the chip label + short date on a single line. Tapping a row opens the same tone-tinted detail panel below the timeline (one open at a time, tap the same row to collapse). Re-collapsing the whole thread also closes any open detail. The active claim is the hero, so it never appears as a row. Replaces the single-line "Original order — Delivered {date}" trace that lived here previously: the timeline is layered enough to show a cancel-rejected + delivered history together, while the trace could only carry the delivery date.
 3. A two-action footer: `View claim details` (opens `ClaimDetailsSheet`) + icon-only `Download receipt` (decorative).
 
 **Claim details sheet.** `ClaimDetailsSheet`
@@ -679,6 +687,7 @@ tap away.
 
 **Section placement.** `App.jsx` routes orders based on claim state:
 
+- `claim.docsRejection` present → `DocsRejectedCard` (see §2.9 below); checked **before** the regular claim branch so a rejection takes over the card surface even when the underlying claim status is mid-flight.
 - `hasActiveClaim(order)` returns true when an order has a `claim` field whose `claimStatusId !== 'refunded'`. Such orders are included in `isOpen` and surface in the **In progress** section, regardless of the underlying order's `statusId` (which stays `delivered`).
 - `isClaimRefunded(order)` returns true for refunded claims; these surface in the **Past orders** section.
 
@@ -702,6 +711,90 @@ the summary-label maps (`REASON_LABELS`, `RETURN_METHOD_LABELS`,
 new claim state here, not in the components. Submission persistence is
 still out of scope — Step 7 of `ClaimFlow` generates a claim ref and
 ends, and the prototype's `order.claim` data is hand-seeded.
+
+### 2.9 Documents-rejected card (faulty-product evidence re-upload)
+
+When the Revibe Quality team rejects the evidence batch attached to a
+faulty-product claim, the card flips out of `ClaimCard` chrome into a
+dedicated `DocsRejectedCard` (`src/components/DocsRejectedCard.jsx`).
+Trigger: an optional `claim.docsRejection` block on the order (see §4.8).
+Whole-batch rejection only — no per-document accept/reject. The customer
+has 3 days to re-upload before the claim auto-cancels; production should
+compute that countdown from `rejectedAt + 72h`, but the prototype carries
+a hand-written `timeLeftLabel`.
+
+**Routing.** Checked first in the in-progress branch of `App.jsx`:
+
+```js
+if (hasActiveClaim(o) && o.claim?.docsRejection) {
+  return <DocsRejectedCard key={o.id} order={o} />
+}
+if (hasActiveClaim(o)) {
+  return <ClaimCard key={o.id} order={o} />
+}
+```
+
+The order still satisfies `hasActiveClaim`, so it stays in the **In
+progress** section and counts toward the `in_progress` filter chip.
+
+**Collapsed view.** Danger-toned left accent strip; `Order · #{id} · Claim
+RET-{ref}` eyebrow; `Action needed` pill; a tinted hero block with the
+`Documents rejected` label, the headline `We need a few photos re-shot`,
+a one-line truncated ops quote, and the countdown strip (`2 days, 14
+hours left to re-upload · Claim auto-cancels {autoCancelAt}`); compact
+product row; `Tap to fix` footer.
+
+**Expanded view.** Same hero but the ops message expands into a full
+attributed block (avatar with `opsName` initial, name + role, rejection
+timestamp, full free-text message). Below the header:
+
+1. **`Your last attempt`** — a collapsed row that opens a horizontal,
+   dimmed thumbnail strip of the previously submitted files, each tagged
+   with the ops reason (`Glare` / `Blurry` / `Too short`, etc.) so the
+   customer can see exactly which file was the problem.
+2. **`Re-upload your evidence`** — a single combined drop zone (no
+   per-category split — ops rejects the whole batch, so re-uploading is
+   batch too). Taps append fake files in this prototype; once at least
+   one file is present, the zone becomes `Add more evidence` and a
+   3-column thumbnail grid renders with × to remove and a `+` tile.
+3. **`Note for Revibe Quality`** — optional 280-char free-text textarea,
+   counter goes amber past 90%.
+4. **Footer** — `Cancel claim` (visual stub) + `Resubmit for review`.
+   Resubmit is gated: shows `Add evidence to resubmit` in disabled grey
+   until at least one file is added, then flips to a solid danger-red
+   primary action.
+
+**Submitted state.** Tapping `Resubmit` flips the card in place to a
+warn-toned variant: amber accent strip, pulsing `Back under review` pill,
+`Resubmitted` phase tag, `Thanks — we've got your new evidence`
+headline, and a body that recaps what the customer sent (3-col grid of
+the same thumbnails + the quoted note, when one was written). A footer
+button — `Undo · edit before review starts` — returns to the rejected
+state with files and note preserved (state lives in the component; no
+session persistence). Component state never persists across closes, the
+same as `ClaimFlow`.
+
+**Tone logic.** Danger red is reserved for blocking, action-required
+states (matches the existing convention that warn means "active
+processing" — the post-resubmit phase). Once the new batch is in, the
+card flips warn so the customer reads the state as "live, awaiting
+verdict" rather than "you still have a problem."
+
+**After the claim moves on.** Once Quality has accepted the new evidence
+and the claim has progressed (e.g., to `under_qc`), the order leaves
+`DocsRejectedCard` and returns to the regular `ClaimCard`. The
+resubmission survives as an `Evidence resubmitted` chip inside the
+`HistoryThread` — a one-line recap (`N new files sent · {date}`) rather
+than re-surfacing the rejected items or the original ops note. Driven by
+`claim.proofResubmission` on the order (see §4.8); chip glyph + labels
+live in `HistoryThread.jsx`; the event is built in
+`src/lib/events.js` (claim mode, after delivery).
+
+**Out of scope for the prototype** (production wiring): the file picker
+is a fake-files cycle, the countdown label is hand-written, the
+`Cancel claim` button is decorative, and there's no notification +
+email trigger. `Resubmit` doesn't persist — the warn state is local
+component state only.
 
 ---
 
@@ -840,7 +933,7 @@ non-cancelled orders do not need this field.
 **Cancellation-history fields** (optional, only set when an earlier
 cancellation request was rejected — see §2.6 "Rejected cancellations"):
 
-- **`cancellationTimeline.rejected`** *(optional, string)* — human-readable timestamp at which the cancellation was rejected (same format as `requested` / `refund_pending`). Presence of this key flips the chip's tone to danger and changes its label from `Cancel requested` to `Cancel rejected`.
+- **`cancellationTimeline.rejected`** *(optional, string)* — human-readable timestamp at which the cancellation was rejected (same format as `requested` / `refund_pending`). Presence of this key changes the chip's label from `Cancel requested` to `Cancel rejected` (tone stays neutral, in line with the rest of the history thread).
 - **`cancellationRejection`** *(optional, object)* — `{ ref, reason }`. `ref` is the rejection reference (e.g. `CXL-4BTb2x`) shown in the chip's expanded detail eyebrow; `reason` is the customer-facing explanation message rendered inside the detail panel's tinted message bubble.
 
 ### 4.6 Product fields
@@ -888,6 +981,8 @@ wired up to persist.
 - **`claim.refundMethod`** — `'wallet'` or `'original'`. Drives the destination chip on the hero and the `Includes 10% restocking fee` sub-copy in the details sheet when `original`.
 - **`claim.expectedRefund`** — `{ gross, fee, bonus, net, rate }`, pre-computed at submission time so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. Math depends on `claim.type` — see "Refund math" in §2.7. `bonus` is the optional flat Wallet bonus on issue claims (AED 100); `0` elsewhere.
 - **`claim.timeline`** — map keyed by `claimStatusId` carrying the timestamp at which the claim entered each phase. Populated progressively as the claim moves; the card renders the date/time under each reached dot.
+- **`claim.docsRejection`** *(optional)* — `{ rejectedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, previous }`. When present, `App.jsx` routes the order to `DocsRejectedCard` instead of `ClaimCard` (the regular claim status is paused while ops waits on better evidence). `rejectedAt` and `autoCancelAt` are human-readable timestamps; `timeLeftLabel` is the hand-written countdown copy ("2 days, 14 hours left") — production should compute from `rejectedAt + 72h`. `opsName` / `opsRole` / `opsMessage` are the free-text rejection block displayed inside the hero. `previous` is the dimmed-reference list of the customer's last submission, each item `{ name, size, kind, duration?, tag? }` — `tag` is the per-file ops reason ("Glare" / "Too short") that renders as a red ribbon. See §2.9. Mirrors the structural pattern of `order.cancellationRejection` (§4.5).
+- **`claim.proofResubmission`** *(optional)* — `{ at, fileCount }`. Marks a closed evidence-resubmission chapter on a claim that has since moved on (typically to QC). When present, `getHistoryEvents` emits an `evidence` chip ("Evidence resubmitted") in the `HistoryThread` of the active `ClaimCard`; the expanded detail is a one-line recap — `N new files sent` — rather than re-surfacing the original rejection. Set this *without* `claim.docsRejection` (the latter routes the card to the active `DocsRejectedCard` state).
 
 ---
 

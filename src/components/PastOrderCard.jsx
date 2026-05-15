@@ -33,6 +33,7 @@ export default function PastOrderCard({ order, onRaiseClaim }) {
 }
 
 function DeliveredOrderCard({ order, onRaiseClaim }) {
+  const history = getHistoryEvents(order, 'delivered')
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
       <span
@@ -44,6 +45,7 @@ function DeliveredOrderCard({ order, onRaiseClaim }) {
         <DeliveredStatePill />
         <DeliveredHero order={order} />
         <DeliveredProductRow order={order} />
+        {history.length > 0 && <HistoryThread events={history} />}
         <div className="flex justify-end gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
           <PastButton icon={Download} label="Download receipt" />
           <PastButton
@@ -203,13 +205,12 @@ function CancelledOrderCard({ order }) {
             <RefundProgressDots order={order} />
           </div>
 
-          {order.cancellationStatusId !== 'requested' &&
-            (() => {
-              const history = getHistoryEvents(order, 'cancellation')
-              return history.length > 0 ? (
-                <HistoryThread events={history} />
-              ) : null
-            })()}
+          {(() => {
+            const history = getHistoryEvents(order, 'cancellation')
+            return history.length > 0 ? (
+              <HistoryThread events={history} />
+            ) : null
+          })()}
 
           {canKeep && (
             <button
