@@ -1,15 +1,29 @@
-import { Check, Paperclip, X, AlertTriangle, FileImage } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Paperclip,
+  X,
+  AlertTriangle,
+  FileImage,
+  ChevronRight,
+  ChevronDown,
+  Lightbulb,
+  FileCheck,
+  ExternalLink,
+} from 'lucide-react'
 import StepHeading from './StepHeading'
+import {
+  ISSUE_SCOPES,
+  NOT_WORKING_SUBTYPES,
+  WRONG_DEVICE_SUBTYPES,
+  PROOF_GUIDE_LABEL,
+  scopeForSubtype,
+  findSubtype,
+} from './issueSubtypes'
 
-const CATEGORIES = [
-  { id: 'battery', label: 'Battery draining' },
-  { id: 'software', label: 'Software issue' },
-  { id: 'physical', label: 'Physical condition' },
-  { id: 'screen', label: 'Screen issue' },
-  { id: 'charger', label: 'Defective charger' },
-  { id: 'overheating', label: 'Overheating' },
-  { id: 'camera', label: 'Camera issue' },
-]
+const SUBTYPES_BY_SCOPE = {
+  not_working: NOT_WORKING_SUBTYPES,
+  wrong_device: WRONG_DEVICE_SUBTYPES,
+}
 
 // Stub filenames cycled when the user "uploads" — there is no real file
 // picker in the prototype.
@@ -20,7 +34,20 @@ const STUB_FILES = [
 ]
 
 export default function Step2IssueDetails({ state, dispatch }) {
-  const { category, description, attachmentName } = state.issueDetails
+  const { description, attachmentName } = state.issueDetails
+  const { issueScope, issueSubtypeId } = state
+
+  const [openScope, setOpenScope] = useState(
+    issueScope || (issueSubtypeId ? scopeForSubtype(issueSubtypeId) : null),
+  )
+
+  const selectedSubtype = issueSubtypeId ? findSubtype(issueSubtypeId) : null
+
+  const clearSelection = () => {
+    // Preserve the scope so the picker reopens on the same list
+    setOpenScope(issueScope || openScope)
+    dispatch({ type: 'SET_ISSUE_SUBTYPE', scope: null, id: null })
+  }
 
   const pickStub = () => {
     const idx = Math.floor(Math.random() * STUB_FILES.length)
@@ -34,46 +61,79 @@ export default function Step2IssueDetails({ state, dispatch }) {
     <>
       <StepHeading
         title="Tell us what went wrong"
-        subtitle="Pick a category, describe the issue, and add a photo or short video so our QC team knows what to look for."
+        subtitle="Pick what matches your situation, describe it briefly, and attach a photo or short video so QC knows what to look for."
       />
 
       <div className="px-4 flex flex-col gap-4">
         <section className="flex flex-col gap-2">
           <SectionLabel>What's the issue?</SectionLabel>
-          <div className="flex flex-col gap-2">
-            {CATEGORIES.map((c) => {
-              const selected = category === c.id
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() =>
-                    dispatch({
-                      type: 'SET_ISSUE_DETAILS',
-                      value: { category: selected ? null : c.id },
-                    })
-                  }
-                  className={`w-full text-left rounded-[12px] border px-3.5 py-3 flex items-center gap-3 transition-colors ${
-                    selected
-                      ? 'border-brand bg-brand-bg/40'
-                      : 'border-line bg-surface hover:bg-line-2/40'
-                  }`}
-                >
-                  <span
-                    aria-hidden
-                    className={`w-[18px] h-[18px] rounded-full border-2 grid place-items-center shrink-0 ${
-                      selected ? 'border-brand bg-brand' : 'border-line'
-                    }`}
-                  >
-                    {selected && (
-                      <Check size={11} strokeWidth={3} className="text-white" />
+          {selectedSubtype ? (
+            <SelectedSubtype
+              sub={selectedSubtype}
+              onRemove={clearSelection}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {ISSUE_SCOPES.map((scope) => {
+                const isOpen = openScope === scope.id
+                const items = SUBTYPES_BY_SCOPE[scope.id]
+                return (
+                  <div key={scope.id} className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpenScope(isOpen ? null : scope.id)}
+                      aria-expanded={isOpen}
+                      className={`w-full text-left rounded-[12px] border px-3.5 py-3 flex items-center gap-3 transition-colors ${
+                        isOpen
+                          ? 'border-line bg-line-2/40'
+                          : 'border-line bg-surface hover:bg-line-2/40'
+                      }`}
+                    >
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[13.5px] font-semibold text-ink">
+                          {scope.label}
+                        </span>
+                        <span className="block text-[11.5px] text-muted mt-0.5">
+                          {scope.sub}
+                        </span>
+                      </span>
+                      {isOpen ? (
+                        <ChevronDown
+                          size={14}
+                          strokeWidth={1.75}
+                          className="text-muted shrink-0"
+                        />
+                      ) : (
+                        <ChevronRight
+                          size={14}
+                          strokeWidth={1.75}
+                          className="text-muted shrink-0"
+                        />
+                      )}
+                    </button>
+
+                    {isOpen && (
+                      <div className="pl-3 flex flex-col gap-1.5">
+                        {items.map((sub) => (
+                          <SubIssueRow
+                            key={sub.id}
+                            sub={sub}
+                            onSelect={() =>
+                              dispatch({
+                                type: 'SET_ISSUE_SUBTYPE',
+                                scope: scope.id,
+                                id: sub.id,
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
                     )}
-                  </span>
-                  <span className="text-[14px] text-ink">{c.label}</span>
-                </button>
-              )
-            })}
-          </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </section>
 
         <section className="flex flex-col gap-2">
@@ -154,6 +214,79 @@ export default function Step2IssueDetails({ state, dispatch }) {
         </section>
       </div>
     </>
+  )
+}
+
+function SubIssueRow({ sub, onSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full text-left rounded-[10px] border border-line bg-surface hover:bg-line-2/40 px-3 py-2.5 flex items-center gap-2 transition-colors"
+    >
+      <span className="block flex-1 min-w-0 text-[13px] text-ink-2">
+        {sub.label}
+      </span>
+      <ChevronRight
+        size={12}
+        strokeWidth={1.75}
+        className="text-muted shrink-0"
+      />
+    </button>
+  )
+}
+
+function SelectedSubtype({ sub, onRemove }) {
+  return (
+    <div className="flex flex-col">
+      <div className="w-full rounded-[12px] border border-brand bg-brand-bg/50 px-3.5 py-3 flex items-center gap-2">
+        <span className="block flex-1 min-w-0 text-[13.5px] font-semibold text-ink">
+          {sub.label}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Change selection"
+          className="w-7 h-7 rounded-full grid place-items-center text-ink-2 hover:bg-line-2 shrink-0"
+        >
+          <X size={15} strokeWidth={1.75} />
+        </button>
+      </div>
+      <div className="mt-1.5 rounded-[10px] border border-brand/30 bg-brand-bg/30 px-3 py-2.5 flex flex-col gap-2">
+        {sub.tryFirst && (
+          <div className="flex items-start gap-2">
+            <Lightbulb
+              size={13}
+              strokeWidth={1.75}
+              className="text-ink-2 shrink-0 mt-0.5"
+            />
+            <div className="text-[11.5px] leading-[1.45] text-ink-2">
+              <span className="font-semibold text-ink">Try this first.</span>{' '}
+              {sub.tryFirst}
+            </div>
+          </div>
+        )}
+        <div className="flex items-start gap-2">
+          <FileCheck
+            size={13}
+            strokeWidth={1.75}
+            className="text-ink-2 shrink-0 mt-0.5"
+          />
+          <div className="text-[11.5px] leading-[1.45] text-ink-2">
+            <span className="font-semibold text-ink">What we need.</span>{' '}
+            {sub.need}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => e.preventDefault()}
+          className="self-start inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline"
+        >
+          {PROOF_GUIDE_LABEL}
+          <ExternalLink size={11} strokeWidth={2} />
+        </button>
+      </div>
+    </div>
   )
 }
 
