@@ -41,7 +41,7 @@ filters, the Revibe Wallet pill, profile menu, language toggle) is decorative
 - Date-range dropdown effect on the list (logic is wired but all mock orders fall inside every range).
 - The Revibe Wallet pill in `GreetRow` (purely visual; the balance is a hardcoded prop and the info tooltip is the only interactive part).
 - Right-to-left and Arabic localisation.
-- Receipt-download flow. Claims flow covers change-of-mind and issue (faulty product) branches (see §2.7); the other three claim types are stubbed.
+- Receipt-download flow. Claims flow covers change-of-mind and issue-return branches (see §2.7); the warranty and compensation branches are stubbed.
 - Real courier tracking — the "Track order" button hardcodes a known-good DHL Express test shipment so the demo always lands on a real tracking page.
 - Return-claim submission — Step 6's Submit advances to a confirmation screen with a generated ref number but does not persist anything.
 
@@ -458,23 +458,41 @@ pre-seeded from the order so the user typically just confirms.
 
 **Step-by-step.**
 
-1. **Claim type.** Five vertical option rows; nothing is pre-selected.
-   `Return an item (change of mind)` → `claimType: 'change_of_mind'`,
-   `Faulty product` → `claimType: 'issue'`. Damaged / missing / other
-   render an inline `not part of this build` note. `canAdvance` requires
-   one of the two in-scope options.
+1. **Claim type.** Three top-level cards; nothing is pre-selected.
+   `I changed my mind` → `claimType: 'change_of_mind'` (change of mind, no
+   fault). `Something's wrong with my device` doesn't set a claim type —
+   tapping it expands an inline accordion that reveals two nested
+   sub-cards: `Return for a refund or replacement` → `claimType: 'issue'`, and
+   `Use my warranty` (stub).
+   `Request compensation` (shipping refund or faulty accessory — keep
+   the item) sits as the third primary card; it's stubbed. Stubbed
+   options render an inline `not part of this build` note instead of
+   setting a claim type. `canAdvance` requires `change_of_mind` or
+   `issue`.
 2. **Reason or issue details (branches on `claimType`).**
    - `change_of_mind` → **Reason (optional).** Five radio options.
      `Other` reveals a 200-char textarea. The sticky bar renders a `Skip`
      alongside `Continue`; both advance.
-   - `issue` → **Issue details (required).** Vertical category list
-     (battery / software / physical / screen / charger / overheating /
-     camera), a required free-text description (500-char max), and a
-     **fake** attachment slot (clicking the dashed drop-zone stubs in a
-     filename; the prototype has no real file picker). A warn-tinted
-     banner reinforces that attachments are required. `Skip` is hidden;
-     `canAdvance` requires category + non-empty description + a stubbed
-     filename.
+   - `issue` → **Issue details (required).** Two-scope sub-issue picker
+     (`Device not working as expected`, 15 items; `I received the wrong
+     device`, 4 items — both sourced from
+     `src/components/ClaimFlow/issueSubtypes.js`). Scopes are mutually
+     exclusive expandable sections; tapping a sub-issue commits the
+     selection (`issueScope` + `issueSubtypeId`) and collapses the
+     picker down to just the chosen row + its guidance panel (optional
+     `Try this first` preflight tip, a one-line `What we need` evidence
+     ask, and a shared `How to provide valid proof` link). The selected
+     row carries an `X` button that clears the selection and reopens
+     the picker on the same scope so the user can pick again. Below
+     the picker: a required free-text
+     description (500-char max), and a **fake** attachment slot
+     (clicking the dashed drop-zone stubs in a filename; the prototype
+     has no real file picker). A warn-tinted banner reinforces that
+     attachments are required. `Skip` is hidden; `canAdvance` requires
+     `issueSubtypeId` + non-empty description + a stubbed filename. The
+     pre-redesign flat `category` field is gone; `Step6Review`'s
+     `IssueSummary` consumes `issueSubtypeId` (via
+     `findSubtype(id)` in `issueSubtypes.js`) and `issueScope` instead.
 3. **Device preparation (gated).** Two stacked radio cards. Option A
    (`I've factory reset the device`, recommended pill) carries an
    `iPhone` / `Android` OS-tabs control, a collapsible numbered reset
@@ -1038,7 +1056,7 @@ Items deliberately parked rather than built.
 - **Re-order CTA on delivered orders.** Common pattern; not currently present.
 - **Forward-looking ETA inside `CourierBanner`.** Currently the banner copy is generic; the ETA shows in the collapsed-card subline only. Could surface in both places.
 - **Receipt download.** Stubbed button today; the returns flow is built (see §2.7).
-- **Returns flow — branches beyond change-of-mind.** Faulty / damaged / missing / other are stubbed on Step 1 with an inline note. Each needs its own diagnostic path before reaching the device-prep + return-method + refund stages.
+- **Returns flow — branches beyond change-of-mind and issue.** Warranty (repair and return) and compensation (shipping refund / faulty accessory) are stubbed on Step 1 with an inline note. Each needs its own downstream path — warranty diverges sharply from a return (no refund math, device round-trips), and compensation likely skips device-prep + pickup entirely.
 - **Returns flow — submission persistence.** Step 6's submit is a no-op. Wire it to an endpoint that creates a real claim and links the `returnedAt` flag on the order so the picker hides it next time.
 - **Returns flow — top-level entry.** Today the only entry point is the delivered card's `Raise a claim`, which seeds a specific `orderId`. The flow always starts at Step 1; a hypothetical top-level "Return an item" entry would need to either pick a product card first (recommended, matches the entry-point assumption baked into Step 6's read-only `Item` block) or reintroduce an order/product picker as a pre-Step-1 picker. The reducer's `initialState(null)` branch already supports a null `orderId`, but the rest of the flow now assumes a product is known.
 - **Multi-item orders.** Today the order shape carries a single `product` and the delivered card represents that one product line. Multi-product orders will need a `products[]` array and one delivered card per product line, so each `Raise a claim` entry remains unambiguous — the flow itself doesn't need a product picker because the entry point already names the item. Partial-quantity returns (returning 2 of 3 of the same product line) are not currently supported; reintroduce a quantity step or add a per-card unit picker when the requirement lands.

@@ -2,6 +2,19 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 24 (claim type picker restructure)
+
+### Added
+
+- **Step 2 sub-issue picker (issue path).** Replaces the flat 7-item category list with two expandable scopes — `Device not working as expected` (15 items) and `I received the wrong device` (4 items). Tapping a sub-issue commits the selection and inline-expands a guidance panel: optional `Try this first` (when a self-check often resolves the symptom), a single-line `What we need` evidence ask, and a shared `How to provide valid proof` link. Step 2 advancement now requires `issueSubtypeId` (in place of the old `issueDetails.category`) plus description + attachment. `issueScope` and `issueSubtypeId` added to the flow reducer; new catalogue at `src/components/ClaimFlow/issueSubtypes.js`. Step 6's `IssueSummary` reads the new fields and the local `ISSUE_CATEGORY_LABELS` map is gone.
+
+### Changed
+
+- **Step 2 sub-issue picker collapses on selection.** Picking a sub-issue now hides both parent scopes and the unrelated rows, leaving just the chosen item + its `Try this first` / `What we need` panel. The selected row carries an `X` button that clears the selection and reopens the picker on the same scope. Neither scope is expanded by default — the user opens whichever one matches.
+- **Step 1 sub-card `Return for a refund` renamed to `Return for a refund or replacement`.** Reflects that the wrong-device branch can also resolve as a replacement, not just a refund.
+- **Step 1 top-card `Return an item` rephrased to `I changed my mind` (sub-label `Return the item for a refund`).** First-person voice to match the issue-scope wording, with the action moved to the sub-label.
+- **Step 1 of the returns flow is now three top-level cards, one with a nested accordion.** `Return an item` (change of mind) and `Request compensation` (shipping refund / faulty accessory, stub) sit as flat primary cards. `Something's wrong with my device` is a non-selectable expander between them; it reveals two sub-cards: `Return for a refund or replacement` (issue, in scope) and `Use my warranty` (warranty, stub — sub-label `Repair and return to me`). Replaces the previous flat five-row list (damaged-in-transit / missing items / other are gone).
+
 ## [Unreleased] — phase 23 (history thread on layered cards)
 
 ### Added

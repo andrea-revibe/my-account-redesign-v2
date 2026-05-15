@@ -10,6 +10,7 @@ import {
 import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
+import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
 
 const REASON_LABELS = {
   no_fit: "Didn't suit my needs",
@@ -19,15 +20,9 @@ const REASON_LABELS = {
   other: 'Other',
 }
 
-const ISSUE_CATEGORY_LABELS = {
-  battery: 'Battery draining',
-  software: 'Software issue',
-  physical: 'Physical condition',
-  screen: 'Screen issue',
-  charger: 'Defective charger',
-  overheating: 'Overheating',
-  camera: 'Camera issue',
-}
+const SCOPE_LABELS = Object.fromEntries(
+  ISSUE_SCOPES.map((s) => [s.id, s.label]),
+)
 
 export default function Step6Review({ state, dispatch, order }) {
   if (!order) return null
@@ -93,7 +88,11 @@ export default function Step6Review({ state, dispatch, order }) {
 
         {isIssue ? (
           <Section title="Issue" onEdit={() => goTo(2)}>
-            <IssueSummary issueDetails={state.issueDetails} />
+            <IssueSummary
+              issueDetails={state.issueDetails}
+              issueScope={state.issueScope}
+              issueSubtypeId={state.issueSubtypeId}
+            />
           </Section>
         ) : (
           <Section title="Reason" onEdit={() => goTo(2)}>
@@ -234,22 +233,26 @@ function PackingConfirmation({ checked, isIssue, onChange }) {
   )
 }
 
-function IssueSummary({ issueDetails }) {
-  const { category, description, attachmentName } = issueDetails
-  const categoryLabel = category ? ISSUE_CATEGORY_LABELS[category] : 'Not selected'
+function IssueSummary({ issueDetails, issueScope, issueSubtypeId }) {
+  const { description, attachmentName } = issueDetails
+  const subtype = issueSubtypeId ? findSubtype(issueSubtypeId) : null
+  const scopeLabel = issueScope ? SCOPE_LABELS[issueScope] : null
   return (
     <div className="flex flex-col gap-2.5">
       <div>
         <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
-          Category
+          Issue
         </div>
         <div
           className={`mt-0.5 text-[13.5px] leading-[1.4] ${
-            category ? 'text-ink' : 'text-muted italic'
+            subtype ? 'text-ink' : 'text-muted italic'
           }`}
         >
-          {categoryLabel}
+          {subtype ? subtype.label : 'Not selected'}
         </div>
+        {scopeLabel && (
+          <div className="mt-0.5 text-[11.5px] text-muted">{scopeLabel}</div>
+        )}
       </div>
       <div>
         <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">

@@ -12,11 +12,12 @@ export function initialState(initialOrderId = null) {
   return {
     step: 1,
     claimType: null,
+    issueScope: null,
+    issueSubtypeId: null,
     orderId: initialOrderId,
     units: 1,
     reason: { value: null, otherText: '' },
     issueDetails: {
-      category: null,
       description: '',
       attachmentName: '',
     },
@@ -40,8 +41,23 @@ export function initialState(initialOrderId = null) {
 
 export function flowReducer(state, action) {
   switch (action.type) {
-    case 'SET_CLAIM_TYPE':
-      return { ...state, claimType: action.value }
+    case 'SET_CLAIM_TYPE': {
+      // Switching off the 'issue' path drops any sub-issue selection so
+      // it can't survive into an unrelated flow (e.g. change_of_mind).
+      const clearsSubIssue = action.value !== 'issue'
+      return {
+        ...state,
+        claimType: action.value,
+        issueScope: clearsSubIssue ? null : state.issueScope,
+        issueSubtypeId: clearsSubIssue ? null : state.issueSubtypeId,
+      }
+    }
+    case 'SET_ISSUE_SUBTYPE':
+      return {
+        ...state,
+        issueScope: action.scope,
+        issueSubtypeId: action.id,
+      }
     case 'SET_REASON':
       return { ...state, reason: { ...state.reason, ...action.value } }
     case 'SET_ISSUE_DETAILS':
@@ -82,7 +98,9 @@ export function canAdvance(state) {
       if (state.claimType === 'issue') {
         const id = state.issueDetails
         return Boolean(
-          id.category && id.description.trim().length > 0 && id.attachmentName,
+          state.issueSubtypeId &&
+            id.description.trim().length > 0 &&
+            id.attachmentName,
         )
       }
       return true
