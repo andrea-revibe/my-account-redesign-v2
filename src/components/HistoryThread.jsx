@@ -1,18 +1,16 @@
 import { useState } from 'react'
 import {
   ShoppingBag,
-  XCircle,
   CircleSlash,
   PackageCheck,
   RotateCcw,
   ShieldX,
   BadgeCheck,
+  UploadCloud,
   Circle,
-  X,
+  ChevronDown,
 } from 'lucide-react'
 
-// Tone tokens for the chip + detail panel. Mirrors the design's TONE map
-// in card-layered.jsx; widened with `danger` for the cancel-rejected chip.
 const TONE = {
   neutral: {
     text: 'text-ink-2',
@@ -38,22 +36,15 @@ const TONE = {
     softBg: 'bg-success-bg',
     border: 'border-[#c6ebd9]',
   },
-  danger: {
-    text: 'text-danger',
-    bg: 'bg-danger',
-    softBg: 'bg-danger-bg',
-    border: 'border-[#f6c5cc]',
-  },
 }
 
 function eventGlyph(ev) {
   if (ev.kind === 'order') return ShoppingBag
-  if (ev.kind === 'cancellation') {
-    return ev.status === 'rejected' ? XCircle : CircleSlash
-  }
+  if (ev.kind === 'cancellation') return CircleSlash
   if (ev.kind === 'delivery') return PackageCheck
   if (ev.kind === 'return') return ev.status === 'rejected' ? ShieldX : RotateCcw
   if (ev.kind === 'refund') return BadgeCheck
+  if (ev.kind === 'evidence') return UploadCloud
   return Circle
 }
 
@@ -70,6 +61,7 @@ function chipLabel(ev) {
     return 'Returned'
   }
   if (ev.kind === 'refund') return 'Refunded'
+  if (ev.kind === 'evidence') return 'Evidence resubmitted'
   return ev.title
 }
 
@@ -79,6 +71,7 @@ function kindLabel(ev) {
   if (ev.kind === 'delivery') return 'Delivery'
   if (ev.kind === 'return') return 'Return claim'
   if (ev.kind === 'refund') return 'Refund'
+  if (ev.kind === 'evidence') return 'Return claim'
   return 'Event'
 }
 
@@ -91,84 +84,88 @@ function shortDate(ts) {
 }
 
 export default function HistoryThread({ events }) {
-  const [openChipId, setOpenChipId] = useState(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [openRowId, setOpenRowId] = useState(null)
   if (!events?.length) return null
-  const openEvent = events.find((e) => e.id === openChipId) || null
-  const toggle = (id) => setOpenChipId((prev) => (prev === id ? null : id))
+  const openEvent = events.find((e) => e.id === openRowId) || null
+  const toggleRow = (id) => setOpenRowId((prev) => (prev === id ? null : id))
+  const toggleAll = () => {
+    setIsExpanded((prev) => {
+      if (prev) setOpenRowId(null)
+      return !prev
+    })
+  }
 
   return (
     <div className="flex flex-col gap-2 pt-3 border-t border-line-2 px-1">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-[0.08em] font-bold text-muted">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          toggleAll()
+        }}
+        aria-expanded={isExpanded}
+        className="w-full flex items-center justify-between text-left hover:opacity-80 transition"
+      >
+        <span className="text-[10px] uppercase tracking-[0.08em] font-bold text-muted">
           History · {events.length} earlier{' '}
           {events.length === 1 ? 'event' : 'events'}
-        </div>
-        {openChipId && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggle(openChipId)
-            }}
-            className="text-[10.5px] text-muted hover:text-ink-2 font-semibold inline-flex items-center gap-0.5"
-          >
-            Close <X size={10} strokeWidth={2.4} />
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {events.map((ev) => (
-          <HistoryChip
-            key={ev.id}
-            ev={ev}
-            isOpen={ev.id === openChipId}
-            onClick={(e) => {
-              e.stopPropagation()
-              toggle(ev.id)
-            }}
-          />
-        ))}
-      </div>
-      {openEvent && <HistoryDetail ev={openEvent} />}
+        </span>
+        <ChevronDown
+          size={14}
+          strokeWidth={2.2}
+          className={`text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isExpanded && (
+        <>
+          <div className="flex flex-col">
+            {events.map((ev, idx) => (
+              <TimelineRow
+                key={ev.id}
+                ev={ev}
+                isFirst={idx === 0}
+                isLast={idx === events.length - 1}
+                isOpen={ev.id === openRowId}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleRow(ev.id)
+                }}
+              />
+            ))}
+          </div>
+          {openEvent && <HistoryDetail ev={openEvent} />}
+        </>
+      )}
     </div>
   )
 }
 
-function HistoryChip({ ev, isOpen, onClick }) {
+function TimelineRow({ ev, isFirst, isLast, isOpen, onClick }) {
   const t = TONE[ev.tone] || TONE.neutral
   const Glyph = eventGlyph(ev)
-  const isNeutral = ev.tone === 'neutral'
-  const wrapClasses = isNeutral
-    ? isOpen
-      ? 'bg-ink text-white border-ink'
-      : 'bg-line-2 border-line text-ink-2 hover:bg-line'
-    : isOpen
-      ? `${t.bg} ${t.border} text-white`
-      : `${t.softBg} ${t.border} ${t.text} hover:brightness-95`
-  const dotClasses = isNeutral
-    ? isOpen
-      ? 'bg-white/20 text-white'
-      : 'bg-white text-ink-2'
-    : isOpen
-      ? 'bg-white/20 text-white'
-      : `${t.bg} text-white`
   return (
     <button
       type="button"
       onClick={onClick}
       aria-expanded={isOpen}
-      className={`inline-flex items-center gap-1.5 h-[28px] pl-1.5 pr-2.5 rounded-full border text-[11px] font-semibold whitespace-nowrap transition ${wrapClasses}`}
+      className={`flex w-full text-left transition rounded-[8px] ${isOpen ? 'bg-line-2' : 'hover:bg-line-2/60'}`}
     >
-      <span
-        className={`grid place-items-center w-[18px] h-[18px] rounded-full ${dotClasses}`}
-      >
-        <Glyph size={10} strokeWidth={2.4} />
-      </span>
-      <span>{chipLabel(ev)}</span>
-      <span className="opacity-50 font-medium">·</span>
-      <span className="font-medium tabular-nums opacity-70">
-        {shortDate(ev.timestamp)}
-      </span>
+      <div className="flex flex-col items-center w-[18px] shrink-0">
+        <div className={`w-px flex-1 ${isFirst ? 'invisible' : 'bg-line'}`} />
+        <div className={`grid place-items-center w-[16px] h-[16px] rounded-full ${t.bg}`}>
+          <Glyph size={9} strokeWidth={2.6} className="text-white" />
+        </div>
+        <div className={`w-px flex-1 ${isLast ? 'invisible' : 'bg-line'}`} />
+      </div>
+      <div className="flex-1 ml-2.5 py-2 pr-1.5 flex items-center justify-between gap-3 min-w-0">
+        <span className={`truncate text-[11.5px] font-semibold ${isOpen ? 'text-ink' : 'text-ink-2'}`}>
+          {chipLabel(ev)}
+        </span>
+        <span className="shrink-0 text-[10.5px] tabular-nums text-muted">
+          {shortDate(ev.timestamp)}
+        </span>
+      </div>
     </button>
   )
 }

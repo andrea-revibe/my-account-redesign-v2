@@ -2,6 +2,34 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 27 (history thread → minimalistic timeline)
+
+### Changed
+
+- **Cancel-rejected event harmonised with the rest of the thread.** Tone drops from `danger` to `neutral` (grey dot + grey detail panel), glyph swaps from `XCircle` to the same `CircleSlash` used for plain cancellations, and the rejection-reason copy is tightened to a single short sentence. The unused `TONE.danger` entry is removed from `HistoryThread`. The detail line drops the time, keeping only the requested date.
+- **`HistoryThread` layout reformat.** The horizontal chip row is replaced by a vertical, minimalistic timeline — small tone-coloured dot/glyphs on a thin `bg-line` rail, with the chip label + short date on a single row per event. Order is chronological with the latest event at the bottom. Same TONE map, glyphs, labels, and `HistoryDetail` expansion panel — only the layout changes.
+- **Collapsed by default.** The `History · N earlier events` caption becomes a chevron-toggle button that reveals the timeline on click. Re-collapsing the thread also closes any open row detail; tap-row-to-expand behaviour inside the timeline is preserved (single open at a time). The old `Close ×` affordance is gone (tapping the open row collapses its detail).
+
+### Added
+
+- **History thread on `DeliveredOrderCard`.** Delivered-close orders (e.g., `89657`) now carry a single-row `HistoryThread` with just the `Order placed` milestone, slotted between the product row and the footer. Backed by a new `'delivered'` mode in `getHistoryEvents` (delivery is the hero, so it is intentionally absent from the thread).
+- **History thread on cancelled `requested` cards.** The `cancellationStatusId !== 'requested'` gate is gone — `89499` and friends now also render the thread, with just `Order placed` (the cancel request itself is the active hero). `'cancellation'` mode now skips the cancel-requested event when active is `requested`; `refund_pending` / `refunded` keep their existing `Placed + Cancellation requested` pair.
+
+## [Unreleased] — phase 26 (evidence-resubmitted history chip)
+
+### Added
+
+- **`evidence` event kind in the history thread.** New `Evidence resubmitted` chip (UploadCloud glyph, neutral tone) that records a closed resubmission chapter on a claim. Renders inline detail as `N new file(s) sent` with the resubmission timestamp — deliberately a simple recap, no re-litigating the rejection itself. Added to `getHistoryEvents` (claim mode, after delivery) and to the glyph/label maps in `HistoryThread`.
+- **Optional `claim.proofResubmission` field.** Block of metadata — `{ at, fileCount }` — that drives the new chip. Mirrors the structural pattern of `claim.docsRejection`. Wired on the existing QC mock (`89815`) so the chip is visible on land. Documented in §4.8.
+
+## [Unreleased] — phase 25 (documents-rejected card)
+
+### Added
+
+- **`DocsRejectedCard` component.** New in-progress card surfaced when ops rejects the evidence batch on a faulty-product claim. Danger-toned hero with the ops free-text message + 3-day countdown, an expanded body with a `Your last attempt` collapse (previous files dimmed with per-file red tags), a single combined upload zone (fake-files stub), a 280-char optional note for Revibe Quality, and a `Resubmit for review` action gated until ≥1 file is added. On submit the card flips to a warn-toned `Back under review · Resubmitted` state with an `Undo · edit before review starts` affordance. Implements Direction A from the design handoff (`docs/my-account-flow.md` §2.9).
+- **Optional `claim.docsRejection` field.** Block of metadata — `{ rejectedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, previous[] }` — that flips routing in `App.jsx` from `ClaimCard` to `DocsRejectedCard`. Mirrors the structural pattern of `order.cancellationRejection`. Documented in §4.8.
+- **One new mock order (`89734`).** Google Pixel 6 / faulty-product claim at `claim_created` with a hand-seeded `docsRejection`, lives in In progress so the new card is visible on land.
+
 ## [Unreleased] — phase 24 (claim type picker restructure)
 
 ### Added

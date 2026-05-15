@@ -7,6 +7,7 @@ import OrderCard from './components/OrderCard'
 import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
 import ClaimCard from './components/ClaimCard'
+import DocsRejectedCard from './components/DocsRejectedCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import { ORDERS } from './data/orders'
@@ -143,6 +144,9 @@ export default function App() {
                 />
                 <div className="px-4 flex flex-col gap-3">
                   {inFlight.map((o) => {
+                    if (hasActiveClaim(o) && o.claim?.docsRejection) {
+                      return <DocsRejectedCard key={o.id} order={o} />
+                    }
                     if (hasActiveClaim(o)) {
                       return <ClaimCard key={o.id} order={o} />
                     }

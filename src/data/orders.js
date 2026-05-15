@@ -310,8 +310,7 @@ export const ORDERS = [
     cancellationRef: '4BTb2x',
     cancellationRejection: {
       ref: 'CXL-4BTb2x',
-      reason:
-        "Your order had already shipped from our warehouse — we couldn't pull it back in time. The cancellation was closed and the order continued through to delivery.",
+      reason: "Order had already shipped — we couldn't pull it back.",
     },
     product: {
       name: 'iPhone 13',
@@ -339,6 +338,10 @@ export const ORDERS = [
         under_collection: '13 May · 10:14 AM',
         in_transit: '13 May · 3:42 PM',
         under_qc: '14 May · 11:05 AM',
+      },
+      proofResubmission: {
+        at: '13 May · 8:12 PM',
+        fileCount: 3,
       },
     },
   },
@@ -381,8 +384,7 @@ export const ORDERS = [
     cancellationRef: '9kP2mq',
     cancellationRejection: {
       ref: 'CXL-9kP2mq',
-      reason:
-        'The order was already on the truck when you asked to cancel. We let it continue to delivery — you returned it instead and got a full wallet refund.',
+      reason: "Order had already shipped — we couldn't pull it back.",
     },
     product: {
       name: 'iPhone SE (3rd gen)',
@@ -412,6 +414,91 @@ export const ORDERS = [
         under_qc: '16 Mar · 10:10 AM',
         ready_for_refund: '17 Mar · 2:25 PM',
         refunded: '18 Mar · 11:00 AM',
+      },
+    },
+  },
+  // ----- Layered mock: delivered → faulty-product claim with docs rejected.
+  // Ops reviewed the submitted evidence before releasing pickup and asked
+  // the customer to re-shoot. The claim is paused at `claim_created` until
+  // the customer either resubmits within 3 days or the claim auto-cancels.
+  // `claim.docsRejection` is the optional metadata block that flips routing
+  // in App.jsx from ClaimCard to DocsRejectedCard. Mirrors the structural
+  // pattern of `cancellationRejection` on cancelled orders.
+  {
+    id: '89734',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    placedAt: '14/04/2026 08:33 AM',
+    placedAtFull: '14 Apr 2026 · 8:33 AM',
+    deliveredOn: '2026-04-20',
+    deliveredOnLong: 'Monday, 20 April',
+    quantity: 1,
+    unitPrice: 519,
+    subtotal: 519,
+    warranty: 60,
+    total: 579,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193411',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Mastercard', last4: '8210' },
+    deviceOs: 'android',
+    timeline: {
+      created: '14 Apr · 8:33 AM',
+      quality_check: '15 Apr · 9:50 AM',
+      shipped: '17 Apr · 6:10 PM',
+      delivered: '20 Apr · 11:14 AM',
+    },
+    product: {
+      name: 'Google Pixel 6',
+      variant: 'Sorta Sage · 128 GB · Good',
+      image: '/iphone-midnight.png',
+    },
+    claim: {
+      claimRef: 'Q3kP7w',
+      claimStatusId: 'claim_created',
+      type: 'issue',
+      submittedAt: '22 Apr 2026 · 4:50 PM',
+      units: 1,
+      issueDetails: {
+        category: 'screen',
+        description:
+          "Battery drains within 4 hours and the screen has unresponsive touch zones in the top-right corner.",
+        attachmentName: 'IMG_0421.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'android' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 519, warranty: 60, gross: 579, fee: 0, net: 579, rate: 0 },
+      timeline: {
+        claim_created: '22 Apr · 4:50 PM',
+      },
+      docsRejection: {
+        rejectedAt: '13 May · 11:18 AM',
+        autoCancelAt: '16 May · 11:18 AM',
+        timeLeftLabel: '2 days, 14 hours left',
+        opsName: 'Marwa',
+        opsRole: 'Revibe Quality',
+        opsMessage:
+          "Hi Andrea — thanks for the report. The photos of the back are clear, but the screen damage isn't visible because of glare. Could you reshoot the screen close-up under softer light? Also, the video is too short to see the touch-input issue you described — try a 20–30 second clip with the device flat on a table.",
+        previous: [
+          { name: 'IMG_0421.jpg', size: '2.4 MB', kind: 'image', tag: 'Glare' },
+          { name: 'IMG_0422.jpg', size: '2.1 MB', kind: 'image', tag: 'Blurry' },
+          { name: 'VID_0094.mov', size: '8.2 MB', kind: 'video', duration: '0:12', tag: 'Too short' },
+          { name: 'IMG_0418.jpg', size: '1.9 MB', kind: 'image' },
+          { name: 'IMG_0419.jpg', size: '2.0 MB', kind: 'image' },
+          { name: 'IMG_0420.jpg', size: '2.2 MB', kind: 'image' },
+          { name: 'IMG_0424.jpg', size: '2.3 MB', kind: 'image' },
+        ],
       },
     },
   },

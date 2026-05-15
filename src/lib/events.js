@@ -2,17 +2,22 @@
 // row on ClaimCard and the cancelled refund-state PastOrderCard.
 //
 // Each event is `{ id, kind, status, tone, title, timestamp, detail?,
-// message?, ref? }`. Resolved events default to neutral tone so the thread
-// reads as a calm record; only an explicit `cancellation/rejected` keeps a
-// danger tone (the rejection is the one historical event that genuinely
-// signals something went sideways and should still stand out).
+// message?, ref? }`. All resolved events use neutral tone so the thread
+// reads as a calm record — even cancel-rejected, which is historical
+// context by the time the user sees it.
 //
 // Modes:
 //   'claim'        — active claim is the hero, so it's excluded. Includes
 //                    order placed, cancellation events (if any), delivery.
-//   'cancellation' — active refund (refund_pending/refunded) is the hero,
-//                    so we just include the placed event + cancellation
-//                    request as background context.
+//   'cancellation' — active refund is the hero. Past events: placed,
+//                    plus the cancellation request once the order has
+//                    moved past `requested` (refund_pending / refunded).
+//                    In `requested` the request itself is the hero, so
+//                    only `placed` survives as background context.
+//   'delivered'    — delivery is the active hero (DeliveredOrderCard).
+//                    Past events: placed only. Cancel-rejected can't
+//                    occur on this card (rejected-then-delivered orders
+//                    layer into a ClaimCard once a return is raised).
 //
 // An order can opt out of derivation by supplying its own `events: [...]`
 // array (same shape). When that's present we use it verbatim and just
@@ -41,14 +46,15 @@ function buildCancellationEvent(order) {
   const c = order.cancellationTimeline
   if (!c) return null
   if (c.rejected) {
+    const requestedDate = c.requested ? c.requested.split(' · ')[0] : null
     return {
       id: 'evt-cancel-rejected',
       kind: 'cancellation',
       status: 'rejected',
-      tone: 'danger',
+      tone: 'neutral',
       title: 'Cancellation rejected',
       timestamp: c.rejected,
-      detail: c.requested ? `Requested ${c.requested}` : undefined,
+      detail: requestedDate ? `Requested ${requestedDate}` : undefined,
       message: order.cancellationRejection?.reason,
       ref: order.cancellationRejection?.ref || order.cancellationRef,
     }
@@ -65,6 +71,21 @@ function buildCancellationEvent(order) {
     }
   }
   return null
+}
+
+function buildProofResubmissionEvent(order) {
+  const pr = order.claim?.proofResubmission
+  if (!pr) return null
+  const n = pr.fileCount
+  return {
+    id: 'evt-proof-resubmitted',
+    kind: 'evidence',
+    status: 'resubmitted',
+    tone: 'neutral',
+    title: 'Evidence resubmitted',
+    timestamp: pr.at,
+    detail: `${n} new file${n === 1 ? '' : 's'} sent`,
+  }
 }
 
 function buildDeliveryEvent(order) {
@@ -96,9 +117,15 @@ export function getHistoryEvents(order, mode = 'claim') {
     if (cancellation) events.push(cancellation)
     const delivery = buildDeliveryEvent(order)
     if (delivery) events.push(delivery)
+    const proofResub = buildProofResubmissionEvent(order)
+    if (proofResub) events.push(proofResub)
   } else if (mode === 'cancellation') {
-    const cancellation = buildCancellationEvent(order)
-    if (cancellation) events.push(cancellation)
+    if (order.cancellationStatusId !== 'requested') {
+      const cancellation = buildCancellationEvent(order)
+      if (cancellation) events.push(cancellation)
+    }
+  } else if (mode === 'delivered') {
+    // Delivery is the active hero; only `placed` survives as background.
   }
 
   return events
