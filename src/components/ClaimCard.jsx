@@ -5,7 +5,6 @@ import {
   Download,
   Wallet,
   CreditCard,
-  PackageCheck,
 } from 'lucide-react'
 import {
   CLAIM_STATUSES,
@@ -17,7 +16,9 @@ import {
   claimTypeLabel,
   refundMethodLabel,
 } from '../lib/claims'
+import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
+import HistoryThread from './HistoryThread'
 
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
@@ -68,7 +69,10 @@ export default function ClaimCard({ order, defaultExpanded = false }) {
             <ClaimProgressDots claim={claim} tone={tone} />
           </div>
 
-          <OriginalOrderTrace order={order} />
+          {(() => {
+            const history = getHistoryEvents(order, 'claim')
+            return history.length > 0 ? <HistoryThread events={history} /> : null
+          })()}
 
           <div className="flex gap-2">
             <button
@@ -311,23 +315,4 @@ function ClaimProgressDots({ claim, tone }) {
   )
 }
 
-function OriginalOrderTrace({ order }) {
-  const deliveredDate =
-    order.deliveredOnLong ||
-    (order.timeline?.delivered
-      ? order.timeline.delivered.split(' · ')[0]
-      : null)
-  if (!deliveredDate) return null
-  return (
-    <div className="flex items-center justify-between px-1">
-      <span className="text-[10.5px] uppercase tracking-[0.06em] font-bold text-muted">
-        Original order
-      </span>
-      <span className="inline-flex items-center gap-1 text-[11px] text-ink-2">
-        <PackageCheck size={11} strokeWidth={2} className="text-success" />
-        Delivered {deliveredDate}
-      </span>
-    </div>
-  )
-}
 

@@ -396,6 +396,25 @@ Submit is a stub: both footer buttons just close the sheet. See §7 — the
 order shape today has no transition to flip `state` back from `cancelled`
 to `open` and to clean up `cancellationStatusId` / `cancellationTimeline`.
 
+**Rejected cancellations on layered orders.** When an order's cancellation
+request was rejected (the order had already shipped, for example), the
+rejection survives as a past event on whatever card the order eventually
+routes to — most commonly a `ClaimCard` once the customer raised a
+post-delivery return. The rejection is represented inside the expanded
+body's history thread as a danger-tone `Cancel rejected` chip; tapping it
+expands an inline detail panel that names the rejection ref and the
+reason copy from `order.cancellationRejection`. The optional data fields
+(`cancellationTimeline.rejected`, `cancellationRejection`) are documented
+in §4.5.
+
+**History thread on cancelled refund cards.** Once a cancellation has
+progressed past `requested` (so the card sits in `refund_pending` or
+`refunded`), the expanded body shows a single-chip `History · 1 earlier
+event` thread with the `Placed` event. The `requested` state itself
+keeps the original single-event layout — there's no past context to
+surface yet. Both branches are driven by `getHistoryEvents(order,
+'cancellation')` in `src/lib/events.js`.
+
 ### 2.7 Returns flow
 
 The `Raise a claim` button on the delivered `PastOrderCard` launches a
@@ -595,10 +614,11 @@ stateDiagram-v2
 
 The seven states live in `CLAIM_STATUSES` inside `src/lib/claims.js` —
 add, rename, or reorder steps there and the card picks them up. The
-prototype today renders one mock claim, seeded on order `89219` in the
-`under_qc` state (see §4.8); rebuilding additional mock claims for
-design review is a matter of attaching extra `claim` objects to other
-delivered orders.
+prototype today renders two mock claims, both with a rejected cancellation
+in history: `89815` (`under_qc`, in-progress section) and `89200`
+(`refunded`, past-orders section) — see §4.8. Rebuilding additional mock
+claims for design review is a matter of attaching extra `claim` objects to
+other delivered orders.
 
 **Tone progression.** The card's left accent strip, state pill, hero
 block, and 7-step progress dots all share a tone driven by
@@ -623,7 +643,7 @@ for its cancelled-past variants, so the language reads as one system.
 **Expanded view.**
 
 1. A 7-step horizontal dot timeline using `CLAIM_STATUSES`. Reached/current dots are filled in the tone colour with the same `shadow-[0_0_0_4px_rgb(255,242,221)]` glow on the current step that `InProgressCard` uses for its top-level timeline. Each reached step renders its date and time on two lines below the label, sourced from `claim.timeline[step.id]`.
-2. A small `Original order — Delivered {date}` trace line (the underlying order's `deliveredOnLong`, or the date part of `timeline.delivered`) so the customer keeps context that the delivery itself was completed.
+2. A `History` thread (`HistoryThread`) — compact horizontal chips for the order's past events (Placed, Cancellation requested / rejected, Delivered) derived in `src/lib/events.js` via `getHistoryEvents(order, 'claim')`. Each chip expands an inline tone-tinted detail panel; only one chip is open at a time, tap the chip again or the `Close ×` affordance to collapse. The active claim is the hero, so it never appears as a chip. Replaces the single-line "Original order — Delivered {date}" trace that lived here previously: the thread is layered enough to show a cancel-rejected + delivered history together, while the trace could only carry the delivery date.
 3. A two-action footer: `View claim details` (opens `ClaimDetailsSheet`) + icon-only `Download receipt` (decorative).
 
 **Claim details sheet.** `ClaimDetailsSheet`
@@ -799,6 +819,12 @@ non-cancelled orders do not need this field.
 - **`refund.breakdown`** — array of `{ label, amount }` line items summing to `refund.subtotal`. Rendered inside `RefundDetailsSheet`.
 - **`refund.fundsAvailable`** *(optional, string)* — short status copy shown under the hero amount. Only surfaced on `refunded` orders today; future card-refund ETAs ("Expected by 22 May") could also populate it.
 
+**Cancellation-history fields** (optional, only set when an earlier
+cancellation request was rejected — see §2.6 "Rejected cancellations"):
+
+- **`cancellationTimeline.rejected`** *(optional, string)* — human-readable timestamp at which the cancellation was rejected (same format as `requested` / `refund_pending`). Presence of this key flips the chip's tone to danger and changes its label from `Cancel requested` to `Cancel rejected`.
+- **`cancellationRejection`** *(optional, object)* — `{ ref, reason }`. `ref` is the rejection reference (e.g. `CXL-4BTb2x`) shown in the chip's expanded detail eyebrow; `reason` is the customer-facing explanation message rendered inside the detail panel's tinted message bubble.
+
 ### 4.6 Product fields
 
 Today an order has one product. The `product` object carries:
@@ -825,7 +851,10 @@ the order picker, so absence is benign.
 ### 4.8 Claim fields (orders with an active or completed return)
 
 Optional object populated on a delivered order to drive `ClaimCard` (§2.8).
-Today only `89219` carries one (`under_qc` state) for design review.
+Today two orders carry one: `89815` (`under_qc` with a rejected
+cancellation in history, lives in In progress) and `89200` (`refunded`
+with a rejected cancellation in history, lives in Past orders). Both
+exercise the layered `HistoryThread` inside the expanded card body.
 Production will write this object when the returns flow's Step 6 submit is
 wired up to persist.
 

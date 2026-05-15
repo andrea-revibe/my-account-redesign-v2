@@ -14,8 +14,10 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { cancellationStepsFor } from '../lib/statuses'
+import { getHistoryEvents } from '../lib/events'
 import RefundDetailsSheet from './RefundDetailsSheet'
 import KeepOrderSheet from './KeepOrderSheet'
+import HistoryThread from './HistoryThread'
 
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
@@ -200,6 +202,14 @@ function CancelledOrderCard({ order }) {
             </div>
             <RefundProgressDots order={order} />
           </div>
+
+          {order.cancellationStatusId !== 'requested' &&
+            (() => {
+              const history = getHistoryEvents(order, 'cancellation')
+              return history.length > 0 ? (
+                <HistoryThread events={history} />
+              ) : null
+            })()}
 
           {canKeep && (
             <button
