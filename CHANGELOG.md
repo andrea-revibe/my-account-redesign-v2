@@ -2,6 +2,80 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — docs reorganisation
+
+### Changed
+
+- **`docs/my-account-flow.md` split into per-feature docs and the folder reorganised into `input/` and `output/`.** The ~1,400-line mega-doc was broken up into `docs/output/orders.md`, `docs/output/cancellations.md`, `docs/output/returns/change_of_mind.md`, `docs/output/returns/issue.md`, `docs/output/returns/claim_tracking.md`, and `docs/output/warranties_compensations.md` (stub for the unwired Step 1 branches). Each follows the same shape as the operational docs (overview → mermaid flows → tables → free-text rationale). Operational state-machine docs (`return_flow_change_of_mind.md`, `return_flow_issue.md`) moved to `docs/input/` to reflect their role as source material used to build features. `my-account-flow.md` was deleted.
+- **`docs/claim_detailed_tracking.md` demoted to design history and moved to `docs/output/`.** The canonical reference tables for the sub-status enum, sub-status copy, action-gate copy, and SLA placeholders now live in `docs/output/returns/claim_tracking.md` §4. A banner at the top of the design-history doc points there.
+- **`CLAUDE.md`, repo root `README.md`, and source-code comments** (`src/data/orders.js`, `src/components/KeepOrderSheet.jsx`, `src/components/ClaimActionBanner.jsx`) updated to point at the new `docs/output/...` / `docs/input/...` paths.
+
+### Added
+
+- **`docs/README.md`** rewritten as an input/output index. Explains the split (input = operational source specs transcribed from drawio; output = prototype / UI feature specs produced from inputs and design work), carries the per-doc map, doc-update protocol triage table, and source-of-truth file pointers.
+
+## [Unreleased] — phase 32 (invalid-claim takeover + ship-back trajectory)
+
+### Added
+
+- **`InvalidClaimCard` component** (`src/components/InvalidClaimCard.jsx`). Third takeover variant after `DocsRejectedCard` and `PickupFailedCard`. Routed when `claim.invalidClaim` is set; supersedes `ClaimCard` while the claim is blocked on the customer paying return shipping after an inspection invalid determination. Danger-toned hero with an attributed Revibe Quality message (avatar + role + timestamp + free-text reason), countdown strip (`X days, Y hours left to pay return shipping · Claim auto-closes {date}`), product row, and a `Tap to fix` hint when collapsed. Expanded body slots a single-row return-shipping fee card, a delivery-details card (address / phone / email — read-only by default), a "Change delivery details" button styled like `InProgressCard`'s "Change details" that toggles the same card into an inline edit mode (Save / Cancel commit/discard local state), and a `Decline` / `Pay AED X` CTA row. Tapping `Pay` flips the card in place to a brand-toned fresh-order-style trajectory — eyebrow rewrites to `Order · #X · Return from Claim RET-Y`, hero borrows `InProgressCard`'s gradient ETA block, and the expanded body renders a 4-step horizontal dot timeline (Placed → Quality Check → Shipped → Delivered) driven by `claim.invalidClaim.returnShipment.timeline`. Tapping `Decline` flips to a muted "Claim closed — device not returned" terminal carrying a warn-toned reversal block with the copy-locked CTA "I changed my mind and will pay for the shipment fee" (subject to the same auto-close window). Both branches expose an `Undo · replay the demo` button — prototype-only, matching `PickupFailedCard`'s convention.
+- **Optional `claim.invalidClaim` field.** Block of metadata — `{ determinedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, returnShipping: { amount, currency }, returnShipment: { courier, estimatedDelivery, estimatedDeliveryLong, currentStatusId, timeline } }` — that flips routing in `App.jsx` from `ClaimCard` to `InvalidClaimCard`. Mirrors the structural pattern of `claim.docsRejection` and `claim.pickupFailure`. `returnShipping.amount` drives the fee summary + the primary CTA label; `returnShipment.timeline` keys mirror `STATUSES` ids (`created` / `quality_check` / `shipped` / `delivered`) so the fresh-order-style dots can reuse the existing chrome conventions.
+- **One new mock order (`89940`).** iPhone 11 Pro / battery-issue claim that passed inspection at QC but came back as invalid (cell health 92%, drain within spec). Carries `claim.subStatusId: 'awaiting_payment'`, `claim.detailedTimeline` entries for `under_qc` / `invalid_confirmed` / `awaiting_payment`, and a hand-seeded `invalidClaim` block with a 7-day auto-close deadline and a pre-staged `returnShipment` at `shipped`. Lives in In progress so the new card is visible on land.
+
+### Changed
+
+- **Routing in `App.jsx`.** New takeover branch `claim.invalidClaim` checked between `pickupFailure` and the generic `hasActiveClaim` fallback. Order matters: the three takeover blocks are mutually exclusive but checked in the order they were introduced.
+- **`claim.actionRequired.kind: 'awaiting_payment'` is now effectively dormant.** Same retirement pattern phase 30 used for the `collection_failed` branch: `89940` ships with `invalidClaim` (which routes to the new card) but no `actionRequired`, so the inline banner code path isn't exercised. The `awaiting_payment` branch in `actionGateCopy()` is retained for completeness and any future claim that needs the inline-only treatment.
+
+## [Unreleased] — phase 31 (expert-revision surfaced inline, detailed-tracking disclosure removed)
+
+### Changed
+
+- **Inline sub-status notes replace the "Show detailed tracking" disclosure on `ClaimCard`.** When a claim carries `subStatusId: 'expert_revision'`, the expanded card now renders two stacked callouts directly above the dot strip: a muted past-state `Reviewing seller's response` row (green check + day stamp, sourced from `claim.detailedTimeline.expert_revision.startedAt`) followed by a brand-tinted active `Expert inspection` row carrying the "Sent to our lab for a closer look. This step takes longer than usual." subline. Copy still pulls from `SUB_STATUS_LABELS` in `src/lib/claims.js`. Customers no longer have to discover the LAB sub-flow behind a collapsed disclosure — order `89762` shows it at a glance.
+
+### Removed
+
+- **`ClaimDetailedTimeline` component** (`src/components/ClaimDetailedTimeline.jsx`) and its "Show detailed tracking" disclosure inside `ClaimCard`. The vertical timeline / past-parent collapse / future-parent `Usually ~Nd` estimate are gone — the inline notes carry the narrative for `expert_revision`, and no other sub-status currently surfaces detailed tracking on the card.
+- **Detail-tracking helpers in `src/lib/claims.js`**: `shouldShowDetailedTracking`, `applicableSubStatuses`, `expectedByFor`, `isStepDelayed`, `detailedSteps`, `CLAIM_SUB_STATUSES`, `DEMO_NOW`, `parseDisplayDate`. All were only consumed by the deleted component. `CLAIM_SLAS` and `SUB_STATUS_LABELS` survive — they back the Step 4 "What happens next" timeline and the new inline notes respectively.
+
+## [Unreleased] — phase 30 (pickup-failed card aligned with docs-rejected)
+
+### Added
+
+- **`PickupFailedCard` component.** New in-progress card promoted from the inline `ClaimActionBanner` "Action needed — pickup didn't go through" treatment. Visually matches `DocsRejectedCard`: danger-toned hero with a courier message + countdown ("X days left to reschedule · Claim auto-cancels {date}"), product row, "Tap to fix" hint when collapsed. Expanded shows the saved pickup address as a confirmation block (read-only with a stub Edit), a one-line preview of what confirming will create (new AWB + courier + slot), and `Cancel claim` / `Confirm new pickup` CTAs. On confirm the card flips to a warn-toned `Pickup rescheduled · New AWB created` confirmation state mirroring `ResubmittedCard`. An `Undo · replay the demo` button is rendered inside the expanded confirmation **for demo purposes only** — production rescheduling is committal once a new AWB is created (the comment in the JSX flags this).
+- **Optional `claim.pickupFailure` field.** Block of metadata — `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, nextPickup: { awb, slot, courier } }` — that flips routing in `App.jsx` from `ClaimCard` to `PickupFailedCard`. Mirrors the structural pattern of `claim.docsRejection`. Wired on the existing `89876` change-of-mind mock; `actionRequired` removed from that order since the new card supersedes the inline banner.
+
+### Changed
+
+- **Order `89876` now routes to `PickupFailedCard` instead of `ClaimCard`** (with the inline `ClaimActionBanner`). The banner code path is untouched — it remains the surface for `awaiting_documents` and `awaiting_payment` gates, and any future claim that sets `actionRequired` without a dedicated takeover card.
+
+## [Unreleased] — phase 29 (returns flow Step 4 — process timeline + confirmation)
+
+### Added
+
+- **"What happens next" timeline on Step 4 of the returns flow.** Always-visible 7-row vertical timeline rendered below the pickup-contact rows, listing every claim status (Claim created → Pending collection → Under collection → In transit → Under Quality Check → Ready for refund → Refunded) with a duration suffix derived from `CLAIM_SLAS.expectedHours` in `src/lib/claims.js`. Sets expectation that the return is a multi-step process before the customer commits. Includes a subline under Quality Check noting that expert inspection can extend the wait, and a "Typically 5–7 business days from pickup to refund" hint below the card.
+- **Step 4 confirmation checkbox.** New `pickupConfirmed` boolean on the flow reducer, toggled by a brand-toned checkbox card below the timeline. Copy: "I confirm the pickup details above and understand the return process timeline." Continue stays disabled until checked. Visually mirrors the Step 6 packing-confirmation pattern. `SET_PICKUP_CONFIRMED` action added; `canAdvance` step 4 now requires the three contact fields **and** the confirmation.
+
+### Changed
+
+- **Courier-pickup banner removed from Step 4.** The brand-tinted `Courier pickup · Pickup within 2 business days` strip at the top of the step is gone — the "Pending collection · within 24h" row in the new timeline now carries that information in context, and the step heading already names the purpose ("Pickup address & contact").
+
+## [Unreleased] — phase 28 (detailed claim tracking + action gates)
+
+### Added
+
+- **`ClaimActionBanner` component.** Inline warn-toned banner that sits above the claim progress dot strip when `claim.actionRequired` is present, so the customer can't miss what they need to do. Carries headline, body, deadline countdown, and a primary CTA. Three gate kinds wired: `awaiting_documents` (Issue flow), `collection_failed`, `awaiting_payment` — copy + CTAs sourced from `actionGateCopy()` in `src/lib/claims.js`. See `docs/claim_detailed_tracking.md` §6.
+- **`ClaimDetailedTimeline` component.** Vertical timeline rendered behind a "Show detailed tracking" disclosure inside `ClaimCard`'s expanded state. Past parents collapse to `Done · {duration}`, the current parent expands with any branch sub-steps, future parents show `Usually ~Nd`. The disclosure only renders when the claim has a sub-status whose parent is `under_qc` — happy-path claims and pre-QC sub-statuses (which surface via the action banner instead) don't open it. `shouldShowDetailedTracking(claim)` is the single source of truth for the trigger.
+- **Sub-status catalog + SLA table in `lib/claims.js`.** Nine branch sub-statuses (`awaiting_documents`, `collection_failed`, `under_revision`, `expert_revision`, `invalid_confirmed`, `awaiting_payment`, `ship_back_pending` / `_in_transit` / `_delivered`) with customer-facing copy + tones; `expectedHours` / `bufferHours` placeholders per step (ops to revise — see spec §4.3). `detailedSteps(claim, order)` derives the row tree consumed by the timeline; `isStepDelayed()` checks the buffer cutoff; `parseDisplayDate()` parses the existing display-string timestamps against a fixed `DEMO_NOW` so the prototype is repeatable.
+- **Optional claim fields.** `claim.subStatusId` (granular state under a main parent), `claim.detailedTimeline` (per-step `startedAt`), `claim.actionRequired` (`{ kind, deadline, deadlineLabel, failedAt? }`). Documented in §4.8.
+- **`order.country` field.** Added to claim-carrying orders; used by `detailedSteps` to gate country-specific sub-flows (the CoM ZA/SA invalid-claim path skips the LAB sub-flow per the operational flow docs).
+- **Two new mock orders.** `89876` (Change-of-mind, country AE, `pending_collection` + `collection_failed`, 2-day action deadline) and `89762` (Issue, country AE, `under_qc` + `expert_revision`). The first demos the banner without disclosure; the second is the only mock that exposes the detailed-tracking timeline.
+- **`docs/claim_detailed_tracking.md`.** Full spec for the feature — goals, data model, SLA placeholders, sub-step catalog, three action gates, visualization, claim-type awareness, mock orders, open questions.
+
+### Changed
+
+- **`ClaimCard` expanded body.** Action banner slots above the dot strip when applicable, and a "Show detailed tracking" disclosure slots immediately below the dots (gated on `shouldShowDetailedTracking`). Existing `HistoryThread` and footer actions unchanged.
+
 ## [Unreleased] — phase 27 (history thread → minimalistic timeline)
 
 ### Changed

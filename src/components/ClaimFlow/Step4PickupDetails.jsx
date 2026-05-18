@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { MapPin, Mail, Phone, ChevronRight, X, Truck } from 'lucide-react'
+import { MapPin, Mail, Phone, ChevronRight, X, Check } from 'lucide-react'
 import StepHeading from './StepHeading'
+import { CLAIM_STATUSES, CLAIM_SLAS } from '../../lib/claims'
 
 const FIELDS = [
   {
@@ -47,19 +48,6 @@ export default function Step4PickupDetails({ state, dispatch }) {
       />
 
       <div className="px-4 flex flex-col gap-3">
-        <div className="flex items-start gap-2.5 rounded-[12px] border border-brand-bg bg-brand-bg/40 px-3.5 py-3 text-[12.5px] text-ink leading-[1.45]">
-          <Truck
-            size={16}
-            strokeWidth={1.75}
-            className="text-brand shrink-0 mt-px"
-          />
-          <span>
-            <span className="font-semibold text-ink">Courier pickup</span>{' '}
-            <span className="text-ink-2">·</span>{' '}
-            <span className="text-ink-2">Pickup within 2 business days</span>
-          </span>
-        </div>
-
         <div className="rounded-[14px] border border-line bg-surface overflow-hidden">
           {FIELDS.map((field, i) => {
             const value = pickupDetails[field.key]
@@ -101,6 +89,25 @@ export default function Step4PickupDetails({ state, dispatch }) {
         <div className="mt-1 text-[11.5px] text-muted leading-[1.45]">
           Used only for this pickup — your account details aren't changed.
         </div>
+
+        <div className="mt-5 flex flex-col gap-2.5">
+          <div className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+            What happens next
+          </div>
+          <div className="rounded-[14px] border border-line bg-surface px-3.5 py-3.5">
+            <ProcessTimeline />
+          </div>
+          <div className="px-1 text-[11.5px] text-muted leading-[1.45]">
+            Typically 5–7 business days from pickup to refund.
+          </div>
+        </div>
+
+        <ConfirmationCheckbox
+          checked={state.pickupConfirmed}
+          onChange={(value) =>
+            dispatch({ type: 'SET_PICKUP_CONFIRMED', value })
+          }
+        />
       </div>
 
       {editingField && (
@@ -118,6 +125,110 @@ export default function Step4PickupDetails({ state, dispatch }) {
         />
       )}
     </>
+  )
+}
+
+// Plain-English duration for an SLA's expectedHours. The 1h SLA on
+// claim_created reads as instant, so we drop it; refunded has no SLA.
+function formatExpected(hours) {
+  if (!hours || hours <= 1) return null
+  if (hours === 12) return 'same day'
+  if (hours < 24) return `within ${hours}h`
+  if (hours === 24) return 'within 24h'
+  const days = Math.round(hours / 24)
+  return `~${days} days`
+}
+
+const STEP_NOTES = {
+  under_qc: 'May take longer if expert inspection is needed.',
+}
+
+const PROCESS_STEPS = CLAIM_STATUSES.map((s) => ({
+  id: s.id,
+  label: s.headline,
+  duration: formatExpected(CLAIM_SLAS[s.id]?.expectedHours),
+  note: STEP_NOTES[s.id] || null,
+}))
+
+function ProcessTimeline() {
+  return (
+    <ol className="flex flex-col">
+      {PROCESS_STEPS.map((step, i) => (
+        <ProcessRow
+          key={step.id}
+          step={step}
+          isFirst={i === 0}
+          isLast={i === PROCESS_STEPS.length - 1}
+        />
+      ))}
+    </ol>
+  )
+}
+
+function ProcessRow({ step, isFirst, isLast }) {
+  return (
+    <li className="flex">
+      <div className="flex flex-col items-center w-[18px] shrink-0">
+        <div className={`w-px flex-1 ${isFirst ? 'invisible' : 'bg-line'}`} />
+        <div className="w-[10px] h-[10px] rounded-full border-2 border-line bg-surface my-1" />
+        <div className={`w-px flex-1 ${isLast ? 'invisible' : 'bg-line'}`} />
+      </div>
+      <div className="flex-1 ml-2.5 min-w-0 pb-2.5">
+        <div className="pt-0.5 flex items-baseline justify-between gap-2">
+          <span className="text-[13px] font-semibold text-ink tracking-[-0.01em]">
+            {step.label}
+          </span>
+          {step.duration && (
+            <span className="text-[11px] tabular-nums text-muted shrink-0">
+              {step.duration}
+            </span>
+          )}
+        </div>
+        {step.note && (
+          <div className="mt-1 text-[11px] text-ink-2 leading-snug">
+            {step.note}
+          </div>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function ConfirmationCheckbox({ checked, onChange }) {
+  return (
+    <label
+      className={`mt-1 flex items-start gap-3 rounded-[14px] border-2 px-3.5 py-3 cursor-pointer transition-colors ${
+        checked
+          ? 'border-brand bg-brand-bg/30'
+          : 'border-line bg-surface hover:bg-line-2/40'
+      }`}
+    >
+      <span className="relative mt-0.5 shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer sr-only"
+        />
+        <span
+          className={`w-[20px] h-[20px] rounded-[6px] border-2 grid place-items-center transition-colors ${
+            checked ? 'bg-brand border-brand' : 'border-line bg-surface'
+          }`}
+        >
+          {checked && (
+            <Check size={13} strokeWidth={3} className="text-white" />
+          )}
+        </span>
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[13.5px] font-semibold text-ink leading-[1.35]">
+          I confirm the pickup details above and understand the return process timeline.
+        </span>
+        <span className="block mt-1 text-[11.5px] text-muted leading-[1.4]">
+          Each step has its own SLA — most returns complete in 5–7 business days, longer if expert inspection is needed.
+        </span>
+      </span>
+    </label>
   )
 }
 

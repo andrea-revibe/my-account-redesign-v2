@@ -167,3 +167,121 @@ export function refundMethodLabel(claim, order) {
   }
   return 'Not selected'
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Claim sub-statuses — copy + SLAs
+// ────────────────────────────────────────────────────────────────────────
+
+// Spec § 4.3 — placeholder SLAs. Ops to revise with measured p50/p90
+// before any production rollout. Keys cover both main statuses and
+// branch sub-statuses; gates handled by actionRequired.deadline carry
+// no SLA entry on purpose.
+export const CLAIM_SLAS = {
+  claim_created:        { expectedHours:   1, bufferHours:   4 },
+  awaiting_documents:   { expectedHours:  48, bufferHours:  48 },
+  pending_collection:   { expectedHours:  24, bufferHours:  24 },
+  under_collection:     { expectedHours:  12, bufferHours:  12 },
+  in_transit:           { expectedHours:  48, bufferHours:  48 },
+  under_qc:             { expectedHours:  48, bufferHours:  48 },
+  under_revision:       { expectedHours:  48, bufferHours:  48 },
+  expert_revision:      { expectedHours: 120, bufferHours:  72 },
+  ship_back_pending:    { expectedHours:  48, bufferHours:  24 },
+  ship_back_in_transit: { expectedHours:  72, bufferHours:  48 },
+  ready_for_refund:     { expectedHours:  24, bufferHours:  24 },
+}
+
+// Spec § 5 — customer-facing copy for each sub-status.
+export const SUB_STATUS_LABELS = {
+  awaiting_documents: {
+    headline: 'More info needed',
+    subline: 'Revibe Quality asked for a clearer photo or longer video.',
+    tone: 'warn',
+  },
+  collection_failed: {
+    headline: 'Pickup didn’t go through',
+    subline: 'We couldn’t collect on the scheduled date.',
+    tone: 'warn',
+  },
+  under_revision: {
+    headline: 'Reviewing seller’s response',
+    subline: 'Our team is double-checking the seller’s notes.',
+    tone: 'brand',
+  },
+  expert_revision: {
+    headline: 'Expert inspection',
+    subline: 'Sent to our lab for a closer look. This step takes longer than usual.',
+    tone: 'brand',
+  },
+  invalid_confirmed: {
+    headline: 'Claim couldn’t be approved',
+    subline: 'Inspection didn’t confirm the issue you reported.',
+    tone: 'warn',
+  },
+  awaiting_payment: {
+    headline: 'Payment needed to return device',
+    subline: 'Cover return shipping to get your device back.',
+    tone: 'warn',
+  },
+  ship_back_pending: {
+    headline: 'Preparing to send your device back',
+    subline: 'Arranging a courier — should be on the way in a day or two.',
+    tone: 'brand',
+  },
+  ship_back_in_transit: {
+    headline: 'Your device is on the way back',
+    subline: 'Tracking will appear here once the courier scans it in.',
+    tone: 'brand',
+  },
+  ship_back_delivered: {
+    headline: 'Device returned',
+    subline: 'Delivered.',
+    tone: 'success',
+  },
+}
+
+// '16 May · 8:20 AM' → '16 May'. Used by gate-banner copy.
+function dayPart(displayDate) {
+  if (!displayDate) return ''
+  const idx = displayDate.indexOf(' · ')
+  return idx > 0 ? displayDate.slice(0, idx) : displayDate
+}
+
+// Spec § 6 — copy + CTAs for the three customer-action gates.
+export function actionGateCopy(actionRequired) {
+  if (!actionRequired) return null
+  const base = {
+    tone: 'warn',
+    deadline: actionRequired.deadline || null,
+    deadlineLabel: actionRequired.deadlineLabel || null,
+  }
+  switch (actionRequired.kind) {
+    case 'awaiting_documents':
+      return {
+        ...base,
+        headline: 'Action needed — documents requested',
+        body: 'Revibe Quality has asked for a clearer photo or longer video before we can pick up your device.',
+        primaryCta: 'Reply with documents',
+        secondaryCta: 'Close claim',
+      }
+    case 'collection_failed':
+      return {
+        ...base,
+        headline: 'Action needed — pickup didn’t go through',
+        body: `Our courier couldn’t pick up your device${
+          actionRequired.failedAt ? ' on ' + dayPart(actionRequired.failedAt) : ''
+        }.`,
+        primaryCta: 'Schedule new pickup',
+        secondaryCta: 'Cancel claim',
+      }
+    case 'awaiting_payment':
+      return {
+        ...base,
+        headline: 'Action needed — return shipping payment',
+        body: 'Your claim couldn’t be approved after inspection. Cover the return shipping fee to get your device sent back.',
+        primaryCta: 'Pay return shipping',
+        secondaryCta: 'Discuss with support',
+      }
+    default:
+      return null
+  }
+}

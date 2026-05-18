@@ -8,6 +8,8 @@ import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
 import ClaimCard from './components/ClaimCard'
 import DocsRejectedCard from './components/DocsRejectedCard'
+import PickupFailedCard from './components/PickupFailedCard'
+import InvalidClaimCard from './components/InvalidClaimCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import { ORDERS } from './data/orders'
@@ -146,6 +148,12 @@ export default function App() {
                   {inFlight.map((o) => {
                     if (hasActiveClaim(o) && o.claim?.docsRejection) {
                       return <DocsRejectedCard key={o.id} order={o} />
+                    }
+                    if (hasActiveClaim(o) && o.claim?.pickupFailure) {
+                      return <PickupFailedCard key={o.id} order={o} />
+                    }
+                    if (hasActiveClaim(o) && o.claim?.invalidClaim) {
+                      return <InvalidClaimCard key={o.id} order={o} />
                     }
                     if (hasActiveClaim(o)) {
                       return <ClaimCard key={o.id} order={o} />

@@ -4,7 +4,7 @@ import { X, Info, RotateCcw } from 'lucide-react'
 // Single-step bottom sheet for reversing an in-flight cancellation
 // (cancellationStatusId 'requested' or 'refund_pending'). Submit is a
 // prototype stub — closes the sheet, no state mutation. See
-// docs/my-account-flow.md § "Mocked vs production gap".
+// docs/output/cancellations.md § 9 (Mocked vs production).
 export default function KeepOrderSheet({ order, open, onClose }) {
   useEffect(() => {
     if (!open) return
