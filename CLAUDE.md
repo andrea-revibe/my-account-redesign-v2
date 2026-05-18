@@ -22,13 +22,13 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 
 For architectural rationale (chrome families, why certain choices), see `docs/my-account-flow.md`. This is just the map.
 
-- `src/App.jsx` — page composition; owns filter state and `claimFlowOrderId`. Routes orders to one of four cards (see Card routing).
-- `src/components/` — one component per file. `InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard` are the four order-card variants. `ClaimDetailsSheet` is `ClaimCard`'s details sheet. `WalletInfoTooltip` is shared anywhere "Revibe Wallet" is named — reuse it; it exports `REVIBE_WALLET_ICON`.
+- `src/App.jsx` — page composition; owns filter state and `claimFlowOrderId`. Routes orders to one of six cards (see Card routing).
+- `src/components/` — one component per file. `InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard` are the four baseline order-card variants; `DocsRejectedCard` and `PickupFailedCard` are takeover variants that supersede `ClaimCard` when the claim is blocked on a single customer action (re-upload evidence / confirm new pickup). `ClaimDetailsSheet` is `ClaimCard`'s details sheet. `ClaimActionBanner` + `ClaimDetailedTimeline` are private children of `ClaimCard` rendered inside its expanded state — see `docs/claim_detailed_tracking.md`. `WalletInfoTooltip` is shared anywhere "Revibe Wallet" is named — reuse it; it exports `REVIBE_WALLET_ICON`.
 - `src/components/ClaimFlow/` — seven-step change-of-mind returns flow. `ClaimFlow.jsx` mounts conditionally (no `open` prop — unmounting is what resets state). `flowReducer.js` owns the state shape + per-step `canAdvance`. Details in `docs/my-account-flow.md` § 2.7.
 - `src/data/orders.js` — mock orders. Optional fields (`delayed`, `statusMessage`, `claim`, returns-flow-only fields) documented in `docs/my-account-flow.md` § 4.
 - `src/lib/statuses.js` — single source of truth: statuses, sub-statuses, header chips, banner copy/tone, `pickActiveOrderId`.
 - `src/lib/returns.js` — single source of truth for returns: eligibility, refund math, fee rate, window.
-- `src/lib/claims.js` — single source of truth for `ClaimCard`: states, tone, copy helpers, `hasActiveClaim` / `isClaimRefunded`.
+- `src/lib/claims.js` — single source of truth for `ClaimCard`: states, tone, copy helpers, `hasActiveClaim` / `isClaimRefunded`. Also hosts the detailed-tracking model — `CLAIM_SUB_STATUSES`, `CLAIM_SLAS`, `SUB_STATUS_LABELS`, `detailedSteps`, `isStepDelayed`, `shouldShowDetailedTracking`, `actionGateCopy`, and `DEMO_NOW`.
 - `brief/` — source screenshots + design-system reference.
 - `docs/my-account-flow.md` — living doc of the orders flow (product + eng).
 - `CHANGELOG.md` — change history, phase by phase.
@@ -37,7 +37,7 @@ For architectural rationale (chrome families, why certain choices), see `docs/my
 
 One-liners. Expand each in `docs/my-account-flow.md` if you need the why.
 
-- **Card routing.** `App.jsx` picks in order: `hasActiveClaim` → `ClaimCard` (In Progress); `isClaimRefunded` → `ClaimCard` (Past); else by `statusId`/`state`: `InProgressCard` (created/QC), `OrderCard` (shipped + in-flight cancelled), `PastOrderCard` (delivered without a claim, or cancelled-and-refunded).
+- **Card routing.** `App.jsx` picks in order: `claim.docsRejection` → `DocsRejectedCard`; `claim.pickupFailure` → `PickupFailedCard`; `hasActiveClaim` → `ClaimCard` (In Progress); `isClaimRefunded` → `ClaimCard` (Past); else by `statusId`/`state`: `InProgressCard` (created/QC), `OrderCard` (shipped + in-flight cancelled), `PastOrderCard` (delivered without a claim, or cancelled-and-refunded). The first two are takeover cards — they replace `ClaimCard`'s surface while the claim is blocked on a single customer action and auto-cancels if ignored.
 - **Two-tier status.** `created → quality_check → shipped → delivered` drives the horizontal timeline. While `shipped`, `subStatusId` drives the vertical sub-timeline. No `delivered` sub-status.
 - **`state` is parallel to `statusId`.** `state` (`open`/`close`/`cancelled`) controls header chips, independent of progression. Cancelled orders keep the `statusId` they had at cancellation. Override: `delivered` always renders a green Delivered chip regardless of `state`.
 - **Status banner tone resolution** (in `statusDescription(order)`):
@@ -49,6 +49,7 @@ One-liners. Expand each in `docs/my-account-flow.md` if you need the why.
 - **Whole header is the tap target.** Chevrons on `OrderCard` / `InProgressCard` are decorative.
 - **Returns flow.** Overlay launched from `Raise a claim` on the delivered `PastOrderCard`. State in one `useReducer`; no session persistence (closing unmounts). Pre-seeded to `change_of_mind` so Step 1 advances straight to Step 2. Eligibility + refund math in `src/lib/returns.js`. Chrome is deliberately checkout-style, **not** the order-card chrome family.
 - **History thread.** On layered cards (`ClaimCard`, cancelled `PastOrderCard` in `refund_pending` / `refunded`), past events render as compact chips under the active hero; tapping a chip expands its detail inline (one open at a time). Derived in `src/lib/events.js` from `timeline` / `cancellationTimeline` / `cancellationRejection`. The active event lives in the hero and is excluded from the thread. Chip click handlers `stopPropagation` because the card header is one big tap target.
+- **Detailed claim tracking.** Two layers inside `ClaimCard`'s expanded state. `ClaimActionBanner` is the always-visible inline gate when `claim.actionRequired` is set (collection failed, missing documents, return-shipping payment). `ClaimDetailedTimeline` is a secondary "Show detailed tracking" disclosure that only renders when the claim has a `subStatusId` whose parent is `under_qc` (expert revision, under revision, etc.) — happy-path claims and pre-QC sub-statuses don't open it because the dot strip / banner already covers them. Full spec: `docs/claim_detailed_tracking.md`.
 
 ## Conventions
 

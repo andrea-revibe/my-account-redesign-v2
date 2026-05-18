@@ -15,9 +15,12 @@ import {
   claimStatusSubline,
   claimTypeLabel,
   refundMethodLabel,
+  shouldShowDetailedTracking,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
+import ClaimActionBanner from './ClaimActionBanner'
+import ClaimDetailedTimeline from './ClaimDetailedTimeline'
 import HistoryThread from './HistoryThread'
 
 const REVIBE_CARE_ICON =
@@ -62,11 +65,18 @@ export default function ClaimCard({ order, defaultExpanded = false }) {
 
       {expanded && (
         <div className="pl-4 pr-3.5 pb-4 pt-0 flex flex-col gap-3.5 animate-slideDown">
+          {claim.actionRequired && (
+            <ClaimActionBanner actionRequired={claim.actionRequired} />
+          )}
+
           <div className="px-1">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Claim progress
             </div>
             <ClaimProgressDots claim={claim} tone={tone} />
+            {shouldShowDetailedTracking(claim) && (
+              <DetailedTrackingDisclosure claim={claim} order={order} />
+            )}
           </div>
 
           {(() => {
@@ -236,6 +246,33 @@ function ProductRow({ order, expanded }) {
       >
         <ChevronDown size={12} strokeWidth={1.75} />
       </span>
+    </div>
+  )
+}
+
+function DetailedTrackingDisclosure({ claim, order }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-3 pt-3 border-t border-line-2 flex flex-col gap-2.5">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen((v) => !v)
+        }}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between text-left hover:opacity-80 transition"
+      >
+        <span className="text-[10px] uppercase tracking-[0.08em] font-bold text-muted">
+          {open ? 'Detailed tracking' : 'Show detailed tracking'}
+        </span>
+        <ChevronDown
+          size={14}
+          strokeWidth={2.2}
+          className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && <ClaimDetailedTimeline claim={claim} order={order} />}
     </div>
   )
 }

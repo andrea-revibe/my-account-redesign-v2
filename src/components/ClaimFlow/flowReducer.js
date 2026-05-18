@@ -33,6 +33,7 @@ export function initialState(initialOrderId = null) {
       email: order?.email || '',
       phone: order?.phone || '',
     },
+    pickupConfirmed: false,
     refundMethod: null,
     packingConfirmed: false,
     claimRef: null,
@@ -72,6 +73,8 @@ export function flowReducer(state, action) {
         ...state,
         pickupDetails: { ...state.pickupDetails, ...action.value },
       }
+    case 'SET_PICKUP_CONFIRMED':
+      return { ...state, pickupConfirmed: action.value }
     case 'SET_REFUND_METHOD':
       return { ...state, refundMethod: action.value }
     case 'SET_PACKING_CONFIRMED':
@@ -117,7 +120,8 @@ export function canAdvance(state) {
       return (
         pd.address.trim().length > 0 &&
         pd.email.trim().length > 0 &&
-        pd.phone.trim().length > 0
+        pd.phone.trim().length > 0 &&
+        state.pickupConfirmed === true
       )
     }
     case 5:

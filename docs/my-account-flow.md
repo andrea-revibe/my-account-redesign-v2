@@ -515,10 +515,21 @@ pre-seeded from the order so the user typically just confirms.
    three contact fields needed for the pickup: delivery address, email,
    and phone. State is pre-seeded from `order.address` / `order.email`
    / `order.phone` so the user typically just confirms; tapping any
-   row opens a single-field bottom sheet for editing. A brand-tinted
-   `Courier pickup · Pickup within 2 business days` banner sits above
-   the rows so the method is still made explicit. All three fields
-   must be non-empty before Continue enables.
+   row opens a single-field bottom sheet for editing. Below the rows,
+   a `What happens next` card renders an always-visible 7-row
+   vertical timeline derived from `CLAIM_STATUSES` + `CLAIM_SLAS` in
+   `lib/claims.js` (each row carries the step headline plus an
+   `expectedHours`-derived duration suffix like `within 24h` /
+   `same day` / `~2 days`; the Quality Check row carries a "may take
+   longer if expert inspection is needed" subline; a "Typically 5–7
+   business days from pickup to refund" hint sits below the card).
+   This sets expectations that the return is a multi-step process
+   before the customer commits. A brand-toned confirmation checkbox
+   card sits below the timeline ("I confirm the pickup details above
+   and understand the return process timeline.") and toggles
+   `pickupConfirmed` on the flow reducer. `canAdvance` requires the
+   three contact fields **and** `pickupConfirmed`. Visually mirrors
+   the Step 6 packing-confirmation card.
 5. **Refund method.** Two stacked refund cards built off
    `refundBreakdown(order, units, method, claimType)` (see §4.7). Visually
    aligned with the cancellation sheet's refund picker so the two
@@ -668,9 +679,11 @@ for its cancelled-past variants, so the language reads as one system.
 
 **Expanded view.**
 
-1. A 7-step horizontal dot timeline using `CLAIM_STATUSES`. Reached/current dots are filled in the tone colour with the same `shadow-[0_0_0_4px_rgb(255,242,221)]` glow on the current step that `InProgressCard` uses for its top-level timeline. Each reached step renders its date and time on two lines below the label, sourced from `claim.timeline[step.id]`.
-2. A `History` thread (`HistoryThread`) — a compact `History · N earlier events` toggle (chevron-rotated) that is **collapsed by default**. Expanding it reveals a vertical, minimalistic timeline of the order's past events (Placed → Cancellation requested / rejected → Delivered → Evidence resubmitted) derived in `src/lib/events.js` via `getHistoryEvents(order, 'claim')`. Rows render chronologically with the latest event at the bottom; each row is a small tone-coloured dot/glyph on a `bg-line` vertical rail, with the chip label + short date on a single line. Tapping a row opens the same tone-tinted detail panel below the timeline (one open at a time, tap the same row to collapse). Re-collapsing the whole thread also closes any open detail. The active claim is the hero, so it never appears as a row. Replaces the single-line "Original order — Delivered {date}" trace that lived here previously: the timeline is layered enough to show a cancel-rejected + delivered history together, while the trace could only carry the delivery date.
-3. A two-action footer: `View claim details` (opens `ClaimDetailsSheet`) + icon-only `Download receipt` (decorative).
+1. An optional `ClaimActionBanner` (`src/components/ClaimActionBanner.jsx`), rendered above the dot strip whenever `claim.actionRequired` is present. Warn-toned card with an alert glyph, headline, one-line body, deadline countdown copy (`claim.actionRequired.deadlineLabel`, e.g. "2 days left"), and a single primary CTA. Three gate kinds are wired today via `actionGateCopy()` in `src/lib/claims.js` — `awaiting_documents` (Issue flow only), `collection_failed`, and `awaiting_payment` (post-invalid-claim ship-back). The CTA stops propagation so it doesn't toggle the card. Full copy + flow rationale in `docs/claim_detailed_tracking.md` §6.
+2. A 7-step horizontal dot timeline using `CLAIM_STATUSES`. Reached/current dots are filled in the tone colour with the same `shadow-[0_0_0_4px_rgb(255,242,221)]` glow on the current step that `InProgressCard` uses for its top-level timeline. Each reached step renders its date and time on two lines below the label, sourced from `claim.timeline[step.id]`.
+3. An optional `Show detailed tracking` disclosure, rendered directly below the dot strip when `shouldShowDetailedTracking(claim)` returns true — that is, when the claim carries a `subStatusId` whose parent is `under_qc` (`expert_revision`, `under_revision`, `invalid_confirmed`, `awaiting_payment`, `ship_back_*`). Happy-path claims and pre-QC sub-statuses do **not** render it because the dot strip and action banner already cover them. Toggling it open reveals `ClaimDetailedTimeline` (`src/components/ClaimDetailedTimeline.jsx`), a vertical timeline derived from `detailedSteps(claim, order)` in `src/lib/claims.js`: past parents collapse to `Done · {duration}`, the current parent expands with any branch sub-steps (rendered as tone-tinted chips with `startedAt` + optional `Expected by` and a `Taking longer than usual` flag when `isStepDelayed`), and future parents show `Usually ~Nd` derived from the `CLAIM_SLAS` placeholder table. Full spec — sub-status catalog, SLA placeholders, claim-type / country awareness, mock orders — in `docs/claim_detailed_tracking.md`.
+4. A `History` thread (`HistoryThread`) — a compact `History · N earlier events` toggle (chevron-rotated) that is **collapsed by default**. Expanding it reveals a vertical, minimalistic timeline of the order's past events (Placed → Cancellation requested / rejected → Delivered → Evidence resubmitted) derived in `src/lib/events.js` via `getHistoryEvents(order, 'claim')`. Rows render chronologically with the latest event at the bottom; each row is a small tone-coloured dot/glyph on a `bg-line` vertical rail, with the chip label + short date on a single line. Tapping a row opens the same tone-tinted detail panel below the timeline (one open at a time, tap the same row to collapse). Re-collapsing the whole thread also closes any open detail. The active claim is the hero, so it never appears as a row. Replaces the single-line "Original order — Delivered {date}" trace that lived here previously: the timeline is layered enough to show a cancel-rejected + delivered history together, while the trace could only carry the delivery date.
+5. A two-action footer: `View claim details` (opens `ClaimDetailsSheet`) + icon-only `Download receipt` (decorative).
 
 **Claim details sheet.** `ClaimDetailsSheet`
 (`src/components/ClaimDetailsSheet.jsx`) is a bottom sheet mirroring
@@ -688,6 +701,7 @@ tap away.
 **Section placement.** `App.jsx` routes orders based on claim state:
 
 - `claim.docsRejection` present → `DocsRejectedCard` (see §2.9 below); checked **before** the regular claim branch so a rejection takes over the card surface even when the underlying claim status is mid-flight.
+- `claim.pickupFailure` present → `PickupFailedCard` (see §2.10 below); same precedence — a failed pickup takes over the card surface while the claim is still nominally at `pending_collection`.
 - `hasActiveClaim(order)` returns true when an order has a `claim` field whose `claimStatusId !== 'refunded'`. Such orders are included in `isOpen` and surface in the **In progress** section, regardless of the underlying order's `statusId` (which stays `delivered`).
 - `isClaimRefunded(order)` returns true for refunded claims; these surface in the **Past orders** section.
 
@@ -795,6 +809,98 @@ is a fake-files cycle, the countdown label is hand-written, the
 `Cancel claim` button is decorative, and there's no notification +
 email trigger. `Resubmit` doesn't persist — the warn state is local
 component state only.
+
+### 2.10 Pickup-failed card (collection failed → reschedule)
+
+When the courier attempts the change-of-mind / issue pickup and the
+collection doesn't happen (no answer at the address, courier couldn't
+reach the customer, etc.), the card flips out of `ClaimCard` chrome
+into a dedicated `PickupFailedCard` (`src/components/PickupFailedCard.jsx`).
+Trigger: an optional `claim.pickupFailure` block on the order (see
+§4.8). Same shape as the docs-rejected takeover — claim auto-cancels
+if the customer doesn't act before `autoCancelAt`; the prototype carries
+a hand-written `timeLeftLabel`.
+
+**Routing.** Checked alongside `docsRejection` in the in-progress branch
+of `App.jsx`:
+
+```js
+if (hasActiveClaim(o) && o.claim?.docsRejection) {
+  return <DocsRejectedCard key={o.id} order={o} />
+}
+if (hasActiveClaim(o) && o.claim?.pickupFailure) {
+  return <PickupFailedCard key={o.id} order={o} />
+}
+if (hasActiveClaim(o)) {
+  return <ClaimCard key={o.id} order={o} />
+}
+```
+
+The order still satisfies `hasActiveClaim`, so it stays in the **In
+progress** section.
+
+**Collapsed view.** Danger-toned left accent strip; `Order · #{id} · Claim
+RET-{ref}` eyebrow; `Action needed` pill; a tinted hero block with the
+`Pickup failed` label, the headline `Pickup didn't go through`, a
+one-line truncated courier quote, and the countdown strip (`3 days, 18
+hours left to reschedule · Claim auto-cancels {autoCancelAt}`); compact
+product row; `Tap to fix` footer.
+
+**Expanded view.** Same hero but the courier message expands into a
+full attributed block (avatar with `opsName` initial — typically the
+courier's first name, name + role, failure timestamp, full free-text
+message). Below the header:
+
+1. **`Pickup address`** — read-only confirmation card showing the saved
+   pickup address + phone + email from `claim.pickupDetails`. A stub
+   `Edit` link is wired but inert in the prototype. The user's decision
+   was "address confirm only" — no slot picker, no note field — so the
+   intent of this surface is to give the customer a chance to verify
+   the address looks right before re-dispatching.
+2. **Confirm summary line** — single sentence preview of what confirming
+   creates: courier + scheduled slot (driven by
+   `claim.pickupFailure.nextPickup`).
+3. **Footer** — `Cancel claim` (visual stub) + `Confirm new pickup`
+   (solid danger-red primary action). Confirm is always enabled; the
+   confirmation step itself is the action gate.
+
+**Submitted state.** Tapping `Confirm new pickup` flips the card in
+place to a warn-toned variant: amber accent strip, pulsing
+`Pickup rescheduled` pill, `New AWB created` phase tag, `Your new pickup
+is on the way` headline, and a body that names the courier + slot +
+new AWB. Expanded shows a `Your new pickup` summary block (courier,
+AWB, slot, pickup-from address) followed by an `Undo · replay the demo`
+button. The undo is **demo-only** — in production, rescheduling is
+committal once a new AWB is issued (rolling it back would require a
+courier cancellation), but the prototype carries the affordance so
+reviewers can replay the confirmation flow without reloading the page.
+Component state never persists across closes.
+
+**Tone logic.** Same as the docs-rejected card: danger red while the
+claim is blocked on the customer's confirmation, warn amber once the
+new pickup is live and the system is in motion again.
+
+**After the claim moves on.** Once the courier successfully collects
+under the new AWB and the claim moves to `under_collection`, the order
+leaves `PickupFailedCard` and returns to the regular `ClaimCard`. In
+production the `claim.pickupFailure` block would be cleared and the
+courier success event would surface through the existing claim timeline;
+no separate history-thread chip is introduced for the failed-then-rescheduled
+chapter at this stage (revisit if user research shows people want it).
+
+**Relationship to `ClaimActionBanner`.** The legacy inline banner code
+path is still wired — it remains the surface for `awaiting_documents`
+and `awaiting_payment` action gates, and any future claim that sets
+`actionRequired` without a dedicated takeover card. `89876` no longer
+exercises the banner (it routes to the new card instead); the
+`collection_failed` branch in `actionGateCopy()` is now effectively
+dormant but retained for completeness.
+
+**Out of scope for the prototype** (production wiring): the `Edit`
+link on the pickup-address card is decorative, the `Cancel claim`
+button is decorative, the new AWB / slot are hand-written rather than
+generated, and there's no notification + email trigger. `Confirm`
+doesn't persist — the warn state is local component state only.
 
 ---
 
@@ -962,12 +1068,15 @@ the order picker, so absence is benign.
 ### 4.8 Claim fields (orders with an active or completed return)
 
 Optional object populated on a delivered order to drive `ClaimCard` (§2.8).
-Today two orders carry one: `89815` (`under_qc` with a rejected
-cancellation in history, lives in In progress) and `89200` (`refunded`
-with a rejected cancellation in history, lives in Past orders). Both
-exercise the layered `HistoryThread` inside the expanded card body.
-Production will write this object when the returns flow's Step 6 submit is
-wired up to persist.
+Today four orders carry one: `89815` (`under_qc` with a rejected
+cancellation in history, lives in In progress), `89200` (`refunded`
+with a rejected cancellation in history, lives in Past orders), `89876`
+(`pending_collection` + `collection_failed` with an action gate, lives in
+In progress), and `89762` (`under_qc` + `expert_revision`, Issue flow, lives
+in In progress). The first two exercise the layered `HistoryThread`; the
+latter two exercise the detailed-tracking work (§2.8 step 1 / step 3 —
+`ClaimActionBanner` and `ClaimDetailedTimeline`). Production will write
+this object when the returns flow's Step 6 submit is wired up to persist.
 
 - **`claim.claimRef`** — `RET-XXXXXXXX` reference shown on the card hero and in the details sheet header. Generated by `generateClaimRef()` in `src/lib/returns.js`.
 - **`claim.claimStatusId`** — one of `claim_created`, `pending_collection`, `under_collection`, `in_transit`, `under_qc`, `ready_for_refund`, `refunded`. Drives the tone, hero copy, progress dot index, and section routing in `App.jsx`.
@@ -982,7 +1091,13 @@ wired up to persist.
 - **`claim.expectedRefund`** — `{ gross, fee, bonus, net, rate }`, pre-computed at submission time so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. Math depends on `claim.type` — see "Refund math" in §2.7. `bonus` is the optional flat Wallet bonus on issue claims (AED 100); `0` elsewhere.
 - **`claim.timeline`** — map keyed by `claimStatusId` carrying the timestamp at which the claim entered each phase. Populated progressively as the claim moves; the card renders the date/time under each reached dot.
 - **`claim.docsRejection`** *(optional)* — `{ rejectedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, previous }`. When present, `App.jsx` routes the order to `DocsRejectedCard` instead of `ClaimCard` (the regular claim status is paused while ops waits on better evidence). `rejectedAt` and `autoCancelAt` are human-readable timestamps; `timeLeftLabel` is the hand-written countdown copy ("2 days, 14 hours left") — production should compute from `rejectedAt + 72h`. `opsName` / `opsRole` / `opsMessage` are the free-text rejection block displayed inside the hero. `previous` is the dimmed-reference list of the customer's last submission, each item `{ name, size, kind, duration?, tag? }` — `tag` is the per-file ops reason ("Glare" / "Too short") that renders as a red ribbon. See §2.9. Mirrors the structural pattern of `order.cancellationRejection` (§4.5).
+- **`claim.pickupFailure`** *(optional)* — `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, nextPickup: { awb, slot, courier } }`. When present, `App.jsx` routes the order to `PickupFailedCard` instead of `ClaimCard`. `failedAt` and `autoCancelAt` are human-readable timestamps; `timeLeftLabel` is hand-written countdown copy ("3 days, 18 hours left") — production should compute from `failedAt + 96h` or the actual cancellation window. `opsName` / `opsRole` / `opsMessage` are the courier's message block displayed inside the hero (the same component pattern as docs-rejected, but the avatar represents the dispatcher rather than a Revibe Quality reviewer). `nextPickup` holds the AWB number, scheduled slot, and courier name that the confirmation state echoes back to the customer once they tap `Confirm new pickup`. See §2.10. Mirrors `claim.docsRejection` structurally.
 - **`claim.proofResubmission`** *(optional)* — `{ at, fileCount }`. Marks a closed evidence-resubmission chapter on a claim that has since moved on (typically to QC). When present, `getHistoryEvents` emits an `evidence` chip ("Evidence resubmitted") in the `HistoryThread` of the active `ClaimCard`; the expanded detail is a one-line recap — `N new files sent` — rather than re-surfacing the original rejection. Set this *without* `claim.docsRejection` (the latter routes the card to the active `DocsRejectedCard` state).
+- **`claim.subStatusId`** *(optional)* — granular state nested under a main `claimStatusId` parent. One of `awaiting_documents`, `collection_failed`, `under_revision`, `expert_revision`, `invalid_confirmed`, `awaiting_payment`, `ship_back_pending`, `ship_back_in_transit`, `ship_back_delivered`. Drives the detailed-tracking disclosure (§2.8 step 3) and, when its parent is `pending_collection` / `claim_created`, often pairs with `actionRequired`. Catalogue + parent mappings live in `CLAIM_SUB_STATUSES` in `src/lib/claims.js`; full spec at `docs/claim_detailed_tracking.md` §4.1.
+- **`claim.detailedTimeline`** *(optional)* — map keyed by either a main `claimStatusId` or a `subStatusId`, with `{ startedAt }` (display-string) per entry. Used by `expectedByFor()` / `isStepDelayed()` / `detailedSteps()` to position rows on the vertical timeline and compute the delayed treatment past `startedAt + expectedHours + bufferHours`. Sits alongside `claim.timeline` (which covers main parents only).
+- **`claim.actionRequired`** *(optional)* — `{ kind, deadline, deadlineLabel, failedAt? }`. Drives the inline `ClaimActionBanner` above the dot strip (§2.8 step 1). `kind` is one of `awaiting_documents`, `collection_failed`, `awaiting_payment`; `deadlineLabel` is the hand-written countdown copy ("2 days left"); `deadline` is the human-readable absolute timestamp; `failedAt` is the pickup-failure timestamp used by the `collection_failed` body. Banner copy + CTAs come from `actionGateCopy()` in `src/lib/claims.js`. Full spec at `docs/claim_detailed_tracking.md` §6.
+
+`order.country` *(optional, default `'AE'`)* — sits at the top level of the order rather than inside `claim`, but feeds `detailedSteps` so the CoM ZA/SA invalid-claim path can skip the LAB sub-flow (`expert_revision`) per the operational flow docs. Added to all claim-carrying orders.
 
 ---
 
@@ -1012,6 +1127,8 @@ src/
     ├── InProgressCard.jsx        Expandable card for non-cancelled created/quality_check (refund-hero chrome family)
     ├── PastOrderCard.jsx         Past-orders card; branches on `order.state` into delivered (no expand) and cancelled-past variants
     ├── ClaimCard.jsx             Expandable card for orders carrying a `claim` field — tracks the 7-state return journey
+    ├── ClaimActionBanner.jsx     Inline warn banner rendered above the dot strip when `claim.actionRequired` is set
+    ├── ClaimDetailedTimeline.jsx Vertical timeline behind ClaimCard's `Show detailed tracking` disclosure (QC-deviation cases only)
     ├── ClaimDetailsSheet.jsx     Bottom sheet opened by ClaimCard's `View claim details` action — Summary + Refund cards
     ├── CancelOrderSheet.jsx      Two- or three-step bottom sheet for cancelling a created / quality_check order
     ├── KeepOrderSheet.jsx        Single-step confirm sheet for reversing an in-flight cancellation
@@ -1032,7 +1149,7 @@ src/
         ├── Step2Reason.jsx       change_of_mind branch — optional reason radio + free-text reveal on "Other"
         ├── Step2IssueDetails.jsx issue branch — required category list + description textarea + fake attachment slot
         ├── Step3DevicePrep.jsx   Gated: factory-reset path (OS tabs + instructions + checkbox) or credentials path
-        ├── Step4PickupDetails.jsx Pickup address + email + phone, each editable in a single-field bottom sheet
+        ├── Step4PickupDetails.jsx Pickup address + email + phone (each editable in a single-field bottom sheet), "What happens next" SLA timeline derived from CLAIM_SLAS, and a confirmation checkbox gating Continue
         ├── Step5RefundMethod.jsx Wallet vs original-payment refund cards with the 10% fee broken out
         ├── Step6Review.jsx       Read-only item block + sectioned summary with per-section Edit links jumping to that step
         └── Step7Confirmation.jsx Success state with claim ref + Copy + next-steps list + claim-type chip

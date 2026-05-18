@@ -2,6 +2,44 @@
 
 Internal demo project. Format roughly follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — phase 30 (pickup-failed card aligned with docs-rejected)
+
+### Added
+
+- **`PickupFailedCard` component.** New in-progress card promoted from the inline `ClaimActionBanner` "Action needed — pickup didn't go through" treatment. Visually matches `DocsRejectedCard`: danger-toned hero with a courier message + countdown ("X days left to reschedule · Claim auto-cancels {date}"), product row, "Tap to fix" hint when collapsed. Expanded shows the saved pickup address as a confirmation block (read-only with a stub Edit), a one-line preview of what confirming will create (new AWB + courier + slot), and `Cancel claim` / `Confirm new pickup` CTAs. On confirm the card flips to a warn-toned `Pickup rescheduled · New AWB created` confirmation state mirroring `ResubmittedCard`. An `Undo · replay the demo` button is rendered inside the expanded confirmation **for demo purposes only** — production rescheduling is committal once a new AWB is created (the comment in the JSX flags this).
+- **Optional `claim.pickupFailure` field.** Block of metadata — `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, nextPickup: { awb, slot, courier } }` — that flips routing in `App.jsx` from `ClaimCard` to `PickupFailedCard`. Mirrors the structural pattern of `claim.docsRejection`. Wired on the existing `89876` change-of-mind mock; `actionRequired` removed from that order since the new card supersedes the inline banner.
+
+### Changed
+
+- **Order `89876` now routes to `PickupFailedCard` instead of `ClaimCard`** (with the inline `ClaimActionBanner`). The banner code path is untouched — it remains the surface for `awaiting_documents` and `awaiting_payment` gates, and any future claim that sets `actionRequired` without a dedicated takeover card.
+
+## [Unreleased] — phase 29 (returns flow Step 4 — process timeline + confirmation)
+
+### Added
+
+- **"What happens next" timeline on Step 4 of the returns flow.** Always-visible 7-row vertical timeline rendered below the pickup-contact rows, listing every claim status (Claim created → Pending collection → Under collection → In transit → Under Quality Check → Ready for refund → Refunded) with a duration suffix derived from `CLAIM_SLAS.expectedHours` in `src/lib/claims.js`. Sets expectation that the return is a multi-step process before the customer commits. Includes a subline under Quality Check noting that expert inspection can extend the wait, and a "Typically 5–7 business days from pickup to refund" hint below the card.
+- **Step 4 confirmation checkbox.** New `pickupConfirmed` boolean on the flow reducer, toggled by a brand-toned checkbox card below the timeline. Copy: "I confirm the pickup details above and understand the return process timeline." Continue stays disabled until checked. Visually mirrors the Step 6 packing-confirmation pattern. `SET_PICKUP_CONFIRMED` action added; `canAdvance` step 4 now requires the three contact fields **and** the confirmation.
+
+### Changed
+
+- **Courier-pickup banner removed from Step 4.** The brand-tinted `Courier pickup · Pickup within 2 business days` strip at the top of the step is gone — the "Pending collection · within 24h" row in the new timeline now carries that information in context, and the step heading already names the purpose ("Pickup address & contact").
+
+## [Unreleased] — phase 28 (detailed claim tracking + action gates)
+
+### Added
+
+- **`ClaimActionBanner` component.** Inline warn-toned banner that sits above the claim progress dot strip when `claim.actionRequired` is present, so the customer can't miss what they need to do. Carries headline, body, deadline countdown, and a primary CTA. Three gate kinds wired: `awaiting_documents` (Issue flow), `collection_failed`, `awaiting_payment` — copy + CTAs sourced from `actionGateCopy()` in `src/lib/claims.js`. See `docs/claim_detailed_tracking.md` §6.
+- **`ClaimDetailedTimeline` component.** Vertical timeline rendered behind a "Show detailed tracking" disclosure inside `ClaimCard`'s expanded state. Past parents collapse to `Done · {duration}`, the current parent expands with any branch sub-steps, future parents show `Usually ~Nd`. The disclosure only renders when the claim has a sub-status whose parent is `under_qc` — happy-path claims and pre-QC sub-statuses (which surface via the action banner instead) don't open it. `shouldShowDetailedTracking(claim)` is the single source of truth for the trigger.
+- **Sub-status catalog + SLA table in `lib/claims.js`.** Nine branch sub-statuses (`awaiting_documents`, `collection_failed`, `under_revision`, `expert_revision`, `invalid_confirmed`, `awaiting_payment`, `ship_back_pending` / `_in_transit` / `_delivered`) with customer-facing copy + tones; `expectedHours` / `bufferHours` placeholders per step (ops to revise — see spec §4.3). `detailedSteps(claim, order)` derives the row tree consumed by the timeline; `isStepDelayed()` checks the buffer cutoff; `parseDisplayDate()` parses the existing display-string timestamps against a fixed `DEMO_NOW` so the prototype is repeatable.
+- **Optional claim fields.** `claim.subStatusId` (granular state under a main parent), `claim.detailedTimeline` (per-step `startedAt`), `claim.actionRequired` (`{ kind, deadline, deadlineLabel, failedAt? }`). Documented in §4.8.
+- **`order.country` field.** Added to claim-carrying orders; used by `detailedSteps` to gate country-specific sub-flows (the CoM ZA/SA invalid-claim path skips the LAB sub-flow per the operational flow docs).
+- **Two new mock orders.** `89876` (Change-of-mind, country AE, `pending_collection` + `collection_failed`, 2-day action deadline) and `89762` (Issue, country AE, `under_qc` + `expert_revision`). The first demos the banner without disclosure; the second is the only mock that exposes the detailed-tracking timeline.
+- **`docs/claim_detailed_tracking.md`.** Full spec for the feature — goals, data model, SLA placeholders, sub-step catalog, three action gates, visualization, claim-type awareness, mock orders, open questions.
+
+### Changed
+
+- **`ClaimCard` expanded body.** Action banner slots above the dot strip when applicable, and a "Show detailed tracking" disclosure slots immediately below the dots (gated on `shouldShowDetailedTracking`). Existing `HistoryThread` and footer actions unchanged.
+
 ## [Unreleased] — phase 27 (history thread → minimalistic timeline)
 
 ### Changed
