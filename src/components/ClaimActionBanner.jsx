@@ -3,8 +3,8 @@ import { actionGateCopy } from '../lib/claims'
 
 // Inline action-required banner shown above the claim progress dot strip
 // when claim.actionRequired is present. Surfaces the gate so the customer
-// can't miss what they need to do. See docs/claim_detailed_tracking.md
-// § 6 for the three gate kinds and § 7.1 for placement.
+// can't miss what they need to do. See docs/output/returns/claim_tracking.md
+// § 4.3 for the three gate kinds and § 2.3 for placement on ClaimCard.
 export default function ClaimActionBanner({ actionRequired }) {
   const copy = actionGateCopy(actionRequired)
   if (!copy) return null

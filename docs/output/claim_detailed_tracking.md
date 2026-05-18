@@ -1,6 +1,10 @@
 # Claim detailed tracking
 
-> Proposal for surfacing branch-specific sub-steps, per-step ETAs, and customer-action gates inside `ClaimCard`. Designed to reduce two flavours of inbound support call: "I expected this by now" and "I'm waiting on something but didn't realise it was on me." Not yet built — implementation follows sign-off on this doc.
+> **Reference tables have moved.** The canonical reference for the sub-status enum (§ 4.1), sub-status copy catalog (§ 5), action-gate copy (§ 6), and SLA placeholders (§ 4.3) now lives in [returns/claim_tracking.md](./returns/claim_tracking.md) § 4. **This file is design history** — the original proposal for the deprecated `Show detailed tracking` disclosure, kept for context on why the current inline-notes shape was chosen.
+>
+> **Status (phase 31).** The "Show detailed tracking" disclosure and the vertical timeline that backed it have been removed. Branch sub-steps are now surfaced as inline notes directly above the dot strip — see § 3 and § 7 for the current shape. Today only `expert_revision` renders the inline notes. The "delayed treatment" (§ 7.3), the future-step preview (§ 7.4), and the `detailedSteps()` / `isStepDelayed()` / `expectedByFor()` helpers (§ 4.3, § 8) no longer exist in code.
+>
+> Original framing kept below for reference: proposal for surfacing branch-specific sub-steps, per-step ETAs, and customer-action gates inside `ClaimCard`. Designed to reduce two flavours of inbound support call: "I expected this by now" and "I'm waiting on something but didn't realise it was on me."
 
 ## 1. Goals
 
@@ -15,30 +19,37 @@
 - Exposing the post-`refunded` seller-credit chain. Customers don't need it.
 - Production-accurate SLAs. The numbers in § 4.3 are placeholders for ops to revise (see § 12).
 
-## 3. Design at a glance
+## 3. Design at a glance (current shape — phase 31)
 
-When `ClaimCard` is expanded, a third row appears below the existing horizontal dot strip:
+When `ClaimCard` is expanded for a claim with `subStatusId: 'expert_revision'`, the QC sub-flow is surfaced inline above the dot strip — no disclosure, no tap required:
 
 ```
 ┌─ expanded ClaimCard ────────────────────┐
 │ [hero with status pill, refund amount]  │
 │                                          │
 │ CLAIM PROGRESS                          │
-│ ●──●──●──●──○──○──○                     │  ← unchanged 7-dot strip
+│ ┌──────────────────────────────────┐    │
+│ │ ✓ Reviewing seller's response  10 May│ ← past sub-status (muted)
+│ │   Our team is double-checking…   │    │
+│ └──────────────────────────────────┘    │
+│ ┌──────────────────────────────────┐    │
+│ │ ● Expert inspection              │    │ ← active sub-status (brand)
+│ │   Sent to our lab for a closer   │    │
+│ │   look. This step takes longer…  │    │
+│ └──────────────────────────────────┘    │
+│ ●──●──●──●──◉──○──○                     │ ← unchanged 7-dot strip
 │ Sub  Pck Col Trn QC  Rdy  Ref           │
 │                                          │
-│ ⚠ Action needed — pickup didn't go      │  ← inline gate banner (if any)
-│   through. Confirm by 18 May.           │     conditional on actionRequired
+│ ⚠ Action needed — pickup didn't go      │ ← inline gate banner (if any)
+│   through. Confirm by 18 May.           │   conditional on actionRequired
 │   [ Schedule new pickup ]               │
-│                                          │
-│ ▸ Show detailed tracking                │  ← secondary disclosure
 │                                          │
 │ [history thread chips]                  │
 │ [ View claim details ]  [ ⬇ ]           │
 └──────────────────────────────────────────┘
 ```
 
-Tapping **Show detailed tracking** slides open a vertical timeline (§ 7.2) that nests sub-steps under the active parent and shows `expectedBy` per step. Completed parents collapse to a one-line summary; the active parent expands inline; future parents show a relative estimate ("Usually ~2 days").
+The inline notes are always visible (no disclosure). Today the trigger is hardcoded to `subStatusId === 'expert_revision'`; if more QC sub-statuses need surfacing the gate can generalise without touching the rendering.
 
 ## 4. Data model
 
@@ -152,34 +163,22 @@ This is the same surface as the existing `DocsRejectedCard` (order 89734). Open 
 
 ### 7.1 Inline gate banner
 
-Renders directly above the dot strip when `claim.actionRequired` is present. Tone-warn (orange), full-width, rounded-card. Single CTA on the banner; "Cancel claim" / "Discuss with support" only appears in the detailed view to avoid crowding.
+Renders directly above the dot strip when `claim.actionRequired` is present. Tone-warn (orange), full-width, rounded-card. Single CTA on the banner.
 
 The deadline label uses the existing prototype convention from `claim.docsRejection.timeLeftLabel` ("2 days, 14 hours left") for consistency.
 
-### 7.2 Vertical timeline
+### 7.2 Inline sub-status notes (current shape)
 
-**Visibility.** The disclosure is hidden by default and only renders when the claim has an active `subStatusId` whose parent is `under_qc` (`expert_revision`, `under_revision`, `invalid_confirmed`, `awaiting_payment`, `ship_back_*`). Happy-path claims, pre-QC sub-statuses (which surface through the action banner instead), and delayed-without-deviation cases do not render it — the dot strip and any banner already carry enough signal. `shouldShowDetailedTracking(claim)` in `src/lib/claims.js` is the single source of truth for the trigger.
+Rendered by the `SubStatusNote` helper inside `src/components/ClaimCard.jsx`, slotted between the `CLAIM PROGRESS` eyebrow and the horizontal dot strip. Today the gate is `claim.subStatusId === 'expert_revision'` — when true, two stacked callouts render:
 
-Once triggered, the disclosure renders below the dot strip when expanded. Structure:
+- **Past `under_revision` row** — `state="past"`, `completedAt` = `claim.detailedTimeline.expert_revision.startedAt`. Muted chrome (`bg-line-2/60`, `border-line`), green success check on the left, day stamp on the right (e.g. "13 May"), subline in `text-muted`. Communicates "the seller-response review step is done."
+- **Active `expert_revision` row** — `state="current"`. Brand-tinted chrome (`bg-brand-bg`, `border-brand-bg2`), brand-toned dot, headline in `text-brand` font-bold, subline in `text-ink-2`. Carries the "Sent to our lab for a closer look. This step takes longer than usual." wait signal.
 
-- **Past parents** (index `< curIdx`): single line, "✓ {short} · completed in {duration}". Tap to expand a list of past sub-steps with their timestamps. One open at a time, mirroring `HistoryThread`.
-- **Current parent** (`= curIdx`): expanded by default. Shows the sub-step the claim is currently on plus any earlier branch sub-steps under this parent, each with `startedAt` and (for current only) `expectedBy`.
-- **Future parents** (`> curIdx`): single line, "○ {short} · Usually ~Nd" derived from SLA table.
+Both rows source headline + subline from `SUB_STATUS_LABELS[subStatusId]` so copy stays single-sourced. No vertical rail, no "Done · {duration}" annotation, no future-step preview — the inline shape deliberately trims everything except the two adjacent sub-statuses that frame the current wait.
 
-Spacing and chrome reuse the layered-card history thread conventions (chip-style rows, brand-tone for active, muted for past/future).
+### 7.3 Wait signal
 
-### 7.3 Delayed treatment
-
-When `now > startedAt + expectedHours + bufferHours` on the active step, the active sub-step row swaps to:
-
-- An orange ring around the timeline node (consistent with `OrderCard` delayed shipping).
-- Subline replaced with: "Taking longer than usual — usually ~{expected}, currently {elapsed}."
-
-The hero status pill in the card stays its base tone — we don't double-signal. Only the detailed-view row turns orange.
-
-### 7.4 Future-step preview
-
-Future parents show "Usually ~Nd" (rounded to days when ≥ 24h, hours otherwise). No absolute date — that would over-promise. Customers see a clear "this should take roughly a week from now" estimate without a specific Tuesday committed.
+Carried entirely in the active row's subline copy ("This step takes longer than usual."). No badge, no chip, no orange ring — the surrounding brand-tinted card already says "this is where you are." The earlier "delayed treatment" (orange ring + elapsed-vs-expected math) was tied to `isStepDelayed()` and was removed alongside the disclosure.
 
 ## 8. Claim-type awareness
 
@@ -202,38 +201,38 @@ None. `App.jsx` still routes any claim with `hasActiveClaim` to `ClaimCard`, and
 
 Two new mocks added to `src/data/orders.js`, slotted within the existing layered-claim cluster, ordered by claim-progression:
 
-1. **`89876` — Change-of-mind, country `AE`.** Parent `pending_collection`, `subStatusId: collection_failed`, `actionRequired.kind: collection_failed` with a 2-day deadline. Inserted **before** 89815. Exercises § 6.2 gate. The detailed-tracking disclosure does **not** render here — the banner already conveys the gate.
-2. **`89762` — Issue, country `AE`.** Parent `under_qc`, `subStatusId: expert_revision`. No action required, but the LAB sub-flow makes the wait long. Inserted **after** 89815, **before** 89200. Exercises § 4.1 expert-revision branch, § 8 claim-type awareness (Issue + LAB), and is the **only** mock that exposes the detailed-tracking disclosure (per § 7.2 trigger).
+1. **`89876` — Change-of-mind, country `AE`.** Parent `pending_collection`, `subStatusId: collection_failed`, `actionRequired.kind: collection_failed` with a 2-day deadline. Routed today to `PickupFailedCard` (see `docs/output/returns/claim_tracking.md` §3.2) rather than `ClaimCard`; the original phase-28 wiring was supplanted in phase 30. Exercises § 6.2 gate.
+2. **`89762` — Issue, country `AE`.** Parent `under_qc`, `subStatusId: expert_revision`. No action required, but the LAB sub-flow makes the wait long. Carries `claim.detailedTimeline.under_revision.startedAt` and `claim.detailedTimeline.expert_revision.startedAt`; the latter doubles as the completion timestamp for the past `under_revision` callout. Exercises § 4.1 expert-revision branch and § 7.2 inline sub-status notes — the only mock today that surfaces the QC sub-flow on the card.
 
 Resulting order in `ORDERS` for the claim cluster:
 
 ```
 ... existing non-claim orders ...
-89876                            ← new (pending_collection · collection_failed · action banner)
-89815                            ← existing (under_qc · happy · no disclosure)
-89762                            ← new (under_qc · expert_revision · Issue type · disclosure)
-89200                            ← existing (refunded)
-89734                            ← existing (claim_created · docs rejected → DocsRejectedCard)
+89876                            ← pending_collection · collection_failed (PickupFailedCard)
+89815                            ← under_qc · happy (no inline notes)
+89762                            ← under_qc · expert_revision (inline notes)
+89200                            ← refunded
+89734                            ← claim_created · docs rejected (DocsRejectedCard)
 ```
 
-An earlier draft of this spec included a third mock (`89880`, delayed in_transit) to exercise the delayed treatment in the detailed view. That mock was removed when the disclosure trigger narrowed to QC deviations only (§ 7.2). Delayed-without-deviation surfacing is now a follow-up — see § 12.
+An earlier draft of this spec included a third mock (`89880`, delayed in_transit) to exercise the delayed treatment in the detailed view. It was dropped when the disclosure trigger narrowed to QC deviations; delayed-without-deviation surfacing remains a follow-up (§ 12).
 
 ## 11. Doc & changelog updates
 
 Per `CLAUDE.md` § "Doc update protocol", this is a behaviour change touching components, state shape, and routing:
 
-- `docs/claim_detailed_tracking.md` — this doc (created).
-- `docs/my-account-flow.md` — extend the ClaimCard section with a pointer to this doc and a short note about the disclosure pattern.
+- `docs/output/claim_detailed_tracking.md` — this doc (created; later moved into `docs/output/` when the docs folder was reorganised into `input/` and `output/`).
+- `docs/output/returns/claim_tracking.md` — canonical reference for the sub-status enum, sub-status copy, action-gate copy, and SLA placeholders.
 - `CHANGELOG.md` — `[Unreleased]` entry naming the feature.
 - `CLAUDE.md` — add a "Mental model" bullet for the disclosure pattern (one line) and update "Where things live" if `ClaimCard`'s component children grow into a folder.
 
 ## 12. Open questions / future revisions
 
-- **Delayed-without-deviation surfacing.** A claim that's late on a happy-path step (e.g., `in_transit` past expected + buffer) currently has no visible signal on the card, because the detailed-tracking disclosure is hidden for non-QC-deviations (§ 7.2). Likely follow-up: a small delayed treatment on the active dot in the horizontal strip, or a delayed subline on the hero. Out of scope for this iteration.
-- **SLA accuracy.** All numbers in § 4.3 are placeholders. Ops to source p50/p90 actuals from production claims and revise before any production rollout.
+- **Generalising the inline-notes gate.** Today the trigger is hardcoded to `subStatusId === 'expert_revision'`. Other QC sub-statuses with a non-trivial customer narrative (e.g., `ship_back_pending` / `_in_transit` showing return shipping after an invalid claim) would benefit from the same treatment but need their own data-shape additions (e.g., a `ship_back` tracking link or AWB).
+- **Delayed-without-deviation surfacing.** A claim that's late on a happy-path step (e.g., `in_transit` past expected + buffer) currently has no visible signal on the card. The original spec routed this through the (now-removed) vertical timeline's orange-ring treatment. Likely follow-up: a small delayed badge on the active dot in the horizontal strip, or a delayed subline on the hero.
+- **SLA accuracy.** All numbers in § 4.3 are placeholders. `CLAIM_SLAS` still ships (it backs the Step 4 "What happens next" timeline in `ClaimFlow`), so ops should still revise these before production rollout.
 - **Country-aware transit SLAs.** `in_transit` SLA likely differs domestic vs international. Deferred — for the prototype, one global value suffices.
-- **Invalid-claim parent arrest.** When a claim resolves as invalid + shipped back, the seven-dot strip arrests at `under_qc` and the resolution lives only in the detailed view. Considered acceptable for the prototype since this is a rare path; future iterations could add an 8th parent or terminal-state hero.
+- **Invalid-claim parent arrest.** ~~When a claim resolves as invalid + shipped back, the seven-dot strip arrests at `under_qc` and there's no equivalent of the old detailed view to communicate the ship-back chain.~~ **Resolved in phase 32** by `InvalidClaimCard` — when inspection determines a claim is invalid the card flips into a dedicated takeover (mirroring `DocsRejectedCard` / `PickupFailedCard`) that surfaces the action gate (pay return shipping), and on `paid` morphs into a fresh-order-style trajectory driven by `claim.invalidClaim.returnShipment` rather than trying to extend `CLAIM_STATUSES`. Trade-off: the seven-dot strip never appears on this path — the customer's mental model is "claim → ship-back order," not "claim with a long ship-back tail," which matches the operational reality better.
 - **`DocsRejectedCard` vs `awaiting_documents`.** They cover the same operational state. Three options: (a) keep both, route by `claim.docsRejection` presence; (b) deprecate `DocsRejectedCard` and route everything through `ClaimCard` + `subStatusId: awaiting_documents` + `actionRequired`; (c) merge `claim.docsRejection` into `actionRequired`. Decision deferred — current scope keeps both and treats them as distinct cards. Recommended path is (b) once the new flow is validated.
-- **Persistence of disclosure state.** Should "Show detailed tracking" stay open across re-renders or always collapse back? Current proposal: per-card local state, not persisted. Matches the rest of the prototype.
-- **Telemetry hooks.** Production should fire events when (i) detailed tracking is opened, (ii) an action gate banner is dismissed, (iii) an action gate CTA is tapped. Out of scope for the prototype.
+- **Telemetry hooks.** Production should fire events when (i) an action gate banner is shown, (ii) an action gate CTA is tapped. The original "detailed tracking opened" event is moot now that there's no disclosure.
 - **Seller-credit chain.** Hidden, per agreement. If/when it surfaces, it would live in `ClaimDetailsSheet` rather than the card.

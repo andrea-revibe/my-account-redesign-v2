@@ -169,35 +169,8 @@ export function refundMethodLabel(claim, order) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Detailed claim tracking — see docs/claim_detailed_tracking.md
+// Claim sub-statuses — copy + SLAs
 // ────────────────────────────────────────────────────────────────────────
-
-// Prototype runs against fixed mock dates. Real "now" would diverge from
-// the demo dataset, so everything that compares against time uses this
-// reference unless an override is passed in.
-export const DEMO_NOW = new Date('2026-05-18T14:30:00')
-
-const PROTO_YEAR = 2026
-const MONTH_INDEX = {
-  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
-}
-
-// '13 May · 10:30 AM' → Date. Mirrors the display format used in
-// `timeline` / `detailedTimeline` entries in src/data/orders.js.
-export function parseDisplayDate(str) {
-  if (!str) return null
-  const m = /^(\d{1,2})\s+(\w{3})\s+·\s+(\d{1,2}):(\d{2})\s+(AM|PM)$/.exec(
-    String(str).trim()
-  )
-  if (!m) return null
-  const month = MONTH_INDEX[m[2]]
-  if (month == null) return null
-  let hour = Number(m[3])
-  if (m[5] === 'PM' && hour !== 12) hour += 12
-  if (m[5] === 'AM' && hour === 12) hour = 0
-  return new Date(PROTO_YEAR, month, Number(m[1]), hour, Number(m[4]))
-}
 
 // Spec § 4.3 — placeholder SLAs. Ops to revise with measured p50/p90
 // before any production rollout. Keys cover both main statuses and
@@ -217,23 +190,7 @@ export const CLAIM_SLAS = {
   ready_for_refund:     { expectedHours:  24, bufferHours:  24 },
 }
 
-// Spec § 4.1 — sub-status catalog. `skipCountries` encodes the CoM ZA/SA
-// variant where invalid-claim escalations loop via `under_revision`
-// instead of the LAB sub-flow.
-export const CLAIM_SUB_STATUSES = [
-  { id: 'awaiting_documents',   parent: 'claim_created',      types: ['issue'] },
-  { id: 'collection_failed',    parent: 'pending_collection', types: ['issue', 'change_of_mind'] },
-  { id: 'under_revision',       parent: 'under_qc',           types: ['issue', 'change_of_mind'] },
-  { id: 'expert_revision',      parent: 'under_qc',           types: ['issue', 'change_of_mind'], skipCountries: ['ZA', 'SA'] },
-  { id: 'invalid_confirmed',    parent: 'under_qc',           types: ['issue', 'change_of_mind'] },
-  { id: 'awaiting_payment',     parent: 'under_qc',           types: ['issue', 'change_of_mind'] },
-  { id: 'ship_back_pending',    parent: 'under_qc',           types: ['issue', 'change_of_mind'] },
-  { id: 'ship_back_in_transit', parent: 'under_qc',           types: ['issue', 'change_of_mind'] },
-  { id: 'ship_back_delivered',  parent: 'under_qc',           types: ['issue', 'change_of_mind'] },
-]
-
-// Spec § 5 — customer-facing copy for each sub-status. Tones drive the
-// row treatment in the detailed view.
+// Spec § 5 — customer-facing copy for each sub-status.
 export const SUB_STATUS_LABELS = {
   awaiting_documents: {
     headline: 'More info needed',
@@ -280,108 +237,6 @@ export const SUB_STATUS_LABELS = {
     subline: 'Delivered.',
     tone: 'success',
   },
-}
-
-// True when the claim genuinely deviates inside the QC parent — the only
-// case where the vertical timeline adds something the dot strip and
-// action banner don't already cover. Pre-QC sub-statuses (e.g. collection
-// failed) are surfaced via the action banner; happy-path claims have
-// nothing extra to show. See docs/claim_detailed_tracking.md § 7.2.
-export function shouldShowDetailedTracking(claim) {
-  if (!claim?.subStatusId) return false
-  const sub = CLAIM_SUB_STATUSES.find((s) => s.id === claim.subStatusId)
-  return sub?.parent === 'under_qc'
-}
-
-// Sub-statuses that apply to the given claim — filters by type and country.
-export function applicableSubStatuses(claim, order) {
-  const type = claim?.type || 'change_of_mind'
-  const country = order?.country || 'AE'
-  return CLAIM_SUB_STATUSES.filter((s) => {
-    if (!s.types.includes(type)) return false
-    if (s.skipCountries?.includes(country)) return false
-    return true
-  })
-}
-
-// Computes the "expected by" Date for a step that has started. Falls
-// back to `claim.timeline` for main statuses; reads `detailedTimeline`
-// for sub-statuses.
-export function expectedByFor(stepId, claim) {
-  const sla = CLAIM_SLAS[stepId]
-  if (!sla) return null
-  const startedStr =
-    claim?.detailedTimeline?.[stepId]?.startedAt ||
-    claim?.timeline?.[stepId]
-  const startedAt = parseDisplayDate(startedStr)
-  if (!startedAt) return null
-  return new Date(startedAt.getTime() + sla.expectedHours * 3600 * 1000)
-}
-
-// Spec § 7.3 — delayed when now > startedAt + expected + buffer.
-export function isStepDelayed(stepId, claim, now = DEMO_NOW) {
-  const sla = CLAIM_SLAS[stepId]
-  if (!sla) return false
-  const startedStr =
-    claim?.detailedTimeline?.[stepId]?.startedAt ||
-    claim?.timeline?.[stepId]
-  const startedAt = parseDisplayDate(startedStr)
-  if (!startedAt) return false
-  const cutoff = new Date(
-    startedAt.getTime() + (sla.expectedHours + sla.bufferHours) * 3600 * 1000
-  )
-  return now > cutoff
-}
-
-// Spec § 7.2 — full vertical-timeline row tree. One row per main parent;
-// each carries the applicable sub-step rows nested underneath. Component
-// decides chrome (past collapsed / current expanded / future preview).
-export function detailedSteps(claim, order, now = DEMO_NOW) {
-  if (!claim) return []
-  const curIdx = claimProgressIndex(claim.claimStatusId)
-  const applicableSubs = applicableSubStatuses(claim, order)
-
-  return CLAIM_STATUSES.map((mainStep, i) => {
-    let state = 'future'
-    if (i < curIdx) state = 'past'
-    else if (i === curIdx) state = 'current'
-
-    const startedAt = claim.timeline?.[mainStep.id] || null
-    const nextStep = CLAIM_STATUSES[i + 1]
-    const completedAt = nextStep ? claim.timeline?.[nextStep.id] || null : null
-
-    const subSteps = applicableSubs
-      .filter((s) => s.parent === mainStep.id)
-      .map((s) => {
-        const subStarted = claim.detailedTimeline?.[s.id]?.startedAt || null
-        const isCurrent = state === 'current' && claim.subStatusId === s.id
-        if (!subStarted && !isCurrent) return null
-        return {
-          id: s.id,
-          ...SUB_STATUS_LABELS[s.id],
-          state: isCurrent ? 'current' : 'past',
-          startedAt: subStarted,
-          expectedBy: isCurrent ? expectedByFor(s.id, claim) : null,
-          isDelayed: isCurrent ? isStepDelayed(s.id, claim, now) : false,
-        }
-      })
-      .filter(Boolean)
-
-    return {
-      id: mainStep.id,
-      short: mainStep.short,
-      label: mainStep.label,
-      headline: mainStep.headline,
-      state,
-      startedAt,
-      completedAt,
-      expectedBy: state === 'current' ? expectedByFor(mainStep.id, claim) : null,
-      expectedRelativeHours:
-        state === 'future' ? CLAIM_SLAS[mainStep.id]?.expectedHours ?? null : null,
-      isDelayed: state === 'current' ? isStepDelayed(mainStep.id, claim, now) : false,
-      subSteps,
-    }
-  })
 }
 
 // '16 May · 8:20 AM' → '16 May'. Used by gate-banner copy.

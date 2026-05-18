@@ -427,7 +427,7 @@ export const ORDERS = [
   // ----- Layered mock: delivered → Issue claim → QC escalated to lab.
   // Exercises the expert_revision sub-step inside the under_qc parent,
   // plus claim-type awareness (Issue flow). No action required; the long
-  // wait is the point. See docs/claim_detailed_tracking.md § 4.1, § 8.
+  // wait is the point. See docs/output/returns/claim_tracking.md § 4.
   {
     id: '89762',
     phone: '+971 50 559 5034',
@@ -655,6 +655,107 @@ export const ORDERS = [
           { name: 'IMG_0420.jpg', size: '2.2 MB', kind: 'image' },
           { name: 'IMG_0424.jpg', size: '2.3 MB', kind: 'image' },
         ],
+      },
+    },
+  },
+  // ----- Layered mock: delivered → Issue claim → inspection invalid →
+  // awaiting return-shipping payment. Routed via `claim.invalidClaim`
+  // to InvalidClaimCard (mirrors docsRejection / pickupFailure routing).
+  // The takeover card carries the three demo branches (action needed /
+  // paid / declined) internally; only the initial action-needed state
+  // is exercised by this mock on land.
+  {
+    id: '89940',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '08/04/2026 10:48 AM',
+    placedAtFull: '8 Apr 2026 · 10:48 AM',
+    deliveredOn: '2026-04-15',
+    deliveredOnLong: 'Wednesday, 15 April',
+    quantity: 1,
+    unitPrice: 689,
+    subtotal: 689,
+    warranty: 60,
+    total: 749,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193477',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '8 Apr · 10:48 AM',
+      quality_check: '10 Apr · 9:32 AM',
+      shipped: '12 Apr · 5:15 PM',
+      delivered: '15 Apr · 12:40 PM',
+    },
+    product: {
+      name: 'iPhone 11 Pro',
+      variant: 'Space Gray · 256 GB · Good',
+      image: '/iphone-midnight.png',
+    },
+    claim: {
+      claimRef: 'Iv7nQk',
+      claimStatusId: 'under_qc',
+      subStatusId: 'awaiting_payment',
+      type: 'issue',
+      submittedAt: '02 May 2026 · 8:45 AM',
+      units: 1,
+      issueDetails: {
+        category: 'battery',
+        description:
+          'Battery seems to drain faster than expected — phone is at 30% after a few hours of light use.',
+        attachmentName: 'IMG_0612.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 689, warranty: 60, gross: 749, fee: 0, net: 749, rate: 0 },
+      timeline: {
+        claim_created: '2 May · 8:45 AM',
+        pending_collection: '2 May · 8:46 AM',
+        under_collection: '4 May · 10:30 AM',
+        in_transit: '4 May · 4:05 PM',
+        under_qc: '7 May · 11:20 AM',
+      },
+      detailedTimeline: {
+        under_qc: { startedAt: '7 May · 11:20 AM' },
+        invalid_confirmed: { startedAt: '14 May · 4:18 PM' },
+        awaiting_payment: { startedAt: '14 May · 4:20 PM' },
+      },
+      invalidClaim: {
+        determinedAt: '14 May · 4:18 PM',
+        autoCancelAt: '21 May · 4:18 PM',
+        timeLeftLabel: '3 days, 8 hours left',
+        opsName: 'Marwa',
+        opsRole: 'Revibe Quality',
+        opsMessage:
+          "Hi Andrea — our technicians ran a full battery diagnostic and the cell health came back at 92%, within the spec we ship at. Standby drain and load tests were also within range. We weren't able to reproduce the issue you described, so we can't approve the claim. To get the device back we'll need you to cover return shipping — otherwise the unit returns to circulation.",
+        returnShipping: {
+          amount: 35,
+          currency: 'AED',
+        },
+        returnShipment: {
+          courier: 'DHL Express',
+          estimatedDelivery: 'May 25',
+          estimatedDeliveryLong: 'Monday, 25 May',
+          currentStatusId: 'shipped',
+          timeline: {
+            created: '19 May · 11:00 AM',
+            quality_check: '19 May · 2:30 PM',
+            shipped: '20 May · 9:15 AM',
+          },
+        },
       },
     },
   },

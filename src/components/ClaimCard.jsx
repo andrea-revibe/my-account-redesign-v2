@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import {
   CLAIM_STATUSES,
+  SUB_STATUS_LABELS,
   claimToneFor,
   claimProgressIndex,
   claimPhaseTag,
@@ -15,12 +16,10 @@ import {
   claimStatusSubline,
   claimTypeLabel,
   refundMethodLabel,
-  shouldShowDetailedTracking,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import ClaimActionBanner from './ClaimActionBanner'
-import ClaimDetailedTimeline from './ClaimDetailedTimeline'
 import HistoryThread from './HistoryThread'
 
 const REVIBE_CARE_ICON =
@@ -73,10 +72,17 @@ export default function ClaimCard({ order, defaultExpanded = false }) {
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Claim progress
             </div>
-            <ClaimProgressDots claim={claim} tone={tone} />
-            {shouldShowDetailedTracking(claim) && (
-              <DetailedTrackingDisclosure claim={claim} order={order} />
+            {claim.subStatusId === 'expert_revision' && (
+              <div className="mb-3 flex flex-col gap-2">
+                <SubStatusNote
+                  subStatusId="under_revision"
+                  state="past"
+                  completedAt={claim.detailedTimeline?.expert_revision?.startedAt}
+                />
+                <SubStatusNote subStatusId="expert_revision" state="current" />
+              </div>
             )}
+            <ClaimProgressDots claim={claim} tone={tone} />
           </div>
 
           {(() => {
@@ -250,31 +256,51 @@ function ProductRow({ order, expanded }) {
   )
 }
 
-function DetailedTrackingDisclosure({ claim, order }) {
-  const [open, setOpen] = useState(false)
+function SubStatusNote({ subStatusId, state, completedAt }) {
+  const copy = SUB_STATUS_LABELS[subStatusId]
+  if (!copy) return null
+  const isPast = state === 'past'
+  const wrapClass = isPast
+    ? 'rounded-[10px] border border-line bg-line-2/60 px-3 py-2'
+    : 'rounded-[10px] border border-brand-bg2 bg-brand-bg px-3 py-2.5'
+  const headlineClass = isPast
+    ? 'text-[12px] font-semibold text-ink-2 leading-tight'
+    : 'text-[12.5px] font-bold text-brand leading-tight'
+  const sublineClass = isPast
+    ? 'text-[11px] text-muted leading-snug'
+    : 'text-[11.5px] text-ink-2 leading-snug'
+  const dayLabel = isPast && completedAt ? shortDay(completedAt) : null
   return (
-    <div className="mt-3 pt-3 border-t border-line-2 flex flex-col gap-2.5">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen((v) => !v)
-        }}
-        aria-expanded={open}
-        className="w-full flex items-center justify-between text-left hover:opacity-80 transition"
-      >
-        <span className="text-[10px] uppercase tracking-[0.08em] font-bold text-muted">
-          {open ? 'Detailed tracking' : 'Show detailed tracking'}
-        </span>
-        <ChevronDown
-          size={14}
-          strokeWidth={2.2}
-          className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && <ClaimDetailedTimeline claim={claim} order={order} />}
+    <div className={wrapClass}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isPast ? (
+            <span
+              aria-hidden
+              className="w-3.5 h-3.5 rounded-full bg-success grid place-items-center shrink-0"
+            >
+              <Check size={8} strokeWidth={3} className="text-white" />
+            </span>
+          ) : (
+            <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-brand shrink-0" />
+          )}
+          <span className={`${headlineClass} truncate`}>{copy.headline}</span>
+        </div>
+        {dayLabel && (
+          <span className="text-[10px] tabular-nums text-muted shrink-0">
+            {dayLabel}
+          </span>
+        )}
+      </div>
+      <div className={`mt-1 ${sublineClass}`}>{copy.subline}</div>
     </div>
   )
+}
+
+function shortDay(displayDate) {
+  if (!displayDate) return ''
+  const idx = displayDate.indexOf(' · ')
+  return idx > 0 ? displayDate.slice(0, idx) : displayDate
 }
 
 function ClaimProgressDots({ claim, tone }) {
