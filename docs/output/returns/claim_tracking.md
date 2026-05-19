@@ -20,7 +20,7 @@ stateDiagram-v2
 
 The seven states live in `CLAIM_STATUSES` inside `src/lib/claims.js` — add, rename, or reorder steps there and the card picks them up.
 
-`claim.subStatusId` (optional, see §4) carries finer-grained branching that hangs off these parents — `awaiting_documents` under `claim_created`, `collection_failed` under `pending_collection`, the `under_revision` / `expert_revision` / `invalid_confirmed` / `awaiting_payment` / `ship_back_*` chain under `under_qc`. Today the card only renders inline notes for `expert_revision`; the other sub-statuses drive the takeover-card routing in §3.
+`claim.subStatusId` (optional, see §4) carries finer-grained branching that hangs off these parents — `awaiting_documents` under `claim_created`, `collection_failed` under `pending_collection`, the `under_revision` / `expert_revision` / `invalid_confirmed` / `awaiting_payment` / `ship_back_*` chain under `under_qc`. Today the card surfaces none of these inline; they're either kept in the registry for future use or drive the takeover-card routing in §3.
 
 **Card routing precedence.** `App.jsx` checks claim takeovers before the baseline `ClaimCard` (see [../orders.md](../orders.md) §2). Order:
 
@@ -72,11 +72,8 @@ This piggybacks the existing `warn` / `brand` / `success` tokens — no new colo
 ### 2.3 Expanded view
 
 1. **Optional `ClaimActionBanner`** (`src/components/ClaimActionBanner.jsx`), rendered above the dot strip whenever `claim.actionRequired` is present. Warn-toned card with an alert glyph, headline, one-line body, deadline countdown copy (`claim.actionRequired.deadlineLabel`, e.g. "2 days left"), and a single primary CTA. Three gate kinds are wired today via `actionGateCopy()` in `src/lib/claims.js` — see §4.3. The CTA stops propagation so it doesn't toggle the card.
-2. **Optional inline sub-status notes**, rendered directly above the dot strip when `claim.subStatusId === 'expert_revision'` — today the only sub-status the card surfaces this way. Two stacked rounded callouts:
-   - A muted past-state `Reviewing seller's response` row (green check + day stamp derived from `claim.detailedTimeline.expert_revision.startedAt`).
-   - A brand-tinted active `Expert inspection` row carrying the "Sent to our lab for a closer look. This step takes longer than usual." subline.
-   Both copies pull from `SUB_STATUS_LABELS` in `src/lib/claims.js`. The notes are always visible (no disclosure), keeping the LAB sub-flow narrative at a glance rather than behind a tap.
-3. **7-step horizontal dot timeline** using `CLAIM_STATUSES`. Reached/current dots are filled in the tone colour with the same `shadow-[0_0_0_4px_rgb(255,242,221)]` glow on the current step that `InProgressCard` uses for its top-level timeline. Each reached step renders its date and time on two lines below the label, sourced from `claim.timeline[step.id]`.
+2. **7-step horizontal dot timeline** using `CLAIM_STATUSES`. Reached/current dots are filled in the tone colour with the same `shadow-[0_0_0_4px_rgb(255,242,221)]` glow on the current step that `InProgressCard` uses for its top-level timeline. Each reached step renders its date and time on two lines below the label, sourced from `claim.timeline[step.id]`.
+3. **Optional `See detailed tracking` dropdown**, rendered between the dot strip and the history thread when `claim.claimStatusId === 'in_transit'`. Mirrors the `HeroCard`'s outbound dropdown but in the light palette. Tapping the button expands a panel containing the courier strip (DHL chip + `order.courier` + `order.trackingNumber` + copy button) and a 4-step inverse-journey sub-timeline (`Picked up` → `Arrived at origin hub` → `In transit` → `Arrived at Revibe hub`). Sourced from `CLAIM_TRANSIT_SUB_STATUSES` in `src/lib/claims.js`; the current step is driven by `claim.transitSubStatusId` and timestamps come from `claim.transitSubTimeline`.
 4. **`History` thread** (`HistoryThread`) — a compact `History · N earlier events` toggle (chevron-rotated) that is **collapsed by default**. Expanding it reveals a vertical, minimalistic timeline of the order's past events (Placed → Cancellation requested / rejected → Delivered → Evidence resubmitted) derived in `src/lib/events.js` via `getHistoryEvents(order, 'claim')`. Rows render chronologically with the latest at the bottom; tapping a row opens a tone-tinted detail panel below the timeline (one open at a time). The active claim is the hero, so it never appears as a row.
 5. **Two-action footer:** `View claim details` (opens `ClaimDetailsSheet`) + icon-only `Download receipt` (decorative).
 
@@ -107,8 +104,9 @@ Filter counts reflect the same rules — an in-flight claim counts toward the `i
 - `claimToneFor(claimStatusId)` — tone mapping.
 - `claimProgressIndex` — auto-expand input (not yet wired into `pickActiveOrderId`).
 - `claimPhaseTag(claimStatusId)` — phase tag icon + label.
+- `CLAIM_TRANSIT_SUB_STATUSES` + `transitSubProgressIndex` — 4-stop inverse-journey sub-timeline rendered inside the `See detailed tracking` dropdown when `claimStatusId === 'in_transit'`.
 - Headline + sub-line resolution.
-- `SUB_STATUS_LABELS` — copy for sub-status inline notes.
+- `SUB_STATUS_LABELS` — copy registry for sub-statuses (see §4.2). Not currently rendered by `ClaimCard`; kept as the source of truth for ops/internal references and any future surface that exposes one of these branches inline.
 - `CLAIM_SLAS` — SLA placeholders (used by the returns flow's Step 4 "What happens next" timeline).
 - `actionGateCopy()` — banner copy for the three action gates.
 - Summary-label maps: `REASON_LABELS`, `RETURN_METHOD_LABELS`, `reasonText`, `devicePrepText`, `refundMethodLabel`.
@@ -250,6 +248,8 @@ The ship-back chain hangs off `under_qc` rather than `ready_for_refund`, because
 
 ### 4.2 Sub-status copy catalog (`SUB_STATUS_LABELS`)
 
+Registry only — no current `ClaimCard` surface renders these inline. Kept as the canonical copy source for ops references and any future surface that exposes one of these branches in the UI.
+
 | `subStatusId` | Headline | Subline | Tone |
 |---|---|---|---|
 | `awaiting_documents` | More info needed | "Revibe Quality asked for a clearer photo / longer video." | warn |
@@ -300,7 +300,7 @@ Track current actuals before promoting these to production.
 
 ## 5. Data model — `claim` object
 
-Optional object populated on a delivered order to drive `ClaimCard` and its takeover variants. Production will write this object when the returns flow's Step 6 submit is wired; today four orders carry hand-seeded claims: `89815` (`under_qc` with a rejected cancellation in history, In progress), `89200` (`refunded` with a rejected cancellation in history, Past orders), `89762` (`under_qc` + `expert_revision`, Issue flow, In progress). Plus takeover-card mocks: `89734` (DocsRejected), `89876` (PickupFailed), `89940` (InvalidClaim).
+Optional object populated on a delivered order to drive `ClaimCard` and its takeover variants. Production will write this object when the returns flow's Step 6 submit is wired; today three orders carry hand-seeded claims: `89815` (`in_transit` with a rejected cancellation in history and the `See detailed tracking` dropdown wired, In progress), `89200` (`refunded` with a rejected cancellation in history, Past orders), `89762` (`under_qc` baseline Issue claim, no sub-status, In progress). Plus takeover-card mocks: `89734` (DocsRejected), `89876` (PickupFailed), `89940` (InvalidClaim).
 
 ### 5.1 Core claim fields
 
@@ -319,12 +319,14 @@ Optional object populated on a delivered order to drive `ClaimCard` and its take
 | `claim.expectedRefund` | `{ gross, fee, bonus, net, rate }` | Pre-computed at submission so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. `bonus` is the optional Wallet bonus on issue claims (AED 100); `0` elsewhere. |
 | `claim.timeline` | map keyed by `claimStatusId` | Timestamp at which the claim entered each phase. Populated progressively. |
 
-### 5.2 Sub-status & detailed-timeline fields
+### 5.2 Sub-status, transit, & detailed-timeline fields
 
 | Field | Type | Notes |
 |---|---|---|
-| `claim.subStatusId` *(optional)* | enum | See §4.1. Today `ClaimCard` only acts on it for `expert_revision`. |
-| `claim.detailedTimeline` *(optional)* | map | Keyed by either a main `claimStatusId` or a `subStatusId`, with `{ startedAt }` per entry. Today only `claim.detailedTimeline.expert_revision.startedAt` is read — `ClaimCard` uses it as the completion timestamp of the past `Reviewing seller's response` callout. |
+| `claim.subStatusId` *(optional)* | enum | See §4.1. Not currently rendered inline by `ClaimCard`; reserved for takeover-card routing and any future inline surface. |
+| `claim.transitSubStatusId` *(optional)* | enum | One of `picked_up`, `arrived_origin_hub`, `in_transit`, `arrived_revibe_hub`. Drives the current dot in the `See detailed tracking` dropdown. Read only when `claim.claimStatusId === 'in_transit'`. |
+| `claim.transitSubTimeline` *(optional)* | map | Keyed by `transitSubStatusId` value, each entry a human-readable timestamp string (e.g. `'13 May · 3:42 PM'`). Renders below each reached step inside the dropdown. |
+| `claim.detailedTimeline` *(optional)* | map | Keyed by either a main `claimStatusId` or a `subStatusId`, with `{ startedAt }` per entry. Not currently consumed by `ClaimCard`; takeover cards use their own fields. |
 | `claim.actionRequired` *(optional)* | `{ kind, deadline, deadlineLabel, failedAt? }` | Drives the inline `ClaimActionBanner`. `kind` is one of `awaiting_documents`, `collection_failed`, `awaiting_payment`; `deadlineLabel` is the hand-written countdown ("2 days left"); `failedAt` is the pickup-failure timestamp used by the `collection_failed` body. |
 
 ### 5.3 Takeover-card extensions
@@ -365,7 +367,9 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 
 **`InvalidClaimCard` paid-state borrows `InProgressCard` chrome.** Once the customer has paid for the return shipment, the leg should read as a normal forward shipment — the same chrome family they recognise for fresh orders. Hiding the lineage (eyebrow `Order · #{id} · Return from Claim RET-{ref}`) is intentional but the eyebrow preserves the link back to the originating claim.
 
-**Inline sub-status notes (today: `expert_revision` only) replaced a `Show detailed tracking` disclosure.** Earlier iterations rendered a vertical sub-step timeline behind a tap. We removed the disclosure when usage data showed customers rarely opened it; surfacing the two adjacent sub-statuses (past `under_revision` + active `expert_revision`) above the dot strip carries the LAB-sub-flow narrative at a glance.
+**`See detailed tracking` dropdown for `in_transit`.** The 7-state dot strip says the device is between hubs but not where it is on that leg. Mirroring `HeroCard`'s outbound dropdown (light palette, 4 sub-stops, courier strip) reuses a pattern customers already recognise from the fulfilment side. The dropdown is gated strictly to `claimStatusId === 'in_transit'` for now — other statuses don't carry a courier sub-timeline yet, and surfacing an empty dropdown reads worse than not surfacing one at all.
+
+**Earlier sub-status callouts removed.** Previous iterations rendered a pair of stacked callouts above the dot strip when `subStatusId === 'expert_revision'` (past `Reviewing seller's response` + active `Expert inspection`). The pattern competed visually with the dot strip and only fired for a single sub-status, so we pulled it. The copy registry (`SUB_STATUS_LABELS`) stays in `src/lib/claims.js` as the canonical sub-status source.
 
 **`History` thread collapsed by default.** The chronological event trace adds depth but isn't where the customer's attention lands first. Keeping it collapsed under a `History · N earlier events` toggle preserves space for the active state.
 
@@ -381,12 +385,13 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 src/
 ├── lib/
 │   ├── claims.js                         CLAIM_STATUSES, claimToneFor, claimProgressIndex, claimPhaseTag,
+│   │                                     CLAIM_TRANSIT_SUB_STATUSES, transitSubProgressIndex,
 │   │                                     SUB_STATUS_LABELS, CLAIM_SLAS, actionGateCopy,
 │   │                                     REASON_LABELS, RETURN_METHOD_LABELS, reasonText, devicePrepText, refundMethodLabel,
 │   │                                     hasActiveClaim, isClaimRefunded
 │   └── events.js                         getHistoryEvents(order, 'claim') — builds the HistoryThread events
 └── components/
-    ├── ClaimCard.jsx                     7-state baseline expandable card; also hosts the SubStatusNote helper
+    ├── ClaimCard.jsx                     7-state baseline expandable card; hosts the ClaimTransitDetail dropdown helper
     ├── ClaimActionBanner.jsx             Inline warn banner above the dot strip when `claim.actionRequired` is set
     ├── ClaimDetailsSheet.jsx             Bottom sheet opened by ClaimCard's `View claim details` — Summary + Refund cards
     ├── DocsRejectedCard.jsx              Takeover: customer must re-upload faulty-product evidence
@@ -411,7 +416,7 @@ src/
 
 ## 9. Open questions
 
-- **Generalising the inline-notes gate.** Today the trigger is hardcoded to `subStatusId === 'expert_revision'`. Other QC sub-statuses with a non-trivial customer narrative (e.g. `ship_back_pending` / `ship_back_in_transit` showing return shipping after an invalid claim) would benefit from the same treatment but need their own data-shape additions (e.g. a `ship_back` tracking link or AWB).
+- **Reviving inline sub-status callouts on a need-by-need basis.** The previous `expert_revision` inline-notes pattern was pulled, but QC sub-statuses with a real customer narrative (e.g. `ship_back_pending` / `ship_back_in_transit`, or any future LAB sub-flow) may want a similar surface. If revived, fold it into the same registry-driven pattern rather than re-hardcoding a single sub-status.
 - **Delayed-without-deviation surfacing.** A claim that's late on a happy-path step (e.g. `in_transit` past expected + buffer) currently has no visible signal. Likely follow-up: a small delayed badge on the active dot in the horizontal strip, or a delayed subline on the hero.
 - **`DocsRejectedCard` vs `awaiting_documents`.** They cover the same operational state. Three options: (a) keep both, route by `claim.docsRejection` presence; (b) deprecate `DocsRejectedCard` and route everything through `ClaimCard` + `subStatusId: awaiting_documents` + `actionRequired`; (c) merge `claim.docsRejection` into `actionRequired`. Decision deferred — current scope keeps both. Recommended path is (b) once the new flow is validated.
 - **Telemetry hooks.** Production should fire events when (i) an action gate banner / takeover is shown, (ii) an action gate CTA is tapped.

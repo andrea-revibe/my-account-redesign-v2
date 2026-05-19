@@ -81,6 +81,21 @@ export function claimProgressIndex(claimStatusId) {
   return CLAIM_STATUSES.findIndex((s) => s.id === claimStatusId)
 }
 
+// Courier sub-steps for the device's return journey, surfaced inside the
+// `See detailed tracking` dropdown when `claim.claimStatusId === 'in_transit'`.
+// Inverse of the outbound `SHIPPING_SUB_STATUSES` in lib/statuses.js — the
+// device moves customer → origin hub → flight → Revibe hub.
+export const CLAIM_TRANSIT_SUB_STATUSES = [
+  { id: 'picked_up', label: 'Picked up' },
+  { id: 'arrived_origin_hub', label: 'Arrived at origin hub' },
+  { id: 'in_transit', label: 'In transit' },
+  { id: 'arrived_revibe_hub', label: 'Arrived at Revibe hub' },
+]
+
+export function transitSubProgressIndex(transitSubStatusId) {
+  return CLAIM_TRANSIT_SUB_STATUSES.findIndex((s) => s.id === transitSubStatusId)
+}
+
 export function hasActiveClaim(order) {
   return Boolean(order?.claim) && order.claim.claimStatusId !== 'refunded'
 }

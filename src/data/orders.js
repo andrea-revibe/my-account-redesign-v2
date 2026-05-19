@@ -346,10 +346,11 @@ export const ORDERS = [
       },
     },
   },
-  // ----- Layered mock: cancellation rejected → delivered → claim in QC.
-  // Exercises the new HistoryThread on the in-progress ClaimCard. The
-  // active hero is the under-QC claim; the history chips surface Order
-  // placed, Cancel rejected (danger tone), and Delivered.
+  // ----- Layered mock: cancellation rejected → delivered → claim in transit.
+  // Exercises the HistoryThread on the in-progress ClaimCard and the
+  // `See detailed tracking` dropdown driven by `claim.transitSubStatusId`
+  // + `claim.transitSubTimeline`. History chips surface Order placed,
+  // Cancel rejected (danger tone), and Delivered.
   // `cancellationTimeline.rejected` + `cancellationRejection` are the
   // optional fields powering the rejection chip's detail panel.
   {
@@ -398,7 +399,7 @@ export const ORDERS = [
     },
     claim: {
       claimRef: 'RETrXc1',
-      claimStatusId: 'under_qc',
+      claimStatusId: 'in_transit',
       type: 'change_of_mind',
       submittedAt: '12 May 2026 · 9:08 AM',
       units: 1,
@@ -416,18 +417,19 @@ export const ORDERS = [
         pending_collection: '12 May · 9:09 AM',
         under_collection: '13 May · 10:14 AM',
         in_transit: '13 May · 3:42 PM',
-        under_qc: '14 May · 11:05 AM',
       },
-      proofResubmission: {
-        at: '13 May · 8:12 PM',
-        fileCount: 3,
+      transitSubStatusId: 'in_transit',
+      transitSubTimeline: {
+        picked_up: '13 May · 10:14 AM',
+        arrived_origin_hub: '13 May · 1:22 PM',
+        in_transit: '13 May · 3:42 PM',
       },
     },
   },
-  // ----- Layered mock: delivered → Issue claim → QC escalated to lab.
-  // Exercises the expert_revision sub-step inside the under_qc parent,
-  // plus claim-type awareness (Issue flow). No action required; the long
-  // wait is the point. See docs/output/returns/claim_tracking.md § 4.
+  // ----- Layered mock: delivered → Issue claim → in QC.
+  // Plain Issue-flow happy-path variant: claim sits at `under_qc` with no
+  // sub-status / action gate. Useful for confirming the baseline claim
+  // card renders cleanly when nothing is escalated.
   {
     id: '89762',
     phone: '+971 50 559 5034',
@@ -466,7 +468,6 @@ export const ORDERS = [
     claim: {
       claimRef: 'Ex5lAb',
       claimStatusId: 'under_qc',
-      subStatusId: 'expert_revision',
       type: 'issue',
       submittedAt: '01 May 2026 · 10:00 AM',
       units: 1,
@@ -491,11 +492,6 @@ export const ORDERS = [
         under_collection: '4 May · 9:30 AM',
         in_transit: '4 May · 3:00 PM',
         under_qc: '8 May · 11:00 AM',
-      },
-      detailedTimeline: {
-        under_qc: { startedAt: '8 May · 11:00 AM' },
-        under_revision: { startedAt: '10 May · 2:00 PM' },
-        expert_revision: { startedAt: '13 May · 9:15 AM' },
       },
     },
   },

@@ -172,8 +172,8 @@ That doc carries:
 How the customer-facing UI surfaces backend state:
 
 - `claim.claimStatusId` drives the 7-state main timeline on `ClaimCard`. See [claim_tracking.md](./claim_tracking.md) §2.
-- `claim.subStatusId` (e.g. `expert_revision`, `collection_failed`, `awaiting_payment`) drives the inline sub-status notes and routing into takeover cards. See [claim_tracking.md](./claim_tracking.md) §4.
-- The LAB sub-flow (operational nodes n45–n51 for UAE/Other, omitted for ZA/SA) surfaces as the `expert_revision` sub-status inline note on `ClaimCard`.
+- `claim.subStatusId` (e.g. `expert_revision`, `collection_failed`, `awaiting_payment`) is recorded but is not currently surfaced inline by `ClaimCard`; specific values drive routing into takeover cards. See [claim_tracking.md](./claim_tracking.md) §4.
+- The LAB sub-flow (operational nodes n45–n51 for UAE/Other, omitted for ZA/SA) is tracked via `expert_revision` but does not currently surface on `ClaimCard`; the long wait is implicit in the parent `under_qc` step.
 
 ## 5. UX decisions
 
