@@ -35,9 +35,9 @@ No money changes hands. The customer keeps the same physical unit (or an identic
 | Step 5 — refund method | Two refund cards | Hidden — replaced by warranty terms confirm or repair-vs-replace preference |
 | Step 6 — review | Refund block | Replaced by "Expected return date" block |
 | Step 7 — confirmation | Refund timeline | Repaired-device return timeline |
-| Claim card | Tracks toward `refunded` terminal | Tracks toward `device_returned` terminal — a new claim status not currently in `CLAIM_STATUSES` |
+| Claim card | Tracks toward `refund_credited` terminal | Tracks toward `device_returned` terminal — a new claim status not currently in `CLAIM_STATUSES` |
 
-The biggest open question is what the post-`under_qc` chain looks like. Issue claims branch into either `ready_for_refund → refunded` (valid) or `invalid_confirmed → ship-back` (invalid). Warranty claims would likely have:
+The biggest open question is what the post-`qc` chain looks like. Issue claims branch into either `refund_issued → refund_credited` (valid) or `invalid_confirmed → ship-back` (invalid). Warranty claims would likely have:
 
 - **Valid warranty case** → `repair_in_progress` → `ship_back_pending` → `ship_back_in_transit` → `ship_back_delivered` (terminal).
 - **Out-of-warranty case** → similar to today's invalid-claim chain (`InvalidClaimCard` takeover — customer pays return shipping if they want the device back).
@@ -51,7 +51,7 @@ The biggest open question is what the post-`under_qc` chain looks like. Issue cl
 - Step 6 needs a new summary section + a "Submit warranty request" CTA copy variant.
 - Step 7 needs a new next-steps list (repair timeline, no refund destination).
 - `lib/claims.js` needs a new claim type label (`claimTypeLabel('warranty')`).
-- `CLAIM_STATUSES` likely gains `repair_in_progress` and a `device_returned` terminal — or warranty piggybacks the existing `under_qc` sub-status chain.
+- `CLAIM_STATUSES` likely gains `repair_in_progress` and a `device_returned` terminal — or warranty piggybacks the existing `qc` sub-status chain.
 
 ### 2.4 UX considerations
 
@@ -75,7 +75,7 @@ The customer reports a problem but **keeps the device**. Likely sub-cases:
 | Device pickup | Always required (Step 4) | **Not required** — the customer keeps the device |
 | Device prep (Step 3) | Required (factory reset or credentials) | **Not required** |
 | Refund math | Computed on `gross` | Computed on a sub-amount (shipping fee, accessory price) |
-| Operational flow | Country routing → collection → QC → refund | Goes straight to `ready_for_refund` (or to an agent-review state) |
+| Operational flow | Country routing → collection → QC → refund | Goes straight to `refund_issued` (or to an agent-review state) |
 
 This is the simplest of the three stubbed branches *structurally* — it skips Steps 3 and 4 entirely — but the hardest to scope, because the compensation amount and approval rules are case-by-case.
 
@@ -106,12 +106,12 @@ No new fields required to *stub* these branches — Step 1 just renders an inlin
 | `claim.compensationDetails` *(compensation only)* | `{ subtype, description, attachmentName, amountClaimed }` | Step 2 compensation intake |
 | `claim.expectedRefund` | (existing shape) | Reused; for warranty the `net` would be `0` and the UI would suppress the refund row |
 
-`CLAIM_STATUSES` likely gains `repair_in_progress` and a `device_returned` terminal for the warranty branch; the compensation branch can likely reuse `under_qc` → `ready_for_refund` → `refunded` as-is.
+`CLAIM_STATUSES` likely gains `repair_in_progress` and a `device_returned` terminal for the warranty branch; the compensation branch can likely reuse `qc` → `refund_issued` → `refund_credited` as-is.
 
 ## 5. Open questions
 
 - **Single warranty branch or sub-branched?** Warranty coverage varies (manufacturer's warranty / Revibe Care add-on / extended warranty). The flow could collapse to one branch with the source determined backend-side, or split at Step 2 like the change-of-mind / issue divergence.
-- **Compensation approval gate.** Whether the agent review is a hard gate (claim doesn't even reach `pending_collection` without it) or a soft gate (the claim moves forward and the agent intervenes for fraud detection).
+- **Compensation approval gate.** Whether the agent review is a hard gate (claim doesn't even reach `pickup` without it) or a soft gate (the claim moves forward and the agent intervenes for fraud detection).
 - **Replace vs refund on faulty accessory.** Does the customer choose, or does the agent dictate based on stock?
 - **Pickup-less claims and `pickupDetails`.** The compensation branch skips Step 4. Does `claim.pickupDetails` stay as a required field on the claim object (filled with the order's defaults so the operational flow is uniform), or does it become optional? Cleaner shape vs ops-pipeline uniformity — pick one.
 - **History thread on a compensation claim.** With no pickup or device prep, the history is shorter. The `HistoryThread` mode may need a `'compensation'` variant.

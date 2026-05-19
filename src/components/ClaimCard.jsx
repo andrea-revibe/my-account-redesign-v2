@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import {
   ChevronDown,
   Check,
+  Copy,
   Download,
   Wallet,
   CreditCard,
+  CalendarClock,
+  MapPin,
 } from 'lucide-react'
 import {
   CLAIM_STATUSES,
-  SUB_STATUS_LABELS,
+  CLAIM_TRANSIT_SUB_STATUSES,
   claimToneFor,
   claimProgressIndex,
   claimPhaseTag,
@@ -16,6 +19,7 @@ import {
   claimStatusSubline,
   claimTypeLabel,
   refundMethodLabel,
+  transitSubProgressIndex,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
@@ -72,18 +76,12 @@ export default function ClaimCard({ order, defaultExpanded = false }) {
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Claim progress
             </div>
-            {claim.subStatusId === 'expert_revision' && (
-              <div className="mb-3 flex flex-col gap-2">
-                <SubStatusNote
-                  subStatusId="under_revision"
-                  state="past"
-                  completedAt={claim.detailedTimeline?.expert_revision?.startedAt}
-                />
-                <SubStatusNote subStatusId="expert_revision" state="current" />
-              </div>
-            )}
             <ClaimProgressDots claim={claim} tone={tone} />
           </div>
+
+          {Boolean(claim.transitSubTimeline?.picked_up) && (
+            <ClaimTransitDetail claim={claim} order={order} />
+          )}
 
           {(() => {
             const history = getHistoryEvents(order, 'claim')
@@ -143,10 +141,12 @@ function StatePill({ claim, tone }) {
 function ClaimHero({ order, claim, tone }) {
   const t = TONE[tone]
   const phase = claimPhaseTag(claim.claimStatusId)
-  const isRefunded = claim.claimStatusId === 'refunded'
+  const isRefunded = claim.claimStatusId === 'refund_credited'
   const isWallet = claim.refundMethod === 'wallet'
   const headline = claimStatusHeadline(claim)
   const subline = claimStatusSubline(claim)
+  const showScheduledPickup =
+    claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup)
 
   return (
     <div className={`rounded-[14px] border p-3.5 ${t.heroBg} ${t.border}`}>
@@ -178,6 +178,14 @@ function ClaimHero({ order, claim, tone }) {
         )}
       </div>
 
+      {showScheduledPickup && (
+        <ScheduledPickupStrip
+          scheduledPickup={claim.scheduledPickup}
+          pickupDetails={claim.pickupDetails}
+          toneText={t.text}
+        />
+      )}
+
       <div className="mt-3 pt-3 border-t border-line-2/70 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
@@ -194,6 +202,44 @@ function ClaimHero({ order, claim, tone }) {
           {order.currency} {claim.expectedRefund.net.toLocaleString()}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText }) {
+  const { date, slot } = scheduledPickup || {}
+  const address = pickupDetails?.address
+  return (
+    <div className="mt-3 pt-3 border-t border-line-2/70 flex flex-col gap-1.5">
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+        Scheduled pickup
+      </div>
+      <div className="flex items-start gap-1.5 text-[12px] text-ink-2">
+        <CalendarClock
+          size={13}
+          strokeWidth={2}
+          className={`${toneText} shrink-0 mt-px`}
+        />
+        <span className="font-semibold leading-[1.3]">
+          {date}
+          {slot && (
+            <>
+              <span className="text-muted/60 font-normal"> · </span>
+              {slot}
+            </>
+          )}
+        </span>
+      </div>
+      {address && (
+        <div className="flex items-start gap-1.5 text-[11.5px] text-ink-2/90">
+          <MapPin
+            size={12}
+            strokeWidth={2}
+            className="text-ink-2/70 shrink-0 mt-px"
+          />
+          <span className="truncate">{address}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -256,51 +302,117 @@ function ProductRow({ order, expanded }) {
   )
 }
 
-function SubStatusNote({ subStatusId, state, completedAt }) {
-  const copy = SUB_STATUS_LABELS[subStatusId]
-  if (!copy) return null
-  const isPast = state === 'past'
-  const wrapClass = isPast
-    ? 'rounded-[10px] border border-line bg-line-2/60 px-3 py-2'
-    : 'rounded-[10px] border border-brand-bg2 bg-brand-bg px-3 py-2.5'
-  const headlineClass = isPast
-    ? 'text-[12px] font-semibold text-ink-2 leading-tight'
-    : 'text-[12.5px] font-bold text-brand leading-tight'
-  const sublineClass = isPast
-    ? 'text-[11px] text-muted leading-snug'
-    : 'text-[11.5px] text-ink-2 leading-snug'
-  const dayLabel = isPast && completedAt ? shortDay(completedAt) : null
+function ClaimTransitDetail({ claim, order }) {
+  const [show, setShow] = useState(false)
+  const cur = transitSubProgressIndex(claim.transitSubStatusId)
+
   return (
-    <div className={wrapClass}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {isPast ? (
-            <span
-              aria-hidden
-              className="w-3.5 h-3.5 rounded-full bg-success grid place-items-center shrink-0"
-            >
-              <Check size={8} strokeWidth={3} className="text-white" />
-            </span>
-          ) : (
-            <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-brand shrink-0" />
+    <div className="px-1">
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        aria-expanded={show}
+        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-[10px] border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-line-2"
+      >
+        <span>{show ? 'Hide detailed tracking' : 'See detailed tracking'}</span>
+        <ChevronDown
+          size={16}
+          strokeWidth={1.75}
+          className={`text-ink-2 transition-transform ${show ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {show && (
+        <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
+          {(order.courier || order.trackingNumber) && (
+            <TransitCourierStrip order={order} />
           )}
-          <span className={`${headlineClass} truncate`}>{copy.headline}</span>
+          {CLAIM_TRANSIT_SUB_STATUSES.map((s, i) => (
+            <TransitSubItem
+              key={s.id}
+              label={s.label}
+              timestamp={claim.transitSubTimeline?.[s.id]}
+              state={
+                i < cur ? 'done' : i === cur ? 'current' : 'future'
+              }
+              isLast={i === CLAIM_TRANSIT_SUB_STATUSES.length - 1}
+            />
+          ))}
         </div>
-        {dayLabel && (
-          <span className="text-[10px] tabular-nums text-muted shrink-0">
-            {dayLabel}
-          </span>
-        )}
-      </div>
-      <div className={`mt-1 ${sublineClass}`}>{copy.subline}</div>
+      )}
     </div>
   )
 }
 
-function shortDay(displayDate) {
-  if (!displayDate) return ''
-  const idx = displayDate.indexOf(' · ')
-  return idx > 0 ? displayDate.slice(0, idx) : displayDate
+function TransitCourierStrip({ order }) {
+  return (
+    <div className="flex items-center gap-2.5 p-2.5 mb-3 rounded-[10px] border border-line bg-surface">
+      <span className="w-9 h-7 rounded-md grid place-items-center text-[11px] font-extrabold tracking-[0.04em] bg-[#ffcc00] text-[#1a1a1a] shrink-0">
+        DHL
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-semibold text-ink truncate">
+          {order.courier || 'Courier'}
+        </div>
+        {order.trackingNumber && (
+          <div className="text-[11.5px] text-muted mt-px tabular-nums truncate">
+            Tracking #{order.trackingNumber}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        aria-label="Copy tracking number"
+        onClick={() =>
+          order.trackingNumber &&
+          navigator.clipboard?.writeText(order.trackingNumber)
+        }
+        className="w-8 h-8 rounded-lg grid place-items-center border border-line text-ink-2 hover:bg-line-2 shrink-0"
+      >
+        <Copy size={14} strokeWidth={1.75} />
+      </button>
+    </div>
+  )
+}
+
+function TransitSubItem({ label, timestamp, state, isLast }) {
+  const done = state === 'done'
+  const current = state === 'current'
+  return (
+    <div className="flex gap-3 items-start">
+      <div className="w-[18px] flex flex-col items-center self-stretch">
+        <span
+          className={`w-[14px] h-[14px] rounded-full border-2 grid place-items-center shrink-0 ${
+            done || current
+              ? 'bg-brand border-brand text-white'
+              : 'bg-surface border-line text-muted'
+          } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
+        >
+          {done && <Check size={9} strokeWidth={3} />}
+        </span>
+        {!isLast && (
+          <span
+            className={`flex-1 w-[2px] mt-0.5 ${done ? 'bg-brand' : 'bg-line'}`}
+          />
+        )}
+      </div>
+      <div className={`flex-1 ${isLast ? 'pb-1' : 'pb-3'}`}>
+        <div
+          className={`text-[13px] ${
+            current
+              ? 'text-ink font-bold'
+              : done
+                ? 'text-ink'
+                : 'text-muted'
+          }`}
+        >
+          {label}
+        </div>
+        {timestamp && (
+          <div className="text-[11px] text-muted mt-px tabular-nums">{timestamp}</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function ClaimProgressDots({ claim, tone }) {

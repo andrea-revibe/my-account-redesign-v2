@@ -1,8 +1,14 @@
 # Claim detailed tracking
 
-> **Reference tables have moved.** The canonical reference for the sub-status enum (§ 4.1), sub-status copy catalog (§ 5), action-gate copy (§ 6), and SLA placeholders (§ 4.3) now lives in [returns/claim_tracking.md](./returns/claim_tracking.md) § 4. **This file is design history** — the original proposal for the deprecated `Show detailed tracking` disclosure, kept for context on why the current inline-notes shape was chosen.
+> **Reference tables have moved.** The canonical reference for the sub-status enum (§ 4.1), sub-status copy catalog (§ 5), action-gate copy (§ 6), and SLA placeholders (§ 4.3) now lives in [returns/claim_tracking.md](./returns/claim_tracking.md) § 4. **This file is design history** — the original proposal for the deprecated `Show detailed tracking` disclosure, kept for the trail of reasoning behind two failed iterations.
 >
-> **Status (phase 31).** The "Show detailed tracking" disclosure and the vertical timeline that backed it have been removed. Branch sub-steps are now surfaced as inline notes directly above the dot strip — see § 3 and § 7 for the current shape. Today only `expert_revision` renders the inline notes. The "delayed treatment" (§ 7.3), the future-step preview (§ 7.4), and the `detailedSteps()` / `isStepDelayed()` / `expectedByFor()` helpers (§ 4.3, § 8) no longer exist in code.
+> **Status-enum note.** All status ids referenced below (`claim_created`, `pending_collection`, `under_collection`, `in_transit`, `under_qc`, `ready_for_refund`, `refunded`) belong to the legacy 7-state pipeline. The customer-facing pipeline was consolidated to 5 states in May 2026 — `initiated`, `pickup`, `qc`, `refund_issued`, `refund_credited`. See [returns/claim_tracking.md](./returns/claim_tracking.md) § 1 for the mapping. The reasoning below still reads correctly against the legacy enum; treat status names as historical when reviewing.
+>
+> **Current state.** `ClaimCard` no longer surfaces QC sub-statuses inline. Two iterations both ended up pulled:
+> 1. Phase 28: a `Show detailed tracking` disclosure backed by a vertical timeline + `detailedSteps()` / `isStepDelayed()` / `expectedByFor()` helpers (§ 4.3, § 8). Removed in phase 31 — usage data showed customers rarely opened it.
+> 2. Phase 31: an always-visible pair of inline callouts above the dot strip when `subStatusId === 'expert_revision'` (past `Reviewing seller's response` + active `Expert inspection`). Removed in phase 33 — competed visually with the dot strip and only fired for a single sub-status.
+>
+> The `SUB_STATUS_LABELS` copy registry survives in `src/lib/claims.js` for ops reference. The `See detailed tracking` dropdown that ships today is unrelated — it's a courier sub-timeline gated on `claim.transitSubTimeline?.picked_up` being set (i.e. the courier has scanned the device), not a QC-sub-flow surface.
 >
 > Original framing kept below for reference: proposal for surfacing branch-specific sub-steps, per-step ETAs, and customer-action gates inside `ClaimCard`. Designed to reduce two flavours of inbound support call: "I expected this by now" and "I'm waiting on something but didn't realise it was on me."
 
