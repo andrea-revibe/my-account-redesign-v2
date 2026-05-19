@@ -170,9 +170,10 @@ stateDiagram-v2
 
 **Expanded (failed state).** Same hero but the courier message expands into a full attributed block (avatar with `opsName` initial — typically the courier's first name). Below the header:
 
-1. **`Pickup address`** — read-only confirmation card showing the saved pickup address + phone + email from `claim.pickupDetails`. A stub `Edit` link is wired but inert. The product decision is "address confirm only" — no slot picker, no note field — so the intent is to give the customer a chance to verify the address before re-dispatching.
-2. **Confirm summary line** — single sentence preview of what confirming creates: courier + scheduled slot (driven by `claim.pickupFailure.nextPickup`).
-3. **Footer** — `Cancel claim` (visual stub) + `Confirm new pickup` (solid danger-red primary action). Confirm is always enabled; the confirmation step itself is the gate.
+1. **`Pickup address` card** — address + phone + email block carrying the saved values from `claim.pickupDetails`. Read-only by default; when the customer taps the `Change pickup address` button below it, the card flips into an inline edit mode (three input fields stacked with Save / Cancel beneath). Save commits the next values back to local component state and exits edit mode; Cancel discards the draft. Local state only — the change does not propagate back to the order data. Mirrors `InvalidClaimCard`'s `Delivery details` card.
+2. **`Change pickup address` button** — solid border-brand outline, Settings2 glyph. Hidden while the pickup-address card is in edit mode.
+3. **Confirm summary line** — single sentence preview of what confirming creates: courier + scheduled slot (driven by `claim.pickupFailure.nextPickup`).
+4. **Footer** — `Cancel claim` (visual stub) + `Confirm new pickup` (solid danger-red primary action). Confirm is always enabled; the confirmation step itself is the gate.
 
 **Submitted state.** Tapping `Confirm new pickup` flips the card to a warn-toned variant: amber accent strip, pulsing `Pickup rescheduled` pill, `New AWB created` phase tag, `Your new pickup is on the way` headline, body that names the courier + slot + new AWB. Expanded shows a `Your new pickup` summary block (courier, AWB, slot, pickup-from address) followed by an `Undo · replay the demo` button.
 

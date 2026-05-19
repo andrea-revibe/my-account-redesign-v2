@@ -6,6 +6,7 @@ import {
   Clock,
   MapPin,
   RotateCcw,
+  Settings2,
   Truck,
 } from 'lucide-react'
 
@@ -20,6 +21,8 @@ const REVIBE_CARE_ICON =
 export default function PickupFailedCard({ order, defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [confirmed, setConfirmed] = useState(false)
+  const [details, setDetails] = useState(order.claim.pickupDetails)
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     setExpanded(defaultExpanded)
@@ -29,6 +32,7 @@ export default function PickupFailedCard({ order, defaultExpanded = false }) {
     return (
       <PickupRescheduledCard
         order={order}
+        details={details}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
         onUndo={() => setConfirmed(false)}
@@ -109,7 +113,29 @@ export default function PickupFailedCard({ order, defaultExpanded = false }) {
 
       {expanded && (
         <div className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3.5 animate-slideDown">
-          <PickupAddressCard claim={claim} />
+          <PickupAddressCard
+            details={details}
+            editing={editing}
+            onSave={(next) => {
+              setDetails(next)
+              setEditing(false)
+            }}
+            onCancel={() => setEditing(false)}
+          />
+
+          {!editing && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditing(true)
+              }}
+              className="h-[42px] rounded-[10px] bg-surface border border-brand text-brand font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5"
+            >
+              <Settings2 size={15} strokeWidth={1.75} />
+              Change pickup address
+            </button>
+          )}
 
           <div className="rounded-[10px] bg-surface border border-line px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
             Confirming creates a new AWB with{' '}
@@ -143,10 +169,11 @@ export default function PickupFailedCard({ order, defaultExpanded = false }) {
   )
 }
 
-function PickupRescheduledCard({ order, expanded, onToggle, onUndo }) {
+function PickupRescheduledCard({ order, details, expanded, onToggle, onUndo }) {
   const claim = order.claim
   const f = claim.pickupFailure
   const next = f.nextPickup
+  const pickupDetails = details || claim.pickupDetails
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2 animate-fadeIn">
@@ -201,7 +228,7 @@ function PickupRescheduledCard({ order, expanded, onToggle, onUndo }) {
 
       {expanded && (
         <div className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3 animate-slideDown">
-          <NewPickupSummary next={next} pickupDetails={claim.pickupDetails} />
+          <NewPickupSummary next={next} pickupDetails={pickupDetails} />
 
           {/* Demo only — production rescheduling is committal once a new
               AWB is created. Kept here so reviewers can replay the
@@ -263,32 +290,102 @@ function CountdownStrip({ failure }) {
   )
 }
 
-function PickupAddressCard({ claim }) {
-  const p = claim.pickupDetails
+// Mirrors InvalidClaimCard's DeliveryDetailsCard: read-only by default,
+// flips to an inline edit form when `editing` is true (Address / Phone /
+// Email inputs + Save / Cancel beneath). Local state only — Save commits
+// the next values back to the parent's `details` state.
+function PickupAddressCard({ details, editing, onSave, onCancel }) {
+  const [draft, setDraft] = useState(details)
+
+  useEffect(() => {
+    if (editing) setDraft(details)
+  }, [editing, details])
+
+  const updateField = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }))
+
   return (
     <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
-      <div className="px-3.5 py-2.5 flex items-center justify-between bg-line-2/30 border-b border-line">
-        <div className="flex items-center gap-2">
-          <MapPin size={13} strokeWidth={2} className="text-muted" />
-          <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink">
-            Pickup address
-          </span>
-        </div>
-        <button
-          type="button"
+      <div className="px-3.5 py-2.5 flex items-center gap-2 bg-line-2/30 border-b border-line">
+        <MapPin size={13} strokeWidth={2} className="text-muted" />
+        <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink">
+          Pickup address
+        </span>
+      </div>
+      {editing ? (
+        <div
+          className="px-3.5 py-3 flex flex-col gap-3"
           onClick={(e) => e.stopPropagation()}
-          className="text-[11px] font-semibold text-brand hover:underline"
         >
-          Edit
-        </button>
-      </div>
-      <div className="px-3.5 py-3 flex flex-col gap-1">
-        <div className="text-[13px] font-semibold text-ink leading-snug">{p.address}</div>
-        <div className="text-[11.5px] text-muted">
-          {p.phone} · {p.email}
+          <EditableField
+            label="Address"
+            value={draft.address}
+            onChange={(v) => updateField('address', v)}
+            multiline
+          />
+          <EditableField
+            label="Phone number"
+            value={draft.phone}
+            onChange={(v) => updateField('phone', v)}
+          />
+          <EditableField
+            label="Email"
+            value={draft.email}
+            onChange={(v) => updateField('email', v)}
+            type="email"
+          />
+          <div className="flex gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 h-[38px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] hover:bg-line-2"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => onSave(draft)}
+              className="flex-1 h-[38px] rounded-[10px] bg-brand text-white font-semibold text-[12.5px] hover:opacity-90"
+            >
+              Save
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="px-3.5 py-3 flex flex-col gap-1">
+          <div className="text-[13px] font-semibold text-ink leading-snug">{details.address}</div>
+          <div className="text-[11.5px] text-muted">
+            {details.phone} · {details.email}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function EditableField({ label, value, onChange, multiline = false, type = 'text' }) {
+  const baseClass =
+    'w-full rounded-[8px] border border-line bg-surface px-3 py-2 text-[12.5px] text-ink leading-snug focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30'
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted">
+        {label}
+      </span>
+      {multiline ? (
+        <textarea
+          rows={2}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={baseClass + ' resize-none'}
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={baseClass}
+        />
+      )}
+    </label>
   )
 }
 
