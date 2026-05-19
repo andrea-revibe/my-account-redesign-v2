@@ -86,18 +86,36 @@ export default function JourneyDevPanel({
           Journey complete
         </div>
       ) : (
-        nexts.map((node) => (
-          <button
-            key={node.id}
-            onClick={() => advance(node.id)}
-            className="w-full flex items-start justify-between gap-2 px-3 py-2.5 rounded-xl bg-brand text-white text-[13px] font-semibold hover:bg-brand/90 transition mb-2"
-          >
-            <span className="flex-1 text-left whitespace-normal break-words">
-              Next: {node.label}
-            </span>
-            <ChevronRight size={16} strokeWidth={2.25} className="mt-0.5 shrink-0" />
-          </button>
-        ))
+        nexts.map((node) => {
+          const isCustomer = node.trigger === 'customer'
+          return (
+            <button
+              key={node.id}
+              onClick={() => advance(node.id)}
+              className={
+                'w-full flex items-start justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition mb-2 ' +
+                (isCustomer
+                  ? 'bg-surface text-brand border border-brand hover:bg-brand/5'
+                  : 'bg-brand text-white hover:bg-brand/90')
+              }
+            >
+              <span className="flex-1 text-left whitespace-normal break-words">
+                {isCustomer && (
+                  <span
+                    className={
+                      'inline-block mr-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-[0.06em] align-[2px] ' +
+                      'bg-brand/10 text-brand'
+                    }
+                  >
+                    via UI
+                  </span>
+                )}
+                Next: {node.label}
+              </span>
+              <ChevronRight size={16} strokeWidth={2.25} className="mt-0.5 shrink-0" />
+            </button>
+          )
+        })
       )}
 
       <button

@@ -121,6 +121,19 @@ export default function App() {
     window.history.replaceState({}, '', url)
   }
 
+  // Customer-triggered journey advance from the real cancel sheet.
+  // Sheet's `method` ids (store_credit / original) map to the journey's
+  // refund-branch suffix (wallet / card). Guarded by validNext so an
+  // out-of-sequence submit silently no-ops instead of corrupting the path.
+  const handleCancelOrder = ({ method }) => {
+    if (!journeyMode) return
+    const branch = method === 'store_credit' ? 'wallet' : 'card'
+    const target = `cancellation_requested_${branch}`
+    if (journey.validNext().some((n) => n.id === target)) {
+      journey.advance(target)
+    }
+  }
+
   const projectedOrders = useMemo(
     () =>
       journeyMode
@@ -231,13 +244,20 @@ export default function App() {
                       return <PastOrderCard key={o.id} order={o} />
                     }
                     if (o.statusId === 'created' || o.statusId === 'quality_check') {
-                      return <InProgressCard key={o.id} order={o} />
+                      return (
+                        <InProgressCard
+                          key={o.id}
+                          order={o}
+                          onCancelOrder={handleCancelOrder}
+                        />
+                      )
                     }
                     return (
                       <OrderCard
                         key={o.id}
                         order={o}
                         defaultExpanded={!showHero && o.id === activeId}
+                        onCancelOrder={handleCancelOrder}
                       />
                     )
                   })}

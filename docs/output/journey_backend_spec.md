@@ -344,7 +344,7 @@ The gate matters: without `validNext().some(...)`, an out-of-sequence submit (ca
 
 ### 6.3 Worked example — cancel sheet ↔ `cancellation_requested_*`
 
-Current state of `CancelOrderSheet`: `{ order, open, onClose }` props, Step 3 confirm is `onConfirm={onClose}` (pure stub). Refund-method ids inside the sheet are `store_credit` / `original` — map to `wallet` / `card` at the wiring layer.
+**Implemented.** `CancelOrderSheet` exposes `onSubmit({ method })` (props: `{ order, open, onClose, onSubmit }`); Step 3's Cancel button fires `onSubmit({ method })` then `onClose()`. The sheet is hosted by both `InProgressCard` and `OrderCard` via an optional `onCancelOrder` prop. `App.jsx`'s `handleCancelOrder` maps the sheet's refund-method ids `store_credit` / `original` to journey-branch suffix `wallet` / `card`, gates on `journey.validNext()`, and early-returns in non-journey mode.
 
 | Sheet outcome | Journey node fired |
 |---|---|
@@ -358,10 +358,10 @@ The `Continue to cancel` button on the Step 2 dissuade screen is **not** a submi
 
 Two stances; default permissive:
 
-- **Permissive (current)** — the dev panel renders Next buttons for every valid transition, including `customer`-triggered ones. Customer flows can be driven either from the panel (shortcut) or from the real UI (full demo). Useful when iterating quickly.
-- **Strict** — hide Next buttons whose node's `trigger === 'customer'` so the only way to advance is through the real surface. Reads cleaner as a backend-spec document (the panel becomes "system event simulator" only), at the cost of slower stakeholder demos.
+- **Permissive (current)** — the dev panel renders Next buttons for every valid transition, including `customer`-triggered ones. Customer flows can be driven either from the panel (shortcut) or from the real UI (full demo). Useful when iterating quickly. Customer-triggered Next buttons render outlined (white bg, brand border/text) with a small `via UI` chip; system-triggered keep the solid brand fill — the style itself flags that the real surface is the canonical path.
+- **Strict** — hide Next buttons whose node's `trigger === 'customer'` entirely so the only way to advance is through the real surface. Reads cleaner as a backend-spec document (the panel becomes "system event simulator" only), at the cost of slower stakeholder demos.
 
-Switching modes is a `trigger === 'customer' && !showCustomerButtons` filter in `JourneyDevPanel.jsx`'s `nexts` render — a couple of lines. Revisit once 3+ customer-triggered nodes exist across journeys.
+Switching to strict is a `trigger === 'customer' && !showCustomerButtons` filter in `JourneyDevPanel.jsx`'s `nexts` render — a couple of lines on top of today's outlined treatment. Revisit once 3+ customer-triggered nodes exist across journeys.
 
 ### 6.5 Future evolution — event-dispatch
 

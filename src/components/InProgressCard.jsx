@@ -28,7 +28,7 @@ const STATE_ICONS = {
   quality_check: ShieldCheck,
 }
 
-export default function InProgressCard({ order, defaultExpanded = false }) {
+export default function InProgressCard({ order, defaultExpanded = false, onCancelOrder }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [cancelOpen, setCancelOpen] = useState(false)
   useEffect(() => {
@@ -100,6 +100,7 @@ export default function InProgressCard({ order, defaultExpanded = false }) {
         order={order}
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
+        onSubmit={onCancelOrder}
       />
     </article>
   )

@@ -10,7 +10,7 @@ const REVIBE_CARE_ICON =
 // waiver still has meaning; shipped/delivered cancellations skip it.
 const DISSUADE_STATUSES = new Set(['created', 'quality_check'])
 
-export default function CancelOrderSheet({ order, open, onClose }) {
+export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
   const [step, setStep] = useState('select')
   const [method, setMethod] = useState(null)
   const dissuadeEligible = DISSUADE_STATUSES.has(order.statusId)
@@ -103,7 +103,10 @@ export default function CancelOrderSheet({ order, open, onClose }) {
               }
             }}
             onClose={onClose}
-            onConfirm={onClose}
+            onConfirm={() => {
+              onSubmit?.({ method })
+              onClose()
+            }}
             total={total}
             fee={fee}
             refundOriginal={refundOriginal}
