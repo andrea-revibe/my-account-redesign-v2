@@ -27,8 +27,8 @@ flowchart TD
   entry([Tap 'Raise a claim' on delivered PastOrderCard]) --> s1[Step 1 — Claim type]
   s1 -->|I changed my mind| com[/Change-of-mind branch — see change_of_mind.md/]
   s1 -->|Something's wrong with my device → Return for refund/replacement| s2[Step 2 — Issue details]
-  s1 -->|Use my warranty| stub1[/Stub — see warranties_compensations.md/]
-  s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md/]
+  s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
+  s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
   s2 -->|Scope + sub-issue + description + attachment| s3[Step 3 — Device prep]
   s3 -->|Reset confirmed OR credentials provided| s4[Step 4 — Pickup details]
   s4 -->|3 fields confirmed + checkbox| s5[Step 5 — Refund method]
@@ -190,7 +190,7 @@ src/components/ClaimFlow/
 
 ## 8. Mocked vs production
 
-- **Step 6 submit is a no-op.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8.
+- **Step 6 submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
 - **Attachment slot is fake.** Clicking the drop-zone stubs in a filename. No real file picker, no upload endpoint, no file-type/size validation.
 - **AED 100 bonus is hardcoded** as `ISSUE_WALLET_BONUS` in `src/lib/returns.js`. Production should read from a backend config (per-order or per-category).
 - **Sub-issue guidance copy is hardcoded** in `issueSubtypes.js`. Production should source from a content management system so non-engineers can revise.

@@ -1,12 +1,14 @@
-import { TOTAL_STEPS } from './flowReducer'
+import { visibleStepCount, visibleStepIndex } from './flowReducer'
 
-export default function ProgressBar({ step }) {
+export default function ProgressBar({ step, claimType }) {
+  const total = visibleStepCount(claimType)
+  const current = visibleStepIndex(step, claimType)
   return (
     <div className="px-4 pb-3">
       <div className="flex gap-1">
-        {Array.from({ length: TOTAL_STEPS }, (_, i) => {
+        {Array.from({ length: total }, (_, i) => {
           const idx = i + 1
-          const reached = idx <= step
+          const reached = idx <= current
           return (
             <span
               key={idx}
@@ -18,7 +20,7 @@ export default function ProgressBar({ step }) {
         })}
       </div>
       <div className="mt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
-        Step {step} of {TOTAL_STEPS}
+        Step {current} of {total}
       </div>
     </div>
   )

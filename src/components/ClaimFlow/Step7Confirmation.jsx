@@ -1,18 +1,30 @@
 import { useState } from 'react'
-import { CheckCircle2, Copy, Check, Mail, Clock, ShieldCheck } from 'lucide-react'
+import {
+  CheckCircle2,
+  Copy,
+  Check,
+  Mail,
+  Clock,
+  ShieldCheck,
+  Wrench,
+} from 'lucide-react'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
-import { claimTypeLabel } from '../../lib/claims'
+import { claimTypeLabel, expectedCompletionFor } from '../../lib/claims'
 
 export default function Step7Confirmation({ state, order, onClose }) {
   const [copied, setCopied] = useState(false)
   if (!order) return null
-  const refund = refundBreakdown(
-    order,
-    state.units,
-    state.refundMethod,
-    state.claimType,
-  )
+  const isWarranty = state.claimType === 'warranty'
+  const refund = isWarranty
+    ? null
+    : refundBreakdown(
+        order,
+        state.units,
+        state.refundMethod,
+        state.claimType,
+      )
   const currency = order.currency
+  const warrantyEta = isWarranty ? expectedCompletionFor('warranty') : null
   const timeline =
     state.refundMethod === 'wallet'
       ? 'Lands in your Revibe Wallet within 1 hour once return is complete.'
@@ -35,7 +47,9 @@ export default function Step7Confirmation({ state, order, onClose }) {
           <CheckCircle2 size={32} strokeWidth={1.75} className="text-success" />
         </div>
         <h1 className="m-0 text-[24px] leading-[1.15] font-bold text-ink tracking-[-0.01em]">
-          Your return request is in
+          {isWarranty
+            ? 'Your warranty claim is in'
+            : 'Your return request is in'}
         </h1>
         <div className="mt-3 inline-flex items-center rounded-full bg-brand-bg text-brand font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px]">
           {claimTypeLabel(state.claimType)}
@@ -78,19 +92,33 @@ export default function Step7Confirmation({ state, order, onClose }) {
       <div className="px-4 pt-3 pb-4">
         <div className="rounded-[14px] border border-line bg-surface divide-y divide-line">
           <Row Icon={Mail} title="Check your inbox">
-            We've sent return instructions and your shipping label (or pickup
-            details) to your email.
+            We've sent {isWarranty ? 'warranty claim' : 'return'} instructions
+            and your pickup details to your email.
           </Row>
-          <Row Icon={Clock} title="Expected refund">
-            <span className="text-ink font-semibold">
-              {currency} {formatMoney(refund.net)}
-            </span>{' '}
-            ·{' '}
-            {state.refundMethod === 'wallet'
-              ? 'Revibe Wallet'
-              : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`}
-            <span className="block mt-1 text-[12px] text-muted">{timeline}</span>
-          </Row>
+          {isWarranty ? (
+            <Row Icon={Wrench} title="Expected back">
+              <span className="text-ink font-semibold">
+                {warrantyEta?.long || 'Soon'}
+              </span>
+              <span className="block mt-1 text-[12px] text-muted">
+                No refund is issued — the same device is returned to you after
+                repair.
+              </span>
+            </Row>
+          ) : (
+            <Row Icon={Clock} title="Expected refund">
+              <span className="text-ink font-semibold">
+                {currency} {formatMoney(refund.net)}
+              </span>{' '}
+              ·{' '}
+              {state.refundMethod === 'wallet'
+                ? 'Revibe Wallet'
+                : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`}
+              <span className="block mt-1 text-[12px] text-muted">
+                {timeline}
+              </span>
+            </Row>
+          )}
           <Row Icon={ShieldCheck} title="Device preparation">
             {devicePrepLine}
           </Row>
@@ -103,7 +131,7 @@ export default function Step7Confirmation({ state, order, onClose }) {
           onClick={onClose}
           className="flex-1 h-[48px] rounded-[12px] inline-flex items-center justify-center bg-surface text-ink border border-line font-semibold text-[14px]"
         >
-          Track this return
+          {isWarranty ? 'Track this claim' : 'Track this return'}
         </button>
         <button
           type="button"

@@ -7,14 +7,16 @@ import OrderCard from './components/OrderCard'
 import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
 import ClaimCard from './components/ClaimCard'
+import WarrantyClaimCard from './components/WarrantyClaimCard'
 import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
+import UndoSnackbar from './components/UndoSnackbar'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
-import { hasActiveClaim, isClaimRefunded } from './lib/claims'
+import { hasActiveClaim, isClaimRefunded, isWarrantyDelivered } from './lib/claims'
 
 const RANGE_DAYS = { '30d': 30, '3m': 90, '1y': 365, all: Infinity }
 
@@ -71,13 +73,31 @@ export default function App() {
   const [activeStatus, setActiveStatus] = useState('all')
   const [activeRange, setActiveRange] = useState('3m')
   const [claimFlowOrderId, setClaimFlowOrderId] = useState(null)
+  // In-session map of orderId → claim seeded by the returns flow on
+  // submit. Cleared on refresh — there's no backend. Listed orders are
+  // projected through this map before filtering so a freshly-submitted
+  // warranty (or refund) claim flips the order to the right card type
+  // immediately and moves between the "In progress" / "Past" sections.
+  const [submittedClaims, setSubmittedClaims] = useState({})
+  // Demo-only undo handle — the most recent seeded claim. Snackbar
+  // surfaces after the returns flow closes; Undo removes the entry
+  // from submittedClaims so the order reverts to its delivered card.
+  const [recentSubmit, setRecentSubmit] = useState(null)
+
+  const projectedOrders = useMemo(
+    () =>
+      ORDERS.map((o) =>
+        submittedClaims[o.id] ? { ...o, claim: submittedClaims[o.id] } : o,
+      ),
+    [submittedClaims],
+  )
 
   // Counts are computed off the date-range-filtered set so the chip badges
   // stay accurate when the user widens / narrows the date window.
   const dateFiltered = useMemo(() => {
     const now = Date.now()
-    return ORDERS.filter((o) => matchesRange(o, activeRange, now))
-  }, [activeRange])
+    return projectedOrders.filter((o) => matchesRange(o, activeRange, now))
+  }, [projectedOrders, activeRange])
 
   const counts = useMemo(
     () => ({
@@ -155,6 +175,9 @@ export default function App() {
                     if (hasActiveClaim(o) && o.claim?.invalidClaim) {
                       return <InvalidClaimCard key={o.id} order={o} />
                     }
+                    if (hasActiveClaim(o) && o.claim?.type === 'warranty') {
+                      return <WarrantyClaimCard key={o.id} order={o} />
+                    }
                     if (hasActiveClaim(o)) {
                       return <ClaimCard key={o.id} order={o} />
                     }
@@ -187,6 +210,9 @@ export default function App() {
                 <SectionLabel title="Past orders" count={past.length} />
                 <div className="px-4 flex flex-col gap-3">
                   {past.map((o) => {
+                    if (isWarrantyDelivered(o)) {
+                      return <WarrantyClaimCard key={o.id} order={o} />
+                    }
                     if (isClaimRefunded(o)) {
                       return <ClaimCard key={o.id} order={o} />
                     }
@@ -210,6 +236,28 @@ export default function App() {
         <ClaimFlow
           initialOrderId={claimFlowOrderId}
           onClose={() => setClaimFlowOrderId(null)}
+          onSubmitClaim={(orderId, claim) => {
+            setSubmittedClaims((prev) => ({ ...prev, [orderId]: claim }))
+            setRecentSubmit({ orderId, claimType: claim.type })
+          }}
+        />
+      )}
+      {claimFlowOrderId === null && recentSubmit && (
+        <UndoSnackbar
+          message={
+            recentSubmit.claimType === 'warranty'
+              ? 'Warranty claim submitted'
+              : 'Return request submitted'
+          }
+          onUndo={() => {
+            setSubmittedClaims((prev) => {
+              const next = { ...prev }
+              delete next[recentSubmit.orderId]
+              return next
+            })
+            setRecentSubmit(null)
+          }}
+          onDismiss={() => setRecentSubmit(null)}
         />
       )}
     </div>

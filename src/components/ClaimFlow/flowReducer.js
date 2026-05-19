@@ -2,6 +2,21 @@ import { ORDERS } from '../../data/orders'
 
 export const TOTAL_STEPS = 7
 
+// Warranty submissions skip Step 5 (refund method) — no money changes
+// hands. Customer-visible step count therefore drops to 6 on warranty,
+// and NEXT / BACK / GO_TO_STEP step over the refund step.
+export function visibleStepCount(claimType) {
+  return claimType === 'warranty' ? 6 : TOTAL_STEPS
+}
+
+// Maps a state.step (still 1..7 internally so Step 6 = review and Step 7
+// = confirmation stay aligned across claim types) onto the position the
+// user sees in the progress bar (1..visibleStepCount).
+export function visibleStepIndex(step, claimType) {
+  if (claimType !== 'warranty') return step
+  return step >= 5 ? step - 1 : step
+}
+
 export function initialState(initialOrderId = null) {
   // Step 1 (claim type) is always shown empty — the customer picks every
   // time. Step 4 (pickup details) is pre-seeded from the order's contact
@@ -43,14 +58,16 @@ export function initialState(initialOrderId = null) {
 export function flowReducer(state, action) {
   switch (action.type) {
     case 'SET_CLAIM_TYPE': {
-      // Switching off the 'issue' path drops any sub-issue selection so
-      // it can't survive into an unrelated flow (e.g. change_of_mind).
-      const clearsSubIssue = action.value !== 'issue'
+      // The warranty branch reuses Step 2's issue picker, so the
+      // sub-issue is only cleared when leaving evidence-collecting flows
+      // (issue / warranty) for a different claim type (e.g. change_of_mind).
+      const usesIssuePicker =
+        action.value === 'issue' || action.value === 'warranty'
       return {
         ...state,
         claimType: action.value,
-        issueScope: clearsSubIssue ? null : state.issueScope,
-        issueSubtypeId: clearsSubIssue ? null : state.issueSubtypeId,
+        issueScope: usesIssuePicker ? state.issueScope : null,
+        issueSubtypeId: usesIssuePicker ? state.issueSubtypeId : null,
       }
     }
     case 'SET_ISSUE_SUBTYPE':
@@ -79,12 +96,25 @@ export function flowReducer(state, action) {
       return { ...state, refundMethod: action.value }
     case 'SET_PACKING_CONFIRMED':
       return { ...state, packingConfirmed: action.value }
-    case 'GO_TO_STEP':
-      return { ...state, step: action.value }
-    case 'NEXT':
-      return { ...state, step: Math.min(TOTAL_STEPS, state.step + 1) }
-    case 'BACK':
-      return { ...state, step: Math.max(1, state.step - 1) }
+    case 'GO_TO_STEP': {
+      // Edit links from Step 6 must never land the user on Step 5 when
+      // there is no refund-method step in the warranty flow.
+      const target =
+        state.claimType === 'warranty' && action.value === 5
+          ? 4
+          : action.value
+      return { ...state, step: target }
+    }
+    case 'NEXT': {
+      const next = state.step + 1
+      const skipRefund = state.claimType === 'warranty' && next === 5
+      return { ...state, step: Math.min(TOTAL_STEPS, skipRefund ? 6 : next) }
+    }
+    case 'BACK': {
+      const prev = state.step - 1
+      const skipRefund = state.claimType === 'warranty' && prev === 5
+      return { ...state, step: Math.max(1, skipRefund ? 4 : prev) }
+    }
     case 'SUBMIT':
       return { ...state, claimRef: action.value, step: TOTAL_STEPS }
     default:
@@ -96,9 +126,13 @@ export function flowReducer(state, action) {
 export function canAdvance(state) {
   switch (state.step) {
     case 1:
-      return state.claimType === 'change_of_mind' || state.claimType === 'issue'
+      return (
+        state.claimType === 'change_of_mind' ||
+        state.claimType === 'issue' ||
+        state.claimType === 'warranty'
+      )
     case 2: {
-      if (state.claimType === 'issue') {
+      if (state.claimType === 'issue' || state.claimType === 'warranty') {
         const id = state.issueDetails
         return Boolean(
           state.issueSubtypeId &&
