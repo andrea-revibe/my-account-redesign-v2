@@ -35,7 +35,7 @@ const REVIBE_CARE_ICON =
 // block (for created / quality_check states), the dot timeline, and a
 // product strip. Expanding reveals the long-form banner, sub-timeline,
 // courier card, Order details collapse, and the action row.
-export default function OrderCard({ order, defaultExpanded = false }) {
+export default function OrderCard({ order, defaultExpanded = false, onCancelOrder }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [cancelOpen, setCancelOpen] = useState(false)
   useEffect(() => {
@@ -230,6 +230,7 @@ export default function OrderCard({ order, defaultExpanded = false }) {
           order={order}
           open={cancelOpen}
           onClose={() => setCancelOpen(false)}
+          onSubmit={onCancelOrder}
         />
       )}
     </article>

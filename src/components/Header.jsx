@@ -1,9 +1,9 @@
-import { Menu, Search, Bell } from 'lucide-react'
+import { Menu, Search, Bell, X } from 'lucide-react'
 
 // Condensed topbar: replaces the previous PromoBar + Header + SearchBar +
 // FiltersRow stack with a single sticky row. Search is moved into the
 // filters section directly underneath the page title (see OrderFilters).
-export default function Header({ initials = 'AG' }) {
+export default function Header({ initials = 'AG', journeyMode = false, onToggleJourney }) {
   return (
     <header className="sticky top-0 z-30 flex items-center gap-2 px-4 py-2.5 bg-surface border-b border-line">
       <button
@@ -15,6 +15,16 @@ export default function Header({ initials = 'AG' }) {
       <a href="#" className="flex items-center" aria-label="Revibe home">
         <img src="/revibe-logo.svg" alt="Revibe" className="h-[18px]" />
       </a>
+      {journeyMode && (
+        <button
+          onClick={onToggleJourney}
+          aria-label="Exit journey mode"
+          className="ml-1 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-brand/10 text-brand text-[11px] font-semibold hover:bg-brand/20"
+        >
+          Journey mode
+          <X size={12} strokeWidth={2.25} />
+        </button>
+      )}
       <div className="flex-1" />
       <button
         aria-label="Search"

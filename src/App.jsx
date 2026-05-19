@@ -14,9 +14,12 @@ import InvalidClaimCard from './components/InvalidClaimCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import UndoSnackbar from './components/UndoSnackbar'
+import JourneyDevPanel from './components/JourneyDevPanel'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
 import { hasActiveClaim, isClaimRefunded, isWarrantyDelivered } from './lib/claims'
+import { useJourney } from './lib/journey'
+import { JOURNEYS } from './data/journey'
 
 const RANGE_DAYS = { '30d': 30, '3m': 90, '1y': 365, all: Infinity }
 
@@ -84,20 +87,72 @@ export default function App() {
   // from submittedClaims so the order reverts to its delivered card.
   const [recentSubmit, setRecentSubmit] = useState(null)
 
+  // Journey mode — sourced from ?journey=<id> URL param. Replaces ORDERS
+  // with a single replayed order driven by the JourneyDevPanel. Mutually
+  // exclusive with the normal multi-order demo. Backward compat:
+  // `?journey=1` maps to the first journey (happy path).
+  const initialJourneyParam =
+    typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('journey')
+  const resolveJourneyId = (raw) => {
+    if (raw == null || raw === '1') return JOURNEYS[0].id
+    return JOURNEYS.some((j) => j.id === raw) ? raw : JOURNEYS[0].id
+  }
+  const [journeyMode, setJourneyMode] = useState(initialJourneyParam != null)
+  const [journeyId, setJourneyId] = useState(() =>
+    resolveJourneyId(initialJourneyParam),
+  )
+  const journey = useJourney(journeyId)
+  const toggleJourneyMode = () => {
+    setJourneyMode((prev) => {
+      const next = !prev
+      const url = new URL(window.location.href)
+      if (next) url.searchParams.set('journey', journeyId)
+      else url.searchParams.delete('journey')
+      window.history.replaceState({}, '', url)
+      return next
+    })
+  }
+  const selectJourney = (id) => {
+    setJourneyId(id)
+    const url = new URL(window.location.href)
+    url.searchParams.set('journey', id)
+    window.history.replaceState({}, '', url)
+  }
+
+  // Customer-triggered journey advance from the real cancel sheet.
+  // Sheet's `method` ids (store_credit / original) map to the journey's
+  // refund-branch suffix (wallet / card). Guarded by validNext so an
+  // out-of-sequence submit silently no-ops instead of corrupting the path.
+  const handleCancelOrder = ({ method }) => {
+    if (!journeyMode) return
+    const branch = method === 'store_credit' ? 'wallet' : 'card'
+    const target = `cancellation_requested_${branch}`
+    if (journey.validNext().some((n) => n.id === target)) {
+      journey.advance(target)
+    }
+  }
+
   const projectedOrders = useMemo(
     () =>
-      ORDERS.map((o) =>
-        submittedClaims[o.id] ? { ...o, claim: submittedClaims[o.id] } : o,
-      ),
-    [submittedClaims],
+      journeyMode
+        ? [journey.order]
+        : ORDERS.map((o) =>
+            submittedClaims[o.id] ? { ...o, claim: submittedClaims[o.id] } : o,
+          ),
+    [journeyMode, journey.order, submittedClaims],
   )
 
   // Counts are computed off the date-range-filtered set so the chip badges
-  // stay accurate when the user widens / narrows the date window.
+  // stay accurate when the user widens / narrows the date window. Journey
+  // mode bypasses the date filter — its single order's placedAt is always
+  // "today" and the demo shouldn't disappear if the system clock drifts.
   const dateFiltered = useMemo(() => {
+    if (journeyMode) return projectedOrders
     const now = Date.now()
     return projectedOrders.filter((o) => matchesRange(o, activeRange, now))
-  }, [projectedOrders, activeRange])
+  }, [journeyMode, projectedOrders, activeRange])
 
   const counts = useMemo(
     () => ({
@@ -123,11 +178,15 @@ export default function App() {
   const activeOrder = filtered.find((o) => o.id === activeId)
 
   // Hero hides on cancelled/delivered tabs since the active order is by
-  // definition in-flight.
+  // definition in-flight. Also hidden for created / quality_check — those
+  // states have no courier or ETA yet, and InProgressCard is the canonical
+  // surface for them (kept collapsed; the user expands manually).
   const showHero =
     activeOrder &&
     activeStatus !== 'cancelled' &&
-    activeStatus !== 'delivered'
+    activeStatus !== 'delivered' &&
+    activeOrder.statusId !== 'created' &&
+    activeOrder.statusId !== 'quality_check'
 
   const inFlight = filtered.filter(
     (o) => isOpen(o) && (!showHero || o.id !== activeId),
@@ -137,7 +196,7 @@ export default function App() {
   return (
     <div className="min-h-full flex justify-center">
       <div className="w-full max-w-mobile bg-canvas shadow-sm relative pb-24">
-        <Header />
+        <Header journeyMode={journeyMode} onToggleJourney={toggleJourneyMode} />
         <GreetRow
           totalOrders={counts.all}
           activeOrders={counts.in_progress}
@@ -189,7 +248,7 @@ export default function App() {
                         <InProgressCard
                           key={o.id}
                           order={o}
-                          defaultExpanded={!showHero && o.id === activeId}
+                          onCancelOrder={handleCancelOrder}
                         />
                       )
                     }
@@ -198,6 +257,7 @@ export default function App() {
                         key={o.id}
                         order={o}
                         defaultExpanded={!showHero && o.id === activeId}
+                        onCancelOrder={handleCancelOrder}
                       />
                     )
                   })}
@@ -220,7 +280,7 @@ export default function App() {
                       <PastOrderCard
                         key={o.id}
                         order={o}
-                        onRaiseClaim={setClaimFlowOrderId}
+                        onRaiseClaim={journeyMode ? undefined : setClaimFlowOrderId}
                       />
                     )
                   })}
@@ -258,6 +318,20 @@ export default function App() {
             setRecentSubmit(null)
           }}
           onDismiss={() => setRecentSubmit(null)}
+        />
+      )}
+      {journeyMode && (
+        <JourneyDevPanel
+          nodes={journey.nodes}
+          currentNodeId={journey.currentNodeId}
+          currentIndex={journey.currentIndex}
+          validNext={journey.validNext}
+          advance={journey.advance}
+          back={journey.back}
+          reset={journey.reset}
+          journeys={journey.journeys}
+          activeJourneyId={journey.journey.id}
+          onSelectJourney={selectJourney}
         />
       )}
     </div>
