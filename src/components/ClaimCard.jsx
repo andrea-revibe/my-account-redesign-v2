@@ -6,6 +6,8 @@ import {
   Download,
   Wallet,
   CreditCard,
+  CalendarClock,
+  MapPin,
 } from 'lucide-react'
 import {
   CLAIM_STATUSES,
@@ -77,7 +79,7 @@ export default function ClaimCard({ order, defaultExpanded = false }) {
             <ClaimProgressDots claim={claim} tone={tone} />
           </div>
 
-          {claim.claimStatusId === 'in_transit' && (
+          {Boolean(claim.transitSubTimeline?.picked_up) && (
             <ClaimTransitDetail claim={claim} order={order} />
           )}
 
@@ -139,10 +141,12 @@ function StatePill({ claim, tone }) {
 function ClaimHero({ order, claim, tone }) {
   const t = TONE[tone]
   const phase = claimPhaseTag(claim.claimStatusId)
-  const isRefunded = claim.claimStatusId === 'refunded'
+  const isRefunded = claim.claimStatusId === 'refund_credited'
   const isWallet = claim.refundMethod === 'wallet'
   const headline = claimStatusHeadline(claim)
   const subline = claimStatusSubline(claim)
+  const showScheduledPickup =
+    claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup)
 
   return (
     <div className={`rounded-[14px] border p-3.5 ${t.heroBg} ${t.border}`}>
@@ -174,6 +178,14 @@ function ClaimHero({ order, claim, tone }) {
         )}
       </div>
 
+      {showScheduledPickup && (
+        <ScheduledPickupStrip
+          scheduledPickup={claim.scheduledPickup}
+          pickupDetails={claim.pickupDetails}
+          toneText={t.text}
+        />
+      )}
+
       <div className="mt-3 pt-3 border-t border-line-2/70 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
@@ -190,6 +202,44 @@ function ClaimHero({ order, claim, tone }) {
           {order.currency} {claim.expectedRefund.net.toLocaleString()}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText }) {
+  const { date, slot } = scheduledPickup || {}
+  const address = pickupDetails?.address
+  return (
+    <div className="mt-3 pt-3 border-t border-line-2/70 flex flex-col gap-1.5">
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+        Scheduled pickup
+      </div>
+      <div className="flex items-start gap-1.5 text-[12px] text-ink-2">
+        <CalendarClock
+          size={13}
+          strokeWidth={2}
+          className={`${toneText} shrink-0 mt-px`}
+        />
+        <span className="font-semibold leading-[1.3]">
+          {date}
+          {slot && (
+            <>
+              <span className="text-muted/60 font-normal"> · </span>
+              {slot}
+            </>
+          )}
+        </span>
+      </div>
+      {address && (
+        <div className="flex items-start gap-1.5 text-[11.5px] text-ink-2/90">
+          <MapPin
+            size={12}
+            strokeWidth={2}
+            className="text-ink-2/70 shrink-0 mt-px"
+          />
+          <span className="truncate">{address}</span>
+        </div>
+      )}
     </div>
   )
 }

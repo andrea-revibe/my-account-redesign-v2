@@ -104,7 +104,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
           <SectionCard title="Refund">
             <div className="flex items-baseline justify-between">
               <span className="text-[13px] text-ink-2">
-                {claim.claimStatusId === 'refunded'
+                {claim.claimStatusId === 'refund_credited'
                   ? 'Refunded'
                   : 'Expected refund'}
               </span>

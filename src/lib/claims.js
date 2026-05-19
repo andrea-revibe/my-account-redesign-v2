@@ -4,65 +4,48 @@
 
 import {
   FileText,
-  PackageOpen,
   Truck,
-  Plane,
   ShieldCheck,
   Receipt,
   CircleDollarSign,
-  Hourglass,
   Check,
   Sparkles,
 } from 'lucide-react'
 
 export const CLAIM_STATUSES = [
   {
-    id: 'claim_created',
-    label: 'Claim created',
-    short: 'Submitted',
-    headline: 'Claim created',
+    id: 'initiated',
+    label: 'Claim initiated',
+    short: 'Initiated',
+    headline: 'Claim initiated',
     icon: FileText,
   },
   {
-    id: 'pending_collection',
-    label: 'Pending collection',
+    id: 'pickup',
+    label: 'Pickup',
     short: 'Pickup',
-    headline: 'Pending collection',
-    icon: Hourglass,
+    headline: 'Pickup',
+    icon: Truck,
   },
   {
-    id: 'under_collection',
-    label: 'Under collection',
-    short: 'Collected',
-    headline: 'Under collection',
-    icon: PackageOpen,
-  },
-  {
-    id: 'in_transit',
-    label: 'In transit',
-    short: 'Transit',
-    headline: 'In transit',
-    icon: Plane,
-  },
-  {
-    id: 'under_qc',
-    label: 'Under Quality Check',
+    id: 'qc',
+    label: 'Quality Check',
     short: 'QC',
     headline: 'Under Quality Check',
     icon: ShieldCheck,
   },
   {
-    id: 'ready_for_refund',
-    label: 'Ready for Refund',
-    short: 'Ready',
-    headline: 'Ready for refund',
+    id: 'refund_issued',
+    label: 'Refund issued',
+    short: 'Refund issued',
+    headline: 'Refund issued',
     icon: Receipt,
   },
   {
-    id: 'refunded',
-    label: 'Refunded',
-    short: 'Refunded',
-    headline: 'Refunded',
+    id: 'refund_credited',
+    label: 'Refund credited',
+    short: 'Refund credited',
+    headline: 'Refund credited',
     icon: CircleDollarSign,
   },
 ]
@@ -72,8 +55,8 @@ export const CLAIM_STATUSES = [
 // the money has moved. Matches the conventions used by `PastOrderCard` for
 // cancelled-past variants.
 export function claimToneFor(claimStatusId) {
-  if (claimStatusId === 'refunded') return 'success'
-  if (claimStatusId === 'ready_for_refund') return 'brand'
+  if (claimStatusId === 'refund_credited') return 'success'
+  if (claimStatusId === 'refund_issued') return 'brand'
   return 'warn'
 }
 
@@ -82,9 +65,10 @@ export function claimProgressIndex(claimStatusId) {
 }
 
 // Courier sub-steps for the device's return journey, surfaced inside the
-// `See detailed tracking` dropdown when `claim.claimStatusId === 'in_transit'`.
-// Inverse of the outbound `SHIPPING_SUB_STATUSES` in lib/statuses.js — the
-// device moves customer → origin hub → flight → Revibe hub.
+// `See detailed tracking` dropdown once `claim.transitSubTimeline.picked_up`
+// is set (i.e. the courier has scanned the device). Inverse of the outbound
+// `SHIPPING_SUB_STATUSES` in lib/statuses.js — the device moves customer
+// → origin hub → flight → Revibe hub.
 export const CLAIM_TRANSIT_SUB_STATUSES = [
   { id: 'picked_up', label: 'Picked up' },
   { id: 'arrived_origin_hub', label: 'Arrived at origin hub' },
@@ -97,30 +81,26 @@ export function transitSubProgressIndex(transitSubStatusId) {
 }
 
 export function hasActiveClaim(order) {
-  return Boolean(order?.claim) && order.claim.claimStatusId !== 'refunded'
+  return Boolean(order?.claim) && order.claim.claimStatusId !== 'refund_credited'
 }
 
 export function isClaimRefunded(order) {
-  return Boolean(order?.claim) && order.claim.claimStatusId === 'refunded'
+  return Boolean(order?.claim) && order.claim.claimStatusId === 'refund_credited'
 }
 
 // Right-side phase tag in the hero, mirroring the InProgressCard `Zap / On
 // track` and PastOrderCard `Hourglass / Receipt / Check` patterns.
 export function claimPhaseTag(claimStatusId) {
   switch (claimStatusId) {
-    case 'claim_created':
+    case 'initiated':
       return { label: 'Submitted', Icon: FileText }
-    case 'pending_collection':
-      return { label: 'Awaiting pickup', Icon: Hourglass }
-    case 'under_collection':
-      return { label: 'Collected', Icon: PackageOpen }
-    case 'in_transit':
-      return { label: 'On the way', Icon: Plane }
-    case 'under_qc':
+    case 'pickup':
+      return { label: 'On the way', Icon: Truck }
+    case 'qc':
       return { label: 'In review', Icon: ShieldCheck }
-    case 'ready_for_refund':
+    case 'refund_issued':
       return { label: 'Processing', Icon: Receipt }
-    case 'refunded':
+    case 'refund_credited':
       return { label: 'Complete', Icon: Check }
     default:
       return { label: '', Icon: Sparkles }
@@ -192,17 +172,15 @@ export function refundMethodLabel(claim, order) {
 // branch sub-statuses; gates handled by actionRequired.deadline carry
 // no SLA entry on purpose.
 export const CLAIM_SLAS = {
-  claim_created:        { expectedHours:   1, bufferHours:   4 },
+  initiated:            { expectedHours:  24, bufferHours:  24 },
   awaiting_documents:   { expectedHours:  48, bufferHours:  48 },
-  pending_collection:   { expectedHours:  24, bufferHours:  24 },
-  under_collection:     { expectedHours:  12, bufferHours:  12 },
-  in_transit:           { expectedHours:  48, bufferHours:  48 },
-  under_qc:             { expectedHours:  48, bufferHours:  48 },
+  pickup:               { expectedHours:  60, bufferHours:  48 },
+  qc:                   { expectedHours:  48, bufferHours:  48 },
   under_revision:       { expectedHours:  48, bufferHours:  48 },
   expert_revision:      { expectedHours: 120, bufferHours:  72 },
   ship_back_pending:    { expectedHours:  48, bufferHours:  24 },
   ship_back_in_transit: { expectedHours:  72, bufferHours:  48 },
-  ready_for_refund:     { expectedHours:  24, bufferHours:  24 },
+  refund_issued:        { expectedHours:  24, bufferHours:  24 },
 }
 
 // Spec § 5 — customer-facing copy for each sub-status.

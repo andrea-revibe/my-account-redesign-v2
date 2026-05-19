@@ -35,7 +35,7 @@ Every doc follows the same shape: `Overview → Flow (mermaid) → State models 
 | [output/cancellations.md](./output/cancellations.md) | `CancelOrderSheet` (with the dissuade step), `KeepOrderSheet` undo, refund-hero card variants, rejected-cancellation chip, refund / cancellation data fields |
 | [output/returns/change_of_mind.md](./output/returns/change_of_mind.md) | UI flow of the change-of-mind returns branch (Steps 1, 2-CoM, 3–7), eligibility, refund math. Links to `input/return_flow_change_of_mind.md` for the operational state machine |
 | [output/returns/issue.md](./output/returns/issue.md) | UI flow of the issue / wrong-device branch (Step 1, 2-issue, 3–7), refund math with AED 100 Wallet bonus. Links to `input/return_flow_issue.md` |
-| [output/returns/claim_tracking.md](./output/returns/claim_tracking.md) | `ClaimCard` (7-state baseline) + three takeover cards (`DocsRejected`, `PickupFailed`, `InvalidClaim`) + canonical sub-status / action-gate / SLA reference |
+| [output/returns/claim_tracking.md](./output/returns/claim_tracking.md) | `ClaimCard` (5-state baseline) + three takeover cards (`DocsRejected`, `PickupFailed`, `InvalidClaim`) + canonical sub-status / action-gate / SLA reference |
 | [output/warranties_compensations.md](./output/warranties_compensations.md) | Stub: the two unwired entries on the returns flow's Step 1; scope, divergence, hook-in points |
 | [output/claim_detailed_tracking.md](./output/claim_detailed_tracking.md) | Design history of the deprecated `Show detailed tracking` disclosure. Reference tables have moved to `output/returns/claim_tracking.md` |
 

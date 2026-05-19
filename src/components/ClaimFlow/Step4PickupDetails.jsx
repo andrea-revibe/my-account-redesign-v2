@@ -128,8 +128,8 @@ export default function Step4PickupDetails({ state, dispatch }) {
   )
 }
 
-// Plain-English duration for an SLA's expectedHours. The 1h SLA on
-// claim_created reads as instant, so we drop it; refunded has no SLA.
+// Plain-English duration for an SLA's expectedHours. Very-short SLAs read
+// as instant, so we drop them; refund_credited has no SLA.
 function formatExpected(hours) {
   if (!hours || hours <= 1) return null
   if (hours === 12) return 'same day'
@@ -140,7 +140,7 @@ function formatExpected(hours) {
 }
 
 const STEP_NOTES = {
-  under_qc: 'May take longer if expert inspection is needed.',
+  qc: 'May take longer if expert inspection is needed.',
 }
 
 const PROCESS_STEPS = CLAIM_STATUSES.map((s) => ({

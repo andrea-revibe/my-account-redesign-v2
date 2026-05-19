@@ -268,6 +268,71 @@ export const ORDERS = [
       image: '/iphone-midnight.png',
     },
   },
+  // ----- Layered mock (baseline `initiated`): delivered → change-of-mind
+  // claim just submitted, pickup scheduled but not yet attempted. No
+  // takeover fields → routes to the regular ClaimCard. The hero renders
+  // the `ScheduledPickupStrip` (courier date/slot + submitted address) and
+  // only the first of the five progress dots is filled.
+  {
+    id: '89855',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '02/05/2026 02:18 PM',
+    placedAtFull: '2 May 2026 · 2:18 PM',
+    deliveredOn: '2026-05-17',
+    deliveredOnLong: 'Sunday, 17 May',
+    quantity: 1,
+    unitPrice: 829,
+    subtotal: 829,
+    warranty: 80,
+    total: 909,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193508',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '2 May · 2:18 PM',
+      quality_check: '4 May · 9:42 AM',
+      shipped: '7 May · 5:30 PM',
+      delivered: '17 May · 12:08 PM',
+    },
+    product: {
+      name: 'iPhone 12',
+      variant: 'Blue · 128 GB · Good',
+      image: '/iphone-midnight.png',
+    },
+    claim: {
+      claimRef: 'Ib4nP9',
+      claimStatusId: 'initiated',
+      type: 'change_of_mind',
+      submittedAt: '19 May 2026 · 9:12 AM',
+      units: 1,
+      reason: { value: 'changed_mind', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Tomorrow, 20 May',
+        slot: '10 AM – 12 PM',
+      },
+      refundMethod: 'wallet',
+      expectedRefund: { itemTotal: 829, warranty: 80, gross: 909, fee: 0, net: 909, rate: 0 },
+      timeline: {
+        initiated: '19 May · 9:12 AM',
+      },
+    },
+  },
   // ----- Layered mock: delivered → change-of-mind claim → courier
   // pickup failed. The customer must confirm a new AWB before the claim
   // auto-cancels. Routed via `claim.pickupFailure` to PickupFailedCard
@@ -309,7 +374,7 @@ export const ORDERS = [
     },
     claim: {
       claimRef: 'Cf9wMz',
-      claimStatusId: 'pending_collection',
+      claimStatusId: 'initiated',
       subStatusId: 'collection_failed',
       type: 'change_of_mind',
       submittedAt: '13 May 2026 · 10:30 AM',
@@ -321,11 +386,15 @@ export const ORDERS = [
         email: 'andrea.grossi@example.com',
         phone: '+971 50 559 5034',
       },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Friday, 15 May',
+        slot: '10 AM – 12 PM',
+      },
       refundMethod: 'wallet',
       expectedRefund: { itemTotal: 749, warranty: 70, gross: 819, fee: 0, net: 819, rate: 0 },
       timeline: {
-        claim_created: '13 May · 10:30 AM',
-        pending_collection: '13 May · 10:31 AM',
+        initiated: '13 May · 10:30 AM',
       },
       detailedTimeline: {
         collection_failed: { startedAt: '16 May · 8:20 AM' },
@@ -399,7 +468,7 @@ export const ORDERS = [
     },
     claim: {
       claimRef: 'RETrXc1',
-      claimStatusId: 'in_transit',
+      claimStatusId: 'pickup',
       type: 'change_of_mind',
       submittedAt: '12 May 2026 · 9:08 AM',
       units: 1,
@@ -410,13 +479,16 @@ export const ORDERS = [
         email: 'andrea.grossi@example.com',
         phone: '+971 50 559 5034',
       },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Wednesday, 13 May',
+        slot: '9 AM – 11 AM',
+      },
       refundMethod: 'original',
       expectedRefund: { itemTotal: 939, warranty: 90, gross: 1029, fee: 102.9, net: 926.1, rate: 0.10 },
       timeline: {
-        claim_created: '12 May · 9:08 AM',
-        pending_collection: '12 May · 9:09 AM',
-        under_collection: '13 May · 10:14 AM',
-        in_transit: '13 May · 3:42 PM',
+        initiated: '12 May · 9:08 AM',
+        pickup: '13 May · 10:14 AM',
       },
       transitSubStatusId: 'in_transit',
       transitSubTimeline: {
@@ -427,7 +499,7 @@ export const ORDERS = [
     },
   },
   // ----- Layered mock: delivered → Issue claim → in QC.
-  // Plain Issue-flow happy-path variant: claim sits at `under_qc` with no
+  // Plain Issue-flow happy-path variant: claim sits at `qc` with no
   // sub-status / action gate. Useful for confirming the baseline claim
   // card renders cleanly when nothing is escalated.
   {
@@ -467,7 +539,7 @@ export const ORDERS = [
     },
     claim: {
       claimRef: 'Ex5lAb',
-      claimStatusId: 'under_qc',
+      claimStatusId: 'qc',
       type: 'issue',
       submittedAt: '01 May 2026 · 10:00 AM',
       units: 1,
@@ -484,14 +556,17 @@ export const ORDERS = [
         email: 'andrea.grossi@example.com',
         phone: '+971 50 559 5034',
       },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Monday, 4 May',
+        slot: '9 AM – 11 AM',
+      },
       refundMethod: 'original',
       expectedRefund: { itemTotal: 619, warranty: 60, gross: 679, fee: 0, net: 679, rate: 0 },
       timeline: {
-        claim_created: '1 May · 10:00 AM',
-        pending_collection: '1 May · 10:01 AM',
-        under_collection: '4 May · 9:30 AM',
-        in_transit: '4 May · 3:00 PM',
-        under_qc: '8 May · 11:00 AM',
+        initiated: '1 May · 10:00 AM',
+        pickup: '4 May · 9:30 AM',
+        qc: '8 May · 11:00 AM',
       },
     },
   },
@@ -544,7 +619,7 @@ export const ORDERS = [
     },
     claim: {
       claimRef: '7yL4zx',
-      claimStatusId: 'refunded',
+      claimStatusId: 'refund_credited',
       type: 'change_of_mind',
       submittedAt: '11 Mar 2026 · 8:20 AM',
       units: 1,
@@ -555,22 +630,25 @@ export const ORDERS = [
         email: 'andrea.grossi@example.com',
         phone: '+971 50 559 5034',
       },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Friday, 13 March',
+        slot: '9 AM – 11 AM',
+      },
       refundMethod: 'wallet',
       expectedRefund: { itemTotal: 559, warranty: 60, gross: 619, fee: 0, net: 619, rate: 0 },
       timeline: {
-        claim_created: '11 Mar · 8:20 AM',
-        pending_collection: '11 Mar · 8:21 AM',
-        under_collection: '13 Mar · 9:30 AM',
-        in_transit: '13 Mar · 4:45 PM',
-        under_qc: '16 Mar · 10:10 AM',
-        ready_for_refund: '17 Mar · 2:25 PM',
-        refunded: '18 Mar · 11:00 AM',
+        initiated: '11 Mar · 8:20 AM',
+        pickup: '13 Mar · 9:30 AM',
+        qc: '16 Mar · 10:10 AM',
+        refund_issued: '17 Mar · 2:25 PM',
+        refund_credited: '18 Mar · 11:00 AM',
       },
     },
   },
   // ----- Layered mock: delivered → faulty-product claim with docs rejected.
   // Ops reviewed the submitted evidence before releasing pickup and asked
-  // the customer to re-shoot. The claim is paused at `claim_created` until
+  // the customer to re-shoot. The claim is paused at `initiated` until
   // the customer either resubmits within 3 days or the claim auto-cancels.
   // `claim.docsRejection` is the optional metadata block that flips routing
   // in App.jsx from ClaimCard to DocsRejectedCard. Mirrors the structural
@@ -612,7 +690,7 @@ export const ORDERS = [
     },
     claim: {
       claimRef: 'Q3kP7w',
-      claimStatusId: 'claim_created',
+      claimStatusId: 'initiated',
       type: 'issue',
       submittedAt: '22 Apr 2026 · 4:50 PM',
       units: 1,
@@ -632,7 +710,7 @@ export const ORDERS = [
       refundMethod: 'original',
       expectedRefund: { itemTotal: 519, warranty: 60, gross: 579, fee: 0, net: 579, rate: 0 },
       timeline: {
-        claim_created: '22 Apr · 4:50 PM',
+        initiated: '22 Apr · 4:50 PM',
       },
       docsRejection: {
         rejectedAt: '13 May · 11:18 AM',
@@ -697,7 +775,7 @@ export const ORDERS = [
     },
     claim: {
       claimRef: 'Iv7nQk',
-      claimStatusId: 'under_qc',
+      claimStatusId: 'qc',
       subStatusId: 'awaiting_payment',
       type: 'issue',
       submittedAt: '02 May 2026 · 8:45 AM',
@@ -715,17 +793,20 @@ export const ORDERS = [
         email: 'andrea.grossi@example.com',
         phone: '+971 50 559 5034',
       },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Monday, 4 May',
+        slot: '10 AM – 12 PM',
+      },
       refundMethod: 'original',
       expectedRefund: { itemTotal: 689, warranty: 60, gross: 749, fee: 0, net: 749, rate: 0 },
       timeline: {
-        claim_created: '2 May · 8:45 AM',
-        pending_collection: '2 May · 8:46 AM',
-        under_collection: '4 May · 10:30 AM',
-        in_transit: '4 May · 4:05 PM',
-        under_qc: '7 May · 11:20 AM',
+        initiated: '2 May · 8:45 AM',
+        pickup: '4 May · 10:30 AM',
+        qc: '7 May · 11:20 AM',
       },
       detailedTimeline: {
-        under_qc: { startedAt: '7 May · 11:20 AM' },
+        qc: { startedAt: '7 May · 11:20 AM' },
         invalid_confirmed: { startedAt: '14 May · 4:18 PM' },
         awaiting_payment: { startedAt: '14 May · 4:20 PM' },
       },
