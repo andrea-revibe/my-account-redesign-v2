@@ -1,7 +1,21 @@
-import { useEffect, useState } from 'react'
-import { MapPin, Mail, Phone, ChevronRight, X, Check } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  MapPin,
+  Mail,
+  Phone,
+  ChevronRight,
+  ChevronDown,
+  X,
+  Check,
+  CalendarClock,
+} from 'lucide-react'
 import StepHeading from './StepHeading'
-import { CLAIM_STATUSES, CLAIM_SLAS } from '../../lib/claims'
+import {
+  CLAIM_STATUSES,
+  CLAIM_SLAS,
+  WARRANTY_CLAIM_STATUSES,
+  expectedCompletionFor,
+} from '../../lib/claims'
 
 const FIELDS = [
   {
@@ -39,6 +53,11 @@ export default function Step4PickupDetails({ state, dispatch }) {
   const { pickupDetails } = state
   const [editingKey, setEditingKey] = useState(null)
   const editingField = FIELDS.find((f) => f.key === editingKey) || null
+  const isWarranty = state.claimType === 'warranty'
+  const eta = useMemo(
+    () => expectedCompletionFor(state.claimType),
+    [state.claimType],
+  )
 
   return (
     <>
@@ -94,16 +113,12 @@ export default function Step4PickupDetails({ state, dispatch }) {
           <div className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
             What happens next
           </div>
-          <div className="rounded-[14px] border border-line bg-surface px-3.5 py-3.5">
-            <ProcessTimeline />
-          </div>
-          <div className="px-1 text-[11.5px] text-muted leading-[1.45]">
-            Typically 5–7 business days from pickup to refund.
-          </div>
+          <ExpectedByCard eta={eta} isWarranty={isWarranty} />
         </div>
 
         <ConfirmationCheckbox
           checked={state.pickupConfirmed}
+          isWarranty={isWarranty}
           onChange={(value) =>
             dispatch({ type: 'SET_PICKUP_CONFIRMED', value })
           }
@@ -141,27 +156,72 @@ function formatExpected(hours) {
 
 const STEP_NOTES = {
   qc: 'May take longer if expert inspection is needed.',
+  under_repair: 'Most repairs wrap up within 7–10 days.',
 }
 
-const PROCESS_STEPS = CLAIM_STATUSES.map((s) => ({
-  id: s.id,
-  label: s.headline,
-  duration: formatExpected(CLAIM_SLAS[s.id]?.expectedHours),
-  note: STEP_NOTES[s.id] || null,
-}))
+function processStepsFor(isWarranty) {
+  const source = isWarranty ? WARRANTY_CLAIM_STATUSES : CLAIM_STATUSES
+  return source.map((s) => ({
+    id: s.id,
+    label: s.headline,
+    duration: formatExpected(CLAIM_SLAS[s.id]?.expectedHours),
+    note: STEP_NOTES[s.id] || null,
+  }))
+}
 
-function ProcessTimeline() {
+function ExpectedByCard({ eta, isWarranty }) {
+  const [open, setOpen] = useState(false)
+  const steps = processStepsFor(isWarranty)
   return (
-    <ol className="flex flex-col">
-      {PROCESS_STEPS.map((step, i) => (
-        <ProcessRow
-          key={step.id}
-          step={step}
-          isFirst={i === 0}
-          isLast={i === PROCESS_STEPS.length - 1}
+    <div className="rounded-[14px] border border-line bg-surface overflow-hidden">
+      <div className="flex items-center gap-3 px-3.5 py-3.5">
+        <span className="w-10 h-10 rounded-[10px] grid place-items-center shrink-0 bg-brand-bg text-brand">
+          <CalendarClock size={18} strokeWidth={1.75} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+            {isWarranty ? 'Device back with you by' : 'Expected refund by'}
+          </div>
+          <div className="text-[15.5px] font-bold text-ink leading-[1.2] mt-0.5">
+            {eta.long}
+          </div>
+          <div className="text-[11.5px] text-muted mt-0.5 leading-[1.4]">
+            {isWarranty
+              ? 'Typical for warranty claims — exact dates confirmed at each step.'
+              : 'Typical for return claims — exact dates confirmed at each step.'}
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full border-t border-line px-3.5 py-2.5 flex items-center justify-between text-[12.5px] font-semibold text-brand hover:bg-line-2/40"
+      >
+        <span>
+          {open ? 'Hide detailed timeline' : 'See detailed claim timeline'}
+        </span>
+        <ChevronDown
+          size={16}
+          strokeWidth={1.75}
+          className={`text-brand transition-transform ${open ? 'rotate-180' : ''}`}
         />
-      ))}
-    </ol>
+      </button>
+      {open && (
+        <div className="border-t border-line bg-canvas px-3.5 py-3.5 animate-slideDown">
+          <ol className="flex flex-col">
+            {steps.map((step, i) => (
+              <ProcessRow
+                key={step.id}
+                step={step}
+                isFirst={i === 0}
+                isLast={i === steps.length - 1}
+              />
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -194,7 +254,7 @@ function ProcessRow({ step, isFirst, isLast }) {
   )
 }
 
-function ConfirmationCheckbox({ checked, onChange }) {
+function ConfirmationCheckbox({ checked, isWarranty, onChange }) {
   return (
     <label
       className={`mt-1 flex items-start gap-3 rounded-[14px] border-2 px-3.5 py-3 cursor-pointer transition-colors ${
@@ -222,10 +282,12 @@ function ConfirmationCheckbox({ checked, onChange }) {
       </span>
       <span className="flex-1 min-w-0">
         <span className="block text-[13.5px] font-semibold text-ink leading-[1.35]">
-          I confirm the pickup details above and understand the return process timeline.
+          I confirm the pickup details above and understand the estimated timeline.
         </span>
         <span className="block mt-1 text-[11.5px] text-muted leading-[1.4]">
-          Each step has its own SLA — most returns complete in 5–7 business days, longer if expert inspection is needed.
+          {isWarranty
+            ? 'Each step has its own SLA — most warranty repairs complete in ~2 weeks, longer if parts are scarce.'
+            : 'Each step has its own SLA — most returns complete in 5–7 business days, longer if expert inspection is needed.'}
         </span>
       </span>
     </label>

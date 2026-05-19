@@ -32,6 +32,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
   const { currency } = order
   const pickup = claim.pickupDetails || {}
   const isWallet = claim.refundMethod === 'wallet'
+  const isWarranty = claim.type === 'warranty'
 
   return (
     <div
@@ -74,58 +75,86 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
             <Row label="Pickup address" value={pickup.address || '—'} />
             <Row label="Pickup email" value={pickup.email || '—'} />
             <Row label="Pickup phone" value={pickup.phone || '—'} />
-            <Row
-              label="Refund destination"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  {isWallet ? (
-                    <Wallet size={12} strokeWidth={2} className="text-ink-2" />
-                  ) : (
-                    <CreditCard
-                      size={12}
-                      strokeWidth={2}
-                      className="text-ink-2"
-                    />
-                  )}
-                  {refundMethodLabel(claim, order)}
-                </span>
-              }
-              sub={
-                claim.refundMethod === 'original'
-                  ? 'Includes 10% restocking fee'
-                  : null
-              }
-            />
+            {!isWarranty && (
+              <Row
+                label="Refund destination"
+                value={
+                  <span className="inline-flex items-center gap-1.5">
+                    {isWallet ? (
+                      <Wallet size={12} strokeWidth={2} className="text-ink-2" />
+                    ) : (
+                      <CreditCard
+                        size={12}
+                        strokeWidth={2}
+                        className="text-ink-2"
+                      />
+                    )}
+                    {refundMethodLabel(claim, order)}
+                  </span>
+                }
+                sub={
+                  claim.refundMethod === 'original'
+                    ? 'Includes 10% restocking fee'
+                    : null
+                }
+              />
+            )}
             {claim.submittedAt && (
               <Row label="Submitted" value={claim.submittedAt} />
             )}
           </SectionCard>
 
-          <SectionCard title="Refund">
-            <div className="flex items-baseline justify-between">
-              <span className="text-[13px] text-ink-2">
-                {claim.claimStatusId === 'refund_credited'
-                  ? 'Refunded'
-                  : 'Expected refund'}
-              </span>
-              <span className="text-[18px] font-bold tabular-nums text-ink">
-                {currency}{' '}
-                {claim.expectedRefund.net.toLocaleString(undefined, {
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-            {claim.expectedRefund.fee > 0 && (
-              <div className="mt-1 text-[11.5px] text-muted">
-                Gross {currency}{' '}
-                {claim.expectedRefund.gross.toLocaleString()} · Restocking fee
-                − {currency}{' '}
-                {claim.expectedRefund.fee.toLocaleString(undefined, {
-                  maximumFractionDigits: 2,
-                })}
+          {isWarranty ? (
+            <SectionCard title="Return">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] text-ink-2">
+                  {claim.claimStatusId === 'device_returned'
+                    ? 'Returned on'
+                    : 'Expected back by'}
+                </span>
+                <span className="text-[14px] font-semibold text-ink">
+                  {claim.claimStatusId === 'device_returned'
+                    ? claim.shipBack?.deliveredOnLong ||
+                      claim.shipBack?.deliveredOn ||
+                      '—'
+                    : claim.shipBack?.estimatedDeliveryLong ||
+                      claim.shipBack?.estimatedDelivery ||
+                      claim.repairWindow?.expectedCompleteLong ||
+                      claim.repairWindow?.expectedComplete ||
+                      '—'}
+                </span>
               </div>
-            )}
-          </SectionCard>
+              <div className="mt-1 text-[11.5px] text-muted">
+                No refund is issued — the same device is returned to you after repair.
+              </div>
+            </SectionCard>
+          ) : (
+            <SectionCard title="Refund">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] text-ink-2">
+                  {claim.claimStatusId === 'refund_credited'
+                    ? 'Refunded'
+                    : 'Expected refund'}
+                </span>
+                <span className="text-[18px] font-bold tabular-nums text-ink">
+                  {currency}{' '}
+                  {claim.expectedRefund.net.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+              {claim.expectedRefund.fee > 0 && (
+                <div className="mt-1 text-[11.5px] text-muted">
+                  Gross {currency}{' '}
+                  {claim.expectedRefund.gross.toLocaleString()} · Restocking fee
+                  − {currency}{' '}
+                  {claim.expectedRefund.fee.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+              )}
+            </SectionCard>
+          )}
         </div>
       </div>
     </div>

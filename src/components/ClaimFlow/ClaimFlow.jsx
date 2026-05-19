@@ -7,7 +7,8 @@ import {
   canAdvance,
   TOTAL_STEPS,
 } from './flowReducer'
-import { generateClaimRef } from '../../lib/returns'
+import { generateClaimRef, refundBreakdown } from '../../lib/returns'
+import { expectedCompletionFor } from '../../lib/claims'
 import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
 import Step1ClaimType from './Step1ClaimType'
@@ -19,7 +20,7 @@ import Step5RefundMethod from './Step5RefundMethod'
 import Step6Review from './Step6Review'
 import Step7Confirmation from './Step7Confirmation'
 
-export default function ClaimFlow({ initialOrderId, onClose }) {
+export default function ClaimFlow({ initialOrderId, onClose, onSubmitClaim }) {
   const [state, dispatch] = useReducer(
     flowReducer,
     initialOrderId,
@@ -50,7 +51,11 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
 
   const handlePrimary = () => {
     if (isReview) {
-      dispatch({ type: 'SUBMIT', value: generateClaimRef() })
+      const claimRef = generateClaimRef()
+      if (order && onSubmitClaim) {
+        onSubmitClaim(order.id, buildClaim({ state, order, claimRef }))
+      }
+      dispatch({ type: 'SUBMIT', value: claimRef })
       return
     }
     dispatch({ type: 'NEXT' })
@@ -64,7 +69,11 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
     dispatch({ type: 'BACK' })
   }
 
-  const primaryLabel = isReview ? 'Submit return request' : 'Continue'
+  const primaryLabel = isReview
+    ? state.claimType === 'warranty'
+      ? 'Submit warranty claim'
+      : 'Submit return request'
+    : 'Continue'
   const primaryVariant = isReview ? 'success' : 'brand'
 
   return (
@@ -96,7 +105,7 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
                 <X size={18} strokeWidth={1.75} />
               </button>
             </div>
-            <ProgressBar step={state.step} />
+            <ProgressBar step={state.step} claimType={state.claimType} />
           </header>
         )}
 
@@ -104,10 +113,11 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
           {state.step === 1 && (
             <Step1ClaimType state={state} dispatch={dispatch} />
           )}
-          {state.step === 2 && state.claimType === 'issue' && (
-            <Step2IssueDetails state={state} dispatch={dispatch} />
-          )}
-          {state.step === 2 && state.claimType !== 'issue' && (
+          {state.step === 2 &&
+            (state.claimType === 'issue' || state.claimType === 'warranty') && (
+              <Step2IssueDetails state={state} dispatch={dispatch} />
+            )}
+          {state.step === 2 && state.claimType === 'change_of_mind' && (
             <Step2Reason state={state} dispatch={dispatch} />
           )}
           {state.step === 3 && (
@@ -156,4 +166,108 @@ export default function ClaimFlow({ initialOrderId, onClose }) {
       </div>
     </div>
   )
+}
+
+// '19 May · 9:12 AM'-style timestamp matching the existing claim mocks.
+function formatStamp(d = new Date()) {
+  const day = d.getDate()
+  const month = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(d)
+  let hours = d.getHours()
+  const minutes = d.getMinutes().toString().padStart(2, '0')
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+  return `${day} ${month} · ${hours}:${minutes} ${ampm}`
+}
+
+// '19 May 2026 · 9:12 AM' — used for `claim.submittedAt`.
+function formatSubmittedAt(d = new Date()) {
+  const day = d.getDate()
+  const month = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(d)
+  const year = d.getFullYear()
+  let hours = d.getHours()
+  const minutes = d.getMinutes().toString().padStart(2, '0')
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+  return `${day} ${month} ${year} · ${hours}:${minutes} ${ampm}`
+}
+
+// 'Tomorrow, 21 May' — pickup is tentatively scheduled the day after
+// submission. Used only for the seeded `scheduledPickup` strip.
+function formatScheduledPickup(today = new Date()) {
+  const next = new Date(today.getTime() + 24 * 60 * 60 * 1000)
+  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(next)
+  const month = new Intl.DateTimeFormat('en-GB', { month: 'long' }).format(next)
+  return `${weekday}, ${next.getDate()} ${month}`
+}
+
+// Build the claim object that gets stitched onto the order in App.jsx.
+// Shape mirrors the seeded mocks in src/data/orders.js — refund flows
+// land on ClaimCard; warranty flows land on WarrantyClaimCard via the
+// type === 'warranty' branch in App.jsx routing.
+function buildClaim({ state, order, claimRef }) {
+  const now = new Date()
+  const submittedAt = formatSubmittedAt(now)
+  const initiatedStamp = formatStamp(now)
+
+  const base = {
+    claimRef,
+    claimStatusId: 'initiated',
+    type: state.claimType,
+    submittedAt,
+    units: state.units || 1,
+    devicePrep: { ...state.devicePrep },
+    pickupDetails: { ...state.pickupDetails },
+    scheduledPickup: {
+      courier: 'DHL Express',
+      date: formatScheduledPickup(now),
+      slot: '10 AM – 12 PM',
+    },
+    timeline: { initiated: initiatedStamp },
+  }
+
+  if (state.claimType === 'change_of_mind') {
+    return {
+      ...base,
+      reason: { ...state.reason },
+      refundMethod: state.refundMethod,
+      expectedRefund: refundBreakdown(
+        order,
+        state.units,
+        state.refundMethod,
+        state.claimType,
+      ),
+    }
+  }
+
+  if (state.claimType === 'issue') {
+    return {
+      ...base,
+      issueDetails: { ...state.issueDetails },
+      issueScope: state.issueScope,
+      issueSubtypeId: state.issueSubtypeId,
+      refundMethod: state.refundMethod,
+      expectedRefund: refundBreakdown(
+        order,
+        state.units,
+        state.refundMethod,
+        state.claimType,
+      ),
+    }
+  }
+
+  // Warranty — no refund block; carry a placeholder repairWindow so the
+  // WarrantyClaimCard's later `under_repair` hero has something to land
+  // on if/when the claim is progressed manually.
+  const eta = expectedCompletionFor('warranty', now)
+  return {
+    ...base,
+    issueDetails: { ...state.issueDetails },
+    issueScope: state.issueScope,
+    issueSubtypeId: state.issueSubtypeId,
+    repairWindow: {
+      expectedComplete: eta.short,
+      expectedCompleteLong: eta.long,
+      note: 'We\'ll confirm the exact repair window after inspection.',
+    },
+  }
 }

@@ -22,8 +22,8 @@ flowchart TD
   entry([Tap 'Raise a claim' on delivered PastOrderCard]) --> s1[Step 1 — Claim type]
   s1 -->|I changed my mind| s2[Step 2 — Reason]
   s1 -->|Something's wrong with my device → Return for refund/replacement| issue[/Issue branch — see issue.md/]
-  s1 -->|Use my warranty| stub1[/Stub — coming soon/]
-  s1 -->|Request compensation| stub2[/Stub — coming soon/]
+  s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
+  s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
   s2 -->|Continue or Skip| s3[Step 3 — Device prep]
   s3 -->|Reset confirmed OR credentials provided| s4[Step 4 — Pickup details]
   s4 -->|3 fields confirmed + checkbox| s5[Step 5 — Refund method]
@@ -41,10 +41,10 @@ flowchart TD
 Three top-level cards; nothing pre-selected:
 
 - `I changed my mind` → `claimType: 'change_of_mind'`. Sets the type and exposes `Continue`.
-- `Something's wrong with my device` → no claim type set on tap. Expands an inline accordion that reveals two nested sub-cards: `Return for a refund or replacement` → `claimType: 'issue'`, and `Use my warranty` (stub).
+- `Something's wrong with my device` → no claim type set on tap. Expands an inline accordion that reveals two nested sub-cards: `Return for a refund or replacement` → `claimType: 'issue'`, and `Use my warranty` → `claimType: 'warranty'` (warranty branch — see [warranties_compensations.md](../warranties_compensations.md) §2).
 - `Request compensation` (shipping refund or faulty accessory — keep the item) — third primary card; stubbed.
 
-Stubbed options render an inline `not part of this build` note instead of setting a claim type. `canAdvance` requires `change_of_mind` or `issue`.
+The compensation entry renders an inline `not part of this build` note instead of setting a claim type. `canAdvance` requires `change_of_mind`, `issue`, or `warranty`.
 
 ### 2.3 Step 2 — Reason (change-of-mind branch, optional)
 
@@ -79,9 +79,9 @@ Returns are always picked up by courier today, so the step skips the method sele
 
 State is pre-seeded so the user typically just confirms; tapping any row opens a single-field bottom sheet for editing.
 
-Below the rows, a `What happens next` card renders an always-visible 7-row vertical timeline derived from `CLAIM_STATUSES` + `CLAIM_SLAS` in `lib/claims.js`. Each row carries the step headline plus an `expectedHours`-derived duration suffix like `within 24h` / `same day` / `~2 days`; the Quality Check row carries a "may take longer if expert inspection is needed" subline; a "Typically 5–7 business days from pickup to refund" hint sits below the card. This sets expectations that the return is a multi-step process before the customer commits.
+Below the rows, a `What happens next` block surfaces an **`ExpectedByCard`**: CalendarClock-iconed eyebrow ("Expected refund by"), a bold long-form date computed by `expectedCompletionFor(claimType)` in `lib/claims.js` (sums `CLAIM_SLAS.expectedHours` across `CLAIM_STATUSES` and adds to `new Date()`), and a one-line subtitle ("Typical for return claims — exact dates confirmed at each step."). A brand-toned **`See detailed claim timeline`** button below it expands a pipeline-aware step list on tap — same `ProcessRow` chrome as the old always-open list (step headline + `expectedHours`-derived duration suffix `within 24h` / `same day` / `~7 days`, plus the "may take longer if expert inspection is needed" subline on QC). The step source switches automatically to `WARRANTY_CLAIM_STATUSES` on the warranty branch so the dropdown reads with the warranty pipeline (6 steps) — see [warranties_compensations.md](../warranties_compensations.md) §2.4.
 
-A brand-toned confirmation checkbox card sits below the timeline (*"I confirm the pickup details above and understand the return process timeline."*) and toggles `pickupConfirmed` on the flow reducer. `canAdvance` requires the three contact fields **and** `pickupConfirmed`. Visually mirrors the Step 6 packing-confirmation card.
+A brand-toned confirmation checkbox card sits below the card (*"I confirm the pickup details above and understand the estimated timeline."*) and toggles `pickupConfirmed` on the flow reducer. `canAdvance` requires the three contact fields **and** `pickupConfirmed`. Visually mirrors the Step 6 packing-confirmation card.
 
 ### 2.6 Step 5 — Refund method (shared chrome, change-of-mind math)
 
@@ -116,7 +116,7 @@ A **packing confirmation** checkbox card sits below the Refund section and gates
 - `Expected refund` — amount + destination + method-keyed timeline.
 - `Device preparation` — reinforcement of the commitment from Step 3.
 
-Two footer buttons: `Track this return` (stub) + `Back to my account` (closes overlay).
+Two footer buttons: `Track this return` (stub) + `Back to my account` (closes overlay). On close, `ClaimFlow.handlePrimary` has already called `onSubmitClaim(orderId, claim)` so `App.jsx` has the seeded claim in `submittedClaims[orderId]`; the order now renders as a `ClaimCard` in the **In progress** section. The `UndoSnackbar` slides up over the orders list so the demo can be reverted — see §8.
 
 ## 3. Eligibility & refund math
 
@@ -183,7 +183,7 @@ How the customer-facing UI surfaces backend state:
 
 **Device prep gate before pickup, not after submission.** Originally Step 3 was a confirmation modal that fired after the customer hit Submit. We moved it forward so the customer can't get to the refund-method picker without committing to reset the device — gives them an exit ramp earlier in the flow if they're not ready.
 
-**`What happens next` timeline on Step 4 not Step 6.** The customer should see the multi-step return process *before* committing the pickup details, not on the final review screen. Step 6's job is to be transactional; Step 4's job is to set expectations.
+**`What happens next` on Step 4 not Step 6, and collapsed by default.** The customer should see the multi-step return process *before* committing the pickup details, not on the final review screen. Step 6's job is to be transactional; Step 4's job is to set expectations. The block was originally an always-open 5-row vertical timeline; it now leads with the single computed expected-by date and tucks the per-step list behind a `See detailed claim timeline` dropdown — the headline is enough information for most customers, the dropdown is there for the ones who want to see the breakdown.
 
 **Two checkboxes (Step 4 pickup confirm, Step 6 packing confirm) for a deliberately heavy double-confirm.** Earlier drafts compressed these into a single confirmation on Step 6. Bringing the pickup confirm forward to Step 4 separates "I confirm the address" from "I've packed the device" — two distinct commitments, two distinct moments.
 
@@ -205,7 +205,7 @@ Populated on demo order `89657` today; other orders fall back to `subtotal`/`tot
 
 ### 6.2 Claim object written by Step 6 (change-of-mind shape)
 
-Production will write this object when Step 6's submit is wired; today the prototype hand-seeds it on selected delivered orders. The full claim-object reference (including issue-branch fields and takeover-card extensions) lives in [claim_tracking.md](./claim_tracking.md) §5.
+Step 6's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and bubbles it up to `App.jsx` via `onSubmitClaim`. Persistence is in-memory only (cleared on refresh, revertable via the `UndoSnackbar`). Selected delivered mocks also hand-seed a claim for the post-submission demo state. The full claim-object reference (including issue-branch fields, warranty fields, and takeover-card extensions) lives in [claim_tracking.md](./claim_tracking.md) §5.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -231,23 +231,23 @@ src/
     └── ClaimFlow/
         ├── ClaimFlow.jsx                  Overlay shell: useReducer, sticky header + progress, step router, sticky action bar
         ├── flowReducer.js                 State shape, action creators, canAdvance(state) per-step validation
-        ├── ProgressBar.jsx                Segmented 7-step progress bar + 'Step X of 7' caption
+        ├── ProgressBar.jsx                Segmented progress bar — 7 segments on refund flows, 6 on warranty (driven by visibleStepCount)
         ├── StickyActionBar.jsx            Sticky bottom button bar (Continue / Submit / optional secondary)
         ├── StepHeading.jsx                Shared 24px step heading + 13.5px muted subtitle
-        ├── Step1ClaimType.jsx             Five claim-type options; change-of-mind and issue advance, the other three stub
+        ├── Step1ClaimType.jsx             Claim-type options; CoM, issue and warranty advance, compensation still stub
         ├── Step2Reason.jsx                Change-of-mind branch — optional reason radio + free-text reveal on 'Other'
         ├── Step3DevicePrep.jsx            Factory-reset path (OS tabs + checkbox) or credentials path
-        ├── Step4PickupDetails.jsx         Pickup fields + 'What happens next' SLA timeline + confirmation checkbox
-        ├── Step5RefundMethod.jsx          Wallet vs original-payment refund cards
-        ├── Step6Review.jsx                Read-only item block + sectioned summary with per-section Edit links
-        └── Step7Confirmation.jsx          Success state with claim ref + Copy + next-steps list
+        ├── Step4PickupDetails.jsx         Pickup fields + 'Expected by' headline + collapsible detailed-timeline dropdown + confirmation checkbox
+        ├── Step5RefundMethod.jsx          Wallet vs original-payment refund cards (skipped for warranty)
+        ├── Step6Review.jsx                Read-only item block + sectioned summary with per-section Edit links (warranty hides Refund, shows 'What you'll get back')
+        └── Step7Confirmation.jsx          Success state with claim ref + Copy + next-steps list (warranty swaps Expected refund for Expected back)
 ```
 
 ## 8. Mocked vs production
 
-- **Step 6 submit is a no-op.** Calls `dispatch({ type: 'SUBMIT', value: generateClaimRef() })` which just advances to Step 7. No persistence, no API call. The `claim` object on `89657` is hand-seeded for the post-submission demo state.
+- **Step 6 submit seeds an in-session claim.** `ClaimFlow.handlePrimary` calls `onSubmitClaim(orderId, claim)` (from `App.jsx`) with a `buildClaim` output — `claimStatusId: 'initiated'`, seeded `scheduledPickup` (DHL Express, tomorrow's date, 10 AM–12 PM slot), timestamp from `new Date()`. No persistence: the claim lives in `App.jsx`'s `submittedClaims` map and is cleared on refresh. The `UndoSnackbar` lets the demo revert. Production needs a real backend write.
 - **10% restocking fee is hardcoded** in `refundBreakdown`. Production should read from a backend config.
-- **`What happens next` SLA placeholders.** `CLAIM_SLAS` in `lib/claims.js` carries hand-guessed `expectedHours` values per step. Ops to revise — see [claim_tracking.md](./claim_tracking.md) §4.
+- **`Expected by` headline + detailed-timeline SLA placeholders.** `CLAIM_SLAS` in `lib/claims.js` carries hand-guessed `expectedHours` values per step (covering refund and warranty pipelines). Ops to revise — see [claim_tracking.md](./claim_tracking.md) §4.
 - **Reason isn't validated.** No length cap on the textarea beyond 200 chars; no profanity filter.
 - **Address edit is a single-field bottom sheet.** No address validation, no autocomplete.
 - **No 10-day window enforcement at submit time.** Eligibility is checked on the order picker but not re-checked at Step 6 submission.

@@ -9,7 +9,10 @@ import {
   Receipt,
   CircleDollarSign,
   Check,
+  CheckCircle2,
   Sparkles,
+  Wrench,
+  PackageCheck,
 } from 'lucide-react'
 
 export const CLAIM_STATUSES = [
@@ -80,12 +83,29 @@ export function transitSubProgressIndex(transitSubStatusId) {
   return CLAIM_TRANSIT_SUB_STATUSES.findIndex((s) => s.id === transitSubStatusId)
 }
 
+// Terminal state differs by claim type: refund flows land on
+// `refund_credited`, warranty flows land on `device_returned`. Anything else
+// is in-flight and surfaces in "In progress".
 export function hasActiveClaim(order) {
-  return Boolean(order?.claim) && order.claim.claimStatusId !== 'refund_credited'
+  if (!order?.claim) return false
+  if (order.claim.type === 'warranty') {
+    return order.claim.claimStatusId !== 'device_returned'
+  }
+  return order.claim.claimStatusId !== 'refund_credited'
 }
 
 export function isClaimRefunded(order) {
   return Boolean(order?.claim) && order.claim.claimStatusId === 'refund_credited'
+}
+
+// Warranty equivalent of `isClaimRefunded` — true once the repaired device
+// has been delivered back to the customer (warranty terminal).
+export function isWarrantyDelivered(order) {
+  return (
+    Boolean(order?.claim) &&
+    order.claim.type === 'warranty' &&
+    order.claim.claimStatusId === 'device_returned'
+  )
 }
 
 // Right-side phase tag in the hero, mirroring the InProgressCard `Zap / On
@@ -118,6 +138,114 @@ export function claimStatusSubline(claim) {
   return null
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Warranty pipeline — 6-state customer-facing chain.
+// ────────────────────────────────────────────────────────────────────────
+//
+// Warranty claims share the head of the refund pipeline (initiated →
+// pickup → qc) but swap the refund tail (refund_issued → refund_credited)
+// for a repair-and-ship-back tail (under_repair → ship_back →
+// device_returned). The customer doesn't see seller-vs-LAB distinction —
+// both routes render the same "Under repair" surface.
+//
+// Operational source: docs/input/return_flow_warranty.md.
+
+export const WARRANTY_CLAIM_STATUSES = [
+  {
+    id: 'initiated',
+    label: 'Claim initiated',
+    short: 'Initiated',
+    headline: 'Claim initiated',
+    icon: FileText,
+  },
+  {
+    id: 'pickup',
+    label: 'Pickup',
+    short: 'Pickup',
+    headline: 'Pickup',
+    icon: Truck,
+  },
+  {
+    id: 'qc',
+    label: 'Quality Check',
+    short: 'QC',
+    headline: 'Under Quality Check',
+    icon: ShieldCheck,
+  },
+  {
+    id: 'under_repair',
+    label: 'Under repair',
+    short: 'Repair',
+    headline: 'Under repair',
+    icon: Wrench,
+  },
+  {
+    id: 'ship_back',
+    label: 'On the way back',
+    short: 'Ship back',
+    headline: 'On its way back',
+    icon: PackageCheck,
+  },
+  {
+    id: 'device_returned',
+    label: 'Device returned',
+    short: 'Returned',
+    headline: 'Device returned',
+    icon: CheckCircle2,
+  },
+]
+
+// Tone progression: warn (amber) while the device is leaving the customer
+// or being verified, brand (purple) once Revibe is doing the work
+// (repairing + shipping back), success (green) when the device is home.
+export function warrantyClaimToneFor(claimStatusId) {
+  if (claimStatusId === 'device_returned') return 'success'
+  if (claimStatusId === 'under_repair' || claimStatusId === 'ship_back') {
+    return 'brand'
+  }
+  return 'warn'
+}
+
+export function warrantyClaimProgressIndex(claimStatusId) {
+  return WARRANTY_CLAIM_STATUSES.findIndex((s) => s.id === claimStatusId)
+}
+
+export function warrantyClaimPhaseTag(claimStatusId) {
+  switch (claimStatusId) {
+    case 'initiated':
+      return { label: 'Submitted', Icon: FileText }
+    case 'pickup':
+      return { label: 'On the way', Icon: Truck }
+    case 'qc':
+      return { label: 'In review', Icon: ShieldCheck }
+    case 'under_repair':
+      return { label: 'Repair in progress', Icon: Wrench }
+    case 'ship_back':
+      return { label: 'Coming back', Icon: Truck }
+    case 'device_returned':
+      return { label: 'Complete', Icon: Check }
+    default:
+      return { label: '', Icon: Sparkles }
+  }
+}
+
+export function warrantyClaimStatusHeadline(claim) {
+  const step = WARRANTY_CLAIM_STATUSES.find((s) => s.id === claim.claimStatusId)
+  return step ? step.headline : 'Warranty claim'
+}
+
+export function warrantyClaimStatusSubline(claim) {
+  const ts = claim.timeline?.[claim.claimStatusId]
+  if (ts) return `Updated ${ts}`
+  return null
+}
+
+// Ship-back tracking reuses the standard outbound SHIPPING_SUB_STATUSES
+// from lib/statuses.js so a warranty return reads with the same
+// milestones as any normal outgoing order (arrived in destination
+// country → cleared customs → forwarded to third-party agent → out for
+// delivery). No warranty-specific sub-status export needed.
+
 // Labels duplicated from Step6Review so the ClaimCard summary stays
 // readable without importing from the flow components.
 export const REASON_LABELS = {
@@ -145,6 +273,7 @@ export function devicePrepText(claim) {
 export const CLAIM_TYPE_LABELS = {
   change_of_mind: 'Change of mind',
   issue: 'Issue',
+  warranty: 'Warranty',
 }
 
 export function claimTypeLabel(typeOrClaim) {
@@ -181,6 +310,41 @@ export const CLAIM_SLAS = {
   ship_back_pending:    { expectedHours:  48, bufferHours:  24 },
   ship_back_in_transit: { expectedHours:  72, bufferHours:  48 },
   refund_issued:        { expectedHours:  24, bufferHours:  24 },
+  // Warranty-tail placeholders — see WARRANTY_CLAIM_STATUSES above.
+  // Repair is the long pole; ship-back mirrors a normal outbound leg.
+  under_repair:         { expectedHours: 168, bufferHours:  72 },
+  ship_back:            { expectedHours:  96, bufferHours:  24 },
+}
+
+// Sums the per-step `expectedHours` across the relevant pipeline,
+// adds it to `today`, and returns the projected completion date in the
+// same shape as `claim.repairWindow.expectedComplete{,Long}` so the
+// Step 4 / Step 6 surfaces and the WarrantyClaimCard speak one language.
+// Steps without an SLA entry (e.g. terminal states like refund_credited
+// or device_returned) contribute 0 — they're instant once the prior
+// step lands.
+export function expectedCompletionFor(claimType, today = new Date()) {
+  const steps =
+    claimType === 'warranty' ? WARRANTY_CLAIM_STATUSES : CLAIM_STATUSES
+  const hours = steps.reduce(
+    (sum, s) => sum + (CLAIM_SLAS[s.id]?.expectedHours || 0),
+    0,
+  )
+  const target = new Date(today.getTime() + hours * 60 * 60 * 1000)
+  // Build the strings explicitly so the output matches the existing
+  // `repairWindow.expectedComplete{,Long}` shape ("Monday, 14 May" and
+  // "Mon, 14 May") regardless of locale CLDR formatting quirks.
+  const weekdayLong = new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(target)
+  const weekdayShort = new Intl.DateTimeFormat('en-GB', { weekday: 'short' }).format(target)
+  const monthLong = new Intl.DateTimeFormat('en-GB', { month: 'long' }).format(target)
+  const monthShort = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(target)
+  const day = target.getDate()
+  return {
+    long: `${weekdayLong}, ${day} ${monthLong}`,
+    short: `${weekdayShort}, ${day} ${monthShort}`,
+    hours,
+    date: target,
+  }
 }
 
 // Spec § 5 — customer-facing copy for each sub-status.

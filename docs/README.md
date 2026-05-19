@@ -26,6 +26,7 @@ Every doc follows the same shape: `Overview → Flow (mermaid) → State models 
 |---|---|
 | [input/return_flow_change_of_mind.md](./input/return_flow_change_of_mind.md) | Operational state machine for change-of-mind returns — country splits (ZA/SA/Other), repair-partner vs seller decision branches, LAB sub-flow, refund chain |
 | [input/return_flow_issue.md](./input/return_flow_issue.md) | Operational state machine for issue / wrong-device returns — single supplier path, country-aware AWB creation, LAB sub-flow, ship-back chain |
+| [input/return_flow_warranty.md](./input/return_flow_warranty.md) | Operational state machine for warranty returns — shared intake + collection with the Issue flow, repair-and-ship-back tail (seller-valid or LAB-valid), invalid-confirmed customer-paid ship-back |
 
 ### Output — feature specs
 
@@ -36,7 +37,7 @@ Every doc follows the same shape: `Overview → Flow (mermaid) → State models 
 | [output/returns/change_of_mind.md](./output/returns/change_of_mind.md) | UI flow of the change-of-mind returns branch (Steps 1, 2-CoM, 3–7), eligibility, refund math. Links to `input/return_flow_change_of_mind.md` for the operational state machine |
 | [output/returns/issue.md](./output/returns/issue.md) | UI flow of the issue / wrong-device branch (Step 1, 2-issue, 3–7), refund math with AED 100 Wallet bonus. Links to `input/return_flow_issue.md` |
 | [output/returns/claim_tracking.md](./output/returns/claim_tracking.md) | `ClaimCard` (5-state baseline) + three takeover cards (`DocsRejected`, `PickupFailed`, `InvalidClaim`) + canonical sub-status / action-gate / SLA reference |
-| [output/warranties_compensations.md](./output/warranties_compensations.md) | Stub: the two unwired entries on the returns flow's Step 1; scope, divergence, hook-in points |
+| [output/warranties_compensations.md](./output/warranties_compensations.md) | Warranty intake (Step 1 → 7, skips refund-method step) + tracking card (`WarrantyClaimCard` — 6-state repair-and-ship-back pipeline, state-specific heroes, brand-toned tracking dropdown reusing outbound `SHIPPING_SUB_STATUSES`). Plus compensation (still stub) |
 | [output/claim_detailed_tracking.md](./output/claim_detailed_tracking.md) | Design history of the deprecated `Show detailed tracking` disclosure. Reference tables have moved to `output/returns/claim_tracking.md` |
 
 ## Stack

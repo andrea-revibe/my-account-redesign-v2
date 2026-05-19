@@ -6,10 +6,12 @@ import {
   Phone,
   Check,
   FileImage,
+  Wrench,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
+import { expectedCompletionFor } from '../../lib/claims'
 import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
 
 const REASON_LABELS = {
@@ -28,12 +30,16 @@ export default function Step6Review({ state, dispatch, order }) {
   if (!order) return null
   const currency = order.currency
   const isIssue = state.claimType === 'issue'
-  const refund = refundBreakdown(
-    order,
-    state.units,
-    state.refundMethod,
-    state.claimType,
-  )
+  const isWarranty = state.claimType === 'warranty'
+  const refund = isWarranty
+    ? null
+    : refundBreakdown(
+        order,
+        state.units,
+        state.refundMethod,
+        state.claimType,
+      )
+  const warrantyEta = isWarranty ? expectedCompletionFor('warranty') : null
   const reasonText = !state.reason.value
     ? 'Not provided'
     : state.reason.value === 'other' && state.reason.otherText.trim()
@@ -45,8 +51,9 @@ export default function Step6Review({ state, dispatch, order }) {
       ? 'Factory reset confirmed'
       : 'Credentials provided'
 
-  const refundMethodLabel =
-    state.refundMethod === 'wallet'
+  const refundMethodLabel = isWarranty
+    ? null
+    : state.refundMethod === 'wallet'
       ? 'Revibe Wallet'
       : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`
 
@@ -55,7 +62,7 @@ export default function Step6Review({ state, dispatch, order }) {
   return (
     <>
       <StepHeading
-        title="Review your return"
+        title={isWarranty ? 'Review your warranty claim' : 'Review your return'}
         subtitle="Double-check before you submit. You can edit any section."
       />
 
@@ -86,8 +93,11 @@ export default function Step6Review({ state, dispatch, order }) {
           </div>
         </div>
 
-        {isIssue ? (
-          <Section title="Issue" onEdit={() => goTo(2)}>
+        {isIssue || isWarranty ? (
+          <Section
+            title={isWarranty ? 'Fault' : 'Issue'}
+            onEdit={() => goTo(2)}
+          >
             <IssueSummary
               issueDetails={state.issueDetails}
               issueScope={state.issueScope}
@@ -131,57 +141,87 @@ export default function Step6Review({ state, dispatch, order }) {
           </div>
         </Section>
 
-        <Section title="Refund" onEdit={() => goTo(5)}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[13.5px] text-ink flex items-center gap-1.5">
-                {state.refundMethod === 'wallet' ? (
-                  <>
-                    <img
-                      src={REVIBE_WALLET_ICON}
-                      alt=""
-                      aria-hidden
-                      className="w-3.5 h-3.5 object-contain"
-                    />
-                    <span>Revibe Wallet</span>
-                    <WalletInfoTooltip stopPropagation />
-                  </>
-                ) : (
-                  <>
-                    <CreditCard
-                      size={13}
-                      strokeWidth={1.75}
-                      className="text-ink-2"
-                    />
-                    {refundMethodLabel}
-                  </>
+        {isWarranty ? (
+          <Section title="What you'll get back">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[13.5px] text-ink flex items-center gap-1.5">
+                  <Wrench
+                    size={13}
+                    strokeWidth={1.75}
+                    className="text-ink-2"
+                  />
+                  Your repaired device
+                </div>
+                <div className="text-[11.5px] text-muted mt-0.5 leading-[1.4]">
+                  No refund — the same unit is returned to you after repair.
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted">
+                  Expected back
+                </div>
+                <div className="text-[14px] font-semibold text-ink leading-[1.2] mt-1">
+                  {warrantyEta?.long || '—'}
+                </div>
+              </div>
+            </div>
+          </Section>
+        ) : (
+          <Section title="Refund" onEdit={() => goTo(5)}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[13.5px] text-ink flex items-center gap-1.5">
+                  {state.refundMethod === 'wallet' ? (
+                    <>
+                      <img
+                        src={REVIBE_WALLET_ICON}
+                        alt=""
+                        aria-hidden
+                        className="w-3.5 h-3.5 object-contain"
+                      />
+                      <span>Revibe Wallet</span>
+                      <WalletInfoTooltip stopPropagation />
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard
+                        size={13}
+                        strokeWidth={1.75}
+                        className="text-ink-2"
+                      />
+                      {refundMethodLabel}
+                    </>
+                  )}
+                </div>
+                {!isIssue && state.refundMethod === 'original' && (
+                  <div className="text-[11.5px] text-muted mt-0.5">
+                    Includes 10% restocking fee
+                  </div>
                 )}
+                {isIssue &&
+                  state.refundMethod === 'wallet' &&
+                  refund.bonus > 0 && (
+                    <div className="text-[11.5px] text-accent font-semibold mt-0.5">
+                      Includes {currency} {formatMoney(refund.bonus)} bonus
+                    </div>
+                  )}
               </div>
-              {!isIssue && state.refundMethod === 'original' && (
-                <div className="text-[11.5px] text-muted mt-0.5">
-                  Includes 10% restocking fee
+              <div className="text-right shrink-0">
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted">
+                  You'll receive
                 </div>
-              )}
-              {isIssue && state.refundMethod === 'wallet' && refund.bonus > 0 && (
-                <div className="text-[11.5px] text-accent font-semibold mt-0.5">
-                  Includes {currency} {formatMoney(refund.bonus)} bonus
+                <div className="text-[18px] font-bold text-ink tabular-nums leading-none mt-1">
+                  {currency} {formatMoney(refund.net)}
                 </div>
-              )}
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted">
-                You'll receive
-              </div>
-              <div className="text-[18px] font-bold text-ink tabular-nums leading-none mt-1">
-                {currency} {formatMoney(refund.net)}
               </div>
             </div>
-          </div>
-        </Section>
+          </Section>
+        )}
 
         <PackingConfirmation
           checked={state.packingConfirmed}
-          isIssue={isIssue}
+          isIssue={isIssue || isWarranty}
           onChange={(value) =>
             dispatch({ type: 'SET_PACKING_CONFIRMED', value })
           }

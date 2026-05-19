@@ -20,7 +20,7 @@ The five states live in `CLAIM_STATUSES` inside `src/lib/claims.js` — add, ren
 
 `claim.subStatusId` (optional, see §4) carries finer-grained branching that hangs off these parents — `awaiting_documents` under `initiated`, `collection_failed` under `pickup`, the `under_revision` / `expert_revision` / `invalid_confirmed` / `awaiting_payment` / `ship_back_*` chain under `qc`. Today the card surfaces none of these inline; they're either kept in the registry for future use or drive the takeover-card routing in §3.
 
-**Card routing precedence.** `App.jsx` checks claim takeovers before the baseline `ClaimCard` (see [../orders.md](../orders.md) §2). Order:
+**Card routing precedence.** `App.jsx` checks claim takeovers first, then the warranty branch, then the refund baseline (see [../orders.md](../orders.md) §2). Order:
 
 ```mermaid
 flowchart TD
@@ -30,13 +30,17 @@ flowchart TD
   q2 -->|yes| pickup[PickupFailedCard]
   q2 -->|no| q3{claim.invalidClaim?}
   q3 -->|yes| invalid[InvalidClaimCard]
-  q3 -->|no| q4{hasActiveClaim?}
-  q4 -->|yes| baseline[ClaimCard — In progress]
-  q4 -->|no| q5{isClaimRefunded?}
-  q5 -->|yes| past[ClaimCard — Past orders]
+  q3 -->|no| q4{type === 'warranty' &amp; active?}
+  q4 -->|yes| warranty[WarrantyClaimCard — In progress]
+  q4 -->|no| q5{hasActiveClaim?}
+  q5 -->|yes| baseline[ClaimCard — In progress]
+  q5 -->|no| q6{isWarrantyDelivered?}
+  q6 -->|yes| warrantyPast[WarrantyClaimCard — Past orders]
+  q6 -->|no| q7{isClaimRefunded?}
+  q7 -->|yes| past[ClaimCard — Past orders]
 ```
 
-The three takeover cards replace `ClaimCard`'s surface while the claim is blocked on a single customer action and auto-cancel (or auto-close) if ignored. They share a structural pattern (danger-toned hero with an ops/courier/quality message → action gate → customer commits → card flips to a warn-toned "submitted" state with an undo affordance).
+The three takeover cards replace the baseline card's surface while the claim is blocked on a single customer action and auto-cancel (or auto-close) if ignored. They share a structural pattern (danger-toned hero with an ops/courier/quality message → action gate → customer commits → card flips to a warn-toned "submitted" state with an undo affordance). `WarrantyClaimCard` is a sibling card type for `claim.type === 'warranty'` — same chrome family as `ClaimCard`, different post-QC tail (repair-and-ship-back instead of refund). Spec at [`../warranties_compensations.md`](../warranties_compensations.md) §2.
 
 ## 2. ClaimCard (baseline)
 
@@ -106,7 +110,8 @@ Filter counts reflect the same rules — an in-flight claim counts toward the `i
 - `CLAIM_TRANSIT_SUB_STATUSES` + `transitSubProgressIndex` — 4-stop inverse-journey sub-timeline rendered inside the `See detailed tracking` dropdown when `claim.transitSubTimeline.picked_up` is set.
 - Headline + sub-line resolution.
 - `SUB_STATUS_LABELS` — copy registry for sub-statuses (see §4.2). Not currently rendered by `ClaimCard`; kept as the source of truth for ops/internal references and any future surface that exposes one of these branches inline.
-- `CLAIM_SLAS` — SLA placeholders (used by the returns flow's Step 4 "What happens next" timeline).
+- `CLAIM_SLAS` — SLA placeholders for refund-flow steps and the warranty-tail steps (`under_repair`, `ship_back`). Used by the returns flow's Step 4 detailed-timeline dropdown and the `expectedCompletionFor(claimType)` helper that drives the Step 4 / Review / Confirmation "Expected by" headlines.
+- `expectedCompletionFor(claimType, today?)` — sums SLA `expectedHours` across the claim-type's pipeline (refund: 5 steps; warranty: 6 steps), adds the total to `today`, and returns `{ short, long, hours, date }`. `long` is the "Monday, 14 May" form used by the Step 4 headline + warranty Step 6/7 surfaces; `short` mirrors the seeded `claim.repairWindow.expectedComplete` shape ("Mon, 14 May").
 - `actionGateCopy()` — banner copy for the three action gates.
 - Summary-label maps: `REASON_LABELS`, `RETURN_METHOD_LABELS`, `reasonText`, `devicePrepText`, `refundMethodLabel`.
 - `hasActiveClaim`, `isClaimRefunded`.
@@ -170,9 +175,10 @@ stateDiagram-v2
 
 **Expanded (failed state).** Same hero but the courier message expands into a full attributed block (avatar with `opsName` initial — typically the courier's first name). Below the header:
 
-1. **`Pickup address`** — read-only confirmation card showing the saved pickup address + phone + email from `claim.pickupDetails`. A stub `Edit` link is wired but inert. The product decision is "address confirm only" — no slot picker, no note field — so the intent is to give the customer a chance to verify the address before re-dispatching.
-2. **Confirm summary line** — single sentence preview of what confirming creates: courier + scheduled slot (driven by `claim.pickupFailure.nextPickup`).
-3. **Footer** — `Cancel claim` (visual stub) + `Confirm new pickup` (solid danger-red primary action). Confirm is always enabled; the confirmation step itself is the gate.
+1. **`Pickup address` card** — address + phone + email block carrying the saved values from `claim.pickupDetails`. Read-only by default; when the customer taps the `Change pickup address` button below it, the card flips into an inline edit mode (three input fields stacked with Save / Cancel beneath). Save commits the next values back to local component state and exits edit mode; Cancel discards the draft. Local state only — the change does not propagate back to the order data. Mirrors `InvalidClaimCard`'s `Delivery details` card.
+2. **`Change pickup address` button** — solid border-brand outline, Settings2 glyph. Hidden while the pickup-address card is in edit mode.
+3. **Confirm summary line** — single sentence preview of what confirming creates: courier + scheduled slot (driven by `claim.pickupFailure.nextPickup`).
+4. **Footer** — `Cancel claim` (visual stub) + `Confirm new pickup` (solid danger-red primary action). Confirm is always enabled; the confirmation step itself is the gate.
 
 **Submitted state.** Tapping `Confirm new pickup` flips the card to a warn-toned variant: amber accent strip, pulsing `Pickup rescheduled` pill, `New AWB created` phase tag, `Your new pickup is on the way` headline, body that names the courier + slot + new AWB. Expanded shows a `Your new pickup` summary block (courier, AWB, slot, pickup-from address) followed by an `Undo · replay the demo` button.
 
@@ -277,7 +283,7 @@ The deadline label uses the prototype convention from `claim.docsRejection.timeL
 
 ### 4.4 SLA placeholders (`CLAIM_SLAS`)
 
-Lives in `src/lib/claims.js`. Drives the returns flow's Step 4 "What happens next" timeline. **Placeholder values — ops to revise.**
+Lives in `src/lib/claims.js`. Drives the returns flow's Step 4 detailed-timeline dropdown and the `expectedCompletionFor(claimType)` helper that computes the "Expected by" headline (and the warranty Review / Confirmation expected-back dates). **Placeholder values — ops to revise.**
 
 | Step | `expectedHours` | `bufferHours` | Notes |
 |---|---|---|---|
@@ -285,19 +291,21 @@ Lives in `src/lib/claims.js`. Drives the returns flow's Step 4 "What happens nex
 | `awaiting_documents` | 48h | 48h | Customer-action gate; deadline comes from `actionRequired.deadline`, not SLA. |
 | `collection_failed` | n/a | n/a | Customer-action gate; SLA replaced by `actionRequired.deadline`. |
 | `pickup` → `qc` | 60h | 48h | Courier collection + transit back to Revibe (consolidates the legacy `under_collection` and `in_transit` SLAs). Country-aware SLAs deferred. |
-| `qc` → `refund_issued` | 48h | 48h | Happy-path inspection. |
+| `qc` → `refund_issued` *(or `under_repair` on warranty)* | 48h | 48h | Happy-path inspection. |
 | `under_revision` | 48h | 48h | Agent reviewing seller's invalid-claim proof. |
 | `expert_revision` | 120h | 72h | LAB sub-flow — explicitly longer; customers should expect it. |
 | `awaiting_payment` | n/a | n/a | Customer-action gate. |
-| `ship_back_pending` → `ship_back_in_transit` | 48h | 24h | After payment received. |
-| `ship_back_in_transit` → `ship_back_delivered` | 72h | 48h | Final leg. |
+| `ship_back_pending` → `ship_back_in_transit` | 48h | 24h | After payment received (invalid-claim ship-back). |
+| `ship_back_in_transit` → `ship_back_delivered` | 72h | 48h | Final leg of invalid-claim ship-back. |
 | `refund_issued` → `refund_credited` | 24h | 24h | Automated refund posting; window for the gateway to move funds to wallet/card. |
+| `under_repair` → `ship_back` *(warranty)* | 168h | 72h | The long pole on the warranty tail — repair window. |
+| `ship_back` → `device_returned` *(warranty)* | 96h | 24h | Repaired device's return leg; reuses the standard outbound `SHIPPING_SUB_STATUSES`. |
 
 Track current actuals before promoting these to production.
 
 ## 5. Data model — `claim` object
 
-Optional object populated on a delivered order to drive `ClaimCard` and its takeover variants. Production will write this object when the returns flow's Step 6 submit is wired; today four orders carry hand-seeded baseline claims: `89855` (`initiated` baseline exemplar — only the hero scheduled-pickup strip + first dot are populated, no takeovers, In progress), `89815` (`pickup` with a rejected cancellation in history and the `See detailed tracking` dropdown wired via `transitSubTimeline.picked_up`, In progress), `89762` (`qc` baseline Issue claim, no sub-status, In progress), and `89200` (`refund_credited` with a rejected cancellation in history, Past orders). Plus takeover-card mocks: `89734` (DocsRejected — underlying `initiated`), `89876` (PickupFailed — underlying `initiated`), `89940` (InvalidClaim — underlying `qc`).
+Optional object populated on a delivered order to drive `ClaimCard` and its takeover variants. Step 6's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and stitches it onto the order at the App level via `submittedClaims` — in-session only, cleared on refresh, revertable via the `UndoSnackbar`. Selected delivered mocks also hand-seed a claim: `89855` (`initiated` baseline exemplar — only the hero scheduled-pickup strip + first dot are populated, no takeovers, In progress), `89815` (`pickup` with a rejected cancellation in history and the `See detailed tracking` dropdown wired via `transitSubTimeline.picked_up`, In progress), `89762` (`qc` baseline Issue claim, no sub-status, In progress), and `89200` (`refund_credited` with a rejected cancellation in history, Past orders). Plus takeover-card mocks: `89734` (DocsRejected — underlying `initiated`), `89876` (PickupFailed — underlying `initiated`), `89940` (InvalidClaim — underlying `qc`). Warranty-specific mocks live in [warranties_compensations.md](../warranties_compensations.md) §2.
 
 ### 5.1 Core claim fields
 
@@ -305,7 +313,7 @@ Optional object populated on a delivered order to drive `ClaimCard` and its take
 |---|---|---|
 | `claim.claimRef` | string | `RET-XXXXXXXX` shown on the card hero and details sheet. Generated by `generateClaimRef()` in `src/lib/returns.js`. |
 | `claim.claimStatusId` | enum | One of `initiated`, `pickup`, `qc`, `refund_issued`, `refund_credited`. Drives tone, hero copy, progress dot index, and section routing. |
-| `claim.type` | `'change_of_mind' | 'issue'` | Drives the `Claim type` row in `ClaimDetailsSheet`, the hero eyebrow on `ClaimCard` (`Claim · Change of mind` / `Claim · Issue`), and the label chip on Step 7. |
+| `claim.type` | `'change_of_mind' | 'issue' | 'warranty'` | Drives the `Claim type` row in `ClaimDetailsSheet`, the hero eyebrow on `ClaimCard` / `WarrantyClaimCard`, the label chip on Step 7, and the routing decision in `App.jsx` between `ClaimCard` and `WarrantyClaimCard`. |
 | `claim.submittedAt` | string | Human-readable timestamp for the `Submitted` row in `ClaimDetailsSheet`. |
 | `claim.units` | integer | Today the returns flow always submits `1`. Kept as an integer for multi-unit future. |
 | `claim.reason` *(change-of-mind only)* | `{ value, otherText }` | `value` is one of the keys of `REASON_LABELS`; `otherText` populated only when `value === 'other'`. |

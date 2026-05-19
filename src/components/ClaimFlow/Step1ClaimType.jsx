@@ -23,7 +23,7 @@ const ISSUE_SUBTYPES = [
     label: 'Use my warranty',
     sub: 'Repair and return to me',
     icon: Wrench,
-    inScope: false,
+    inScope: true,
   },
 ]
 
