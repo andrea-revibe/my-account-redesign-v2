@@ -204,6 +204,8 @@ Once the customer taps a card, their state sticks across filter changes (state l
 
 `ClaimCard` does **not** currently participate in `pickActiveOrderId`. Fulfilment in-flight orders win the auto-expand slot when both are present; claim cards collapse by default.
 
+**Exception — `created` / `quality_check`.** Even when one of these is the active order, neither the `HeroCard` nor auto-expansion of the `InProgressCard` is triggered. The hero is built around courier and ETA data that doesn't exist yet at those states, so `App.jsx` excludes them from `showHero`; `InProgressCard` is rendered without `defaultExpanded` so it stays collapsed until the user opens it manually. This is invisible in the normal demo (the active order is always at `shipped`) but matters in journey mode (`?journey=1`), where the single journey order is the active one at every step.
+
 ## 6. History thread
 
 On layered cards — `ClaimCard`, cancelled `PastOrderCard` in `refund_pending` / `refunded`, and the `DeliveredOrderCard` — past events render as compact chips under the active hero; tapping a chip expands its detail inline (one open at a time). Derived in `src/lib/events.js` from `timeline` / `cancellationTimeline` / `cancellationRejection`.
