@@ -46,12 +46,18 @@ const TONE = {
 // block; the hero carries state-specific context instead (repair window
 // on `under_repair`, return ETA + courier on `ship_back`, delivered date
 // on `device_returned`).
-export default function WarrantyClaimCard({ order, defaultExpanded = false }) {
+export default function WarrantyClaimCard({ order, defaultExpanded = false, openSignal = 0 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [detailsOpen, setDetailsOpen] = useState(false)
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
+  // One-shot expand fired by Step 7's "Track this claim" — bump-only
+  // signal so subsequent flow opens (Back-to-account, raising another
+  // claim, etc.) don't re-trigger the expand.
+  useEffect(() => {
+    if (openSignal > 0) setExpanded(true)
+  }, [openSignal])
 
   const claim = order.claim
   const tone = warrantyClaimToneFor(claim.claimStatusId)

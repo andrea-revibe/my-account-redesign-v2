@@ -39,12 +39,18 @@ const TONE = {
   success: { text: 'text-success', bg: 'bg-success', softBg: 'bg-success-bg', softText: 'text-success', border: 'border-[#c6ebd9]',  heroBg: 'bg-gradient-to-br from-success-bg to-[#d4f0e3]' },
 }
 
-export default function ClaimCard({ order, defaultExpanded = false }) {
+export default function ClaimCard({ order, defaultExpanded = false, openSignal = 0 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [detailsOpen, setDetailsOpen] = useState(false)
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
+  // One-shot expand fired by Step 7's "Track this return" — bump-only
+  // signal so subsequent flow opens (Back-to-account, raising another
+  // claim, etc.) don't re-trigger the expand.
+  useEffect(() => {
+    if (openSignal > 0) setExpanded(true)
+  }, [openSignal])
 
   const claim = order.claim
   const tone = claimToneFor(claim.claimStatusId)

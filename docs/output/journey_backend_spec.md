@@ -2,7 +2,7 @@
 
 > Companion doc to the prototype's **journey mode** (`?journey=1`). Every transition the dev panel exposes corresponds to a backend event production engineering will need to emit. This doc explains why the mode exists, how to extend it with new journeys, and is the canonical spec for each wired transition (trigger, event name, payload sketch, field deltas, UI surface).
 >
-> Scope today: **happy-path order lifecycle** (§3 + §4) and **cancellation at QC** with refund-method and supplier-decision forks (§5). Claim and warranty journeys will extend this doc as they ship — see §7 for the recipe, and §6 for how to wire customer-triggered nodes to real UI.
+> Scope today: **happy-path order lifecycle** (§3 + §4), **cancellation at QC** with refund-method and supplier-decision forks (§5), and **change-of-mind claim** with refund-method, pickup-outcome, and recovery forks (§7). Warranty journeys will extend this doc as they ship — see §8 for the recipe, and §6 for how to wire customer-triggered nodes to real UI.
 
 ## 1. Purpose
 
@@ -354,7 +354,22 @@ The gate matters: without `validNext().some(...)`, an out-of-sequence submit (ca
 
 The `Continue to cancel` button on the Step 2 dissuade screen is **not** a submit — it routes to Step 3 confirm. Only Step 3's Cancel button counts as the customer's commitment.
 
-### 6.4 Permissive vs strict dev panel
+### 6.4 Worked example — `ClaimFlow` ↔ `claim_submitted_*`
+
+**Implemented.** Same pattern as §6.3, with two prototype-side adjustments worth flagging:
+
+1. **Order lookup needs the journey order injected.** `ClaimFlow` and `flowReducer` previously looked up the order via `ORDERS.find(o => o.id === state.orderId)` — but the journey order (`JOURNEY-001`) doesn't live in `ORDERS`. `ClaimFlow` now accepts an optional `initialOrder` prop that supersedes the lookup; `flowReducer.initialState` takes `{ initialOrderId, initialOrder }`. `App.jsx` passes `initialOrder={journey.order}` when `journeyMode && journey.order.id === claimFlowOrderId`. Non-journey callers continue to rely on the `ORDERS` lookup, unchanged.
+2. **Mode-aware submit handler.** `App.jsx` consolidates the previous inline `onSubmitClaim` callback into a named `handleSubmitClaim(orderId, claim)`. In journey mode it reads `claim.refundMethod` (`'wallet'` vs `'original'`) and advances to `claim_submitted_wallet` / `claim_submitted_card`, gated on `journey.validNext()`; the in-session `submittedClaims` map and `UndoSnackbar` are skipped (the journey's `apply()` owns the claim shape and the dev panel's Back/Reset already handles undo). Non-journey mode keeps the existing seed-claim + undo flow.
+
+| Step 6 submit | Journey node fired |
+|---|---|
+| `claim.refundMethod === 'wallet'` | `claim_submitted_wallet` |
+| `claim.refundMethod === 'original'` | `claim_submitted_card` |
+| Warranty submit (`claim.type === 'warranty'`) | — no journey wired yet; submit no-ops (validNext doesn't include a warranty target) |
+
+Step 7's `Track this return` / `Track this claim` is **not** wired to advance the journey — it closes the flow and signals the `ClaimCard` / `WarrantyClaimCard` to mount expanded via the one-shot `openSignal` prop, but the claim stays at `initiated`. The journey continues to be driven by dev-panel transitions (`claim_picked_up`, `claim_pickup_failed`, …).
+
+### 6.5 Permissive vs strict dev panel
 
 Two stances; default permissive:
 
@@ -363,7 +378,7 @@ Two stances; default permissive:
 
 Switching to strict is a `trigger === 'customer' && !showCustomerButtons` filter in `JourneyDevPanel.jsx`'s `nexts` render — a couple of lines on top of today's outlined treatment. Revisit once 3+ customer-triggered nodes exist across journeys.
 
-### 6.5 Future evolution — event-dispatch
+### 6.6 Future evolution — event-dispatch
 
 Each node already carries `event: 'order.cancellation.requested'`. The natural evolution is to make the journey listen for *events* instead of *node ids*:
 
@@ -388,11 +403,187 @@ Why this is better:
 
 Why we haven't done it yet: refactor cost outweighs benefit at one consumer. Hold until 3+ customer-triggered nodes exist across journeys.
 
-## 7. Adding a new journey
+## 7. Journey: Change-of-mind claim
 
-The code today (`src/data/journey.js`) holds two journeys — happy path (§3 + §4) and cancellation at QC (§5). The data layer uses a **hybrid architecture**: top-level journeys picked from the dev panel, with optional branches inside each journey. This section is the recipe for adding a third.
+The customer takes delivery of an order, then raises a change-of-mind claim from the delivered `PastOrderCard` and rides the refund pipeline. Three forks layer on top of the happy-path lifecycle:
 
-### 7.1 Target data shape
+1. **Customer refund choice** — `ClaimFlow` Step 5 (wallet vs original payment). Each method produces a different `expectedRefund` shape (wallet 100%, card −10% restocking fee per `src/lib/returns.js → refundBreakdown`), so each gets its own `claim_submitted_*` node.
+2. **System pickup outcome** — courier picks up successfully, or collection fails. The failed branch sets `claim.pickupFailure` so the order routes to `PickupFailedCard` (see `docs/output/returns/claim_tracking.md` §3.2).
+3. **Customer recovery** — `claim_pickup_rescheduled` clears the failure and bumps the claim to **pickup** state with `transitSubTimeline.picked_up` seeded together, so the `See detailed tracking` dropdown is visible immediately. Reschedule deliberately collapses two events (status bump + first courier scan) into one customer-facing surface so the customer experiences forward progress rather than reverting to "claim initiated" on confirm.
+
+Both refund-method branches converge at `claim_picked_up`. The pickup-failed branch rejoins the trunk **past** `claim_picked_up` at `claim_transit_arrived_origin_hub` — because reschedule already does what `claim_picked_up` would do. Chain terminates at `claim_refund_credited`.
+
+Card-vs-wallet processing delay is elided — the journey models wallet-style instant settle for both branches. The cancel-at-QC journey (§5) is the canonical demo for timestamp-divergent refund paths.
+
+### 7.1 Node graph
+
+```
+placed → qc_started → [shipping chain] → delivered
+                                              ↓ next: [claim_submitted_wallet, claim_submitted_card]
+                                              │
+                              ┌───────────────┴───────────────┐
+                              ↓                               ↓
+                  claim_submitted_wallet           claim_submitted_card
+                  (refund: wallet, fee 0)          (refund: card, fee 10%)
+                              │                               │
+                              └───────────────┬───────────────┘
+                                              ↓ next: [claim_picked_up, claim_pickup_failed]
+                                              │
+                              ┌───────────────┴───────────────┐
+                              ↓                               ↓
+                       claim_picked_up                claim_pickup_failed
+                              │                               ↓
+                              │                    claim_pickup_rescheduled
+                              │                               │  (skips claim_picked_up — reschedule
+                              │                               │   bumps to pickup + seeds the scan)
+                              ↓                               │
+              claim_transit_arrived_origin_hub  ←─────────────┘
+                              ↓
+              claim_transit_in_transit
+                              ↓
+              claim_transit_arrived_revibe_hub
+                              ↓
+              claim_qc_started
+                              ↓
+              claim_refund_issued
+                              ↓
+              claim_refund_credited   (terminal)
+```
+
+### 7.2 Transition summary
+
+| # | Node id | Trigger | Event | Card after transition |
+|---|---|---|---|---|
+| 0–6 | `placed` → `delivered` | per §3 | per §3 | per §3 (delivered's `next` is overridden) |
+| 7a | `claim_submitted_wallet` | customer (ClaimFlow) | `claim.created` | `ClaimCard` (initiated, wallet refund) |
+| 7b | `claim_submitted_card` | customer (ClaimFlow) | `claim.created` | `ClaimCard` (initiated, card refund) |
+| 8 | `claim_picked_up` | system (DHL scan) | `claim.transit.picked_up` | `ClaimCard` (pickup, detailed tracking visible) |
+| 9 | `claim_transit_arrived_origin_hub` | system | `claim.transit.arrived_origin_hub` | same |
+| 10 | `claim_transit_in_transit` | system | `claim.transit.in_transit` | same |
+| 11 | `claim_transit_arrived_revibe_hub` | system | `claim.transit.arrived_revibe_hub` | same |
+| 12 | `claim_qc_started` | system (Revibe ops) | `claim.qc.started` | `ClaimCard` (qc) |
+| 13 | `claim_refund_issued` | system (Revibe ops) | `claim.refund.issued` | `ClaimCard` (refund_issued) |
+| 14 | `claim_refund_credited` | system (processor) | `claim.refund.completed` | `ClaimCard` (refund_credited) → **Past orders** |
+| 8′ | `claim_pickup_failed` | system (DHL failed scan) | `claim.pickup.failed` | `PickupFailedCard` (takeover) |
+| 9′ | `claim_pickup_rescheduled` | customer (PickupFailedCard, stub) | `claim.pickup.rescheduled` | `ClaimCard` (pickup, detailed tracking visible — rejoins at #9) |
+
+### 7.3 Per-transition detail
+
+Nodes 0–6 are identical to §4 (happy path) except `delivered.next: ['claim_submitted_wallet', 'claim_submitted_card']` instead of the default terminal. The below covers nodes 7+.
+
+#### 7.3.7a `claim_submitted_wallet` — claim submitted, wallet refund
+
+- **Trigger**: customer completes the 7-step `ClaimFlow` overlay with `claimType: 'change_of_mind'` and `refundMethod: 'wallet'` (Step 5 wallet radio + Step 6 Submit).
+- **Event**: `claim.created`
+- **Payload** (sketch):
+  ```json
+  {
+    "orderId": "JOURNEY-001",
+    "claimRef": "CMJrn1",
+    "type": "change_of_mind",
+    "reason": "changed_mind",
+    "devicePrep": { "option": "reset" },
+    "pickupDetails": { "address": "...", "email": "...", "phone": "..." },
+    "scheduledPickup": { "courier": "DHL Express", "date": "Wednesday, 27 May", "slot": "10 AM – 12 PM" },
+    "refundMethod": "wallet",
+    "submittedAt": "2026-05-25T16:02:00+04:00"
+  }
+  ```
+- **Field deltas**:
+  - `claim: null → { claimRef: 'CMJrn1', claimStatusId: 'initiated', type: 'change_of_mind', refundMethod: 'wallet', expectedRefund: { itemTotal: 939, warranty: 90, gross: 1029, fee: 0, net: 1029, rate: 0 }, scheduledPickup, pickupDetails, timeline: { initiated: '25 May · 4:02 PM' } }`
+  - Other order fields unchanged (already at `statusId: 'delivered'`, `state: 'close'`).
+- **UI surface**: routes from `PastOrderCard` to `ClaimCard` initiated-state, card moves from **Past orders** to **In progress**. Scheduled-pickup strip visible. If `Track this return` is tapped on Step 7, the card auto-expands via the one-shot `openSignal` bump.
+
+#### 7.3.7b `claim_submitted_card`
+
+- **Trigger**: same as 7.3.7a, Step 5 set to **Original payment method**.
+- **Event**: `claim.created`
+- **Field deltas**: same as 7.3.7a except `refundMethod: 'original'` and `expectedRefund: { itemTotal: 939, warranty: 90, gross: 1029, fee: 102.9, net: 926.1, rate: 0.10 }` (10% restocking fee per change-of-mind rules in `lib/returns.js`).
+- **UI surface**: same. Fee line surfaces in `ClaimDetailsSheet`.
+
+#### 7.3.8 `claim_picked_up` — courier scanned the device
+
+- **Trigger**: DHL webhook (driver scans device at pickup).
+- **Event**: `claim.transit.picked_up`
+- **Field deltas**:
+  - `claim.claimStatusId: 'initiated' → 'pickup'`
+  - `claim.timeline.pickup: null → '28 May · 10:14 AM'`
+  - `claim.transitSubStatusId: null → 'picked_up'`
+  - `claim.transitSubTimeline.picked_up: null → '28 May · 10:14 AM'`
+- **UI surface**: `ClaimCard` advances to pickup-state hero (Truck phase tag, brand-warn tone). `See detailed tracking` dropdown becomes visible (gated on `claim.transitSubTimeline?.picked_up`). Scheduled-pickup strip retired (initiated-only).
+
+#### 7.3.9 – 7.3.11 transit nodes
+
+Same shape — each sets `claim.transitSubStatusId` to the next stop and appends a timestamp to `claim.transitSubTimeline`: `arrived_origin_hub` (28 May · 1:22 PM), `in_transit` (28 May · 5:42 PM), `arrived_revibe_hub` (29 May · 9:10 AM). `claimStatusId` stays at `pickup` throughout transit — the detailed-tracking dropdown advances; the card surface is unchanged.
+
+#### 7.3.12 `claim_qc_started`
+
+- **Trigger**: Revibe ops receives the device and assigns to QC.
+- **Event**: `claim.qc.started`
+- **Field deltas**: `claim.claimStatusId: 'pickup' → 'qc'`; `claim.timeline.qc: null → '29 May · 11:00 AM'`.
+- **UI surface**: phase tag flips to ShieldCheck "In review". Tone still brand-warn (per `claimToneFor`).
+
+#### 7.3.13 `claim_refund_issued`
+
+- **Trigger**: Revibe ops approves and issues refund.
+- **Event**: `claim.refund.issued`
+- **Field deltas**: `claim.claimStatusId: 'qc' → 'refund_issued'`; `claim.timeline.refund_issued: null → '30 May · 2:18 PM'`.
+- **UI surface**: tone flips warn → brand. Phase tag becomes Receipt "Processing".
+
+#### 7.3.14 `claim_refund_credited` — terminal
+
+- **Trigger**: payment processor confirms refund settled (wallet path modelled here as instant).
+- **Event**: `claim.refund.completed`
+- **Field deltas**: `claim.claimStatusId: 'refund_issued' → 'refund_credited'`; `claim.timeline.refund_credited: null → '30 May · 2:19 PM'`.
+- **UI surface**: tone flips brand → success. Order drops to **Past orders**. `hasActiveClaim` → false; `isClaimRefunded` → true.
+
+#### 7.3.8′ `claim_pickup_failed`
+
+- **Trigger**: DHL webhook (driver couldn't complete pickup — no answer / wrong address).
+- **Event**: `claim.pickup.failed`
+- **Payload** (sketch):
+  ```json
+  {
+    "claimRef": "CMJrn1",
+    "failedAt": "2026-05-27T08:20:00+04:00",
+    "opsName": "Rashid",
+    "opsMessage": "...",
+    "nextPickup": { "awb": "25193520", "slot": "Thursday, 28 May · 10 AM – 12 PM" }
+  }
+  ```
+- **Field deltas**:
+  - `claim.subStatusId: null → 'collection_failed'`
+  - `claim.pickupFailure: null → { failedAt, autoCancelAt, opsName, opsRole, opsMessage, nextPickup }`
+  - `claim.actionRequired: null → { kind: 'collection_failed', failedAt }`
+  - `claim.claimStatusId` stays at `'initiated'` (the device hasn't been collected).
+- **UI surface**: order routes from `ClaimCard` to `PickupFailedCard` (takeover, danger tone). Customer sees courier's note + `Schedule new pickup` CTA + countdown to auto-cancel.
+
+#### 7.3.9′ `claim_pickup_rescheduled`
+
+- **Trigger**: customer taps `Schedule new pickup` on `PickupFailedCard` and confirms the proposed slot. (Real UI is a stub today — see §7.4; advanced from the dev panel.)
+- **Event**: `claim.pickup.rescheduled`
+- **Field deltas** — combines status bump + first scan into one surface:
+  - `claim.subStatusId: 'collection_failed' → undefined`
+  - `claim.pickupFailure: {...} → undefined`
+  - `claim.actionRequired: {...} → undefined`
+  - `claim.scheduledPickup.date: 'Wednesday, 27 May' → 'Thursday, 28 May'`
+  - `claim.claimStatusId: 'initiated' → 'pickup'`
+  - `claim.timeline.pickup: null → '28 May · 10:14 AM'`
+  - `claim.transitSubStatusId: null → 'picked_up'`
+  - `claim.transitSubTimeline.picked_up: null → '28 May · 10:14 AM'`
+- **UI surface**: reverts from `PickupFailedCard` to `ClaimCard` in **pickup** state with the detailed-tracking dropdown visible immediately. Rejoins the happy chain — next dev-panel button is `Arrived at origin hub`.
+
+### 7.4 Open prototype gaps (claim-change-of-mind only)
+
+- **`PickupFailedCard` reschedule still a stub.** The card has a confirm flow internally but doesn't bubble `claim.pickup.rescheduled` out via a callback yet. Until that wiring lands (§6.2 pattern), `claim_pickup_rescheduled` can only be driven from the dev panel.
+- **`claim_picked_up` orphaned in the failed branch.** The node still exists for the happy branch's use, but reschedule bypasses it. If the design later separates "pickup confirmed" from "courier scanned", `claim_pickup_rescheduled` will need to split into two nodes and reach `claim_picked_up` again.
+- **Step 7's `Track this return` doesn't advance the journey.** Tapping it closes the flow and auto-expands the matching `ClaimCard` via the one-shot `openSignal` prop, but the claim stays at `initiated`. Journey continues to be driven by the dev panel.
+
+## 8. Adding a new journey
+
+The code today (`src/data/journey.js`) holds three journeys — happy path (§3 + §4), cancellation at QC (§5), and change-of-mind claim (§7). The data layer uses a **hybrid architecture**: top-level journeys picked from the dev panel, with optional branches inside each journey. This section is the recipe for adding a fourth.
+
+### 8.1 Target data shape
 
 ```js
 // src/data/journey.js (post-refactor)
@@ -429,29 +620,29 @@ export const JOURNEYS = [
 
   When `validNext()` returns multiple options, the dev panel renders one Next button per option. This keeps the linear `Next →` UX clean for the common case while supporting forks where they exist.
 
-### 7.2 URL + dev-panel
+### 8.2 URL + dev-panel
 
 - URL is `?journey=<journey_id>` (e.g. `?journey=happy_path`, `?journey=cancel_at_qc`). `?journey=1` is kept as a backward-compat alias for the first journey; unknown ids fall back to the first journey too.
 - Dev panel renders a **picker chip row** at the top (one chip per journey, active filled brand). Click to switch journeys — the cursor resets to the new journey's first node and the URL param is updated in `replaceState`.
 - The panel hides the picker row when only one journey exists (forward-compat — never the case today).
 
-### 7.3 Recipe — add a new top-level journey
+### 8.3 Recipe — add a new top-level journey
 
 1. **Sketch the nodes on paper first.** For each node: id, customer-facing label, trigger (`customer` / `system` / `external`), backend event name, the exact field deltas applied to the order. The node *is* the spec — do this before writing code.
 2. **Decide if you need branches.** If multiple paths fork from one node, list the destination node ids; if not, leave nodes linear.
 3. **Author the journey config** as an entry in `JOURNEYS`. Reuse the existing `INITIAL_ORDER` constant unless your journey starts from a meaningfully different shape.
 4. **Verify card routing.** Journey mode runs the projected order through `App.jsx`'s existing routing tree (`hasActiveClaim` / `isInFlightCancellation` / `statusId` checks etc.). If your transitions land the order in a state no card handles, update the routing too.
-5. **Document the journey** here, in this file: add a new top-level section before §7 (e.g. `## 7. Journey: <name>`, renumbering subsequent sections) with a node graph, transition summary table, and per-transition detail (trigger, event, payload, field deltas, UI surface). Mirror the structure of §5 (cancel-at-qc) for branched journeys, or §3 + §4 (happy path) for linear ones.
+5. **Document the journey** here, in this file: add a new top-level section before §8 (e.g. `## 8. Journey: <name>`, renumbering subsequent sections) with a node graph, transition summary table, and per-transition detail (trigger, event, payload, field deltas, UI surface). Mirror the structure of §5 (cancel-at-qc) or §7 (change-of-mind claim) for branched journeys, or §3 + §4 (happy path) for linear ones.
 6. **Update meta docs.** Add a one-line bullet to `CHANGELOG.md` Unreleased. Update `docs/README.md` only if the new journey introduces new feature surfaces (otherwise the existing journey-mode entry covers it).
 
-### 7.4 Recipe — add a branch within an existing journey
+### 8.4 Recipe — add a branch within an existing journey
 
 1. Add the new node(s) at the appropriate place in the journey's `nodes` array.
 2. Add `next: ['existingNextId', 'newBranchNodeId']` to the source node where the fork begins. Both ids must exist in `nodes`.
 3. Walk each branch to a sensible terminal node (or rejoin the trunk if the flow converges later — set `next` on the branch's last node to point at the rejoin target).
 4. Add the new transitions to this doc under the journey's section.
 
-### 7.5 Worked example — cancellation at placed (sketch)
+### 8.5 Worked example — cancellation at placed (sketch)
 
 A paper sketch for a different cancellation journey than the one wired in §5. Pre-QC cancellation: the customer cancels before the warehouse has touched the device, so the order skips the `requested` cancellation sub-status (per `src/lib/statuses.js` — created-stage cancellations go straight to `refund_pending`). Three nodes, all share the happy-path starting order. Contrast with the wired cancel-at-qc journey in §5, which exercises the `requested` phase and forks at supplier-confirm time.
 
@@ -502,7 +693,7 @@ UI walkthrough (anticipated): the card swaps from `InProgressCard` → `PastOrde
 
 When this journey ships, this sketch graduates into a fully-spec'd section with payloads, deltas, and UI surface notes per transition — same shape as §5.
 
-## 8. Field touch map
+## 9. Field touch map
 
 All order fields written across the lifecycle, grouped by category. Read this as: "production backend must be able to produce each of these on the order resource."
 
@@ -518,7 +709,7 @@ All order fields written across the lifecycle, grouped by category. Read this as
 | `delayed` | (not in happy path) | boolean | Flips banner to warn tone with `DELAYED_BODY` copy. Surfaced by a separate "delay detected" event. |
 | `statusMessage` | (not in happy path) | string | Overrides banner body only — for ad-hoc ops messages. |
 
-## 9. Mocked vs production
+## 10. Mocked vs production
 
 What the prototype fakes that production will need to replace:
 
@@ -527,14 +718,14 @@ What the prototype fakes that production will need to replace:
 - **No retries / failure events.** This journey is the happy path. Production also needs: customs hold, delivery attempt failed, address invalid, package lost, etc. None are in scope for this doc yet.
 - **Sub-status timestamps are independent of the parent.** `subTimeline.arrived_destination` is set independently of `timeline.shipped`. Production should ensure consistency (sub-status timestamps must be ≥ parent status timestamp).
 
-## 10. Open questions for engineering
+## 11. Open questions for engineering
 
 1. **Event sourcing vs state mutation.** This doc describes the order resource as a single mutable record with timeline fields appended. Is production using event sourcing (immutable log) with the order resource as a projection, or direct mutation? The prototype's `apply(o)` model maps cleanly to either.
 2. **Webhook authority.** For shipping sub-statuses, are we trusting DHL's webhook to define our sub-state, or normalising their events into our enum? `SHIPPING_SUB_STATUSES` is a Revibe enum — DHL emits many more granular events.
 3. **Delayed detection.** Where does `delayed: true` come from — a SLA timer service, or operator marking? This doc doesn't cover it but it will need a transition node when journey mode grows.
 4. **Webhook ordering & idempotency.** What's the contract for out-of-order or duplicate webhook deliveries? The prototype assumes strict linear order with no retries.
 
-## 11. Source code references
+## 12. Source code references
 
 - Journey definition: `src/data/journey.js`
 - Journey hook: `src/lib/journey.js`

@@ -86,6 +86,11 @@ export default function App() {
   // surfaces after the returns flow closes; Undo removes the entry
   // from submittedClaims so the order reverts to its delivered card.
   const [recentSubmit, setRecentSubmit] = useState(null)
+  // Auto-expand target driven by Step 7's "Track this return" button.
+  // `n` is bumped on each Track click so the matched ClaimCard's key
+  // changes → it remounts with defaultExpanded={true} even if the same
+  // orderId was tracked previously (e.g. journey replay).
+  const [autoOpenClaim, setAutoOpenClaim] = useState({ orderId: null, n: 0 })
 
   // Journey mode — sourced from ?journey=<id> URL param. Replaces ORDERS
   // with a single replayed order driven by the JourneyDevPanel. Mutually
@@ -132,6 +137,32 @@ export default function App() {
     if (journey.validNext().some((n) => n.id === target)) {
       journey.advance(target)
     }
+  }
+
+  // Customer-triggered journey advance from the real ClaimFlow submit.
+  // Mirrors handleCancelOrder: refund-method ids (wallet / original) map
+  // to the journey's refund-branch suffix. validNext gates an
+  // out-of-sequence submit (e.g. journey isn't on the claim_change_of_mind
+  // branch). Non-journey mode keeps the existing seed-claim + undo flow.
+  const handleSubmitClaim = (orderId, claim) => {
+    if (journeyMode) {
+      const branch = claim.refundMethod === 'wallet' ? 'wallet' : 'card'
+      const target = `claim_submitted_${branch}`
+      if (journey.validNext().some((n) => n.id === target)) {
+        journey.advance(target)
+      }
+      return
+    }
+    setSubmittedClaims((prev) => ({ ...prev, [orderId]: claim }))
+    setRecentSubmit({ orderId, claimType: claim.type })
+  }
+
+  // Step 7 "Track this return" — close the flow and signal the matched
+  // ClaimCard to mount expanded. Bumping `n` forces the key change.
+  const handleTrackClaim = (orderId) => {
+    setClaimFlowOrderId(null)
+    if (orderId == null) return
+    setAutoOpenClaim((prev) => ({ orderId, n: prev.n + 1 }))
   }
 
   const projectedOrders = useMemo(
@@ -235,10 +266,26 @@ export default function App() {
                       return <InvalidClaimCard key={o.id} order={o} />
                     }
                     if (hasActiveClaim(o) && o.claim?.type === 'warranty') {
-                      return <WarrantyClaimCard key={o.id} order={o} />
+                      return (
+                        <WarrantyClaimCard
+                          key={o.id}
+                          order={o}
+                          openSignal={
+                            autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
+                          }
+                        />
+                      )
                     }
                     if (hasActiveClaim(o)) {
-                      return <ClaimCard key={o.id} order={o} />
+                      return (
+                        <ClaimCard
+                          key={o.id}
+                          order={o}
+                          openSignal={
+                            autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
+                          }
+                        />
+                      )
                     }
                     if (isInFlightCancellation(o)) {
                       return <PastOrderCard key={o.id} order={o} />
@@ -271,16 +318,32 @@ export default function App() {
                 <div className="px-4 flex flex-col gap-3">
                   {past.map((o) => {
                     if (isWarrantyDelivered(o)) {
-                      return <WarrantyClaimCard key={o.id} order={o} />
+                      return (
+                        <WarrantyClaimCard
+                          key={o.id}
+                          order={o}
+                          openSignal={
+                            autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
+                          }
+                        />
+                      )
                     }
                     if (isClaimRefunded(o)) {
-                      return <ClaimCard key={o.id} order={o} />
+                      return (
+                        <ClaimCard
+                          key={o.id}
+                          order={o}
+                          openSignal={
+                            autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
+                          }
+                        />
+                      )
                     }
                     return (
                       <PastOrderCard
                         key={o.id}
                         order={o}
-                        onRaiseClaim={journeyMode ? undefined : setClaimFlowOrderId}
+                        onRaiseClaim={setClaimFlowOrderId}
                       />
                     )
                   })}
@@ -295,11 +358,14 @@ export default function App() {
       {claimFlowOrderId !== null && (
         <ClaimFlow
           initialOrderId={claimFlowOrderId}
+          initialOrder={
+            journeyMode && journey.order.id === claimFlowOrderId
+              ? journey.order
+              : undefined
+          }
           onClose={() => setClaimFlowOrderId(null)}
-          onSubmitClaim={(orderId, claim) => {
-            setSubmittedClaims((prev) => ({ ...prev, [orderId]: claim }))
-            setRecentSubmit({ orderId, claimType: claim.type })
-          }}
+          onSubmitClaim={handleSubmitClaim}
+          onTrackClaim={handleTrackClaim}
         />
       )}
       {claimFlowOrderId === null && recentSubmit && (
