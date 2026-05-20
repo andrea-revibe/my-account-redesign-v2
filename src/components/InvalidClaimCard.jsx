@@ -17,7 +17,11 @@ import {
   Truck,
   Zap,
 } from 'lucide-react'
-import { STATUSES } from '../lib/statuses'
+import {
+  STATUSES,
+  SHIPPING_SUB_STATUSES,
+  subProgressIndex,
+} from '../lib/statuses'
 
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
@@ -35,13 +39,37 @@ const REVIBE_CARE_ICON =
 // Per CLAUDE.md, this is the third takeover variant — see Card routing.
 export default function InvalidClaimCard({ order, defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const [mode, setMode] = useState('action_needed')
+  // Mode is internal demo state, but mirror any matching signal on the
+  // order data so a journey-driven advance (paidAt / declinedAt set on
+  // claim.invalidClaim) flips the card the same way the in-card buttons
+  // would. The local Undo / Reverse handlers still toggle mode directly —
+  // they're demo affordances that don't write back to the order.
+  const initialMode = order.claim.invalidClaim?.declinedAt
+    ? 'declined'
+    : order.claim.invalidClaim?.paidAt
+      ? 'paid'
+      : 'action_needed'
+  const [mode, setMode] = useState(initialMode)
   const [details, setDetails] = useState(order.claim.pickupDetails)
   const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
+
+  // Re-sync mode when the journey advances the order's invalidClaim
+  // outcome fields. Only forward transitions are applied — the in-card
+  // Undo / Reverse buttons remain authoritative on local rewinds.
+  useEffect(() => {
+    if (order.claim.invalidClaim?.declinedAt && mode !== 'declined') {
+      setMode('declined')
+    } else if (
+      order.claim.invalidClaim?.paidAt &&
+      mode === 'action_needed'
+    ) {
+      setMode('paid')
+    }
+  }, [order.claim.invalidClaim?.paidAt, order.claim.invalidClaim?.declinedAt, mode])
 
   if (mode === 'paid') {
     return (
@@ -267,6 +295,16 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
             </div>
             <TimelineDots ship={ship} curIdx={curIdx} />
           </div>
+
+          {/* Once the return shipment hits `shipped`, surface the same
+              outbound sub-status drill-down a regular order would carry
+              (arrived in destination country → cleared customs → forwarded
+              to third-party agent → out for delivery). Gated on ship
+              actually being in the shipped state — pre-shipping there's
+              nothing to track yet. */}
+          {ship.currentStatusId === 'shipped' && ship.subStatusId && (
+            <PaidShipBackSubDetail ship={ship} />
+          )}
 
           <div className="rounded-[10px] bg-brand-bg/60 border border-brand-bg2 px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
             <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued — the device is being shipped back as it was inspected.
@@ -624,6 +662,90 @@ function TimelineDots({ ship, curIdx }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// Outbound-style sub-status detail for the post-payment return shipment.
+// Same four milestones as a normal outgoing order (arrived in destination
+// country → cleared customs → forwarded to third-party agent → out for
+// delivery), driven by ship.subStatusId + ship.subTimeline. Neutral chrome
+// since the hero already does the brand-toned attention-grabbing.
+function PaidShipBackSubDetail({ ship }) {
+  const [show, setShow] = useState(false)
+  const cur = subProgressIndex(ship.subStatusId)
+
+  return (
+    <div className="px-1">
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        aria-expanded={show}
+        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-[10px] border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-line-2"
+      >
+        <span>{show ? 'Hide detailed tracking' : 'See detailed tracking'}</span>
+        <ChevronDown
+          size={16}
+          strokeWidth={1.75}
+          className={`text-ink-2 transition-transform ${show ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {show && (
+        <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
+          {SHIPPING_SUB_STATUSES.map((s, i) => (
+            <SubStatusItem
+              key={s.id}
+              label={s.label}
+              timestamp={ship.subTimeline?.[s.id]}
+              state={i < cur ? 'done' : i === cur ? 'current' : 'future'}
+              isLast={i === SHIPPING_SUB_STATUSES.length - 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SubStatusItem({ label, timestamp, state, isLast }) {
+  const done = state === 'done'
+  const current = state === 'current'
+  return (
+    <div className="flex gap-3 items-start">
+      <div className="w-[18px] flex flex-col items-center self-stretch">
+        <span
+          className={`w-[14px] h-[14px] rounded-full border-2 grid place-items-center shrink-0 ${
+            done || current
+              ? 'bg-brand border-brand text-white'
+              : 'bg-surface border-line text-muted'
+          } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
+        >
+          {done && <Check size={9} strokeWidth={3} />}
+        </span>
+        {!isLast && (
+          <span
+            className={`flex-1 w-[2px] mt-0.5 ${done ? 'bg-brand' : 'bg-line'}`}
+          />
+        )}
+      </div>
+      <div className={`flex-1 ${isLast ? 'pb-1' : 'pb-3'}`}>
+        <div
+          className={`text-[13px] ${
+            current
+              ? 'text-ink font-bold'
+              : done
+                ? 'text-ink'
+                : 'text-muted'
+          }`}
+        >
+          {label}
+        </div>
+        {timestamp && (
+          <div className="text-[11px] text-muted mt-px tabular-nums">
+            {timestamp}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -39,7 +39,7 @@ Every doc follows the same shape: `Overview → Flow (mermaid) → State models 
 | [output/returns/claim_tracking.md](./output/returns/claim_tracking.md) | `ClaimCard` (5-state baseline) + three takeover cards (`DocsRejected`, `PickupFailed`, `InvalidClaim`) + canonical sub-status / action-gate / SLA reference |
 | [output/warranties_compensations.md](./output/warranties_compensations.md) | Warranty intake (Step 1 → 7, skips refund-method step) + tracking card (`WarrantyClaimCard` — 6-state repair-and-ship-back pipeline, state-specific heroes, brand-toned tracking dropdown reusing outbound `SHIPPING_SUB_STATUSES`). Plus compensation (still stub) |
 | [output/claim_detailed_tracking.md](./output/claim_detailed_tracking.md) | Design history of the deprecated `Show detailed tracking` disclosure. Reference tables have moved to `output/returns/claim_tracking.md` |
-| [output/journey_backend_spec.md](./output/journey_backend_spec.md) | Journey mode (`?journey=<id>`) — single-order replays for happy-path and cancellation-at-QC; backend-event spec mapping each prototype transition to a production event with payload sketch + field deltas; recipe for wiring real customer-UI to journey nodes |
+| [output/journey_backend_spec.md](./output/journey_backend_spec.md) | Journey mode (`?journey=<id>`) — single-order replays driving prototype components through one lifecycle. Conventions + recipe for adding a journey. Detailed backend-event spec deferred until data-warehouse column mapping. |
 
 ## Stack
 
@@ -70,7 +70,7 @@ Triage by change type — don't blanket-update everything:
 | Issue / wrong-device returns flow | [output/returns/issue.md](./output/returns/issue.md) + `CHANGELOG.md` |
 | `ClaimCard`, takeover cards, sub-status / action gates, SLAs | [output/returns/claim_tracking.md](./output/returns/claim_tracking.md) + `CHANGELOG.md` |
 | Warranty / compensation scoping (when wired) | [output/warranties_compensations.md](./output/warranties_compensations.md) + `CHANGELOG.md` |
-| Journey mode (`?journey=<id>`), new journeys, branches, real-UI wiring, backend-event spec | [output/journey_backend_spec.md](./output/journey_backend_spec.md) + `CHANGELOG.md` |
+| Journey mode (`?journey=<id>`), new journeys, branches, real-UI wiring | [output/journey_backend_spec.md](./output/journey_backend_spec.md) (keep slim — see its **Editing this doc** section) + `CHANGELOG.md` |
 | Operational state machine (drawio source) | [input/](./input/) + the source `.drawio` file in lock-step |
 | User-visible copy / style / microcopy only | `CHANGELOG.md` only |
 | Internal refactor, no UX change | Neither |

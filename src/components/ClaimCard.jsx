@@ -45,11 +45,12 @@ export default function ClaimCard({ order, defaultExpanded = false, openSignal =
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
-  // One-shot expand fired by Step 7's "Track this return" — bump-only
-  // signal so subsequent flow opens (Back-to-account, raising another
-  // claim, etc.) don't re-trigger the expand.
+  // Expand signal driven by Step 7's "Track this return" (bumps
+  // openSignal to a positive value). App.jsx resets openSignal back to 0
+  // when the flow closes via "Back to my account" / X / Escape, which
+  // drops the card back to collapsed here.
   useEffect(() => {
-    if (openSignal > 0) setExpanded(true)
+    setExpanded(openSignal > 0)
   }, [openSignal])
 
   const claim = order.claim

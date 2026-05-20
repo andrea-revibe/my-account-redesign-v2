@@ -141,13 +141,17 @@ export default function App() {
 
   // Customer-triggered journey advance from the real ClaimFlow submit.
   // Mirrors handleCancelOrder: refund-method ids (wallet / original) map
-  // to the journey's refund-branch suffix. validNext gates an
-  // out-of-sequence submit (e.g. journey isn't on the claim_change_of_mind
-  // branch). Non-journey mode keeps the existing seed-claim + undo flow.
+  // to the journey's refund-branch suffix on refund flows; warranty
+  // submits have no refund method and target a single submit node.
+  // validNext gates an out-of-sequence submit (e.g. journey isn't on the
+  // claim_change_of_mind branch). Non-journey mode keeps the existing
+  // seed-claim + undo flow.
   const handleSubmitClaim = (orderId, claim) => {
     if (journeyMode) {
-      const branch = claim.refundMethod === 'wallet' ? 'wallet' : 'card'
-      const target = `claim_submitted_${branch}`
+      const target =
+        claim.type === 'warranty'
+          ? 'claim_submitted_warranty'
+          : `claim_submitted_${claim.refundMethod === 'wallet' ? 'wallet' : 'card'}`
       if (journey.validNext().some((n) => n.id === target)) {
         journey.advance(target)
       }
@@ -363,7 +367,13 @@ export default function App() {
               ? journey.order
               : undefined
           }
-          onClose={() => setClaimFlowOrderId(null)}
+          onClose={() => {
+            setClaimFlowOrderId(null)
+            // Only Track-this-claim should auto-expand the card; if the
+            // user lands here via "Back to my account" / X / Escape, drop
+            // any prior expand signal so the card returns to collapsed.
+            setAutoOpenClaim({ orderId: null, n: 0 })
+          }}
           onSubmitClaim={handleSubmitClaim}
           onTrackClaim={handleTrackClaim}
         />
