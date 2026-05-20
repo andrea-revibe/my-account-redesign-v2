@@ -6,9 +6,11 @@
 
 ## Shipped journeys
 
-Source of truth: `src/data/journey.js → JOURNEYS`. Today the array holds four: `happy_path`, `cancel_at_qc`, `claim_change_of_mind`, `claim_warranty`. `?journey=1` aliases the first journey; unknown ids fall back to the first.
+Source of truth: `src/data/journey.js → JOURNEYS`. Today the array holds five: `happy_path`, `dynamic_edd`, `cancel_at_qc`, `claim_change_of_mind`, `claim_warranty`. `?journey=1` aliases the first journey; unknown ids fall back to the first.
 
 The warranty journey reuses the pre-claim chain (placed → QC → 4× shipping sub-statuses → delivered) and then submits a `type: 'warranty'` claim with no refund-method fork (Step 5 is skipped on warranty intake). Downstream forks are: pickup-failed loop (rejoins the trunk at `claim_transit_arrived_origin_hub`, same shape as the CoM journey), QC outcome (valid → repair → ship-back → device_returned; invalid → `claim.invalidClaim` set → customer pays → 4× return sub-statuses → delivered, *or* customer declines → terminal). Same convention for customer-triggered nodes: the dev panel surfaces them with the `via UI` chip so the demo can advance regardless of how much of the real surface is wired.
+
+`dynamic_edd` is the first **sandbox** journey — `kind: 'sandbox'`, `nodes: []`. There's no node graph to advance; instead, `useEddSandbox` owns four date inputs (today / order / QC / shipped) + an "actual delivered" toggle + a market selector (UAE / ZA / SA), and synthesises an order shape on every change. `App.jsx` swaps `JourneyDevPanel` for `EddSandboxPanel` (date pickers + a debug strip showing stage / elapsed / SLA verdict / message key / initial promise / EDD). The pure EDD model lives in `src/lib/edd.js` (1:1 port of `brief/edd.py` / `EDD_FINAL.xlsx`). Banner copy is injected via a new `order.statusBanner: { tone, lead, body }` field that fully overrides `statusDescription`'s status-driven defaults — the existing `statusMessage` only overrides body.
 
 ## Adding a new journey
 
@@ -26,13 +28,18 @@ The warranty journey reuses the pre-claim chain (placed → QC → 4× shipping 
 - **Refund-method branching pattern.** When a customer-triggered node forks on refund method, use sibling nodes (`*_wallet`, `*_card`) that converge later in the chain. Branch suffix maps to the sheet's refund-method value in `App.jsx` (`store_credit → wallet`, `original → card`).
 - **Permissive panel (current default).** The dev panel renders Next buttons for `customer`-triggered nodes too, styled outlined with a `via UI` chip — flags that the real surface is the canonical path. Switch to strict (filter `trigger === 'customer'`) once 3+ customer-triggered nodes exist across journeys.
 - **Path-based replay.** `useJourney` tracks `path: string[]` rather than a single cursor. Required for branched journeys — applying nodes 0..i in array order would silently misapply deltas as soon as the array contains nodes from unreachable branches.
+- **`kind: 'sandbox'` for free-input journeys.** When a journey is parameter-driven (not event-driven), set `kind: 'sandbox'`, leave `nodes: []`, and pair it with a dedicated hook + panel. `App.jsx` calls *both* `useJourney` and the sandbox hook unconditionally (hook rules) and picks one based on `journey.kind`. The sandbox order shape feeds the existing card-routing tree unchanged — no new branches in the rendering pipeline.
 
 ## Source files
 
 - `src/data/journey.js` — `INITIAL_ORDER` + `JOURNEYS` array.
-- `src/lib/journey.js` — `useJourney(journeyId)` hook (`advance` / `back` / `reset` / `validNext`).
-- `src/components/JourneyDevPanel.jsx` — floating panel + journey picker.
-- `src/App.jsx` — `journeyMode` + `?journey=<id>` URL param; `handleCancelOrder` / `handleSubmitClaim` (customer-triggered advances).
+- `src/lib/journey.js` — `useJourney(journeyId)` hook (`advance` / `back` / `reset` / `validNext`). Returns `kind: 'replay' | 'sandbox'` so `App.jsx` knows which panel to render.
+- `src/lib/edd.js` — pure EDD model (markets, `workdayIntl`, `calculateEdd`, `orderStatus`, message constants). Port of `brief/edd.py`.
+- `src/lib/eddSandbox.js` — `useEddSandbox(journey)` hook (date/market inputs → synthesised order with `statusBanner` override).
+- `src/components/JourneyDevPanel.jsx` — replay panel (Next buttons + journey picker).
+- `src/components/EddSandboxPanel.jsx` — sandbox panel (date inputs + debug strip + journey picker).
+- `src/App.jsx` — `journeyMode` + `?journey=<id>` URL param; `handleCancelOrder` / `handleSubmitClaim` (customer-triggered advances; no-op in sandbox).
+- `src/lib/statuses.js` — `statusDescription` honours `order.statusBanner` as a full override (used by the sandbox).
 - `src/components/Header.jsx` — `Journey mode ×` chip (exits the mode).
 
 ## Editing this doc

@@ -123,6 +123,12 @@ export function cancellationStepsFor() {
 // (mirrors how a backend would inject ad-hoc updates without changing the
 // underlying status).
 export function statusDescription(order) {
+  // Full override path — used by the Dynamic EDD sandbox to inject
+  // (tone + lead + body) derived from the EDD model's customer message,
+  // bypassing the status-driven defaults below. `statusMessage` only
+  // overrides body; this overrides everything.
+  if (order.statusBanner) return order.statusBanner
+
   if (order.state === 'cancelled') {
     const phase = order.cancellationStatusId
     if (phase === 'requested') {
