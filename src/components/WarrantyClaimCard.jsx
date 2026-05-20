@@ -20,6 +20,8 @@ import {
   warrantyClaimStatusHeadline,
   warrantyClaimStatusSubline,
   claimTypeLabel,
+  CLAIM_TRANSIT_SUB_STATUSES,
+  transitSubProgressIndex,
 } from '../lib/claims'
 import { SHIPPING_SUB_STATUSES, subProgressIndex } from '../lib/statuses'
 import { getHistoryEvents } from '../lib/events'
@@ -52,11 +54,12 @@ export default function WarrantyClaimCard({ order, defaultExpanded = false, open
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
-  // One-shot expand fired by Step 7's "Track this claim" — bump-only
-  // signal so subsequent flow opens (Back-to-account, raising another
-  // claim, etc.) don't re-trigger the expand.
+  // Expand signal driven by Step 7's "Track this claim" (bumps openSignal
+  // to a positive value). App.jsx resets openSignal back to 0 when the
+  // flow closes via "Back to my account" / X / Escape, which drops the
+  // card back to collapsed here.
   useEffect(() => {
-    if (openSignal > 0) setExpanded(true)
+    setExpanded(openSignal > 0)
   }, [openSignal])
 
   const claim = order.claim
@@ -88,7 +91,17 @@ export default function WarrantyClaimCard({ order, defaultExpanded = false, open
             <WarrantyProgressDots claim={claim} tone={tone} />
           </div>
 
-          {/* Detailed tracking surfaces as soon as the AWB has been
+          {/* Pickup-leg detailed tracking — the inverse-journey scan
+              chain (customer → origin hub → flight → Revibe hub). Same
+              data shape as ClaimCard's pickup dropdown; gated on the
+              picked-up scan landing. Neutral chrome so the later
+              ship-back dropdown (brand-toned) reads as the more
+              attention-worthy event. */}
+          {Boolean(claim.transitSubTimeline?.picked_up) && (
+            <PickupTransitDetail claim={claim} order={order} />
+          )}
+
+          {/* Ship-back detailed tracking surfaces once the AWB has been
               created. Collapsed by default and styled in the brand tone
               so it reads as an inviting tap target rather than another
               neutral row. */}
@@ -392,6 +405,80 @@ function ProductRow({ order, expanded }) {
 // country → cleared customs → forwarded to third-party agent → out for
 // delivery). Collapsed by default; the brand styling cues "tap me" so
 // the customer notices it without it stealing focus from the hero.
+// Pickup-leg detailed tracking — mirrors ClaimCard's ClaimTransitDetail.
+// Uses the inverse-journey stop list (CLAIM_TRANSIT_SUB_STATUSES). Neutral
+// chrome — the ship-back dropdown owns the brand-toned styling, so a
+// warranty claim mid-pickup doesn't have two competing tap targets.
+function PickupTransitDetail({ claim, order }) {
+  const [show, setShow] = useState(false)
+  const cur = transitSubProgressIndex(claim.transitSubStatusId)
+
+  return (
+    <div className="px-1">
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        aria-expanded={show}
+        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-[10px] border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-line-2"
+      >
+        <span>{show ? 'Hide detailed tracking' : 'See detailed tracking'}</span>
+        <ChevronDown
+          size={16}
+          strokeWidth={1.75}
+          className={`text-ink-2 transition-transform ${show ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {show && (
+        <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
+          {(order.courier || order.trackingNumber) && (
+            <PickupCourierStrip order={order} />
+          )}
+          {CLAIM_TRANSIT_SUB_STATUSES.map((s, i) => (
+            <TransitSubItem
+              key={s.id}
+              label={s.label}
+              timestamp={claim.transitSubTimeline?.[s.id]}
+              state={i < cur ? 'done' : i === cur ? 'current' : 'future'}
+              isLast={i === CLAIM_TRANSIT_SUB_STATUSES.length - 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PickupCourierStrip({ order }) {
+  return (
+    <div className="flex items-center gap-2.5 p-2.5 mb-3 rounded-[10px] border border-line bg-surface">
+      <span className="w-9 h-7 rounded-md grid place-items-center text-[11px] font-extrabold tracking-[0.04em] bg-[#ffcc00] text-[#1a1a1a] shrink-0">
+        DHL
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-semibold text-ink truncate">
+          {order.courier || 'Courier'}
+        </div>
+        {order.trackingNumber && (
+          <div className="text-[11.5px] text-muted mt-px tabular-nums truncate">
+            AWB #{order.trackingNumber}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        aria-label="Copy AWB"
+        onClick={() =>
+          order.trackingNumber &&
+          navigator.clipboard?.writeText(order.trackingNumber)
+        }
+        className="w-8 h-8 rounded-lg grid place-items-center border border-line text-ink-2 hover:bg-line-2 shrink-0"
+      >
+        <Copy size={14} strokeWidth={1.75} />
+      </button>
+    </div>
+  )
+}
+
 function ShipBackDetail({ claim, order }) {
   const [show, setShow] = useState(false)
   const cur = subProgressIndex(claim.shipBack?.subStatusId)
