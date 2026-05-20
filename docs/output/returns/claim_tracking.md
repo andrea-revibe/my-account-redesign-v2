@@ -97,7 +97,13 @@ Filter counts reflect the same rules — an in-flight claim counts toward the `i
 
 ### 2.6 Auto-expand
 
-`ClaimCard` does not currently participate in `pickActiveOrderId`. Fulfilment in-flight orders win the auto-expand slot when both are present; claim cards collapse by default. If customer research shows users want their active claim opened on land, extend the rank function in `src/lib/statuses.js` to consider `claimProgressIndex` from `src/lib/claims.js`.
+`ClaimCard` does not participate in `pickActiveOrderId` (fulfilment in-flight orders win that slot when both are present), but it does carry a **one-shot `openSignal` prop** for the post-submit Track flow:
+
+- Step 7's `Track this return` button calls `onTrackClaim(orderId)` (forwarded through `ClaimFlow`), which closes the flow and bumps `App.jsx`'s `autoOpenClaim = { orderId, n }` state.
+- `ClaimCard` receives `openSignal={autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0}`. A side-effect-only `useEffect` calls `setExpanded(true)` whenever `openSignal > 0` and changes — so a fresh bump expands, but subsequent renders (e.g. flow re-opens that end on `Back to my account`) don't re-trigger the expand. `WarrantyClaimCard` uses the same prop for `Track this claim`.
+- Card collapse remains user-controlled. Once the user manually collapses, no later non-Track event re-expands it.
+
+`pickActiveOrderId` is the lever to pull if customer research shows the *list-level* should also auto-open active claims on land — extend the rank function in `src/lib/statuses.js` to consider `claimProgressIndex` from `src/lib/claims.js`. The one-shot signal stays orthogonal to that.
 
 ### 2.7 Source of truth
 

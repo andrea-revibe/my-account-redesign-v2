@@ -20,10 +20,16 @@ import Step5RefundMethod from './Step5RefundMethod'
 import Step6Review from './Step6Review'
 import Step7Confirmation from './Step7Confirmation'
 
-export default function ClaimFlow({ initialOrderId, onClose, onSubmitClaim }) {
+export default function ClaimFlow({
+  initialOrderId,
+  initialOrder = null,
+  onClose,
+  onSubmitClaim,
+  onTrackClaim,
+}) {
   const [state, dispatch] = useReducer(
     flowReducer,
-    initialOrderId,
+    { initialOrderId, initialOrder },
     initialState,
   )
 
@@ -42,8 +48,8 @@ export default function ClaimFlow({ initialOrderId, onClose, onSubmitClaim }) {
   }, [onClose])
 
   const order = useMemo(
-    () => ORDERS.find((o) => o.id === state.orderId) || null,
-    [state.orderId],
+    () => initialOrder ?? ORDERS.find((o) => o.id === state.orderId) ?? null,
+    [initialOrder, state.orderId],
   )
 
   const isConfirmation = state.step === TOTAL_STEPS && state.claimRef
@@ -141,6 +147,7 @@ export default function ClaimFlow({ initialOrderId, onClose, onSubmitClaim }) {
               state={state}
               order={order}
               onClose={onClose}
+              onTrack={onTrackClaim}
             />
           )}
         </main>

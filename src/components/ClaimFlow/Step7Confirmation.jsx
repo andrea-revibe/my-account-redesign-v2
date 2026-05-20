@@ -11,7 +11,7 @@ import {
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 import { claimTypeLabel, expectedCompletionFor } from '../../lib/claims'
 
-export default function Step7Confirmation({ state, order, onClose }) {
+export default function Step7Confirmation({ state, order, onClose, onTrack }) {
   const [copied, setCopied] = useState(false)
   if (!order) return null
   const isWarranty = state.claimType === 'warranty'
@@ -128,7 +128,7 @@ export default function Step7Confirmation({ state, order, onClose }) {
       <div className="mt-auto sticky bottom-0 bg-surface border-t border-line px-4 py-3 flex gap-2">
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => (onTrack ? onTrack(order?.id) : onClose())}
           className="flex-1 h-[48px] rounded-[12px] inline-flex items-center justify-center bg-surface text-ink border border-line font-semibold text-[14px]"
         >
           {isWarranty ? 'Track this claim' : 'Track this return'}

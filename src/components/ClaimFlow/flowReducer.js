@@ -17,13 +17,15 @@ export function visibleStepIndex(step, claimType) {
   return step >= 5 ? step - 1 : step
 }
 
-export function initialState(initialOrderId = null) {
+export function initialState({ initialOrderId = null, initialOrder = null } = {}) {
   // Step 1 (claim type) is always shown empty — the customer picks every
   // time. Step 4 (pickup details) is pre-seeded from the order's contact
   // info so the user only needs to edit fields that are out of date.
-  const order = initialOrderId
-    ? ORDERS.find((o) => o.id === initialOrderId)
-    : null
+  // `initialOrder` (journey mode) takes precedence — its order isn't in
+  // ORDERS, so the lookup would miss without it.
+  const order =
+    initialOrder ??
+    (initialOrderId ? ORDERS.find((o) => o.id === initialOrderId) : null)
   return {
     step: 1,
     claimType: null,
