@@ -30,7 +30,7 @@ export default function JourneyDevPanel({
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[360px] bg-surface border border-line rounded-2xl shadow-lg p-4">
       {journeys && journeys.length > 1 && (
-        <div className="flex items-center gap-1.5 mb-3 -mt-0.5">
+        <div className="flex flex-wrap items-center gap-1.5 mb-3 -mt-0.5">
           {journeys.map((j) => {
             const active = j.id === activeJourneyId
             return (
@@ -38,7 +38,7 @@ export default function JourneyDevPanel({
                 key={j.id}
                 onClick={() => onSelectJourney(j.id)}
                 className={
-                  'flex-1 px-2 py-1 rounded-full text-[10.5px] font-semibold uppercase tracking-[0.04em] transition ' +
+                  'px-2 py-1 rounded-full text-[10.5px] font-semibold uppercase tracking-[0.04em] whitespace-nowrap transition ' +
                   (active
                     ? 'bg-brand text-white'
                     : 'bg-brand/10 text-brand hover:bg-brand/15')

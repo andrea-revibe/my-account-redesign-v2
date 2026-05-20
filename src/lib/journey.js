@@ -20,15 +20,20 @@ export function useJourney(journeyId) {
     [journeyId],
   )
 
-  const [path, setPath] = useState(() => [journey.nodes[0].id])
+  const hasNodes = journey.nodes && journey.nodes.length > 0
+  const [path, setPath] = useState(() =>
+    hasNodes ? [journey.nodes[0].id] : [],
+  )
 
   // Reset cursor when the active journey changes — node ids are
-  // namespaced per journey so the previous path is meaningless.
+  // namespaced per journey so the previous path is meaningless. Sandbox
+  // journeys have no node graph; their state lives in useEddSandbox.
   useEffect(() => {
-    setPath([journey.nodes[0].id])
-  }, [journey])
+    setPath(hasNodes ? [journey.nodes[0].id] : [])
+  }, [journey, hasNodes])
 
   const order = useMemo(() => {
+    if (!hasNodes) return journey.initialOrder
     let o = journey.initialOrder
     for (const id of path) {
       const node = journey.nodes.find((n) => n.id === id)
@@ -36,7 +41,7 @@ export function useJourney(journeyId) {
       o = node.apply(o)
     }
     return o
-  }, [journey, path])
+  }, [journey, path, hasNodes])
 
   const currentNodeId = path[path.length - 1]
   const currentIndex = path.length - 1
@@ -70,6 +75,7 @@ export function useJourney(journeyId) {
   }, [journey])
 
   return {
+    kind: journey.kind ?? 'replay',
     journey,
     journeys: JOURNEYS,
     currentNodeId,

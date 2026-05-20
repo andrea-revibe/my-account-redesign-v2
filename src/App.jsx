@@ -15,10 +15,12 @@ import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import UndoSnackbar from './components/UndoSnackbar'
 import JourneyDevPanel from './components/JourneyDevPanel'
+import EddSandboxPanel from './components/EddSandboxPanel'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
 import { hasActiveClaim, isClaimRefunded, isWarrantyDelivered } from './lib/claims'
 import { useJourney } from './lib/journey'
+import { useEddSandbox } from './lib/eddSandbox'
 import { JOURNEYS } from './data/journey'
 
 const RANGE_DAYS = { '30d': 30, '3m': 90, '1y': 365, all: Infinity }
@@ -109,6 +111,11 @@ export default function App() {
     resolveJourneyId(initialJourneyParam),
   )
   const journey = useJourney(journeyId)
+  // Sandbox state lives outside the replay hook — both hooks are called
+  // unconditionally (hook rules), then `active` is the one we actually use.
+  const sandbox = useEddSandbox(journey.journey)
+  const isSandbox = journey.kind === 'sandbox'
+  const activeOrderFromJourney = isSandbox ? sandbox.order : journey.order
   const toggleJourneyMode = () => {
     setJourneyMode((prev) => {
       const next = !prev
@@ -131,7 +138,7 @@ export default function App() {
   // refund-branch suffix (wallet / card). Guarded by validNext so an
   // out-of-sequence submit silently no-ops instead of corrupting the path.
   const handleCancelOrder = ({ method }) => {
-    if (!journeyMode) return
+    if (!journeyMode || isSandbox) return
     const branch = method === 'store_credit' ? 'wallet' : 'card'
     const target = `cancellation_requested_${branch}`
     if (journey.validNext().some((n) => n.id === target)) {
@@ -148,6 +155,9 @@ export default function App() {
   // seed-claim + undo flow.
   const handleSubmitClaim = (orderId, claim) => {
     if (journeyMode) {
+      // Sandbox journeys have no node graph to advance and no Past-order
+      // surfaces — claim submit is a no-op there.
+      if (isSandbox) return
       const target =
         claim.type === 'warranty'
           ? 'claim_submitted_warranty'
@@ -172,11 +182,11 @@ export default function App() {
   const projectedOrders = useMemo(
     () =>
       journeyMode
-        ? [journey.order]
+        ? [activeOrderFromJourney]
         : ORDERS.map((o) =>
             submittedClaims[o.id] ? { ...o, claim: submittedClaims[o.id] } : o,
           ),
-    [journeyMode, journey.order, submittedClaims],
+    [journeyMode, activeOrderFromJourney, submittedClaims],
   )
 
   // Counts are computed off the date-range-filtered set so the chip badges
@@ -363,8 +373,8 @@ export default function App() {
         <ClaimFlow
           initialOrderId={claimFlowOrderId}
           initialOrder={
-            journeyMode && journey.order.id === claimFlowOrderId
-              ? journey.order
+            journeyMode && activeOrderFromJourney.id === claimFlowOrderId
+              ? activeOrderFromJourney
               : undefined
           }
           onClose={() => {
@@ -396,7 +406,7 @@ export default function App() {
           onDismiss={() => setRecentSubmit(null)}
         />
       )}
-      {journeyMode && (
+      {journeyMode && !isSandbox && (
         <JourneyDevPanel
           nodes={journey.nodes}
           currentNodeId={journey.currentNodeId}
@@ -406,6 +416,18 @@ export default function App() {
           back={journey.back}
           reset={journey.reset}
           journeys={journey.journeys}
+          activeJourneyId={journey.journey.id}
+          onSelectJourney={selectJourney}
+        />
+      )}
+      {journeyMode && isSandbox && (
+        <EddSandboxPanel
+          inputs={sandbox.inputs}
+          setInput={sandbox.setInput}
+          status={sandbox.status}
+          markets={sandbox.markets}
+          reset={sandbox.reset}
+          journeys={sandbox.journeys}
           activeJourneyId={journey.journey.id}
           onSelectJourney={selectJourney}
         />

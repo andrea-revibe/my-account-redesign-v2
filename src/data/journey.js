@@ -1461,6 +1461,17 @@ export const JOURNEYS = [
     initialOrder: INITIAL_ORDER,
     nodes: HAPPY_PATH_NODES,
   },
+  // Sandbox journey — no node graph. Inputs (market + four dates) live in
+  // useEddSandbox; the dev panel branches on `kind: 'sandbox'` and renders
+  // EddSandboxPanel instead of the Next-button JourneyDevPanel. See
+  // src/lib/edd.js for the underlying model.
+  {
+    id: 'dynamic_edd',
+    label: 'Dynamic EDD',
+    kind: 'sandbox',
+    initialOrder: INITIAL_ORDER,
+    nodes: [],
+  },
   {
     id: 'cancel_at_qc',
     label: 'Cancellation at QC',
