@@ -359,6 +359,11 @@ export const SUB_STATUS_LABELS = {
     subline: 'We couldn’t collect on the scheduled date.',
     tone: 'warn',
   },
+  reset_failed: {
+    headline: 'Device still linked to iCloud',
+    subline: 'We couldn’t wipe the device — Activation Lock is still on.',
+    tone: 'warn',
+  },
   under_revision: {
     headline: 'Reviewing seller’s response',
     subline: 'Our team is double-checking the seller’s notes.',
@@ -437,6 +442,14 @@ export function actionGateCopy(actionRequired) {
         body: 'Your claim couldn’t be approved after inspection. Cover the return shipping fee to get your device sent back.',
         primaryCta: 'Pay return shipping',
         secondaryCta: 'Discuss with support',
+      }
+    case 'reset_failed':
+      return {
+        ...base,
+        headline: 'Action needed — device still linked to iCloud',
+        body: 'Activation Lock is still on, so we can’t wipe the device. Remove it from your iCloud account and share your passcode so we can complete the reset.',
+        primaryCta: 'Unlock device',
+        secondaryCta: 'Cancel claim',
       }
     default:
       return null

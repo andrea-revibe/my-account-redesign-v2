@@ -667,6 +667,7 @@ const CLAIM_COM_NODES = [
     label: 'Claim quality check started',
     trigger: 'system',
     event: 'claim.qc.started',
+    next: ['claim_refund_issued', 'claim_reset_failed'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -767,6 +768,114 @@ const CLAIM_COM_NODES = [
         transitSubTimeline: {
           ...(o.claim.transitSubTimeline ?? {}),
           picked_up: '28 May · 10:14 AM',
+        },
+      },
+    }),
+  },
+  // ----- Reset-failed sub-branch. Triggered at QC when the technician
+  //       tries to wipe the device and Activation Lock is still on.
+  //       Setting `claim.resetFailed` routes the order to ResetFailedCard.
+  //       The customer submits unlink confirmation + passcode; on first
+  //       attempt the journey can either continue (success) or loop once
+  //       through `claim_reset_retry_failed` (wrong info). After the
+  //       second submission the journey re-merges into the QC outcome —
+  //       refund_issued for change-of-mind (no invalid path). --------
+  {
+    id: 'claim_reset_failed',
+    label: 'Reset failed — device still locked',
+    trigger: 'system',
+    event: 'claim.reset.failed',
+    next: ['claim_reset_details_received'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '1 Jun · 11:32 AM',
+          deadlineLabel: '2 days, 22 hours left',
+        },
+        resetFailed: {
+          failedAt: '29 May · 11:32 AM',
+          autoCancelAt: '1 Jun · 11:32 AM',
+          timeLeftLabel: '2 days, 22 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — when we tried to wipe the device, Activation Lock was still on so we couldn't go further. Please remove it from your iCloud account at iCloud.com (Find My → All Devices → Erase, then Remove from Account) and send us the device passcode so we can complete the reset and resume the quality check.",
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_details_received',
+    label: 'Unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.details_received',
+    // Forks: success path re-merges into the QC outcome (refund_issued),
+    // failure path loops once through claim_reset_retry_failed.
+    next: ['claim_refund_issued', 'claim_reset_retry_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '29 May · 12:48 PM',
+          attempt: 1,
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_failed',
+    label: 'Reset retry failed — still locked',
+    trigger: 'system',
+    event: 'claim.reset.retry_failed',
+    next: ['claim_reset_retry_resubmitted'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '2 Jun · 9:14 AM',
+          deadlineLabel: '2 days, 20 hours left',
+        },
+        resetFailed: {
+          failedAt: '30 May · 9:14 AM',
+          autoCancelAt: '2 Jun · 9:14 AM',
+          timeLeftLabel: '2 days, 20 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — thanks for the details, but the device is still showing Activation Lock when we try the wipe. Could you double-check that you signed in to iCloud.com with the same Apple ID that's on this device, and that you tapped Remove from Account at the end of the Erase flow? If your passcode might have a typo, please re-enter it.",
+          attempt: 2,
+        },
+        resetUnlock: undefined,
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_resubmitted',
+    label: 'Updated unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.retry_resubmitted',
+    next: ['claim_refund_issued'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '30 May · 10:22 AM',
+          attempt: 2,
         },
       },
     }),
@@ -1014,7 +1123,7 @@ const CLAIM_WARRANTY_NODES = [
     label: 'Claim quality check started',
     trigger: 'system',
     event: 'claim.qc.started',
-    next: ['claim_under_repair', 'claim_invalid_confirmed'],
+    next: ['claim_under_repair', 'claim_invalid_confirmed', 'claim_reset_failed'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -1452,6 +1561,109 @@ const CLAIM_WARRANTY_NODES = [
       },
     }),
   },
+  // ----- Reset-failed sub-branch. Same shape as the change-of-mind /
+  //       issue journeys but re-merges into the warranty QC outcome
+  //       (under_repair + invalid_confirmed). Setting `claim.resetFailed`
+  //       routes the order to ResetFailedCard; one retry loop is allowed
+  //       before the second submission re-enters the QC fork. ---------
+  {
+    id: 'claim_reset_failed',
+    label: 'Reset failed — device still locked',
+    trigger: 'system',
+    event: 'claim.reset.failed',
+    next: ['claim_reset_details_received'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '1 Jun · 11:32 AM',
+          deadlineLabel: '2 days, 22 hours left',
+        },
+        resetFailed: {
+          failedAt: '29 May · 11:32 AM',
+          autoCancelAt: '1 Jun · 11:32 AM',
+          timeLeftLabel: '2 days, 22 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — when we tried to wipe the device, Activation Lock was still on so we couldn't go further. Please remove it from your iCloud account at iCloud.com (Find My → All Devices → Erase, then Remove from Account) and send us the device passcode so we can complete the reset and resume the quality check.",
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_details_received',
+    label: 'Unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.details_received',
+    next: ['claim_under_repair', 'claim_invalid_confirmed', 'claim_reset_retry_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '29 May · 12:48 PM',
+          attempt: 1,
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_failed',
+    label: 'Reset retry failed — still locked',
+    trigger: 'system',
+    event: 'claim.reset.retry_failed',
+    next: ['claim_reset_retry_resubmitted'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '2 Jun · 9:14 AM',
+          deadlineLabel: '2 days, 20 hours left',
+        },
+        resetFailed: {
+          failedAt: '30 May · 9:14 AM',
+          autoCancelAt: '2 Jun · 9:14 AM',
+          timeLeftLabel: '2 days, 20 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — thanks for the details, but the device is still showing Activation Lock when we try the wipe. Could you double-check that you signed in to iCloud.com with the same Apple ID that's on this device, and that you tapped Remove from Account at the end of the Erase flow? If your passcode might have a typo, please re-enter it.",
+          attempt: 2,
+        },
+        resetUnlock: undefined,
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_resubmitted',
+    label: 'Updated unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.retry_resubmitted',
+    next: ['claim_under_repair', 'claim_invalid_confirmed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '30 May · 10:22 AM',
+          attempt: 2,
+        },
+      },
+    }),
+  },
 ]
 
 // ----- Issue / wrong-device claim journey -------------------------------
@@ -1755,7 +1967,7 @@ const CLAIM_ISSUE_NODES = [
     label: 'Claim quality check started',
     trigger: 'system',
     event: 'claim.qc.started',
-    next: ['claim_refund_issued', 'claim_invalid_confirmed'],
+    next: ['claim_refund_issued', 'claim_invalid_confirmed', 'claim_reset_failed'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -2130,6 +2342,109 @@ const CLAIM_ISSUE_NODES = [
         invalidClaim: {
           ...o.claim.invalidClaim,
           declinedAt: '31 May · 9:45 AM',
+        },
+      },
+    }),
+  },
+  // ----- Reset-failed sub-branch. Same shape as the change-of-mind /
+  //       warranty journeys but re-merges into the issue QC outcome
+  //       (refund_issued + invalid_confirmed). Setting `claim.resetFailed`
+  //       routes the order to ResetFailedCard; one retry loop is allowed
+  //       before the second submission re-enters the QC fork. ---------
+  {
+    id: 'claim_reset_failed',
+    label: 'Reset failed — device still locked',
+    trigger: 'system',
+    event: 'claim.reset.failed',
+    next: ['claim_reset_details_received'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '1 Jun · 11:32 AM',
+          deadlineLabel: '2 days, 22 hours left',
+        },
+        resetFailed: {
+          failedAt: '29 May · 11:32 AM',
+          autoCancelAt: '1 Jun · 11:32 AM',
+          timeLeftLabel: '2 days, 22 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — when we tried to wipe the device, Activation Lock was still on so we couldn't go further. Please remove it from your iCloud account at iCloud.com (Find My → All Devices → Erase, then Remove from Account) and send us the device passcode so we can complete the reset and resume the quality check.",
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_details_received',
+    label: 'Unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.details_received',
+    next: ['claim_refund_issued', 'claim_invalid_confirmed', 'claim_reset_retry_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '29 May · 12:48 PM',
+          attempt: 1,
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_failed',
+    label: 'Reset retry failed — still locked',
+    trigger: 'system',
+    event: 'claim.reset.retry_failed',
+    next: ['claim_reset_retry_resubmitted'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '2 Jun · 9:14 AM',
+          deadlineLabel: '2 days, 20 hours left',
+        },
+        resetFailed: {
+          failedAt: '30 May · 9:14 AM',
+          autoCancelAt: '2 Jun · 9:14 AM',
+          timeLeftLabel: '2 days, 20 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — thanks for the details, but the device is still showing Activation Lock when we try the wipe. Could you double-check that you signed in to iCloud.com with the same Apple ID that's on this device, and that you tapped Remove from Account at the end of the Erase flow? If your passcode might have a typo, please re-enter it.",
+          attempt: 2,
+        },
+        resetUnlock: undefined,
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_resubmitted',
+    label: 'Updated unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.retry_resubmitted',
+    next: ['claim_refund_issued', 'claim_invalid_confirmed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '30 May · 10:22 AM',
+          attempt: 2,
         },
       },
     }),
