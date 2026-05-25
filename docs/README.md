@@ -2,6 +2,15 @@
 
 > Internal-demo prototype for the Revibe **My Account → Orders** area. This folder is the living spec for the prototype, organised into **input** (operational source material used to build features) and **output** (UI / feature specs produced from those inputs). For change history see [`../CHANGELOG.md`](../CHANGELOG.md); for repo conventions see [`../CLAUDE.md`](../CLAUDE.md).
 
+## Backend-mapping context
+
+For a separate LLM / project tasked with mapping this prototype to real backend tables, start here — these two files are self-contained and don't require any other docs to be read first:
+
+| Doc | Purpose |
+|---|---|
+| [db_explorer_context.md](./db_explorer_context.md) | Self-contained brief: glossary, system map, per-feature requirements (Orders / Cancellations / Returns / Warranties), cross-cutting concerns, validation checklist, consolidated open decisions |
+| [db_explorer_system_prompt.md](./db_explorer_system_prompt.md) | System prompt for the mapping agent — task framing, inputs, process, output format, rules (read-only DB, conflict resolution, iteration cadence) |
+
 ## Input vs output
 
 ```

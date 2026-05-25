@@ -13,7 +13,7 @@ Change of mind is the entry point used when the customer doesn't want the device
 
 Distinguishing characteristic vs the issue branch: change of mind always carries a 10% restocking fee on the original-payment path (issue carries no fee, plus a flat AED 100 Wallet bonus). The Step 2 of the flow is a 5-option reason picker; Step 3 onwards is identical to the issue branch.
 
-The flow's visual chrome is deliberately distinct from the order-card family: white surface, segmented top progress bar (`bg-brand` for reached segments, `bg-line` for upcoming) + `Step X of 7` caption, sticky bottom action bar with the only filled brand-purple `Continue` button, and line-bordered cards that gain a `border-brand bg-brand-bg/30` treatment when selected. Tinted hero blocks are reserved for one place — the Step 3 device-prep warn callout — so the user can feel the visual shift between "informational" (account cards) and "doing a task" (the flow) without leaving the design system.
+The flow's visual chrome is deliberately distinct from the order-card family: white surface, segmented top progress bar (`bg-brand` for reached segments, `bg-line` for upcoming) + `Step X of 8` caption, sticky bottom action bar with the only filled brand-purple `Continue` button, and line-bordered cards that gain a `border-brand bg-brand-bg/30` treatment when selected. Tinted hero blocks are reserved for one place — the Step 3 device-prep warn callout — so the user can feel the visual shift between "informational" (account cards) and "doing a task" (the flow) without leaving the design system.
 
 ## 2. UI flow
 
@@ -25,11 +25,12 @@ flowchart TD
   s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
   s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
   s2 -->|Continue or Skip| s3[Step 3 — Device prep]
-  s3 -->|Reset confirmed OR credentials provided| s4[Step 4 — Pickup details]
-  s4 -->|3 fields confirmed + checkbox| s5[Step 5 — Refund method]
-  s5 -->|Wallet or Original payment| s6[Step 6 — Review & submit]
-  s6 -->|Submit return request| s7[Step 7 — Confirmation]
-  s7 -->|Back to my account| close([Close overlay])
+  s3 -->|Reset confirmed OR credentials provided| s4[Step 4 — Packing]
+  s4 -->|Original Revibe box OR sturdy post box selected| s5[Step 5 — Pickup details]
+  s5 -->|3 fields confirmed + checkbox| s6[Step 6 — Refund method]
+  s6 -->|Wallet or Original payment| s7[Step 7 — Review & submit]
+  s7 -->|Both acks ticked → Submit return request| s8[Step 8 — Confirmation]
+  s8 -->|Back to my account| close([Close overlay])
 ```
 
 ### 2.1 Mount & state
@@ -67,9 +68,18 @@ Two stacked radio cards. `canAdvance` returns false until one complete option is
 - **Option A — `I've factory reset the device`** (recommended pill). Carries an `iPhone` / `Android` OS-tabs control, a collapsible numbered reset instructions list per OS, and a required confirmation checkbox.
 - **Option B — `Provide unlock credentials`**. Same OS tabs, an email field, a password field with show/hide toggle, and the encryption-disclosure note.
 
-The reducer stores `devicePrep: { option, os }` and (for Option B) the credentials. Credentials are never persisted back into the claim object — they're masked to `Credentials provided` on Step 6 review and in the `ClaimDetailsSheet`.
+The reducer stores `devicePrep: { option, os }` and (for Option B) the credentials. Credentials are never persisted back into the claim object — they're masked to `Credentials provided` on Step 7 review and in the `ClaimDetailsSheet`.
 
-### 2.5 Step 4 — Pickup details (shared)
+### 2.5 Step 4 — Packing (shared)
+
+Two stacked radio cards, each with a 9 mm brand-tinted icon tile (`Package` / `ShieldAlert`), title, one-line subtitle, and a bullet list of packing instructions. The selection is the gate: `canAdvance` requires `packingMethod !== null`. No ack checkbox on this step — the *"I have packed the device properly"* acknowledgment lives on the Review step (§2.8) so it's enforced right before submission.
+
+- **Option A — `Use the original Revibe box`.** Re-use the device's original shipping box. Bullets: replace in the original tray/sleeve; include all accessories (charger, cable, SIM tool); nothing loose; seal seams.
+- **Option B — `Use any sturdy post box`.** Fallback when the original box is gone. Bullets: wrap fully in bubble wrap (2+ layers); cushion top/bottom/sides; tape all seams; mark "Fragile".
+
+The reducer stores `packingMethod: 'original_box' | 'post_box'`. The chosen label is surfaced on Review's Packing summary card via `PACKING_LABELS` (exported from `Step4Packing.jsx`); the Review's edit link returns the user here.
+
+### 2.6 Step 5 — Pickup details (shared)
 
 Returns are always picked up by courier today, so the step skips the method selector and surfaces the three contact fields needed for the pickup:
 
@@ -81,9 +91,9 @@ State is pre-seeded so the user typically just confirms; tapping any row opens a
 
 Below the rows, a `What happens next` block surfaces an **`ExpectedByCard`**: CalendarClock-iconed eyebrow ("Expected refund by"), a bold long-form date computed by `expectedCompletionFor(claimType)` in `lib/claims.js` (sums `CLAIM_SLAS.expectedHours` across `CLAIM_STATUSES` and adds to `new Date()`), and a one-line subtitle ("Typical for return claims — exact dates confirmed at each step."). A brand-toned **`See detailed claim timeline`** button below it expands a pipeline-aware step list on tap — same `ProcessRow` chrome as the old always-open list (step headline + `expectedHours`-derived duration suffix `within 24h` / `same day` / `~7 days`, plus the "may take longer if expert inspection is needed" subline on QC). The step source switches automatically to `WARRANTY_CLAIM_STATUSES` on the warranty branch so the dropdown reads with the warranty pipeline (6 steps) — see [warranties_compensations.md](../warranties_compensations.md) §2.4.
 
-A brand-toned confirmation checkbox card sits below the card (*"I confirm the pickup details above and understand the estimated timeline."*) and toggles `pickupConfirmed` on the flow reducer. `canAdvance` requires the three contact fields **and** `pickupConfirmed`. Visually mirrors the Step 6 packing-confirmation card.
+A brand-toned confirmation checkbox card sits below the card (*"I confirm the pickup details above and understand the estimated timeline."*) and toggles `pickupConfirmed` on the flow reducer. `canAdvance` requires the three contact fields **and** `pickupConfirmed`. Visually mirrors the Step 7 ack cards.
 
-### 2.6 Step 5 — Refund method (shared chrome, change-of-mind math)
+### 2.7 Step 6 — Refund method (shared chrome, change-of-mind math)
 
 Two stacked refund cards built off `refundBreakdown(order, units, method, 'change_of_mind')` (see §3). Visually aligned with the cancellation sheet's refund picker (see [../cancellations.md](../cancellations.md) §2) so the two refund-choice surfaces feel like siblings.
 
@@ -92,23 +102,26 @@ Two stacked refund cards built off `refundBreakdown(order, units, method, 'chang
 
 Both cards keep `whitespace-nowrap` on anchor lines.
 
-### 2.7 Step 6 — Review & submit (shared)
+### 2.8 Step 7 — Review & submit (shared)
 
 Sectioned summary with an inline `Edit` link per section dispatching `GO_TO_STEP` to jump back to the originating step. A read-only `Item` block at the top shows the product + order ID (not editable — the item is fixed by the entry point).
 
-Change-of-mind-specific sections:
+The order of sections in Review is deliberate — each ack checkbox sits directly under the section it's confirming:
 
-- **Reason** — text (mapped via `REASON_LABELS`) or "Not provided".
+1. **Item** (read-only).
+2. **Reason** (change-of-mind) / **Issue** (issue / warranty) — Edit → Step 2.
+3. **Device preparation** — Edit → Step 3. Masked to `Factory reset confirmed` / `Credentials provided`; credentials never displayed in plain text.
+4. **☑︎ I have factory reset my device** — soft-validated ack card; see below.
+5. **Packing** — Edit → Step 4. Shows the chosen method label (`Original Revibe box` / `Sturdy post box`).
+6. **☑︎ I have packed the device properly** — soft-validated ack card.
+7. **Pickup** — Edit → Step 5. Three rows (address / email / phone).
+8. **Refund** — Edit → Step 6. Final net + an explanatory line: `Includes 10% restocking fee` when method is `original`. For Wallet, no extra line (wallet has no fee on change of mind).
 
-Shared:
+**Soft validation on the two ack cards.** `canAdvance` returns `true` unconditionally on the Review step so the `Submit return request` button stays clickable. `ClaimFlow.handlePrimary` intercepts the click: if `factoryResetConfirmed` or `packingConfirmed` is false, it sets a local `submitAttempted` flag and returns without dispatching `SUBMIT`. Both ack cards re-render via the shared `AckCard` component — when `error === true` the card switches to a danger-toned border + bg + an `AlertCircle` helper line ("Please confirm before submitting your return."). The first error card also calls `scrollIntoView({ block: 'center' })` so it always lands in view; the parent passes `scrollOnError` to make sure only the topmost error scrolls (factory-reset wins; packing scrolls only when factory-reset is already checked).
 
-- **Device prep** — masked to `Factory reset confirmed` / `Credentials provided`. Credentials never displayed in plain text.
-- **Pickup** — three rows (address / email / phone).
-- **Refund** — final net + an explanatory line: `Includes 10% restocking fee` when method is `original`. For Wallet, no extra line (wallet has no fee on change of mind).
+The sticky bar swaps `Continue` for a success-tone `Submit return request`.
 
-A **packing confirmation** checkbox card sits below the Refund section and gates `canAdvance` — Submit stays disabled until the user confirms they've packed the device. Copy is the change-of-mind variant ("I've packed the device securely…"). The sticky bar swaps `Continue` for a success-tone `Submit return request`.
-
-### 2.8 Step 7 — Confirmation (shared)
+### 2.9 Step 8 — Confirmation (shared)
 
 `generateClaimRef()` produces a `RET-XXXXXXXX` reference shown with a `Copy` button. Next-steps list:
 
@@ -156,7 +169,7 @@ The check prefers the new `deliveredOn` ISO field (`'2026-05-08'`) and falls bac
 | **Wallet** | `fee = 0`, `bonus = 0`, `net = gross` |
 | **Original payment** | `fee = round(gross * 0.10)`, `bonus = 0`, `net = gross - fee` |
 
-The returned shape is `{ itemTotal, warranty, gross, fee, bonus, net, rate }`. Step 5 uses `itemTotal` / `warranty` to render the line-by-line breakdown on the original-payment card; `bonus` is always present (0 here) so consumers don't need null-guards.
+The returned shape is `{ itemTotal, warranty, gross, fee, bonus, net, rate }`. Step 6 uses `itemTotal` / `warranty` to render the line-by-line breakdown on the original-payment card; `bonus` is always present (0 here) so consumers don't need null-guards.
 
 `ISSUE_WALLET_BONUS` (the AED 100 issue-branch bonus) is **not applied** on the change-of-mind branch.
 
@@ -188,9 +201,11 @@ How the customer-facing UI surfaces backend state:
 
 **Device prep gate before pickup, not after submission.** Originally Step 3 was a confirmation modal that fired after the customer hit Submit. We moved it forward so the customer can't get to the refund-method picker without committing to reset the device — gives them an exit ramp earlier in the flow if they're not ready.
 
-**`What happens next` on Step 4 not Step 6, and collapsed by default.** The customer should see the multi-step return process *before* committing the pickup details, not on the final review screen. Step 6's job is to be transactional; Step 4's job is to set expectations. The block was originally an always-open 5-row vertical timeline; it now leads with the single computed expected-by date and tucks the per-step list behind a `See detailed claim timeline` dropdown — the headline is enough information for most customers, the dropdown is there for the ones who want to see the breakdown.
+**`What happens next` lives on the Pickup step (now Step 5), not on Review, and collapsed by default.** The customer should see the multi-step return process *before* committing the pickup details, not on the final review screen. Review's job is to be transactional; the Pickup step's job is to set expectations. The block was originally an always-open 5-row vertical timeline; it now leads with the single computed expected-by date and tucks the per-step list behind a `See detailed claim timeline` dropdown — the headline is enough information for most customers, the dropdown is there for the ones who want to see the breakdown.
 
-**Two checkboxes (Step 4 pickup confirm, Step 6 packing confirm) for a deliberately heavy double-confirm.** Earlier drafts compressed these into a single confirmation on Step 6. Bringing the pickup confirm forward to Step 4 separates "I confirm the address" from "I've packed the device" — two distinct commitments, two distinct moments.
+**Three commitment moments across the flow, soft-validated on submit.** Step 5 pickup-confirm gates Continue (hard gate — three fields + checkbox). Step 7 Review carries two ack cards (factory-reset + packed-properly) that are *soft*-validated: Submit stays clickable so the customer never sees a dead button, but clicking with either ack unchecked highlights the offending card in red, scrolls it into view, and blocks submission. Earlier drafts had a single trailing packing checkbox on Review and a hard-disabled Submit button — felt cagey and didn't separate "device is reset" from "box is packed" cleanly. Splitting the two acks under their respective sections (Device preparation → factory-reset card; Packing summary → packed-properly card) makes each confirmation feel adjacent to the thing it's confirming.
+
+**Dedicated packing step instead of a trailing checkbox.** Step 4 was added so the customer reads packing instructions (Revibe box vs sturdy post box with bubble wrap) *before* booking the pickup window, not as a fine-print ack on Review. The selection itself (`packingMethod`) is the gate to leave the step — the *acknowledgment* that they've actually done it now lives on Review where it's enforced right before submission.
 
 **Submit copy is `Submit return request`, not `Confirm`.** Communicates that this isn't an instant confirmation — Revibe still has to inspect the device.
 
@@ -204,13 +219,13 @@ Populated on demo order `89657` today; other orders fall back to `subtotal`/`tot
 |---|---|---|
 | `deliveredOn` *(optional)* | ISO date | Canonical delivery date for the 10-day return-window check. Falls back to parsing `timeline.delivered` when absent. |
 | `unitPrice` *(optional)* | number | Per-unit price used by `refundBreakdown` to compute `gross = unitPrice * units`. Falls back to `subtotal` (then `total`). Today the flow always passes `units: 1`. |
-| `paymentMethod` *(optional)* | `{ type, brand, last4 }` | Drives the `Visa •• 4242` label on Step 5's original-payment card and Steps 6 & 7. Also consumed by `CancelOrderSheet`. Falls back to a generic `Card •• 0000`. |
+| `paymentMethod` *(optional)* | `{ type, brand, last4 }` | Drives the `Visa •• 4242` label on Step 6's original-payment card and Steps 7 & 8. Also consumed by `CancelOrderSheet`. Falls back to a generic `Card •• 0000`. |
 | `deviceOs` *(optional, `'ios' | 'android'`)* | string | Seeds Step 3's OS-tabs control. Defaults to `'ios'`. |
 | `returnedAt` *(future hook)* | string | When set, makes the order ineligible with reason `Already returned`. |
 
-### 6.2 Claim object written by Step 6 (change-of-mind shape)
+### 6.2 Claim object written by Step 7 (change-of-mind shape)
 
-Step 6's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and bubbles it up to `App.jsx` via `onSubmitClaim`. Persistence is in-memory only (cleared on refresh, revertable via the `UndoSnackbar`). Selected delivered mocks also hand-seed a claim for the post-submission demo state. The full claim-object reference (including issue-branch fields, warranty fields, and takeover-card extensions) lives in [claim_tracking.md](./claim_tracking.md) §5.
+Step 7's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and bubbles it up to `App.jsx` via `onSubmitClaim`. Persistence is in-memory only (cleared on refresh, revertable via the `UndoSnackbar`). Selected delivered mocks also hand-seed a claim for the post-submission demo state. The full claim-object reference (including issue-branch fields, warranty fields, and takeover-card extensions) lives in [claim_tracking.md](./claim_tracking.md) §5.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -221,7 +236,7 @@ Step 6's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and 
 | `claim.units` | integer | Today always `1`. |
 | `claim.reason` | `{ value, otherText }` | `value` is one of the 5 reason keys; `otherText` populated only when `value === 'other'`. |
 | `claim.devicePrep` | `{ option, os }` | `option` is `'reset'` or `'credentials'`; `os` is `'ios'` or `'android'`. Raw credentials intentionally not persisted. |
-| `claim.pickupDetails` | `{ address, email, phone }` | Three contact fields captured at Step 4. |
+| `claim.pickupDetails` | `{ address, email, phone }` | Three contact fields captured at Step 5. |
 | `claim.refundMethod` | `'wallet' | 'original'` | Drives the destination chip on the hero and the `Includes 10% restocking fee` sub-copy in details. |
 | `claim.expectedRefund` | `{ gross, fee, bonus, net, rate }` | Pre-computed at submission so the card doesn't re-run `refundBreakdown` every render. |
 | `claim.timeline` | map keyed by `claimStatusId` | Timestamps populated progressively as the claim moves. |
@@ -250,18 +265,18 @@ src/
 
 ## 8. Mocked vs production
 
-- **Step 6 submit seeds an in-session claim.** `ClaimFlow.handlePrimary` calls `onSubmitClaim(orderId, claim)` (from `App.jsx`) with a `buildClaim` output — `claimStatusId: 'initiated'`, seeded `scheduledPickup` (DHL Express, tomorrow's date, 10 AM–12 PM slot), timestamp from `new Date()`. No persistence: the claim lives in `App.jsx`'s `submittedClaims` map and is cleared on refresh. The `UndoSnackbar` lets the demo revert. Production needs a real backend write.
+- **Step 7 submit seeds an in-session claim.** `ClaimFlow.handlePrimary` calls `onSubmitClaim(orderId, claim)` (from `App.jsx`) with a `buildClaim` output — `claimStatusId: 'initiated'`, seeded `scheduledPickup` (DHL Express, tomorrow's date, 10 AM–12 PM slot), timestamp from `new Date()`. No persistence: the claim lives in `App.jsx`'s `submittedClaims` map and is cleared on refresh. The `UndoSnackbar` lets the demo revert. Production needs a real backend write.
 - **10% restocking fee is hardcoded** in `refundBreakdown`. Production should read from a backend config.
 - **`Expected by` headline + detailed-timeline SLA placeholders.** `CLAIM_SLAS` in `lib/claims.js` carries hand-guessed `expectedHours` values per step (covering refund and warranty pipelines). Ops to revise — see [claim_tracking.md](./claim_tracking.md) §4.
 - **Reason isn't validated.** No length cap on the textarea beyond 200 chars; no profanity filter.
 - **Address edit is a single-field bottom sheet.** No address validation, no autocomplete.
-- **No 10-day window enforcement at submit time.** Eligibility is checked on the order picker but not re-checked at Step 6 submission.
+- **No 10-day window enforcement at submit time.** Eligibility is checked on the order picker but not re-checked at Step 7 submission.
 - **`returnedAt` is a future hook.** No order today sets it, so the picker doesn't yet hide returned items.
 
 ## 9. Open questions
 
 - **Multi-product returns.** Today the order shape carries a single `product` and the delivered card represents that one product line. Multi-product orders will need a `products[]` array and one delivered card per product line, so each `Raise a claim` entry remains unambiguous.
 - **Partial-quantity returns.** Returning 2 of 3 of the same product line is not currently supported. Would need a quantity step or a per-card unit picker. The reducer already carries `units` as an integer.
-- **Top-level "Return an item" entry.** Today the only entry is the delivered card's `Raise a claim` button, which seeds a specific `orderId`. A top-level entry would need to either pick a product card first (recommended — matches the entry-point assumption baked into Step 6's read-only `Item` block) or reintroduce an order/product picker as a pre-Step-1 picker.
+- **Top-level "Return an item" entry.** Today the only entry is the delivered card's `Raise a claim` button, which seeds a specific `orderId`. A top-level entry would need to either pick a product card first (recommended — matches the entry-point assumption baked into Step 7's read-only `Item` block) or reintroduce an order/product picker as a pre-Step-1 picker.
 - **Cancel a submitted return.** No in-flight cancellation affordance exists for a submitted change-of-mind return. Once added, lives in [claim_tracking.md](./claim_tracking.md).
 - **Country-aware refund timing.** The "5–10 business days once return is complete" copy on the original-payment card is generic; payment-processor SLAs vary by country.
