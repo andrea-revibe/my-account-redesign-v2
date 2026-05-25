@@ -1454,6 +1454,688 @@ const CLAIM_WARRANTY_NODES = [
   },
 ]
 
+// ----- Issue / wrong-device claim journey -------------------------------
+// Order lifecycle through delivery, then customer raises an Issue claim
+// (battery scope) and rides the refund pipeline. The distinguishing
+// branches vs the change-of-mind journey are:
+//   1. Refund-method fork at submit: wallet (+AED 100 bonus per
+//      ISSUE_WALLET_BONUS) vs original-payment (no restocking fee on the
+//      issue branch). Both branches converge on the same downstream nodes.
+//   2. DocsRejected branch — issue-flow specific because Step 2 requires
+//      an attachment. Setting `claim.docsRejection` (+ subStatusId +
+//      actionRequired) routes the order to DocsRejectedCard. After the
+//      customer resubmits, `claim.proofResubmission` is set so the
+//      HistoryThread carries the "Evidence resubmitted" chip when the
+//      claim later moves to pickup. Re-merges into the pickup-outcome
+//      fork. Operational reference: issue n4 → n6 → n7 in
+//      docs/input/return_flow_issue.md.
+//   3. Courier pickup outcome (succeeded vs failed). Same shape as the
+//      CoM and warranty journeys.
+//   4. QC outcome (valid vs invalid). Valid → refund_issued →
+//      refund_credited (terminal). Invalid → `claim.invalidClaim` routes
+//      to InvalidClaimCard with the issue-flavoured ops message. The
+//      paid / declined sub-branches mirror the warranty journey's
+//      invalid-claim chain.
+//
+// Issue subtype seeded as `battery` (from issueSubtypes.NOT_WORKING_SUBTYPES)
+// so the ops dialogue can quote a concrete diagnostic ("cell health 92%").
+const CLAIM_ISSUE_NODES = [
+  {
+    id: 'placed',
+    label: 'Order placed',
+    trigger: 'customer',
+    event: 'order.created',
+    apply: (o) => o,
+  },
+  {
+    id: 'qc_started',
+    label: 'Quality check started',
+    trigger: 'system',
+    event: 'order.quality_check.started',
+    apply: (o) => ({
+      ...o,
+      statusId: 'quality_check',
+      timeline: { ...o.timeline, quality_check: '21 May · 9:18 AM' },
+    }),
+  },
+  {
+    id: 'shipped_arrived_destination',
+    label: 'Arrived in destination country',
+    trigger: 'system',
+    event: 'shipment.arrived_destination',
+    apply: (o) => ({
+      ...o,
+      statusId: 'shipped',
+      subStatusId: 'arrived_destination',
+      courier: 'DHL Express',
+      trackingNumber: '25193399',
+      trackingUrl: 'https://www.dhl.com/track',
+      timeline: { ...o.timeline, shipped: '23 May · 11:02 AM' },
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        arrived_destination: '24 May · 8:30 AM',
+      },
+    }),
+  },
+  {
+    id: 'shipped_cleared_customs',
+    label: 'Cleared customs',
+    trigger: 'system',
+    event: 'shipment.cleared_customs',
+    apply: (o) => ({
+      ...o,
+      subStatusId: 'cleared_customs',
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        cleared_customs: '24 May · 11:15 AM',
+      },
+    }),
+  },
+  {
+    id: 'shipped_forwarded_to_agent',
+    label: 'Forwarded to third-party agent',
+    trigger: 'system',
+    event: 'shipment.forwarded_to_agent',
+    apply: (o) => ({
+      ...o,
+      subStatusId: 'forwarded_to_agent',
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        forwarded_to_agent: '24 May · 4:45 PM',
+      },
+    }),
+  },
+  {
+    id: 'shipped_out_for_delivery',
+    label: 'Out for delivery',
+    trigger: 'system',
+    event: 'shipment.out_for_delivery',
+    apply: (o) => ({
+      ...o,
+      subStatusId: 'out_for_delivery',
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        out_for_delivery: '25 May · 7:30 AM',
+      },
+    }),
+  },
+  {
+    id: 'delivered',
+    label: 'Delivered',
+    trigger: 'system',
+    event: 'shipment.delivered',
+    next: ['claim_submitted_wallet', 'claim_submitted_card'],
+    apply: (o) => ({
+      ...o,
+      statusId: 'delivered',
+      state: 'close',
+      subStatusId: null,
+      timeline: { ...o.timeline, delivered: '25 May · 3:14 PM' },
+      deliveredOn: '2026-05-25',
+      deliveredOnLong: 'Monday, 25 May',
+    }),
+  },
+  // ----- Issue claim submitted (customer-triggered via ClaimFlow). Forks
+  //       on refund method: wallet carries the +AED 100 bonus chip,
+  //       original payment carries no fee (issue branch). Both converge
+  //       on the same downstream nodes via shared `next` targets. -------
+  {
+    id: 'claim_submitted_wallet',
+    label: 'Issue claim submitted — wallet refund',
+    trigger: 'customer',
+    event: 'claim.created',
+    next: ['claim_picked_up', 'claim_pickup_failed', 'claim_docs_rejected'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        claimRef: 'IsJrn1',
+        claimStatusId: 'initiated',
+        type: 'issue',
+        submittedAt: '25 May 2026 · 4:02 PM',
+        units: 1,
+        issueScope: 'not_working',
+        issueSubtypeId: 'battery',
+        issueDetails: {
+          category: 'battery',
+          description:
+            'Battery drops from 100% to under 30% in about four hours of light use, even after a factory reset. Battery Health shows the capacity.',
+          attachmentName: 'IMG_0710.jpg',
+        },
+        // Shape parity with the refund-flow mocks — issue intake skips the
+        // change-of-mind reason picker, but ClaimDetailsSheet reads it
+        // defensively for shared rows.
+        reason: { value: 'other', otherText: '' },
+        devicePrep: { option: 'reset', os: 'ios' },
+        pickupDetails: {
+          address: o.address,
+          email: o.email,
+          phone: o.phone,
+        },
+        scheduledPickup: {
+          courier: 'DHL Express',
+          date: 'Wednesday, 27 May',
+          slot: '10 AM – 12 PM',
+        },
+        refundMethod: 'wallet',
+        expectedRefund: {
+          itemTotal: 939,
+          warranty: 90,
+          gross: 1029,
+          fee: 0,
+          bonus: 100,
+          net: 1129,
+          rate: 0,
+        },
+        timeline: { initiated: '25 May · 4:02 PM' },
+      },
+    }),
+  },
+  {
+    id: 'claim_submitted_card',
+    label: 'Issue claim submitted — card refund',
+    trigger: 'customer',
+    event: 'claim.created',
+    next: ['claim_picked_up', 'claim_pickup_failed', 'claim_docs_rejected'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        claimRef: 'IsJrn1',
+        claimStatusId: 'initiated',
+        type: 'issue',
+        submittedAt: '25 May 2026 · 4:02 PM',
+        units: 1,
+        issueScope: 'not_working',
+        issueSubtypeId: 'battery',
+        issueDetails: {
+          category: 'battery',
+          description:
+            'Battery drops from 100% to under 30% in about four hours of light use, even after a factory reset. Battery Health shows the capacity.',
+          attachmentName: 'IMG_0710.jpg',
+        },
+        reason: { value: 'other', otherText: '' },
+        devicePrep: { option: 'reset', os: 'ios' },
+        pickupDetails: {
+          address: o.address,
+          email: o.email,
+          phone: o.phone,
+        },
+        scheduledPickup: {
+          courier: 'DHL Express',
+          date: 'Wednesday, 27 May',
+          slot: '10 AM – 12 PM',
+        },
+        refundMethod: 'original',
+        expectedRefund: {
+          itemTotal: 939,
+          warranty: 90,
+          gross: 1029,
+          fee: 0,
+          bonus: 0,
+          net: 1029,
+          rate: 0,
+        },
+        timeline: { initiated: '25 May · 4:02 PM' },
+      },
+    }),
+  },
+  // ----- Happy pickup → transit → QC chain (shared with the docs-resubmitted
+  //       and pickup-rescheduled re-merge targets). ----------------------
+  {
+    id: 'claim_picked_up',
+    label: 'Picked up by courier',
+    trigger: 'system',
+    event: 'claim.transit.picked_up',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'pickup',
+        timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
+        transitSubStatusId: 'picked_up',
+        transitSubTimeline: {
+          ...(o.claim.transitSubTimeline ?? {}),
+          picked_up: '28 May · 10:14 AM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_transit_arrived_origin_hub',
+    label: 'Arrived at origin hub',
+    trigger: 'system',
+    event: 'claim.transit.arrived_origin_hub',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        transitSubStatusId: 'arrived_origin_hub',
+        transitSubTimeline: {
+          ...o.claim.transitSubTimeline,
+          arrived_origin_hub: '28 May · 1:22 PM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_transit_in_transit',
+    label: 'In transit',
+    trigger: 'system',
+    event: 'claim.transit.in_transit',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        transitSubStatusId: 'in_transit',
+        transitSubTimeline: {
+          ...o.claim.transitSubTimeline,
+          in_transit: '28 May · 5:42 PM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_transit_arrived_revibe_hub',
+    label: 'Arrived at Revibe hub',
+    trigger: 'system',
+    event: 'claim.transit.arrived_revibe_hub',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        transitSubStatusId: 'arrived_revibe_hub',
+        transitSubTimeline: {
+          ...o.claim.transitSubTimeline,
+          arrived_revibe_hub: '29 May · 9:10 AM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_qc_started',
+    label: 'Claim quality check started',
+    trigger: 'system',
+    event: 'claim.qc.started',
+    next: ['claim_refund_issued', 'claim_invalid_confirmed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'qc',
+        timeline: { ...o.claim.timeline, qc: '29 May · 11:00 AM' },
+      },
+    }),
+  },
+  {
+    id: 'claim_refund_issued',
+    label: 'Refund issued',
+    trigger: 'system',
+    event: 'claim.refund.issued',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'refund_issued',
+        timeline: { ...o.claim.timeline, refund_issued: '30 May · 2:18 PM' },
+      },
+    }),
+  },
+  {
+    id: 'claim_refund_credited',
+    label: 'Refund credited',
+    trigger: 'system',
+    event: 'claim.refund.completed',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'refund_credited',
+        timeline: { ...o.claim.timeline, refund_credited: '30 May · 2:19 PM' },
+      },
+    }),
+  },
+  // ----- Docs-rejected sub-branch (issue-specific). Setting
+  //       `claim.docsRejection` routes the order to DocsRejectedCard.
+  //       Resubmission clears the takeover, sets `proofResubmission`
+  //       (surfaces the "Evidence resubmitted" chip in HistoryThread on
+  //       the next ClaimCard view), and re-merges into the pickup
+  //       outcome fork. -------------------------------------------------
+  {
+    id: 'claim_docs_rejected',
+    label: 'Documents rejected by Quality',
+    trigger: 'system',
+    event: 'claim.documents.rejected',
+    next: ['claim_docs_resubmitted'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'awaiting_documents',
+        actionRequired: {
+          kind: 'awaiting_documents',
+          deadline: '29 May · 11:18 AM',
+          deadlineLabel: '2 days, 14 hours left',
+        },
+        docsRejection: {
+          rejectedAt: '26 May · 11:18 AM',
+          autoCancelAt: '29 May · 11:18 AM',
+          timeLeftLabel: '2 days, 14 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — thanks for the report. The Battery Health screenshot you sent is cropped and the capacity percentage isn't visible. Could you reshoot the full Settings → Battery → Battery Health screen, including the percentage line near the top? A short clip showing the drain over a few minutes would help too.",
+          previous: [
+            { name: 'IMG_0710.jpg', size: '2.4 MB', kind: 'image', tag: 'Cropped' },
+            { name: 'IMG_0711.jpg', size: '2.1 MB', kind: 'image', tag: 'Blurry' },
+          ],
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_docs_resubmitted',
+    label: 'Evidence resubmitted',
+    trigger: 'customer',
+    event: 'claim.documents.resubmitted',
+    // Re-merges into the pickup outcome fork — customer can still hit a
+    // failed-pickup downstream of a resubmitted-evidence chapter.
+    next: ['claim_picked_up', 'claim_pickup_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        docsRejection: undefined,
+        proofResubmission: {
+          at: '27 May · 10:42 AM',
+          fileCount: 3,
+        },
+      },
+    }),
+  },
+  // ----- Pickup-failed sub-branch (placed after the docs branch so the
+  //       happy chain's default-next routing isn't disturbed). ----------
+  {
+    id: 'claim_pickup_failed',
+    label: 'Pickup failed',
+    trigger: 'system',
+    event: 'claim.pickup.failed',
+    next: ['claim_pickup_rescheduled'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'collection_failed',
+        pickupFailure: {
+          failedAt: '27 May · 8:20 AM',
+          autoCancelAt: '31 May · 8:20 AM',
+          timeLeftLabel: '3 days, 18 hours left',
+          opsName: 'Rashid',
+          opsRole: 'DHL Express',
+          opsMessage:
+            "Hi Andrea — our driver was at your building at 8:20 AM but couldn't reach you on the listed number and there was no answer at the office. Please confirm the address (or add a note for the driver) and we'll dispatch again on the next available slot.",
+          nextPickup: {
+            awb: '25193520',
+            slot: 'Thursday, 28 May · 10 AM – 12 PM',
+            courier: 'DHL Express',
+          },
+        },
+        actionRequired: {
+          kind: 'collection_failed',
+          failedAt: '27 May · 8:20 AM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_pickup_rescheduled',
+    label: 'Pickup rescheduled',
+    trigger: 'customer',
+    event: 'claim.pickup.rescheduled',
+    // Re-merges into the transit chain past `claim_picked_up` — reschedule
+    // itself advances claimStatusId to 'pickup' and seeds the picked_up
+    // scan so the detailed-tracking dropdown is visible immediately.
+    next: ['claim_transit_arrived_origin_hub'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'pickup',
+        subStatusId: undefined,
+        pickupFailure: undefined,
+        actionRequired: undefined,
+        scheduledPickup: {
+          courier: 'DHL Express',
+          date: 'Thursday, 28 May',
+          slot: '10 AM – 12 PM',
+        },
+        timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
+        transitSubStatusId: 'picked_up',
+        transitSubTimeline: {
+          ...(o.claim.transitSubTimeline ?? {}),
+          picked_up: '28 May · 10:14 AM',
+        },
+      },
+    }),
+  },
+  // ----- Invalid-claim sub-branch (issue-flavoured ops message; LAB /
+  //       expert_revision sub-flow intentionally skipped per design
+  //       choice — no inline surface today). Setting `claim.invalidClaim`
+  //       routes to InvalidClaimCard which manages its own internal
+  //       action_needed → paid / declined state. The journey advances
+  //       through the same outcomes via customer-triggered nodes the
+  //       dev panel surfaces with the `via UI` chip. -------------------
+  {
+    id: 'claim_invalid_confirmed',
+    label: 'Inspection — invalid claim confirmed',
+    trigger: 'system',
+    event: 'claim.inspection.invalid_confirmed',
+    next: ['claim_return_shipping_paid', 'claim_invalid_declined'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        // Pre-takeover sub-status for ops surfaces; the card itself reads
+        // from claim.invalidClaim.
+        subStatusId: 'invalid_confirmed',
+        actionRequired: {
+          kind: 'awaiting_payment',
+          deadline: '6 Jun · 4:18 PM',
+          deadlineLabel: '7 days left',
+        },
+        invalidClaim: {
+          determinedAt: '30 May · 4:18 PM',
+          autoCancelAt: '6 Jun · 4:18 PM',
+          timeLeftLabel: '7 days left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — our technicians ran a full battery diagnostic and the cell health came back at 92%, within the spec we ship at. Standby drain and load tests were also within range. We weren't able to reproduce the issue you described, so we can't approve the claim. To get the device back we'll need you to cover return shipping — otherwise the unit returns to circulation.",
+          returnShipping: {
+            amount: 35,
+            currency: 'AED',
+          },
+          // Pre-seeded shipment shape so the card has something to render
+          // when its internal demo state flips to `paid`. Mirrors mock 89940.
+          returnShipment: {
+            courier: 'DHL Express',
+            estimatedDelivery: 'Jun 8',
+            estimatedDeliveryLong: 'Monday, 8 June',
+            currentStatusId: 'created',
+            timeline: {
+              created: '31 May · 11:00 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_return_shipping_paid',
+    label: 'Customer paid return shipping',
+    trigger: 'customer',
+    event: 'claim.return_shipping.paid',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          paidAt: '31 May · 9:45 AM',
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            currentStatusId: 'shipped',
+            subStatusId: null,
+            subTimeline: {},
+            timeline: {
+              ...o.claim.invalidClaim.returnShipment.timeline,
+              quality_check: '31 May · 2:30 PM',
+              shipped: '1 Jun · 9:15 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_arrived_destination',
+    label: 'Return — arrived in destination country',
+    trigger: 'system',
+    event: 'claim.return_shipment.arrived_destination',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'arrived_destination',
+            subTimeline: {
+              ...(o.claim.invalidClaim.returnShipment.subTimeline ?? {}),
+              arrived_destination: '3 Jun · 8:30 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_cleared_customs',
+    label: 'Return — cleared customs',
+    trigger: 'system',
+    event: 'claim.return_shipment.cleared_customs',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'cleared_customs',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              cleared_customs: '3 Jun · 11:15 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_forwarded_to_agent',
+    label: 'Return — forwarded to third-party agent',
+    trigger: 'system',
+    event: 'claim.return_shipment.forwarded_to_agent',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'forwarded_to_agent',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              forwarded_to_agent: '3 Jun · 4:45 PM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_out_for_delivery',
+    label: 'Return — out for delivery',
+    trigger: 'system',
+    event: 'claim.return_shipment.out_for_delivery',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'out_for_delivery',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              out_for_delivery: '8 Jun · 7:30 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_delivered',
+    label: 'Unrepaired device delivered to customer',
+    trigger: 'system',
+    event: 'claim.return_shipment.delivered',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            currentStatusId: 'delivered',
+            subStatusId: null,
+            timeline: {
+              ...o.claim.invalidClaim.returnShipment.timeline,
+              delivered: '8 Jun · 11:42 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_declined',
+    label: 'Customer declined — claim closed',
+    trigger: 'customer',
+    event: 'claim.declined',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          declinedAt: '31 May · 9:45 AM',
+        },
+      },
+    }),
+  },
+]
+
 export const JOURNEYS = [
   {
     id: 'happy_path',
@@ -1483,6 +2165,12 @@ export const JOURNEYS = [
     label: 'Change-of-mind claim',
     initialOrder: INITIAL_ORDER,
     nodes: CLAIM_COM_NODES,
+  },
+  {
+    id: 'claim_issue',
+    label: 'Issue / wrong-device claim',
+    initialOrder: INITIAL_ORDER,
+    nodes: CLAIM_ISSUE_NODES,
   },
   {
     id: 'claim_warranty',
