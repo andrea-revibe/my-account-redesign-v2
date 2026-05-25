@@ -1,20 +1,20 @@
 import { ORDERS } from '../../data/orders'
 
-export const TOTAL_STEPS = 7
+export const TOTAL_STEPS = 8
 
-// Warranty submissions skip Step 5 (refund method) — no money changes
-// hands. Customer-visible step count therefore drops to 6 on warranty,
+// Warranty submissions skip Step 6 (refund method) — no money changes
+// hands. Customer-visible step count therefore drops by one on warranty,
 // and NEXT / BACK / GO_TO_STEP step over the refund step.
 export function visibleStepCount(claimType) {
-  return claimType === 'warranty' ? 6 : TOTAL_STEPS
+  return claimType === 'warranty' ? TOTAL_STEPS - 1 : TOTAL_STEPS
 }
 
-// Maps a state.step (still 1..7 internally so Step 6 = review and Step 7
-// = confirmation stay aligned across claim types) onto the position the
+// Maps a state.step (1..8 internally — 4 = packing, 5 = pickup, 6 =
+// refund method, 7 = review, 8 = confirmation) onto the position the
 // user sees in the progress bar (1..visibleStepCount).
 export function visibleStepIndex(step, claimType) {
   if (claimType !== 'warranty') return step
-  return step >= 5 ? step - 1 : step
+  return step >= 6 ? step - 1 : step
 }
 
 export function initialState({ initialOrderId = null, initialOrder = null } = {}) {
@@ -52,7 +52,9 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     },
     pickupConfirmed: false,
     refundMethod: null,
+    packingMethod: null,
     packingConfirmed: false,
+    factoryResetConfirmed: false,
     claimRef: null,
   }
 }
@@ -96,26 +98,30 @@ export function flowReducer(state, action) {
       return { ...state, pickupConfirmed: action.value }
     case 'SET_REFUND_METHOD':
       return { ...state, refundMethod: action.value }
+    case 'SET_PACKING_METHOD':
+      return { ...state, packingMethod: action.value }
     case 'SET_PACKING_CONFIRMED':
       return { ...state, packingConfirmed: action.value }
+    case 'SET_FACTORY_RESET_CONFIRMED':
+      return { ...state, factoryResetConfirmed: action.value }
     case 'GO_TO_STEP': {
-      // Edit links from Step 6 must never land the user on Step 5 when
+      // Edit links from Review must never land the user on Step 6 when
       // there is no refund-method step in the warranty flow.
       const target =
-        state.claimType === 'warranty' && action.value === 5
-          ? 4
+        state.claimType === 'warranty' && action.value === 6
+          ? 5
           : action.value
       return { ...state, step: target }
     }
     case 'NEXT': {
       const next = state.step + 1
-      const skipRefund = state.claimType === 'warranty' && next === 5
-      return { ...state, step: Math.min(TOTAL_STEPS, skipRefund ? 6 : next) }
+      const skipRefund = state.claimType === 'warranty' && next === 6
+      return { ...state, step: Math.min(TOTAL_STEPS, skipRefund ? 7 : next) }
     }
     case 'BACK': {
       const prev = state.step - 1
-      const skipRefund = state.claimType === 'warranty' && prev === 5
-      return { ...state, step: Math.max(1, skipRefund ? 4 : prev) }
+      const skipRefund = state.claimType === 'warranty' && prev === 6
+      return { ...state, step: Math.max(1, skipRefund ? 5 : prev) }
     }
     case 'SUBMIT':
       return { ...state, claimRef: action.value, step: TOTAL_STEPS }
@@ -151,7 +157,9 @@ export function canAdvance(state) {
         return dp.email.trim().length > 0 && dp.password.length > 0
       return false
     }
-    case 4: {
+    case 4:
+      return state.packingMethod !== null
+    case 5: {
       const pd = state.pickupDetails
       return (
         pd.address.trim().length > 0 &&
@@ -160,10 +168,14 @@ export function canAdvance(state) {
         state.pickupConfirmed === true
       )
     }
-    case 5:
-      return state.refundMethod === 'wallet' || state.refundMethod === 'original'
     case 6:
-      return state.packingConfirmed === true
+      return state.refundMethod === 'wallet' || state.refundMethod === 'original'
+    case 7:
+      // Review keeps Submit clickable regardless of the two ack
+      // checkboxes. ClaimFlow.handlePrimary enforces the gate and
+      // flips unchecked cards into their red error state on a
+      // blocked submit.
+      return true
     default:
       return false
   }

@@ -30,11 +30,12 @@ flowchart TD
   s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
   s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
   s2 -->|Scope + sub-issue + description + attachment| s3[Step 3 — Device prep]
-  s3 -->|Reset confirmed OR credentials provided| s4[Step 4 — Pickup details]
-  s4 -->|3 fields confirmed + checkbox| s5[Step 5 — Refund method]
-  s5 -->|Wallet +100 AED or Original payment| s6[Step 6 — Review & submit]
-  s6 -->|Submit return request| s7[Step 7 — Confirmation]
-  s7 -->|Back to my account| close([Close overlay])
+  s3 -->|Reset confirmed OR credentials provided| s4[Step 4 — Packing]
+  s4 -->|Original Revibe box OR sturdy post box selected| s5[Step 5 — Pickup details]
+  s5 -->|3 fields confirmed + checkbox| s6[Step 6 — Refund method]
+  s6 -->|Wallet +100 AED or Original payment| s7[Step 7 — Review & submit]
+  s7 -->|Both acks ticked → Submit return request| s8[Step 8 — Confirmation]
+  s8 -->|Back to my account| close([Close overlay])
 ```
 
 ### 2.1 Step 1 — Claim type (shared)
@@ -70,30 +71,32 @@ The selected row carries an `X` button that clears the selection and reopens the
 
 The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` consumes `issueSubtypeId` (via `findSubtype(id)` in `issueSubtypes.js`) and `issueScope`.
 
-### 2.3 Steps 3 & 4 — Device prep + pickup (shared)
+### 2.3 Steps 3 – 5 — Device prep + packing + pickup (shared)
 
-Identical to the change-of-mind branch. See [change_of_mind.md](./change_of_mind.md) §2.4–2.5.
+Identical to the change-of-mind branch. See [change_of_mind.md](./change_of_mind.md) §2.4–2.6 (Step 3 device prep, Step 4 packing radio pick, Step 5 pickup details).
 
-### 2.4 Step 5 — Refund method (shared chrome, issue math)
+### 2.4 Step 6 — Refund method (shared chrome, issue math)
 
 Two stacked refund cards built off `refundBreakdown(order, units, method, 'issue')`. Chrome is identical to the change-of-mind Step 5; only the math and secondary copy diverge.
 
 - **Wallet card.** Net amount (= `gross + AED 100 bonus`) + an accent-tinted `+AED 100 bonus` chip + tagline `Full refund + bonus · instantly once return is complete`.
 - **Original-payment card.** Full net (no fee), no breakdown table, tagline `Full refund · 5–10 business days once return is complete`. Card label uses `order.paymentMethod.brand` + `last4`.
 
-### 2.5 Step 6 — Review & submit (shared)
+### 2.5 Step 7 — Review & submit (shared)
 
 Sectioned summary. Issue-specific section:
 
 - **Issue** — category label (resolved via `findSubtype(id)` against `issueSubtypes.js`) + description + attachment chip.
 
-Shared sections: Device prep (masked to `Factory reset confirmed` / `Credentials provided`), Pickup, Refund.
+Shared sections: Device prep (masked to `Factory reset confirmed` / `Credentials provided`), Packing summary (with the chosen method label), Pickup, Refund.
+
+Two soft-validated ack cards sit inside the Review surface — **☑︎ I have factory reset my device** directly under Device preparation, **☑︎ I have packed the device properly** directly under the Packing summary. Submit stays clickable; clicking with either unchecked flips the topmost unchecked card into a danger-toned error state and blocks submission. Same `AckCard` chrome as the change-of-mind branch — see [change_of_mind.md](./change_of_mind.md) §2.8 for the full soft-validation contract.
 
 The refund block surfaces the final net + an explanatory line: `Includes AED 100 bonus` (accent tone) for Wallet, or no extra line for Original payment.
 
-A **packing confirmation** checkbox card gates `canAdvance`. Copy is the issue variant: it merges packing with the "necessary testing" acknowledgement (replacing an earlier double-checkbox bug where ticking "I have *not* done the testing" still let the form submit). The sticky bar swaps `Continue` for a success-tone `Submit return request`.
+The sticky bar swaps `Continue` for a success-tone `Submit return request`.
 
-### 2.6 Step 7 — Confirmation (shared)
+### 2.6 Step 8 — Confirmation (shared)
 
 Same as change of mind. See [change_of_mind.md](./change_of_mind.md) §2.8.
 
@@ -114,7 +117,7 @@ Identical to change of mind. See [change_of_mind.md](./change_of_mind.md) §3.1 
 | **Wallet** | `fee = 0`, `bonus = ISSUE_WALLET_BONUS` (flat AED 100), `net = gross + bonus` |
 | **Original payment** | `fee = 0`, `bonus = 0`, `net = gross` |
 
-`bonus` is always present in the return shape (0 when not applicable) so consumers don't need null-guards. Step 5 reads `bonus` to render the `+AED 100 bonus` chip and Step 6 reads it for the `Includes AED 100 bonus` explanatory line.
+`bonus` is always present in the return shape (0 when not applicable) so consumers don't need null-guards. Step 6 reads `bonus` to render the `+AED 100 bonus` chip and Step 7 reads it for the `Includes AED 100 bonus` explanatory line.
 
 `ISSUE_WALLET_BONUS` is a constant in `src/lib/returns.js`; the value is currency-agnostic and could grow into a per-order amount sourced from the backend.
 
@@ -152,9 +155,9 @@ How the customer-facing UI surfaces backend state:
 
 **AED 100 bonus on Wallet, not "double the bonus on original payment".** Earlier drafts had a sliding bonus that doubled when the customer chose Wallet. The clean +100 framing is simpler to communicate and easier to A/B against the change-of-mind branch's "no bonus, just a fee waiver".
 
-**Packing checkbox merges with the testing acknowledgement.** The earlier double-checkbox setup ("I've packed the device" + "I have done the testing") had a bug where ticking the negation of the second was still considered a yes. Merging them into a single checkbox copy fixes the bug *and* simplifies the surface.
+**Packing and factory-reset acks moved onto Review as a soft-validated pair.** Earlier drafts had a single trailing packing checkbox on Review that hard-gated Submit; an even earlier version merged packing with a "testing acknowledged" checkbox to fix a negation-tick bug. Both got replaced when Step 4 became a dedicated packing-instructions screen — packing is now its own surface, and the *acknowledgments* (factory-reset + packed-properly) live on Review where they're enforced right before submission. See [change_of_mind.md](./change_of_mind.md) §5 for the rationale on splitting the two acks and using soft validation instead of disabling Submit.
 
-**`category` field was replaced by `issueSubtypeId` + `issueScope`.** The pre-redesign flat `category` field couldn't differentiate "wrong device" from "battery issue" cleanly. Step 6 review now consumes the structured pair via `findSubtype(id)`.
+**`category` field was replaced by `issueSubtypeId` + `issueScope`.** The pre-redesign flat `category` field couldn't differentiate "wrong device" from "battery issue" cleanly. Step 7 review now consumes the structured pair via `findSubtype(id)`.
 
 ## 6. Data model
 
@@ -162,7 +165,7 @@ How the customer-facing UI surfaces backend state:
 
 Same as change of mind. See [change_of_mind.md](./change_of_mind.md) §6.1.
 
-### 6.2 Claim object written by Step 6 (issue shape)
+### 6.2 Claim object written by Step 7 (issue shape)
 
 The full claim-object reference (including takeover-card extensions) lives in [claim_tracking.md](./claim_tracking.md) §5. Issue-specific fields:
 
@@ -190,7 +193,7 @@ src/components/ClaimFlow/
 
 ## 8. Mocked vs production
 
-- **Step 6 submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
+- **Step 7 submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
 - **Attachment slot is fake.** Clicking the drop-zone stubs in a filename. No real file picker, no upload endpoint, no file-type/size validation.
 - **AED 100 bonus is hardcoded** as `ISSUE_WALLET_BONUS` in `src/lib/returns.js`. Production should read from a backend config (per-order or per-category).
 - **Sub-issue guidance copy is hardcoded** in `issueSubtypes.js`. Production should source from a content management system so non-engineers can revise.

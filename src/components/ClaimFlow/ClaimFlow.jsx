@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import { ChevronLeft, X } from 'lucide-react'
 import { ORDERS } from '../../data/orders'
 import {
@@ -15,6 +15,7 @@ import Step1ClaimType from './Step1ClaimType'
 import Step2Reason from './Step2Reason'
 import Step2IssueDetails from './Step2IssueDetails'
 import Step3DevicePrep from './Step3DevicePrep'
+import Step4Packing from './Step4Packing'
 import Step4PickupDetails from './Step4PickupDetails'
 import Step5RefundMethod from './Step5RefundMethod'
 import Step6Review from './Step6Review'
@@ -32,6 +33,7 @@ export default function ClaimFlow({
     { initialOrderId, initialOrder },
     initialState,
   )
+  const [submitAttempted, setSubmitAttempted] = useState(false)
 
   // Lock background scroll while the overlay is up; restore on unmount.
   useEffect(() => {
@@ -53,10 +55,14 @@ export default function ClaimFlow({
   )
 
   const isConfirmation = state.step === TOTAL_STEPS && state.claimRef
-  const isReview = state.step === 6
+  const isReview = state.step === 7
 
   const handlePrimary = () => {
     if (isReview) {
+      if (!state.factoryResetConfirmed || !state.packingConfirmed) {
+        setSubmitAttempted(true)
+        return
+      }
       const claimRef = generateClaimRef()
       if (order && onSubmitClaim) {
         onSubmitClaim(order.id, buildClaim({ state, order, claimRef }))
@@ -130,17 +136,25 @@ export default function ClaimFlow({
             <Step3DevicePrep state={state} dispatch={dispatch} order={order} />
           )}
           {state.step === 4 && (
-            <Step4PickupDetails state={state} dispatch={dispatch} />
+            <Step4Packing state={state} dispatch={dispatch} />
           )}
           {state.step === 5 && (
+            <Step4PickupDetails state={state} dispatch={dispatch} />
+          )}
+          {state.step === 6 && (
             <Step5RefundMethod
               state={state}
               dispatch={dispatch}
               order={order}
             />
           )}
-          {state.step === 6 && (
-            <Step6Review state={state} dispatch={dispatch} order={order} />
+          {state.step === 7 && (
+            <Step6Review
+              state={state}
+              dispatch={dispatch}
+              order={order}
+              submitAttempted={submitAttempted}
+            />
           )}
           {isConfirmation && (
             <Step7Confirmation

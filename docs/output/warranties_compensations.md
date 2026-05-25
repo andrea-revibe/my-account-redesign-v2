@@ -27,7 +27,7 @@ The customer's device is faulty but within warranty. Outcome is always **repair 
 
 ```mermaid
 stateDiagram-v2
-    [*] --> initiated: Step 6 submit
+    [*] --> initiated: Step 7 submit
     initiated --> pickup
     pickup --> qc
     qc --> under_repair
@@ -85,21 +85,22 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 
 ### 2.4 Intake flow
 
-The warranty intake reuses the existing returns-flow chrome and most of the existing steps. Total visible step count is **6** (not 7) — Step 5 (Refund method) is skipped because no money changes hands. The progress bar reads "Step X of 6"; internally `state.step` still uses 1..7 indexing so Step 6 = review and Step 7 = confirmation stay aligned across all three claim types. Routing lives in `flowReducer.js`:
+The warranty intake reuses the existing returns-flow chrome and most of the existing steps. Total visible step count is **7** (not 8) — Step 6 (Refund method) is skipped because no money changes hands. The progress bar reads "Step X of 7"; internally `state.step` still uses 1..8 indexing so Step 4 = packing, Step 7 = review and Step 8 = confirmation stay aligned across all three claim types. Routing lives in `flowReducer.js`:
 
-- `visibleStepCount(claimType)` → 7 for refund flows, 6 for warranty.
-- `visibleStepIndex(step, claimType)` → maps internal 1..7 onto displayed 1..6, subtracting 1 once `step >= 5` when the claim type is warranty.
-- `NEXT` / `BACK` / `GO_TO_STEP` step over `state.step === 5` for warranty so the user never lands on the refund-method screen.
+- `visibleStepCount(claimType)` → 8 for refund flows, 7 for warranty.
+- `visibleStepIndex(step, claimType)` → maps internal 1..8 onto displayed 1..7, subtracting 1 once `step >= 6` when the claim type is warranty.
+- `NEXT` / `BACK` / `GO_TO_STEP` step over `state.step === 6` for warranty so the user never lands on the refund-method screen.
 
 | Step | Behaviour on warranty |
 |---|---|
 | 1 — Claim type | `Use my warranty` row is in-scope. Selecting it dispatches `SET_CLAIM_TYPE: 'warranty'` and unlocks Continue. |
 | 2 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch). Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
 | 3 — Device prep | Shared with refund flows (factory reset or credentials). |
-| 4 — Pickup details | Shared with refund flows. The Step 4 "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → QC → Under repair → On its way back → Device returned). |
-| 5 — Refund method | **Skipped.** |
-| 6 — Review | Refund section is replaced by a **What you'll get back** card: Wrench-iconed "Your repaired device" + "Expected back" date + "No refund — the same unit is returned to you after repair." The Edit-by-section navigation only exposes Fault / Device prep / Pickup. CTA reads `Submit warranty claim` (still success-toned). The packing-confirmation checkbox uses the issue variant ("packed properly and performed the necessary testing") since warranty also collects evidence. |
-| 7 — Confirmation | Title swaps to "Your warranty claim is in"; chip reads `Warranty`; second row swaps "Expected refund" (Clock glyph) for **"Expected back"** (Wrench glyph) with the computed return date and a "No refund issued — same device returned after repair" note. Secondary CTA reads "Track this claim". |
+| 4 — Packing | Shared with refund flows. Radio pick between original Revibe box and sturdy post box with bubble wrap — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.5. |
+| 5 — Pickup details | Shared with refund flows. The Step 5 "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → QC → Under repair → On its way back → Device returned). |
+| 6 — Refund method | **Skipped.** |
+| 7 — Review | Refund section is replaced by a **What you'll get back** card: Wrench-iconed "Your repaired device" + "Expected back" date + "No refund — the same unit is returned to you after repair." The Edit-by-section navigation only exposes Fault / Device prep / Packing / Pickup. CTA reads `Submit warranty claim` (still success-toned). Two soft-validated ack cards sit inline (factory-reset + packed-properly) — same `AckCard` contract as the refund branches; see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.8. |
+| 8 — Confirmation | Title swaps to "Your warranty claim is in"; chip reads `Warranty`; second row swaps "Expected refund" (Clock glyph) for **"Expected back"** (Wrench glyph) with the computed return date and a "No refund issued — same device returned after repair" note. Secondary CTA reads "Track this claim". |
 
 On submit, `ClaimFlow.handlePrimary` builds a warranty-shaped claim object (`buildClaim` at the bottom of `ClaimFlow.jsx`) and bubbles it up via the new `onSubmitClaim(orderId, claim)` prop. The shape:
 

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import {
   Pencil,
   CreditCard,
@@ -7,12 +8,15 @@ import {
   Check,
   FileImage,
   Wrench,
+  Package,
+  AlertCircle,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 import { expectedCompletionFor } from '../../lib/claims'
 import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
+import { PACKING_LABELS } from './Step4Packing'
 
 const REASON_LABELS = {
   no_fit: "Didn't suit my needs",
@@ -26,7 +30,12 @@ const SCOPE_LABELS = Object.fromEntries(
   ISSUE_SCOPES.map((s) => [s.id, s.label]),
 )
 
-export default function Step6Review({ state, dispatch, order }) {
+export default function Step6Review({
+  state,
+  dispatch,
+  order,
+  submitAttempted = false,
+}) {
   if (!order) return null
   const currency = order.currency
   const isIssue = state.claimType === 'issue'
@@ -120,7 +129,49 @@ export default function Step6Review({ state, dispatch, order }) {
           <div className="text-[13.5px] text-ink">{devicePrep}</div>
         </Section>
 
-        <Section title="Pickup details" onEdit={() => goTo(4)}>
+        <FactoryResetConfirmation
+          checked={state.factoryResetConfirmed}
+          error={submitAttempted && !state.factoryResetConfirmed}
+          scrollOnError={submitAttempted && !state.factoryResetConfirmed}
+          onChange={(value) =>
+            dispatch({ type: 'SET_FACTORY_RESET_CONFIRMED', value })
+          }
+        />
+
+        <Section title="Packing" onEdit={() => goTo(4)}>
+          <div className="flex items-start gap-2.5">
+            <Package
+              size={13}
+              strokeWidth={1.75}
+              className="text-ink-2 mt-1 shrink-0"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-[13.5px] text-ink leading-[1.4]">
+                {PACKING_LABELS[state.packingMethod] || 'Not selected'}
+              </div>
+              <div className="text-[11.5px] text-muted mt-0.5 leading-[1.4]">
+                {state.packingMethod === 'post_box'
+                  ? 'Bubble-wrapped and cushioned in a sturdy outer box.'
+                  : 'Repacked using the original Revibe box.'}
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        <PackingConfirmation
+          checked={state.packingConfirmed}
+          error={submitAttempted && !state.packingConfirmed}
+          scrollOnError={
+            submitAttempted &&
+            !state.packingConfirmed &&
+            state.factoryResetConfirmed
+          }
+          onChange={(value) =>
+            dispatch({ type: 'SET_PACKING_CONFIRMED', value })
+          }
+        />
+
+        <Section title="Pickup details" onEdit={() => goTo(5)}>
           <div className="flex flex-col gap-2">
             <PickupRow
               Icon={MapPin}
@@ -168,7 +219,7 @@ export default function Step6Review({ state, dispatch, order }) {
             </div>
           </Section>
         ) : (
-          <Section title="Refund" onEdit={() => goTo(5)}>
+          <Section title="Refund" onEdit={() => goTo(6)}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[13.5px] text-ink flex items-center gap-1.5">
@@ -219,26 +270,72 @@ export default function Step6Review({ state, dispatch, order }) {
           </Section>
         )}
 
-        <PackingConfirmation
-          checked={state.packingConfirmed}
-          isIssue={isIssue || isWarranty}
-          onChange={(value) =>
-            dispatch({ type: 'SET_PACKING_CONFIRMED', value })
-          }
-        />
       </div>
     </>
   )
 }
 
-function PackingConfirmation({ checked, isIssue, onChange }) {
+function FactoryResetConfirmation({ checked, error, scrollOnError, onChange }) {
+  return (
+    <AckCard
+      checked={checked}
+      error={error}
+      scrollOnError={scrollOnError}
+      onChange={onChange}
+      title="I have factory reset my device."
+      subtitle="Required before pickup. Unreset devices may delay your refund."
+    />
+  )
+}
+
+function PackingConfirmation({ checked, error, scrollOnError, onChange }) {
+  return (
+    <AckCard
+      checked={checked}
+      error={error}
+      scrollOnError={scrollOnError}
+      onChange={onChange}
+      title="I have packed the device properly."
+      subtitle="Sealed, cushioned, and ready for the courier to collect."
+    />
+  )
+}
+
+function AckCard({
+  checked,
+  error,
+  scrollOnError,
+  onChange,
+  title,
+  subtitle,
+}) {
+  const cardRef = useRef(null)
+  useEffect(() => {
+    if (scrollOnError && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [scrollOnError])
+
+  const border = error
+    ? 'border-danger'
+    : checked
+      ? 'border-brand'
+      : 'border-line'
+  const bg = error
+    ? 'bg-danger-bg/40'
+    : checked
+      ? 'bg-brand-bg/30'
+      : 'bg-surface hover:bg-line-2/40'
+  const boxFill = error
+    ? 'border-danger bg-surface'
+    : checked
+      ? 'bg-brand border-brand'
+      : 'border-line bg-surface'
+
   return (
     <label
-      className={`flex items-start gap-3 rounded-[14px] border-2 px-3.5 py-3 cursor-pointer transition-colors ${
-        checked
-          ? 'border-brand bg-brand-bg/30'
-          : 'border-line bg-surface hover:bg-line-2/40'
-      }`}
+      ref={cardRef}
+      className={`flex items-start gap-3 rounded-[14px] border-2 px-3.5 py-3 cursor-pointer transition-colors ${border} ${bg}`}
     >
       <span className="relative mt-0.5 shrink-0">
         <input
@@ -248,9 +345,7 @@ function PackingConfirmation({ checked, isIssue, onChange }) {
           className="peer sr-only"
         />
         <span
-          className={`w-[20px] h-[20px] rounded-[6px] border-2 grid place-items-center transition-colors ${
-            checked ? 'bg-brand border-brand' : 'border-line bg-surface'
-          }`}
+          className={`w-[20px] h-[20px] rounded-[6px] border-2 grid place-items-center transition-colors ${boxFill}`}
         >
           {checked && (
             <Check size={13} strokeWidth={3} className="text-white" />
@@ -259,15 +354,17 @@ function PackingConfirmation({ checked, isIssue, onChange }) {
       </span>
       <span className="flex-1 min-w-0">
         <span className="block text-[13.5px] font-semibold text-ink leading-[1.35]">
-          {isIssue
-            ? 'I have packed the device properly and performed the necessary testing.'
-            : 'I have packed the device properly in its original box.'}
+          {title}
         </span>
         <span className="block mt-1 text-[11.5px] text-muted leading-[1.4]">
-          {isIssue
-            ? 'Devices returned without proper testing or packaging may be delayed or rejected.'
-            : 'Include all original accessories. Devices returned damaged may be sent back at your cost.'}
+          {subtitle}
         </span>
+        {error && (
+          <span className="mt-2 flex items-start gap-1.5 text-[11.5px] font-semibold text-danger leading-[1.4]">
+            <AlertCircle size={12} strokeWidth={2} className="mt-px shrink-0" />
+            <span>Please confirm before submitting your return.</span>
+          </span>
+        )}
       </span>
     </label>
   )
