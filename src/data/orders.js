@@ -1053,7 +1053,12 @@ export const ORDERS = [
         attachmentName: 'VID_0118.mov',
       },
       reason: { value: 'other', otherText: '' },
-      devicePrep: { option: 'credentials', os: 'android' },
+      devicePrep: {
+        option: 'credentials',
+        os: 'android',
+        accountUnlinked: true,
+        passcode: '••••48',
+      },
       pickupDetails: {
         address: 'Ontario Tower, Office 103, Business Bay Dubai',
         email: 'andrea.grossi@example.com',

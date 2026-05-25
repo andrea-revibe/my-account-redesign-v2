@@ -32,7 +32,7 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
   const devicePrepLine =
     state.devicePrep.option === 'reset'
       ? 'You confirmed the device is factory reset.'
-      : 'Thanks for providing your credentials.'
+      : 'Thanks for unlinking the device and sharing your passcode.'
 
   const copy = () => {
     navigator.clipboard?.writeText(state.claimRef)
@@ -128,17 +128,17 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
       <div className="mt-auto sticky bottom-0 bg-surface border-t border-line px-4 py-3 flex gap-2">
         <button
           type="button"
-          onClick={() => (onTrack ? onTrack(order?.id) : onClose())}
+          onClick={onClose}
           className="flex-1 h-[48px] rounded-[12px] inline-flex items-center justify-center bg-surface text-ink border border-line font-semibold text-[14px]"
         >
-          {isWarranty ? 'Track this claim' : 'Track this return'}
+          Back to my account
         </button>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => (onTrack ? onTrack(order?.id) : onClose())}
           className="flex-1 h-[48px] rounded-[12px] inline-flex items-center justify-center bg-brand text-white border border-brand font-semibold text-[14px]"
         >
-          Back to my account
+          {isWarranty ? 'Track this claim' : 'Track this return'}
         </button>
       </div>
     </div>
