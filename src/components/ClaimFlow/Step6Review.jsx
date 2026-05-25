@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
+import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 import { expectedCompletionFor } from '../../lib/claims'
 import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
@@ -73,7 +74,9 @@ export default function Step6Review({
     ? null
     : state.refundMethod === 'wallet'
       ? 'Revibe Wallet'
-      : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`
+      : isBnpl(order)
+        ? order.paymentMethod.brand
+        : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`
 
   const goTo = (step) => dispatch({ type: 'GO_TO_STEP', value: step })
 
@@ -262,7 +265,13 @@ export default function Step6Review({
                         strokeWidth={1.75}
                         className="text-ink-2"
                       />
-                      {refundMethodLabel}
+                      <span>{refundMethodLabel}</span>
+                      {isBnpl(order) && (
+                        <BnplDisclaimerTooltip
+                          provider={order.paymentMethod.provider}
+                          align="left"
+                        />
+                      )}
                     </>
                   )}
                 </div>

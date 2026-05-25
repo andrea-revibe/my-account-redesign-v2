@@ -127,7 +127,7 @@ export const ORDERS = [
     trackingNumber: '25193323',
     trackingUrl: 'https://www.dhl.com/track',
     customerName: 'Andrea Grossi',
-    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    paymentMethod: { type: 'bnpl', provider: 'tabby', brand: 'Tabby' },
     deviceOs: 'ios',
     timeline: {
       created: '3 May · 7:09 PM',
@@ -201,6 +201,7 @@ export const ORDERS = [
     courier: null,
     trackingNumber: null,
     customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'bnpl', provider: 'tamara', brand: 'Tamara' },
     timeline: {
       created: '28 Mar · 2:15 PM',
     },
@@ -212,7 +213,7 @@ export const ORDERS = [
       subtotal: 349,
       fee: { label: 'Processing fee', rate: 0.05, amount: 17.45 },
       amount: 331.55,
-      destination: { kind: 'card', label: 'Visa', last4: '4242' },
+      destination: { kind: 'bnpl', label: 'Tamara', provider: 'tamara' },
       breakdown: [
         { label: 'iPhone 8', amount: 309 },
         { label: 'Revibe Care', amount: 40 },
@@ -531,7 +532,7 @@ export const ORDERS = [
     trackingNumber: '25193388',
     trackingUrl: 'https://www.dhl.com/track',
     customerName: 'Andrea Grossi',
-    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    paymentMethod: { type: 'bnpl', provider: 'tabby', brand: 'Tabby' },
     deviceOs: 'ios',
     timeline: {
       created: '28 Apr · 4:39 PM',

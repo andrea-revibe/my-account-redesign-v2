@@ -287,6 +287,7 @@ export function refundMethodLabel(claim, order) {
   if (claim?.refundMethod === 'wallet') return 'Revibe Wallet'
   if (claim?.refundMethod === 'original') {
     const pm = order?.paymentMethod
+    if (pm?.type === 'bnpl') return pm.brand || 'Buy now, pay later'
     if (pm) return `${pm.brand || 'Card'} •• ${pm.last4 || '0000'}`
     return 'Original payment method'
   }

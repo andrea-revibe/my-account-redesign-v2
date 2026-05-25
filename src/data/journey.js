@@ -554,7 +554,7 @@ const CLAIM_COM_NODES = [
   },
   {
     id: 'claim_submitted_card',
-    label: 'Claim submitted — card refund',
+    label: 'Claim submitted — original payment method refund',
     trigger: 'customer',
     event: 'claim.created',
     next: ['claim_picked_up', 'claim_pickup_failed'],
@@ -2691,7 +2691,10 @@ export const JOURNEYS = [
   {
     id: 'claim_change_of_mind',
     label: 'Change-of-mind claim',
-    initialOrder: INITIAL_ORDER,
+    initialOrder: {
+      ...INITIAL_ORDER,
+      paymentMethod: { type: 'bnpl', provider: 'tabby', brand: 'Tabby' },
+    },
     nodes: CLAIM_COM_NODES,
   },
   {

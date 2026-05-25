@@ -25,6 +25,7 @@ import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import ClaimActionBanner from './ClaimActionBanner'
 import HistoryThread from './HistoryThread'
+import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
@@ -255,6 +256,8 @@ function DestinationChip({ claim, order, accent }) {
   const isWallet = claim.refundMethod === 'wallet'
   const Icon = isWallet ? Wallet : CreditCard
   const label = refundMethodLabel(claim, order)
+  const showBnplTooltip =
+    claim.refundMethod === 'original' && isBnpl(order)
   const tones = accent
     ? 'bg-gradient-to-r from-brand to-accent text-white border-transparent'
     : 'bg-surface text-ink border-line'
@@ -264,6 +267,16 @@ function DestinationChip({ claim, order, accent }) {
     >
       <Icon size={12} strokeWidth={2} />
       {label}
+      {showBnplTooltip && (
+        <BnplDisclaimerTooltip
+          provider={order.paymentMethod.provider}
+          align="center"
+          iconClassName={
+            accent ? 'text-white/85 hover:text-white' : 'text-muted hover:text-ink'
+          }
+          stopPropagation
+        />
+      )}
     </span>
   )
 }

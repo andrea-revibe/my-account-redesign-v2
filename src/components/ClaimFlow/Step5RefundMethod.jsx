@@ -1,6 +1,7 @@
 import { CreditCard, Clock, Sparkles } from 'lucide-react'
 import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
+import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 
 const REVIBE_CARE_ICON =
@@ -63,10 +64,20 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
           title={
             <span className="flex items-center gap-1.5">
               <CreditCard size={14} strokeWidth={1.75} className="text-ink-2" />
-              <span>
-                {order.paymentMethod?.brand || 'Card'} ••{' '}
-                {order.paymentMethod?.last4 || '0000'}
-              </span>
+              {isBnpl(order) ? (
+                <>
+                  <span>{order.paymentMethod.brand}</span>
+                  <BnplDisclaimerTooltip
+                    provider={order.paymentMethod.provider}
+                    align="left"
+                  />
+                </>
+              ) : (
+                <span>
+                  {order.paymentMethod?.brand || 'Card'} ••{' '}
+                  {order.paymentMethod?.last4 || '0000'}
+                </span>
+              )}
             </span>
           }
           amount={`${currency} ${formatMoney(original.net)}`}
