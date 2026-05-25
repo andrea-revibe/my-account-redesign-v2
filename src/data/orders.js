@@ -415,6 +415,93 @@ export const ORDERS = [
       },
     },
   },
+  // ----- Layered mock: delivered → issue claim → QC discovered the device
+  // wasn't actually factory reset (Activation Lock still on). The customer
+  // must remove the device from their iCloud account remotely and share the
+  // device passcode before QC can resume. Routed via `claim.resetFailed`
+  // to ResetFailedCard (mirrors docsRejection / pickupFailure routing).
+  {
+    id: '89812',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '12/04/2026 09:40 AM',
+    placedAtFull: '12 Apr 2026 · 9:40 AM',
+    deliveredOn: '2026-04-18',
+    deliveredOnLong: 'Saturday, 18 April',
+    quantity: 1,
+    unitPrice: 909,
+    subtotal: 909,
+    warranty: 80,
+    total: 989,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193488',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '12 Apr · 9:40 AM',
+      quality_check: '13 Apr · 10:18 AM',
+      shipped: '15 Apr · 4:45 PM',
+      delivered: '18 Apr · 12:32 PM',
+    },
+    product: {
+      name: 'iPhone 13',
+      variant: 'Midnight · 128 GB · Good',
+      image: '/iphone-midnight.png',
+    },
+    claim: {
+      claimRef: 'Rs8tLp',
+      claimStatusId: 'qc',
+      subStatusId: 'reset_failed',
+      type: 'issue',
+      submittedAt: '08 May 2026 · 9:15 AM',
+      units: 1,
+      issueDetails: {
+        category: 'battery',
+        description:
+          'Battery drops from 100% to ~40% within a couple of hours of normal use, even with screen-time low.',
+        attachmentName: 'IMG_0731.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Monday, 11 May',
+        slot: '10 AM – 12 PM',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 909, warranty: 80, gross: 989, fee: 0, net: 989, rate: 0 },
+      timeline: {
+        initiated: '8 May · 9:15 AM',
+        pickup: '11 May · 10:42 AM',
+        qc: '14 May · 11:05 AM',
+      },
+      detailedTimeline: {
+        qc: { startedAt: '14 May · 11:05 AM' },
+        reset_failed: { startedAt: '14 May · 11:32 AM' },
+      },
+      resetFailed: {
+        failedAt: '14 May · 11:32 AM',
+        autoCancelAt: '17 May · 11:32 AM',
+        timeLeftLabel: '2 days, 22 hours left',
+        opsName: 'Marwa',
+        opsRole: 'Revibe Quality',
+        opsMessage:
+          "Hi Andrea — when we tried to wipe the iPhone 13, Activation Lock was still on so we couldn't go further. Please remove it from your iCloud account at iCloud.com (Find My → All Devices → Erase, then Remove from Account) and send us the device passcode so we can complete the reset and resume the quality check.",
+      },
+    },
+  },
   // ----- Layered mock: cancellation rejected → delivered → claim in transit.
   // Exercises the HistoryThread on the in-progress ClaimCard and the
   // `See detailed tracking` dropdown driven by `claim.transitSubStatusId`

@@ -10,6 +10,7 @@ import ClaimCard from './components/ClaimCard'
 import WarrantyClaimCard from './components/WarrantyClaimCard'
 import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
+import ResetFailedCard from './components/ResetFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
@@ -275,6 +276,9 @@ export default function App() {
                     }
                     if (hasActiveClaim(o) && o.claim?.pickupFailure) {
                       return <PickupFailedCard key={o.id} order={o} />
+                    }
+                    if (hasActiveClaim(o) && o.claim?.resetFailed) {
+                      return <ResetFailedCard key={o.id} order={o} />
                     }
                     if (hasActiveClaim(o) && o.claim?.invalidClaim) {
                       return <InvalidClaimCard key={o.id} order={o} />

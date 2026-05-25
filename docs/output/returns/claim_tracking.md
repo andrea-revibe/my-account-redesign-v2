@@ -18,9 +18,9 @@ stateDiagram-v2
 
 The five states live in `CLAIM_STATUSES` inside `src/lib/claims.js` — add, rename, or reorder steps there and the card picks them up. The pipeline was consolidated from 7 → 5 states in May 2026: `claim_created` + `pending_collection` folded into `initiated` (one bucket for "submitted, awaiting courier"), `under_collection` + `in_transit` folded into `pickup` (one bucket for "device in courier's hands"), and the terminal `refunded` was split into `refund_issued` (Revibe has triggered the payout) + `refund_credited` (money has landed in the customer's wallet/card).
 
-`claim.subStatusId` (optional, see §4) carries finer-grained branching that hangs off these parents — `awaiting_documents` under `initiated`, `collection_failed` under `pickup`, the `under_revision` / `expert_revision` / `invalid_confirmed` / `awaiting_payment` / `ship_back_*` chain under `qc`. Today the card surfaces none of these inline; they're either kept in the registry for future use or drive the takeover-card routing in §3.
+`claim.subStatusId` (optional, see §4) carries finer-grained branching that hangs off these parents — `awaiting_documents` under `initiated`, `collection_failed` under `pickup`, the `reset_failed` / `under_revision` / `expert_revision` / `invalid_confirmed` / `awaiting_payment` / `ship_back_*` chain under `qc`. Today the card surfaces none of these inline; they're either kept in the registry for future use or drive the takeover-card routing in §3.
 
-**Card routing precedence.** `App.jsx` checks claim takeovers first, then the warranty branch, then the refund baseline (see [../orders.md](../orders.md) §2). Order:
+**Card routing precedence.** `App.jsx` checks claim takeovers first, then the warranty branch, then the refund baseline (see [../orders.md](../orders.md) §2). Order — chronological in the pipeline (docs at submit → pickup at collection → reset at QC wipe → invalid at QC verdict):
 
 ```mermaid
 flowchart TD
@@ -28,19 +28,21 @@ flowchart TD
   q1 -->|yes| docs[DocsRejectedCard]
   q1 -->|no| q2{claim.pickupFailure?}
   q2 -->|yes| pickup[PickupFailedCard]
-  q2 -->|no| q3{claim.invalidClaim?}
-  q3 -->|yes| invalid[InvalidClaimCard]
-  q3 -->|no| q4{type === 'warranty' &amp; active?}
-  q4 -->|yes| warranty[WarrantyClaimCard — In progress]
-  q4 -->|no| q5{hasActiveClaim?}
-  q5 -->|yes| baseline[ClaimCard — In progress]
-  q5 -->|no| q6{isWarrantyDelivered?}
-  q6 -->|yes| warrantyPast[WarrantyClaimCard — Past orders]
-  q6 -->|no| q7{isClaimRefunded?}
-  q7 -->|yes| past[ClaimCard — Past orders]
+  q2 -->|no| q3{claim.resetFailed?}
+  q3 -->|yes| reset[ResetFailedCard]
+  q3 -->|no| q4{claim.invalidClaim?}
+  q4 -->|yes| invalid[InvalidClaimCard]
+  q4 -->|no| q5{type === 'warranty' &amp; active?}
+  q5 -->|yes| warranty[WarrantyClaimCard — In progress]
+  q5 -->|no| q6{hasActiveClaim?}
+  q6 -->|yes| baseline[ClaimCard — In progress]
+  q6 -->|no| q7{isWarrantyDelivered?}
+  q7 -->|yes| warrantyPast[WarrantyClaimCard — Past orders]
+  q7 -->|no| q8{isClaimRefunded?}
+  q8 -->|yes| past[ClaimCard — Past orders]
 ```
 
-The three takeover cards replace the baseline card's surface while the claim is blocked on a single customer action and auto-cancel (or auto-close) if ignored. They share a structural pattern (danger-toned hero with an ops/courier/quality message → action gate → customer commits → card flips to a warn-toned "submitted" state with an undo affordance). `WarrantyClaimCard` is a sibling card type for `claim.type === 'warranty'` — same chrome family as `ClaimCard`, different post-QC tail (repair-and-ship-back instead of refund). Spec at [`../warranties_compensations.md`](../warranties_compensations.md) §2.
+The four takeover cards replace the baseline card's surface while the claim is blocked on a single customer action and auto-cancel (or auto-close) if ignored. They share a structural pattern (danger-toned hero with an ops/courier/quality message → action gate → customer commits → card flips to a warn-toned "submitted" state with an undo affordance). `WarrantyClaimCard` is a sibling card type for `claim.type === 'warranty'` — same chrome family as `ClaimCard`, different post-QC tail (repair-and-ship-back instead of refund). Spec at [`../warranties_compensations.md`](../warranties_compensations.md) §2.
 
 ## 2. ClaimCard (baseline)
 
@@ -126,7 +128,7 @@ Edit copy or add a new claim state here, not in the components.
 
 ## 3. Takeover cards
 
-When the claim is blocked on a single customer action, the card flips out of `ClaimCard` chrome into a dedicated takeover. All three follow the same structural pattern:
+When the claim is blocked on a single customer action, the card flips out of `ClaimCard` chrome into a dedicated takeover. All four follow the same structural pattern:
 
 | Aspect | Pattern |
 |---|---|
@@ -233,9 +235,42 @@ None of the transitions persist across re-renders or unmounts.
 
 Both terminal branches expose an `Undo · replay the demo` button below the action area.
 
-### 3.4 Relationship to `ClaimActionBanner`
+### 3.4 ResetFailedCard — Activation Lock still on at QC → remote unlink + passcode
 
-Phase 30 (PickupFailedCard) and phase 32 (InvalidClaimCard) migrated their gates onto dedicated takeover cards. The inline `ClaimActionBanner` code path remains wired and is still the surface for `awaiting_documents` (Issue flow only) and any future claim that sets `actionRequired` without a dedicated takeover card. The `collection_failed` and `awaiting_payment` branches in `actionGateCopy()` are retained for completeness but effectively dormant — no current mock claim exercises them through the inline banner.
+Trigger: `claim.resetFailed` is set. The technician tried to wipe the device during QC and Activation Lock was still on (the customer ticked "factory reset" on Step 3 / Step 7 but didn't actually unlink the device from their iCloud account). The customer must remove the device from their iCloud account remotely and share their device passcode before QC can resume. Same auto-cancel posture as docs-rejected — claim auto-cancels if the customer doesn't act before `autoCancelAt`. **iOS only** today — the unlink instructions are iCloud-specific (Find My → Remove from Account); an Android (Google Account remote sign-out) branch is deferred.
+
+```mermaid
+stateDiagram-v2
+    [*] --> reset_failed: QC technician hits Activation Lock
+    reset_failed --> received: customer unlinks + submits passcode
+    reset_failed --> [*]: customer ignored → auto-cancel
+    received --> retry_failed: still locked / wrong passcode
+    received --> qc: reset succeeds → ClaimCard resumes (refund) or WarrantyClaimCard (repair)
+    retry_failed --> received: customer resubmits updated details
+    retry_failed --> [*]: customer ignored → auto-cancel
+```
+
+**Collapsed (reset_failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Device still locked` right-align label (Lock glyph), headline `We couldn't wipe the device`, one-line truncated quote from Revibe Quality, countdown strip (`2 days, 22 hours left to unlock · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` footer.
+
+**Expanded (reset_failed state).** Same hero but the Quality message expands into a full attributed block (avatar with `opsName` initial). Below the header:
+
+1. **`Remove device from your iCloud` instructions card** — three numbered steps with `Open iCloud` deep-link in the card header that opens `https://www.icloud.com/find` in a new tab. Steps: 1) Sign in at iCloud.com; 2) Open Find My → choose the device under All Devices; 3) Tap Erase This Device, then Remove from Account.
+2. **`I've removed this device from my iCloud account` confirmation toggle** — large tap target with a checkbox and required-helper subline. Required before submit.
+3. **`Device passcode` field** — masked numeric input (`type=password`, `inputMode=numeric`), 6-digit cap with progress counter (`0/6` → `6/6` in success-green). Wide tracking + monospace tabular nums so the dots read as a real PIN input. Helper line: "If it's 4 digits, pad with zeros at the end."
+4. **Security note** — danger-tinted strip with ShieldCheck glyph: "Your passcode is encrypted and used only by our technician during the reset. It's deleted once the device is wiped." Reuses the tone of the hero so it reads as part of the action, not an afterthought.
+5. **Footer** — `Cancel claim` (visual stub) + `Submit details`. Submit is gated: shows `Confirm unlink + passcode` in disabled grey until both the toggle is on and the passcode is complete (6 digits), then flips to a solid danger-red primary action with the ShieldCheck glyph.
+
+**Submitted state.** Tapping `Submit details` flips the card in place to a warn-toned variant: amber accent strip, pulsing `Reset in progress` pill, `Details received` phase tag, `Thanks — we'll attempt the reset` headline, body that names the technician and the 24-hour retry window. Expanded shows a `What you sent` summary card (iCloud unlink confirmation row with success check + masked passcode row showing the last two digits — `••••42`) followed by the warn-toned security note and an `Undo · replay the demo` button.
+
+The masking convention (last two digits visible) is a prototype cue that the value was received and survives the round-trip without ever revealing it back to the customer in plaintext. Production should not echo the passcode at all once submitted.
+
+**After the claim moves on.** Once the technician completes the wipe on the next attempt and QC resumes, the order leaves `ResetFailedCard` and returns to the regular `ClaimCard` (or `WarrantyClaimCard` for warranty claims). The submission survives as a `resetUnlock: { at, attempt }` field on the claim — reserved for a future HistoryThread chip ("Device unlocked — 29 May") that the current build does not yet render.
+
+**Retry loop.** Journey mode (`?journey=claim_*`) wires a one-shot retry: after `claim_reset_details_received` the dev panel exposes both a happy-path advance (back into the QC outcome fork) and a `claim_reset_retry_failed` system-triggered branch. The retry takeover reuses the same chrome with updated copy ("thanks for the details, but the device is still showing Activation Lock…") and a fresh countdown. A second submission (`claim_reset_retry_resubmitted`) re-merges into the QC outcome fork — the journey doesn't model a third failure (in production the claim would auto-cancel and the device would ship back to the customer like the invalid-paid branch). See `docs/output/journey_backend_spec.md` for the node graph.
+
+### 3.5 Relationship to `ClaimActionBanner`
+
+Phase 30 (PickupFailedCard) and phase 32 (InvalidClaimCard) migrated their gates onto dedicated takeover cards. The inline `ClaimActionBanner` code path remains wired and is still the surface for `awaiting_documents` (Issue flow only) and any future claim that sets `actionRequired` without a dedicated takeover card. The `collection_failed`, `awaiting_payment`, and `reset_failed` branches in `actionGateCopy()` are retained for completeness but effectively dormant — no current mock claim exercises them through the inline banner.
 
 ## 4. Sub-status & action-gate reference
 
@@ -247,6 +282,7 @@ These tables are the canonical reference for sub-status copy, action-gate behavi
 |---|---|---|---|
 | `awaiting_documents` | `initiated` | Issue only | issue n6 / n7 |
 | `collection_failed` | `pickup` | Both | issue n18 / com n20, n30 |
+| `reset_failed` | `qc` | Both (iOS today) | (not yet in drawio) — fires when QC hits Activation Lock during the wipe |
 | `under_revision` | `qc` | Both | issue n31 / com n43, n72 |
 | `expert_revision` | `qc` | Issue + CoM UAE/Other | issue n33–n39 / com n45–n51 |
 | `invalid_confirmed` | `qc` | Both | issue n41 / com n53 |
@@ -265,6 +301,7 @@ Registry only — no current `ClaimCard` surface renders these inline. Kept as t
 |---|---|---|---|
 | `awaiting_documents` | More info needed | "Revibe Quality asked for a clearer photo / longer video." | warn |
 | `collection_failed` | Pickup didn't go through | "We couldn't collect on {date}." | warn |
+| `reset_failed` | Device still linked to iCloud | "We couldn't wipe the device — Activation Lock is still on." | warn |
 | `under_revision` | Reviewing seller's response | "Our team is double-checking the seller's notes." | brand |
 | `expert_revision` | Expert inspection | "Sent to our lab for a closer look. This step takes longer than usual." | brand |
 | `invalid_confirmed` | Claim couldn't be approved | "Inspection didn't confirm the issue you reported." | warn |
@@ -277,12 +314,13 @@ All copy is customer-facing — internal (IS) labels never appear in the UI.
 
 ### 4.3 Action gates (`actionGateCopy`)
 
-Three gates total. Each fires a promoted banner above the dot strip (inline) or routes to a dedicated takeover card.
+Four gates total. Each fires a promoted banner above the dot strip (inline) or routes to a dedicated takeover card.
 
 | Gate (`kind`) | Surface | Banner headline | Body | Deadline | Primary CTA | Secondary |
 |---|---|---|---|---|---|---|
 | `awaiting_documents` | Inline `ClaimActionBanner` | Action needed — documents requested | "{opsName} from Revibe Quality has asked for a clearer photo / longer video." | "Reply by {deadline} or the claim will close automatically." | Reply with documents | Close claim |
 | `collection_failed` | Inline banner (dormant) **or** `PickupFailedCard` takeover | Action needed — pickup didn't go through | "Our courier couldn't pick up your device on {failedAt}." | "Confirm by {deadline} or the claim will close automatically." | Schedule new pickup | Cancel claim |
+| `reset_failed` | Inline banner (dormant) **or** `ResetFailedCard` takeover | Action needed — device still linked to iCloud | "Activation Lock is still on, so we can't wipe the device. Remove it from your iCloud account and share your passcode so we can complete the reset." | "Submit by {deadline} or the claim will close automatically." | Unlock device | Cancel claim |
 | `awaiting_payment` | Inline banner (dormant) **or** `InvalidClaimCard` takeover | Action needed — return shipping payment | "Your claim couldn't be approved after inspection. Cover the return shipping fee to get your device sent back." | "Pay by {deadline} or your device will not be returned." | Pay return shipping | Discuss with support |
 
 The deadline label uses the prototype convention from `claim.docsRejection.timeLeftLabel` ("2 days, 14 hours left") for consistency across all three gates.
@@ -311,7 +349,7 @@ Track current actuals before promoting these to production.
 
 ## 5. Data model — `claim` object
 
-Optional object populated on a delivered order to drive `ClaimCard` and its takeover variants. Step 6's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and stitches it onto the order at the App level via `submittedClaims` — in-session only, cleared on refresh, revertable via the `UndoSnackbar`. Selected delivered mocks also hand-seed a claim: `89855` (`initiated` baseline exemplar — only the hero scheduled-pickup strip + first dot are populated, no takeovers, In progress), `89815` (`pickup` with a rejected cancellation in history and the `See detailed tracking` dropdown wired via `transitSubTimeline.picked_up`, In progress), `89762` (`qc` baseline Issue claim, no sub-status, In progress), and `89200` (`refund_credited` with a rejected cancellation in history, Past orders). Plus takeover-card mocks: `89734` (DocsRejected — underlying `initiated`), `89876` (PickupFailed — underlying `initiated`), `89940` (InvalidClaim — underlying `qc`). Warranty-specific mocks live in [warranties_compensations.md](../warranties_compensations.md) §2.
+Optional object populated on a delivered order to drive `ClaimCard` and its takeover variants. Step 6's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and stitches it onto the order at the App level via `submittedClaims` — in-session only, cleared on refresh, revertable via the `UndoSnackbar`. Selected delivered mocks also hand-seed a claim: `89855` (`initiated` baseline exemplar — only the hero scheduled-pickup strip + first dot are populated, no takeovers, In progress), `89815` (`pickup` with a rejected cancellation in history and the `See detailed tracking` dropdown wired via `transitSubTimeline.picked_up`, In progress), `89762` (`qc` baseline Issue claim, no sub-status, In progress), and `89200` (`refund_credited` with a rejected cancellation in history, Past orders). Plus takeover-card mocks: `89734` (DocsRejected — underlying `initiated`), `89876` (PickupFailed — underlying `initiated`), `89812` (ResetFailed — underlying `qc`, iOS device), `89940` (InvalidClaim — underlying `qc`). Warranty-specific mocks live in [warranties_compensations.md](../warranties_compensations.md) §2.
 
 ### 5.1 Core claim fields
 
@@ -349,8 +387,10 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 |---|---|---|
 | `claim.docsRejection` | `{ rejectedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, previous }` | `DocsRejectedCard` |
 | `claim.pickupFailure` | `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, nextPickup: { awb, slot, courier } }` | `PickupFailedCard` |
+| `claim.resetFailed` | `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, attempt? }` | `ResetFailedCard` (iOS only) |
 | `claim.invalidClaim` | `{ determinedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, returnShipping: { amount, currency }, returnShipment: { courier, estimatedDelivery, estimatedDeliveryLong, currentStatusId, timeline } }` | `InvalidClaimCard` |
 | `claim.proofResubmission` | `{ at, fileCount }` | History chip on `ClaimCard` after the rejection chapter closes |
+| `claim.resetUnlock` | `{ at, attempt }` | Marker after a successful `ResetFailedCard` submit; reserved for a future HistoryThread chip (no UI surface today) |
 
 **Common subfields across takeovers:**
 
@@ -365,6 +405,7 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 |---|---|---|
 | `docsRejection.previous` | DocsRejectedCard | Array of `{ name, size, kind, duration?, tag? }` — `tag` is the per-file ops reason ("Glare" / "Too short") that renders as a red ribbon. |
 | `pickupFailure.nextPickup.{awb, slot, courier}` | PickupFailedCard | Hand-written; echoed back on the confirmation state. |
+| `resetFailed.attempt` | ResetFailedCard | Optional integer marking which retry round this is. `1` (or undefined) on the initial gate; `2` on the journey-mode retry takeover. Lets the card switch to retry-specific copy if needed in future iterations. |
 | `invalidClaim.returnShipping.{amount, currency}` | InvalidClaimCard | Carried on the fee card + primary CTA label. |
 | `invalidClaim.returnShipment.{currentStatusId, timeline}` | InvalidClaimCard (paid state) | `currentStatusId` is one of the `STATUSES` ids (`created` / `quality_check` / `shipped` / `delivered`); `timeline` is the corresponding map. Drives the 4-step horizontal dot timeline on the paid trajectory. |
 | `invalidClaim.returnShipment.{estimatedDelivery, estimatedDeliveryLong}` | InvalidClaimCard (paid state) | Populates the brand-tone ETA hero. |
@@ -373,7 +414,7 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 
 ## 6. UX decisions
 
-**Tone shift from danger to warn/brand on commit is the same across all three takeovers.** The danger red while blocked → warn amber once the customer's action is in flight (DocsRejected: resubmitted, PickupFailed: rescheduled) or brand purple once the return is committed and forward-moving (InvalidClaim: paid). Same convention `ClaimCard` uses (warn = active processing, brand = the system is doing the work).
+**Tone shift from danger to warn/brand on commit is the same across all four takeovers.** The danger red while blocked → warn amber once the customer's action is in flight (DocsRejected: resubmitted, PickupFailed: rescheduled, ResetFailed: details received) or brand purple once the return is committed and forward-moving (InvalidClaim: paid). Same convention `ClaimCard` uses (warn = active processing, brand = the system is doing the work).
 
 **Takeover cards instead of an ever-longer status enum.** Earlier drafts considered adding `evidence_rejected`, `pickup_failed`, `invalid_paid`, etc. to `CLAIM_STATUSES`. That would have stretched the dot strip beyond what fits on 430px and conflated "happy-path progress" with "we need you to do something". Takeover cards keep the dot strip stable and put the action-required state on its own card surface.
 
@@ -410,6 +451,7 @@ src/
     ├── ClaimDetailsSheet.jsx             Bottom sheet opened by ClaimCard's `View claim details` — Summary + Refund cards
     ├── DocsRejectedCard.jsx              Takeover: customer must re-upload faulty-product evidence
     ├── PickupFailedCard.jsx              Takeover: customer must confirm a new pickup
+    ├── ResetFailedCard.jsx               Takeover: customer must unlink iCloud + share passcode after QC hit Activation Lock
     ├── InvalidClaimCard.jsx              Takeover: customer must pay return shipping after invalid inspection
     └── HistoryThread.jsx                 Compact chip thread for past events on layered cards
 ```
@@ -424,7 +466,7 @@ src/
 - **Webhook / polling for state progression.** Production needs a mechanism to move the claim through the 7 states as the warehouse handles the unit; today `claim.claimStatusId` is a static field on the mock data.
 - **DocsRejectedCard.** File picker is a fake-files cycle, countdown label is hand-written, `Resubmit` doesn't persist (warn state is local component state only), no notification + email trigger.
 - **PickupFailedCard.** `Edit` link on the pickup-address card is decorative, new AWB / slot are hand-written rather than generated, `Confirm` doesn't persist.
-- **InvalidClaimCard.** Delivery-details edit mode does not persist or revalidate, fee amount is a flat placeholder rather than a real shipping quote, `Pay` doesn't open a real payment sheet, auto-close countdown is hand-written.
+- **ResetFailedCard.** Submit is local component state only — the unlink confirmation and passcode are never transmitted, never persisted, and the warn-toned "received" view is a visual stub. Android branch is not yet implemented; today the takeover routes regardless of `claim.devicePrep.os` and the instructions are iOS-only. Auto-cancel countdown is hand-written. Production must encrypt the passcode in transit + at rest, scope visibility to the named technician, and delete it on a short timer once the wipe succeeds.
 - **SLA placeholders.** `CLAIM_SLAS` values are hand-guessed; ops to revise.
 - **`order.country` is unused.** No UI branches on it; future country-aware behaviour will need it.
 
@@ -437,3 +479,5 @@ src/
 - **Auto-expand for active claims.** Extend `pickActiveOrderId` to consider `claimProgressIndex` if research shows customers want their active claim opened on land.
 - **Filter chip for claims.** No new filter chip was added for claims — they count toward `in_progress` while active, `delivered` when refunded. Revisit when more than one or two claim cards routinely show at once.
 - **Country-aware transit SLAs.** `in_transit` SLA likely differs domestic vs international. Deferred for the prototype.
+- **`ResetFailedCard` Android branch.** Today the card routes regardless of `claim.devicePrep.os` but the instructions and the iCloud deep-link are iOS-only. Android equivalent is Google Account → Devices → Sign out remotely. Build once an Android claim mock exists.
+- **Real auto-cancel + auto-retry behaviour after a failed `ResetFailedCard` submit.** Journey mode models a one-shot retry then a happy re-merge into QC. Production likely needs (a) a real second-attempt countdown with auto-cancel + return-shipment on a second failure, mirroring the invalid-paid branch; (b) a way for QC to flag a third-party-locked device (carrier lock, MDM enrollment) that the customer can't unlink. Deferred until ops surfaces the failure-rate data.
