@@ -667,7 +667,7 @@ const CLAIM_COM_NODES = [
     label: 'Claim quality check started',
     trigger: 'system',
     event: 'claim.qc.started',
-    next: ['claim_refund_issued', 'claim_reset_failed'],
+    next: ['claim_refund_issued', 'claim_invalid_confirmed', 'claim_reset_failed'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -772,14 +772,226 @@ const CLAIM_COM_NODES = [
       },
     }),
   },
+  // ----- Invalid-claim sub-branch (change-of-mind flavoured ops message —
+  //       damage-on-arrival / condition mismatch, since CoM has no
+  //       claimed issue to disprove). Setting `claim.invalidClaim`
+  //       routes to InvalidClaimCard which manages its own internal
+  //       action_needed → paid / declined state. The journey advances
+  //       through the same outcomes via customer-triggered nodes the
+  //       dev panel surfaces with the `via UI` chip. Structurally
+  //       identical to the issue/warranty invalid sub-branches. --------
+  {
+    id: 'claim_invalid_confirmed',
+    label: 'Inspection — invalid claim confirmed',
+    trigger: 'system',
+    event: 'claim.inspection.invalid_confirmed',
+    next: ['claim_return_shipping_paid', 'claim_invalid_declined'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'invalid_confirmed',
+        actionRequired: {
+          kind: 'awaiting_payment',
+          deadline: '6 Jun · 4:18 PM',
+          deadlineLabel: '7 days left',
+        },
+        invalidClaim: {
+          determinedAt: '30 May · 4:18 PM',
+          autoCancelAt: '6 Jun · 4:18 PM',
+          timeLeftLabel: '7 days left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — when the device arrived for inspection we found visible damage that wasn't disclosed at submission (a hairline screen crack and a small dent near the camera bump). Under our change-of-mind policy we can only refund devices returned in the condition they were sold in, so we can't approve this claim. To get the device back we'll need you to cover return shipping — otherwise it returns to circulation.",
+          returnShipping: {
+            amount: 35,
+            currency: 'AED',
+          },
+          returnShipment: {
+            courier: 'DHL Express',
+            estimatedDelivery: 'Jun 8',
+            estimatedDeliveryLong: 'Monday, 8 June',
+            currentStatusId: 'created',
+            timeline: {
+              created: '31 May · 11:00 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_return_shipping_paid',
+    label: 'Customer paid return shipping',
+    trigger: 'customer',
+    event: 'claim.return_shipping.paid',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          paidAt: '31 May · 9:45 AM',
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            currentStatusId: 'shipped',
+            subStatusId: null,
+            subTimeline: {},
+            timeline: {
+              ...o.claim.invalidClaim.returnShipment.timeline,
+              quality_check: '31 May · 2:30 PM',
+              shipped: '1 Jun · 9:15 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_arrived_destination',
+    label: 'Return — arrived in destination country',
+    trigger: 'system',
+    event: 'claim.return_shipment.arrived_destination',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'arrived_destination',
+            subTimeline: {
+              ...(o.claim.invalidClaim.returnShipment.subTimeline ?? {}),
+              arrived_destination: '3 Jun · 8:30 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_cleared_customs',
+    label: 'Return — cleared customs',
+    trigger: 'system',
+    event: 'claim.return_shipment.cleared_customs',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'cleared_customs',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              cleared_customs: '3 Jun · 11:15 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_forwarded_to_agent',
+    label: 'Return — forwarded to third-party agent',
+    trigger: 'system',
+    event: 'claim.return_shipment.forwarded_to_agent',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'forwarded_to_agent',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              forwarded_to_agent: '3 Jun · 4:45 PM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_out_for_delivery',
+    label: 'Return — out for delivery',
+    trigger: 'system',
+    event: 'claim.return_shipment.out_for_delivery',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'out_for_delivery',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              out_for_delivery: '8 Jun · 7:30 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_delivered',
+    label: 'Unrepaired device delivered to customer',
+    trigger: 'system',
+    event: 'claim.return_shipment.delivered',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            currentStatusId: 'delivered',
+            subStatusId: null,
+            timeline: {
+              ...o.claim.invalidClaim.returnShipment.timeline,
+              delivered: '8 Jun · 11:42 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_declined',
+    label: 'Customer declined — claim closed',
+    trigger: 'customer',
+    event: 'claim.declined',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          declinedAt: '31 May · 9:45 AM',
+        },
+      },
+    }),
+  },
   // ----- Reset-failed sub-branch. Triggered at QC when the technician
   //       tries to wipe the device and Activation Lock is still on.
   //       Setting `claim.resetFailed` routes the order to ResetFailedCard.
   //       The customer submits unlink confirmation + passcode; on first
   //       attempt the journey can either continue (success) or loop once
   //       through `claim_reset_retry_failed` (wrong info). After the
-  //       second submission the journey re-merges into the QC outcome —
-  //       refund_issued for change-of-mind (no invalid path). --------
+  //       second submission the journey re-merges into the QC outcome
+  //       fork (refund_issued or invalid_confirmed). ----------------------
   {
     id: 'claim_reset_failed',
     label: 'Reset failed — device still locked',
@@ -813,9 +1025,10 @@ const CLAIM_COM_NODES = [
     label: 'Unlock details received',
     trigger: 'customer',
     event: 'claim.reset.details_received',
-    // Forks: success path re-merges into the QC outcome (refund_issued),
-    // failure path loops once through claim_reset_retry_failed.
-    next: ['claim_refund_issued', 'claim_reset_retry_failed'],
+    // Forks: success path re-merges into the QC outcome (refund_issued or
+    // invalid_confirmed), failure path loops once through
+    // claim_reset_retry_failed.
+    next: ['claim_refund_issued', 'claim_invalid_confirmed', 'claim_reset_retry_failed'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -865,7 +1078,7 @@ const CLAIM_COM_NODES = [
     label: 'Updated unlock details received',
     trigger: 'customer',
     event: 'claim.reset.retry_resubmitted',
-    next: ['claim_refund_issued'],
+    next: ['claim_refund_issued', 'claim_invalid_confirmed'],
     apply: (o) => ({
       ...o,
       claim: {
