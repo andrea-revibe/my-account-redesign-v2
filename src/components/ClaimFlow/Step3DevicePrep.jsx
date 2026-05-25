@@ -4,8 +4,9 @@ import {
   ChevronDown,
   Check,
   Lock,
-  Eye,
-  EyeOff,
+  KeyRound,
+  ShieldCheck,
+  ExternalLink,
   Apple,
   Smartphone,
 } from 'lucide-react'
@@ -25,6 +26,47 @@ const RESET_STEPS = {
     'Confirm and wait for the device to restart.',
   ],
 }
+
+const UNLINK_STEPS = {
+  ios: [
+    {
+      title: 'Go to iCloud.com on any browser',
+      body: 'Sign in with the Apple ID linked to this device.',
+    },
+    {
+      title: 'Open Find My, then choose All Devices',
+      body: 'Pick the device you\'re returning from the list.',
+    },
+    {
+      title: 'Tap Erase This Device, then Remove from Account',
+      body: 'This switches Activation Lock off so we can wipe it.',
+    },
+  ],
+  android: [
+    {
+      title: 'Go to android.com/find on any browser',
+      body: 'Sign in with the Google account linked to this device.',
+    },
+    {
+      title: 'Open Find My Device, then pick this device',
+      body: 'Select the device you\'re returning from the list.',
+    },
+    {
+      title: 'Choose Erase device, then remove the account',
+      body: 'This clears Factory Reset Protection so we can wipe it.',
+    },
+  ],
+}
+
+const UNLINK_LINKS = {
+  ios: { href: 'https://www.icloud.com/find', label: 'Open iCloud' },
+  android: {
+    href: 'https://www.google.com/android/find',
+    label: 'Open Find My Device',
+  },
+}
+
+const PASSCODE_LEN = 6
 
 export default function Step3DevicePrep({ state, dispatch, order }) {
   const dp = state.devicePrep
@@ -84,24 +126,28 @@ export default function Step3DevicePrep({ state, dispatch, order }) {
               value: { option: 'credentials' },
             })
           }
-          title="Provide unlock credentials"
-          subtitle="We'll reset the device on your behalf."
+          title="I can't factory reset it"
+          subtitle="Share your passcode and unlink it — we'll wipe it on pickup. Slower to process."
+          slower
         >
           {dp.option === 'credentials' && (
-            <CredentialsPanel
+            <UnlinkPanel
               os={os}
               onOsChange={(value) =>
                 dispatch({ type: 'SET_DEVICE_PREP', value: { os: value } })
               }
-              email={dp.email}
-              onEmailChange={(value) =>
-                dispatch({ type: 'SET_DEVICE_PREP', value: { email: value } })
-              }
-              password={dp.password}
-              onPasswordChange={(value) =>
+              accountUnlinked={dp.accountUnlinked}
+              onUnlinkChange={(value) =>
                 dispatch({
                   type: 'SET_DEVICE_PREP',
-                  value: { password: value },
+                  value: { accountUnlinked: value },
+                })
+              }
+              passcode={dp.passcode}
+              onPasscodeChange={(value) =>
+                dispatch({
+                  type: 'SET_DEVICE_PREP',
+                  value: { passcode: value },
                 })
               }
             />
@@ -130,7 +176,15 @@ function Callout({ children }) {
   )
 }
 
-function OptionCard({ selected, onSelect, title, subtitle, recommended, children }) {
+function OptionCard({
+  selected,
+  onSelect,
+  title,
+  subtitle,
+  recommended,
+  slower,
+  children,
+}) {
   return (
     <div
       className={`rounded-[14px] border-2 transition-colors ${
@@ -161,6 +215,11 @@ function OptionCard({ selected, onSelect, title, subtitle, recommended, children
             {recommended && (
               <span className="inline-flex items-center rounded-full bg-success-bg text-success font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
                 Recommended
+              </span>
+            )}
+            {slower && (
+              <span className="inline-flex items-center rounded-full bg-warn-bg text-warn font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
+                Slower
               </span>
             )}
           </span>
@@ -239,64 +298,154 @@ function ResetPanel({ os, onOsChange, confirmed, onConfirmChange }) {
   )
 }
 
-function CredentialsPanel({
+function UnlinkPanel({
   os,
   onOsChange,
-  email,
-  onEmailChange,
-  password,
-  onPasswordChange,
+  accountUnlinked,
+  onUnlinkChange,
+  passcode,
+  onPasscodeChange,
 }) {
-  const [show, setShow] = useState(false)
-  const emailLabel = os === 'ios' ? 'Apple ID' : 'Google account email'
-  const passwordLabel = os === 'ios' ? 'Apple ID password' : 'Google account password'
+  const steps = UNLINK_STEPS[os]
+  const link = UNLINK_LINKS[os]
+  const accountLabel = os === 'ios' ? 'iCloud account' : 'Google account'
 
   return (
     <div className="pt-3 flex flex-col gap-3">
       <OsTabs os={os} onChange={onOsChange} />
-      <Field label={emailLabel}>
-        <input
-          type="email"
-          inputMode="email"
-          autoComplete="off"
-          value={email}
-          onChange={(e) => onEmailChange(e.target.value)}
-          placeholder={
-            os === 'ios' ? 'name@icloud.com' : 'name@gmail.com'
-          }
-          className="w-full h-[44px] rounded-[10px] border border-line bg-surface px-3 text-[14px] text-ink placeholder:text-muted outline-none focus:border-brand"
-        />
-      </Field>
-      <Field label={passwordLabel}>
-        <div className="relative">
-          <input
-            type={show ? 'text' : 'password'}
-            autoComplete="off"
-            value={password}
-            onChange={(e) => onPasswordChange(e.target.value)}
-            placeholder="••••••••"
-            className="w-full h-[44px] rounded-[10px] border border-line bg-surface pl-3 pr-10 text-[14px] text-ink placeholder:text-muted outline-none focus:border-brand"
-          />
-          <button
-            type="button"
-            onClick={() => setShow((v) => !v)}
-            aria-label={show ? 'Hide password' : 'Show password'}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center text-muted hover:text-ink"
+
+      <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
+        <div className="px-3.5 py-2.5 flex items-center justify-between gap-2 bg-line-2/30 border-b border-line">
+          <div className="flex items-center gap-2">
+            <Lock size={13} strokeWidth={2} className="text-muted" />
+            <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink">
+              Remove device from your {accountLabel}
+            </span>
+          </div>
+          <a
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-[11px] font-semibold text-brand inline-flex items-center gap-1 hover:underline"
           >
-            {show ? (
-              <EyeOff size={16} strokeWidth={1.75} />
-            ) : (
-              <Eye size={16} strokeWidth={1.75} />
-            )}
-          </button>
+            {link.label}
+            <ExternalLink size={11} strokeWidth={2} />
+          </a>
         </div>
-      </Field>
-      <div className="flex items-start gap-2 text-[11.5px] text-muted leading-[1.45]">
-        <Lock size={12} strokeWidth={1.75} className="shrink-0 mt-px" />
+        <ol className="px-3.5 py-3 flex flex-col gap-2.5">
+          {steps.map((step, i) => (
+            <li key={i} className="flex gap-2.5 items-start">
+              <span className="w-5 h-5 rounded-full bg-brand text-white text-[10.5px] font-bold grid place-items-center shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12.5px] font-semibold text-ink leading-snug">
+                  {step.title}
+                </div>
+                <div className="text-[11.5px] text-muted leading-snug mt-0.5">
+                  {step.body}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <UnlinkToggle
+        accountLabel={accountLabel}
+        checked={accountUnlinked}
+        onChange={onUnlinkChange}
+      />
+
+      <PasscodeField value={passcode} onChange={onPasscodeChange} />
+
+      <div className="rounded-[10px] border border-line bg-line-2/40 px-3 py-2.5 text-[11.5px] leading-snug flex items-start gap-2 text-ink">
+        <ShieldCheck
+          size={13}
+          strokeWidth={2}
+          className="text-ink-2 mt-0.5 shrink-0"
+        />
         <span>
-          Credentials are encrypted in transit, used only to process your
-          return, and deleted after processing.
+          Your passcode is encrypted and used only by our technician during the
+          reset. It's deleted once the device is wiped.
         </span>
+      </div>
+    </div>
+  )
+}
+
+function UnlinkToggle({ accountLabel, checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      role="checkbox"
+      aria-checked={checked}
+      className={`w-full rounded-[12px] border px-3.5 py-3 flex items-start gap-2.5 text-left transition ${
+        checked
+          ? 'bg-success/5 border-success/40'
+          : 'bg-surface border-line hover:bg-line-2/40'
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`w-5 h-5 rounded-[6px] border-2 grid place-items-center shrink-0 mt-0.5 transition ${
+          checked
+            ? 'bg-success border-success text-white'
+            : 'bg-surface border-line'
+        }`}
+      >
+        {checked && <Check size={12} strokeWidth={2.5} />}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-semibold text-ink leading-snug">
+          I've removed this device from my {accountLabel}
+        </div>
+        <div className="text-[11.5px] text-muted leading-snug mt-0.5">
+          Required so our technician can complete the wipe.
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function PasscodeField({ value, onChange }) {
+  const handleChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, PASSCODE_LEN)
+    onChange(digits)
+  }
+  const complete = value.length === PASSCODE_LEN
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5">
+          <KeyRound size={12} strokeWidth={2.2} className="text-muted" />
+          Device passcode
+        </span>
+        <span
+          className={`text-[10.5px] tabular-nums font-medium ${
+            complete ? 'text-success' : 'text-muted'
+          }`}
+        >
+          {value.length}/{PASSCODE_LEN}
+        </span>
+      </label>
+      <input
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        value={value}
+        onChange={handleChange}
+        placeholder="6-digit passcode"
+        className={`w-full h-[46px] rounded-[10px] border bg-surface px-3.5 text-[15px] text-ink tracking-[0.4em] font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 ${
+          complete ? 'border-success/50' : 'border-line focus:border-brand'
+        }`}
+      />
+      <div className="text-[11px] text-muted leading-snug">
+        Enter the passcode you set on this device. If it's 4 digits, pad with
+        zeros at the end.
       </div>
     </div>
   )
@@ -328,16 +477,5 @@ function OsTabs({ os, onChange }) {
         )
       })}
     </div>
-  )
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11.5px] font-semibold text-ink-2 uppercase tracking-[0.04em]">
-        {label}
-      </span>
-      {children}
-    </label>
   )
 }

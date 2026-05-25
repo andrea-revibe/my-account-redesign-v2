@@ -42,8 +42,8 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       option: null,
       os: 'ios',
       resetConfirmed: false,
-      email: '',
-      password: '',
+      accountUnlinked: false,
+      passcode: '',
     },
     pickupDetails: {
       address: order?.address || '',
@@ -154,7 +154,7 @@ export function canAdvance(state) {
       const dp = state.devicePrep
       if (dp.option === 'reset') return dp.resetConfirmed === true
       if (dp.option === 'credentials')
-        return dp.email.trim().length > 0 && dp.password.length > 0
+        return dp.accountUnlinked === true && dp.passcode.length === 6
       return false
     }
     case 4:

@@ -55,10 +55,19 @@ export default function Step6Review({
       ? state.reason.otherText.trim()
       : REASON_LABELS[state.reason.value]
 
-  const devicePrep =
-    state.devicePrep.option === 'reset'
-      ? 'Factory reset confirmed'
-      : 'Credentials provided'
+  const isUnlinkPath = state.devicePrep.option === 'credentials'
+  const devicePrep = isUnlinkPath
+    ? 'Unlinked + passcode shared'
+    : 'Factory reset confirmed'
+  const devicePrepAck = isUnlinkPath
+    ? {
+        title: "I've unlinked the device and shared my passcode.",
+        subtitle: 'Required so our technician can complete the wipe.',
+      }
+    : {
+        title: 'I have factory reset my device.',
+        subtitle: 'Required before pickup. Unreset devices may delay your refund.',
+      }
 
   const refundMethodLabel = isWarranty
     ? null
@@ -67,6 +76,12 @@ export default function Step6Review({
       : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`
 
   const goTo = (step) => dispatch({ type: 'GO_TO_STEP', value: step })
+
+  const resetError = submitAttempted && !state.factoryResetConfirmed
+  const packingError =
+    submitAttempted &&
+    !state.packingConfirmed &&
+    state.factoryResetConfirmed
 
   return (
     <>
@@ -125,20 +140,30 @@ export default function Step6Review({
           </Section>
         )}
 
-        <Section title="Device preparation" onEdit={() => goTo(3)}>
+        <Section
+          title="Device preparation"
+          onEdit={() => goTo(3)}
+          error={resetError}
+          scrollOnError={resetError}
+        >
           <div className="text-[13.5px] text-ink">{devicePrep}</div>
+          <AckCheckboxRow
+            checked={state.factoryResetConfirmed}
+            error={resetError}
+            onChange={(value) =>
+              dispatch({ type: 'SET_FACTORY_RESET_CONFIRMED', value })
+            }
+            title={devicePrepAck.title}
+            subtitle={devicePrepAck.subtitle}
+          />
         </Section>
 
-        <FactoryResetConfirmation
-          checked={state.factoryResetConfirmed}
-          error={submitAttempted && !state.factoryResetConfirmed}
-          scrollOnError={submitAttempted && !state.factoryResetConfirmed}
-          onChange={(value) =>
-            dispatch({ type: 'SET_FACTORY_RESET_CONFIRMED', value })
-          }
-        />
-
-        <Section title="Packing" onEdit={() => goTo(4)}>
+        <Section
+          title="Packing"
+          onEdit={() => goTo(4)}
+          error={packingError}
+          scrollOnError={packingError}
+        >
           <div className="flex items-start gap-2.5">
             <Package
               size={13}
@@ -156,20 +181,16 @@ export default function Step6Review({
               </div>
             </div>
           </div>
+          <AckCheckboxRow
+            checked={state.packingConfirmed}
+            error={packingError}
+            onChange={(value) =>
+              dispatch({ type: 'SET_PACKING_CONFIRMED', value })
+            }
+            title="I have packed the device properly."
+            subtitle="Sealed, cushioned, and ready for the courier to collect."
+          />
         </Section>
-
-        <PackingConfirmation
-          checked={state.packingConfirmed}
-          error={submitAttempted && !state.packingConfirmed}
-          scrollOnError={
-            submitAttempted &&
-            !state.packingConfirmed &&
-            state.factoryResetConfirmed
-          }
-          onChange={(value) =>
-            dispatch({ type: 'SET_PACKING_CONFIRMED', value })
-          }
-        />
 
         <Section title="Pickup details" onEdit={() => goTo(5)}>
           <div className="flex flex-col gap-2">
@@ -275,57 +296,8 @@ export default function Step6Review({
   )
 }
 
-function FactoryResetConfirmation({ checked, error, scrollOnError, onChange }) {
-  return (
-    <AckCard
-      checked={checked}
-      error={error}
-      scrollOnError={scrollOnError}
-      onChange={onChange}
-      title="I have factory reset my device."
-      subtitle="Required before pickup. Unreset devices may delay your refund."
-    />
-  )
-}
-
-function PackingConfirmation({ checked, error, scrollOnError, onChange }) {
-  return (
-    <AckCard
-      checked={checked}
-      error={error}
-      scrollOnError={scrollOnError}
-      onChange={onChange}
-      title="I have packed the device properly."
-      subtitle="Sealed, cushioned, and ready for the courier to collect."
-    />
-  )
-}
-
-function AckCard({
-  checked,
-  error,
-  scrollOnError,
-  onChange,
-  title,
-  subtitle,
-}) {
-  const cardRef = useRef(null)
-  useEffect(() => {
-    if (scrollOnError && cardRef.current) {
-      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [scrollOnError])
-
-  const border = error
-    ? 'border-danger'
-    : checked
-      ? 'border-brand'
-      : 'border-line'
-  const bg = error
-    ? 'bg-danger-bg/40'
-    : checked
-      ? 'bg-brand-bg/30'
-      : 'bg-surface hover:bg-line-2/40'
+function AckCheckboxRow({ checked, error, onChange, title, subtitle }) {
+  const dividerCls = error ? 'border-danger/30' : 'border-line/60'
   const boxFill = error
     ? 'border-danger bg-surface'
     : checked
@@ -334,8 +306,7 @@ function AckCard({
 
   return (
     <label
-      ref={cardRef}
-      className={`flex items-start gap-3 rounded-[14px] border-2 px-3.5 py-3 cursor-pointer transition-colors ${border} ${bg}`}
+      className={`mt-3 pt-3 border-t flex items-start gap-3 cursor-pointer ${dividerCls}`}
     >
       <span className="relative mt-0.5 shrink-0">
         <input
@@ -362,7 +333,7 @@ function AckCard({
         {error && (
           <span className="mt-2 flex items-start gap-1.5 text-[11.5px] font-semibold text-danger leading-[1.4]">
             <AlertCircle size={12} strokeWidth={2} className="mt-px shrink-0" />
-            <span>Please confirm before submitting your return.</span>
+            <span>Please confirm before submitting.</span>
           </span>
         )}
       </span>
@@ -448,21 +419,36 @@ function PickupRow({ Icon, label, value, multiline }) {
   )
 }
 
-function Section({ title, onEdit, children }) {
+function Section({ title, onEdit, children, error, scrollOnError }) {
+  const cardRef = useRef(null)
+  useEffect(() => {
+    if (scrollOnError && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [scrollOnError])
+
+  const borderCls = error ? 'border-danger' : 'border-line'
+  const bgCls = error ? 'bg-danger-bg/40' : 'bg-surface'
+
   return (
-    <div className="rounded-[14px] border border-line bg-surface px-3.5 py-3">
+    <div
+      ref={cardRef}
+      className={`rounded-[14px] border ${borderCls} ${bgCls} px-3.5 py-3 transition-colors`}
+    >
       <div className="flex items-center justify-between mb-2">
         <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
           {title}
         </h3>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
-        >
-          <Pencil size={11} strokeWidth={2} />
-          Edit
-        </button>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+          >
+            <Pencil size={11} strokeWidth={2} />
+            Edit
+          </button>
+        )}
       </div>
       {children}
     </div>
