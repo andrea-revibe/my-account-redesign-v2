@@ -22,7 +22,7 @@ All three claim journeys (`claim_change_of_mind`, `claim_issue`, `claim_warranty
 
 1. **Sketch the nodes on paper first.** For each: `id`, `label`, `trigger` (`customer` or `system`), `event` (backend event name), and the exact field deltas `apply(order)` applies. The node *is* the spec — do this before writing code.
 2. **Decide branching.** Default is linear (next node in the array). For forks, set `next: ['idA', 'idB']` on the source node — both ids must exist in `nodes`. Terminal nodes set `next: []` if they aren't last in the array. For converging branches, point the last node of each branch at the rejoin target's id.
-3. **Author the journey config** as an entry in `JOURNEYS`. Reuse `INITIAL_ORDER` unless the journey starts from a meaningfully different shape.
+3. **Author the journey config** as an entry in `JOURNEYS`. Reuse `INITIAL_ORDER` unless the journey starts from a meaningfully different shape. For minor overrides (e.g., a different `paymentMethod` so the journey exercises the BNPL disclaimer path — `claim_change_of_mind` does this today with a spread over `INITIAL_ORDER` setting `paymentMethod` to Tabby), spread `INITIAL_ORDER` inline rather than defining a sibling constant.
 4. **Verify card routing.** Journey mode runs the projected order through `App.jsx`'s existing routing tree. If transitions land the order in a state no card handles, update routing too.
 5. **Update meta docs.** One-line bullet at the top of `CHANGELOG.md` Unreleased.
 

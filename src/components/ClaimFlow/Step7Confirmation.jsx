@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 import { claimTypeLabel, expectedCompletionFor } from '../../lib/claims'
+import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 
 export default function Step7Confirmation({ state, order, onClose, onTrack }) {
   const [copied, setCopied] = useState(false)
@@ -28,7 +29,9 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
   const timeline =
     state.refundMethod === 'wallet'
       ? 'Lands in your Revibe Wallet within 1 hour once return is complete.'
-      : 'Returns to your card in 5–10 business days once return is complete.'
+      : isBnpl(order)
+        ? `Returns to your ${order.paymentMethod.brand} account in 5–10 business days once return is complete.`
+        : 'Returns to your card in 5–10 business days once return is complete.'
   const devicePrepLine =
     state.devicePrep.option === 'reset'
       ? 'You confirmed the device is factory reset.'
@@ -111,9 +114,19 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
                 {currency} {formatMoney(refund.net)}
               </span>{' '}
               ·{' '}
-              {state.refundMethod === 'wallet'
-                ? 'Revibe Wallet'
-                : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`}
+              {state.refundMethod === 'wallet' ? (
+                'Revibe Wallet'
+              ) : isBnpl(order) ? (
+                <span className="inline-flex items-center gap-1">
+                  {order.paymentMethod.brand}
+                  <BnplDisclaimerTooltip
+                    provider={order.paymentMethod.provider}
+                    align="left"
+                  />
+                </span>
+              ) : (
+                `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`
+              )}
               <span className="block mt-1 text-[12px] text-muted">
                 {timeline}
               </span>

@@ -6,6 +6,7 @@ import {
   refundMethodLabel,
   claimTypeLabel,
 } from '../lib/claims'
+import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 
 // Bottom sheet surfacing the full set of choices captured during the
 // raise-a-claim flow: reason, device prep, pickup details (address +
@@ -89,7 +90,13 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
                         className="text-ink-2"
                       />
                     )}
-                    {refundMethodLabel(claim, order)}
+                    <span>{refundMethodLabel(claim, order)}</span>
+                    {claim.refundMethod === 'original' && isBnpl(order) && (
+                      <BnplDisclaimerTooltip
+                        provider={order.paymentMethod.provider}
+                        align="right"
+                      />
+                    )}
                   </span>
                 }
                 sub={
