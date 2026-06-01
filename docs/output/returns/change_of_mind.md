@@ -65,8 +65,8 @@ Five radio options:
 
 Two stacked radio cards. `canAdvance` returns false until one complete option is filled. A `If you leave this flow, you'll need to start over` hint sits below.
 
-- **Option A — `I've factory reset the device`** (recommended pill). Carries an `iPhone` / `Android` OS-tabs control, a collapsible numbered reset instructions list per OS, and a required confirmation checkbox.
-- **Option B — `Provide unlock credentials`**. Same OS tabs, an email field, a password field with show/hide toggle, and the encryption-disclosure note.
+- **Option A — `I've factory reset the device`** (recommended pill). Carries an `iPhone` / `Android` OS-tabs control, a collapsible structured reset guide per OS, and a required confirmation checkbox. The guide is a vertical numbered chapter list — each chapter has a title, an optional emphasised lead + body, an optional nested sub-action list (rendered with bolded UI labels like **Settings** / **Sign Out**), and an optional success-tinted verification tip. The critical sign-out-of-iCloud / sign-out-of-Google chapter carries the "single most important step" lead to surface the Activation-Lock / FRP risk before the customer wipes.
+- **Option B — `I can't factory reset it`**. Same OS tabs and the same chapter-style guide format (3 chapters per OS — sign in to the find-device site, open it and pick the device, erase + remove from account/sign out of Google), followed by a "removed device from account" confirmation toggle, a 6-digit passcode field, and the encryption-disclosure note. The reducer stores `accountUnlinked` + `passcode`; the toggle gates Submit.
 
 The reducer stores `devicePrep: { option, os }` and (for Option B) the credentials. Credentials are never persisted back into the claim object — they're masked to `Credentials provided` on Step 7 review and in the `ClaimDetailsSheet`.
 

@@ -9,51 +9,123 @@ import {
   ExternalLink,
   Apple,
   Smartphone,
+  BadgeCheck,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 
-const RESET_STEPS = {
+const RESET_GUIDE = {
   ios: [
-    'Open Settings → General → Transfer or Reset iPhone.',
-    'Tap "Erase All Content and Settings".',
-    'Sign out of your Apple ID when prompted.',
-    'Confirm the erase and wait for the device to restart.',
+    {
+      title: 'Back up your device',
+      body: "If you want to keep anything on this device, back it up to iCloud or your computer before continuing — the next steps will erase everything.",
+    },
+    {
+      title: 'Sign out of iCloud and turn off Find My',
+      lead: 'This is the single most important step in this entire guide.',
+      body: 'Doing this before the reset is what prevents Activation Lock from blocking the device after the wipe.',
+      subActions: [
+        'Open **Settings**',
+        'Tap your name at the very top',
+        'Scroll all the way to the bottom and tap **Sign Out**',
+        'Enter your Apple ID password when prompted (this is what disables Find My and removes Activation Lock)',
+        "Choose whether to keep a copy of your data on the device (it'll be erased in the next step anyway, so it doesn't matter much)",
+        'Confirm **Sign Out**',
+      ],
+      tip: 'You should now see "Sign in to your iPhone/iPad" at the top of Settings. That confirms iCloud is disconnected.',
+    },
+    {
+      title: 'Erase all content and settings',
+      subActions: [
+        'Open **Settings → General → Transfer or Reset iPhone**',
+        'Tap **Erase All Content and Settings**',
+        'Enter your passcode if prompted, then tap **Continue**',
+        'Confirm the erase',
+      ],
+    },
+    {
+      title: 'Leave the device on the Hello screen',
+      body: "Once it restarts, you'll see the Hello / language picker. Don't set it up — just power it off and pack it for pickup.",
+    },
   ],
   android: [
-    'Open Settings → System → Reset options.',
-    'Tap "Erase all data (factory reset)".',
-    'Remove your Google account when prompted.',
-    'Confirm and wait for the device to restart.',
+    {
+      title: 'Back up your device',
+      body: 'Back up photos, contacts, and anything else you want to keep before continuing — the next steps will erase everything.',
+    },
+    {
+      title: 'Sign out of your Google account and turn off Find My Device',
+      lead: 'This is the single most important step in this entire guide.',
+      body: 'Doing this before the reset is what prevents Factory Reset Protection (FRP) from locking the device after the wipe.',
+      subActions: [
+        'Open **Settings**',
+        'Tap **Passwords & accounts** (called **Accounts** on some versions)',
+        'Tap your Google account, then **Remove account**',
+        'Confirm with your screen-lock PIN or pattern if prompted',
+        'Go to **Settings → Security → Find My Device** and toggle it off',
+        'If you have more than one Google account on the device, repeat for each one',
+      ],
+      tip: "Your Google account should no longer appear under Accounts. That confirms Factory Reset Protection won't trigger after the reset.",
+    },
+    {
+      title: 'Erase all data (factory reset)',
+      subActions: [
+        'Open **Settings → System → Reset options**',
+        'Tap **Erase all data (factory reset)**',
+        'Enter your PIN, pattern, or password if prompted',
+        'Confirm the erase',
+      ],
+    },
+    {
+      title: 'Leave the device on the welcome screen',
+      body: "Once it restarts, you'll see the welcome / language picker. Don't set it up — just power it off and pack it for pickup.",
+    },
   ],
 }
 
-const UNLINK_STEPS = {
+const UNLINK_GUIDE = {
   ios: [
     {
-      title: 'Go to iCloud.com on any browser',
-      body: 'Sign in with the Apple ID linked to this device.',
+      title: 'Sign in to iCloud.com from any browser',
+      body: 'Use a phone, tablet, or computer — anything with internet. Sign in with the Apple ID linked to the device you are returning.',
+      tip: "If two-factor is on, you'll need a verification code from another trusted Apple device or phone number.",
     },
     {
       title: 'Open Find My, then choose All Devices',
-      body: 'Pick the device you\'re returning from the list.',
+      body: 'From the iCloud dashboard, open Find My and pick the device you are returning from the All Devices list.',
     },
     {
-      title: 'Tap Erase This Device, then Remove from Account',
-      body: 'This switches Activation Lock off so we can wipe it.',
+      title: 'Erase the device, then remove it from your account',
+      lead: 'This is the single most important step in this entire guide.',
+      body: 'This is what switches Activation Lock off so our technician can wipe and resell the device.',
+      subActions: [
+        'Tap **Erase This Device**',
+        'Confirm with your Apple ID password',
+        'Once the device shows as erased, tap **Remove from Account**',
+        'Confirm the removal',
+      ],
+      tip: 'The device should disappear from the All Devices list. That confirms Activation Lock is switched off.',
     },
   ],
   android: [
     {
-      title: 'Go to android.com/find on any browser',
-      body: 'Sign in with the Google account linked to this device.',
+      title: 'Sign in to android.com/find from any browser',
+      body: 'Use a phone, tablet, or computer with internet. Sign in with the Google account linked to the device you are returning.',
     },
     {
       title: 'Open Find My Device, then pick this device',
-      body: 'Select the device you\'re returning from the list.',
+      body: 'Select the device you are returning from the list of devices on your account.',
     },
     {
-      title: 'Choose Erase device, then remove the account',
-      body: 'This clears Factory Reset Protection so we can wipe it.',
+      title: 'Erase the device, then sign out of your Google account',
+      lead: 'This is the single most important step in this entire guide.',
+      body: 'This is what clears Factory Reset Protection so our technician can wipe and resell the device.',
+      subActions: [
+        'Tap **Erase device**',
+        'Confirm with your Google password',
+        'Open **myaccount.google.com → Security → Your devices**',
+        'Find the returned device and tap **Sign out**',
+      ],
+      tip: 'The device should disappear from Find My Device. That confirms Factory Reset Protection has been cleared.',
     },
   ],
 }
@@ -237,9 +309,71 @@ function OptionCard({
   )
 }
 
+function renderBold(text) {
+  if (!text) return null
+  const parts = String(text).split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((p, i) =>
+    p.startsWith('**') && p.endsWith('**') ? (
+      <strong key={i} className="font-semibold text-ink">
+        {p.slice(2, -2)}
+      </strong>
+    ) : (
+      <span key={i}>{p}</span>
+    ),
+  )
+}
+
+function GuideStep({ index, step }) {
+  return (
+    <li className="flex gap-2.5 items-start">
+      <span className="w-6 h-6 rounded-full bg-brand text-white grid place-items-center shrink-0 text-[11px] font-bold tabular-nums mt-px">
+        {index + 1}
+      </span>
+      <div className="flex-1 min-w-0 pt-0.5">
+        <div className="text-[13px] font-semibold text-ink leading-snug">
+          {step.title}
+        </div>
+        {(step.lead || step.body) && (
+          <div className="text-[12px] text-ink-2 leading-[1.5] mt-1">
+            {step.lead && (
+              <span className="font-semibold text-ink">{step.lead} </span>
+            )}
+            {step.body && renderBold(step.body)}
+          </div>
+        )}
+        {step.subActions && (
+          <ol className="flex flex-col gap-1.5 mt-2">
+            {step.subActions.map((sa, j) => (
+              <li
+                key={j}
+                className="flex gap-2 items-start text-[12px] text-ink-2 leading-[1.5]"
+              >
+                <span className="text-muted shrink-0 tabular-nums font-medium min-w-[14px]">
+                  {j + 1}.
+                </span>
+                <span>{renderBold(sa)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+        {step.tip && (
+          <div className="mt-2 flex items-start gap-1.5 rounded-[8px] bg-success-bg/40 border border-success-bg px-2.5 py-2 text-[11.5px] text-ink-2 leading-snug">
+            <BadgeCheck
+              size={13}
+              strokeWidth={2}
+              className="text-success shrink-0 mt-0.5"
+            />
+            <span>{renderBold(step.tip)}</span>
+          </div>
+        )}
+      </div>
+    </li>
+  )
+}
+
 function ResetPanel({ os, onOsChange, confirmed, onConfirmChange }) {
   const [open, setOpen] = useState(true)
-  const steps = RESET_STEPS[os]
+  const guide = RESET_GUIDE[os]
   return (
     <div className="pt-3 flex flex-col gap-3">
       <OsTabs os={os} onChange={onOsChange} />
@@ -258,17 +392,9 @@ function ResetPanel({ os, onOsChange, confirmed, onConfirmChange }) {
         />
       </button>
       {open && (
-        <ol className="flex flex-col gap-2 pl-1 animate-slideDown">
-          {steps.map((step, i) => (
-            <li
-              key={i}
-              className="flex items-start gap-2.5 text-[12.5px] text-ink-2 leading-[1.45]"
-            >
-              <span className="w-5 h-5 rounded-full bg-brand-bg text-brand grid place-items-center shrink-0 text-[11px] font-bold tabular-nums mt-px">
-                {i + 1}
-              </span>
-              <span>{step}</span>
-            </li>
+        <ol className="flex flex-col gap-3.5 animate-slideDown">
+          {guide.map((step, i) => (
+            <GuideStep key={i} index={i} step={step} />
           ))}
         </ol>
       )}
@@ -306,7 +432,7 @@ function UnlinkPanel({
   passcode,
   onPasscodeChange,
 }) {
-  const steps = UNLINK_STEPS[os]
+  const guide = UNLINK_GUIDE[os]
   const link = UNLINK_LINKS[os]
   const accountLabel = os === 'ios' ? 'iCloud account' : 'Google account'
 
@@ -333,21 +459,9 @@ function UnlinkPanel({
             <ExternalLink size={11} strokeWidth={2} />
           </a>
         </div>
-        <ol className="px-3.5 py-3 flex flex-col gap-2.5">
-          {steps.map((step, i) => (
-            <li key={i} className="flex gap-2.5 items-start">
-              <span className="w-5 h-5 rounded-full bg-brand text-white text-[10.5px] font-bold grid place-items-center shrink-0 mt-0.5">
-                {i + 1}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[12.5px] font-semibold text-ink leading-snug">
-                  {step.title}
-                </div>
-                <div className="text-[11.5px] text-muted leading-snug mt-0.5">
-                  {step.body}
-                </div>
-              </div>
-            </li>
+        <ol className="px-3.5 py-3.5 flex flex-col gap-3.5">
+          {guide.map((step, i) => (
+            <GuideStep key={i} index={i} step={step} />
           ))}
         </ol>
       </div>
