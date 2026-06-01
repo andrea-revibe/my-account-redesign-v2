@@ -14,6 +14,7 @@ import StickyActionBar from './StickyActionBar'
 import Step1ClaimType from './Step1ClaimType'
 import Step2Reason from './Step2Reason'
 import Step2IssueDetails from './Step2IssueDetails'
+import Step2Compensation from './Step2Compensation'
 import Step3DevicePrep from './Step3DevicePrep'
 import Step4Packing from './Step4Packing'
 import Step4PickupDetails from './Step4PickupDetails'
@@ -60,7 +61,13 @@ export default function ClaimFlow({
 
   const handlePrimary = () => {
     if (isReview) {
-      if (!state.factoryResetConfirmed || !state.packingConfirmed) {
+      // Compensation keeps the device — no factory-reset / packing acks to
+      // gate on. Refund + warranty flows still require both.
+      const requiresAcks = state.claimType !== 'compensation'
+      if (
+        requiresAcks &&
+        (!state.factoryResetConfirmed || !state.packingConfirmed)
+      ) {
         setSubmitAttempted(true)
         return
       }
@@ -97,7 +104,9 @@ export default function ClaimFlow({
   const primaryLabel = isReview
     ? state.claimType === 'warranty'
       ? 'Submit warranty claim'
-      : 'Submit return request'
+      : state.claimType === 'compensation'
+        ? 'Submit compensation request'
+        : 'Submit return request'
     : 'Continue'
   const primaryVariant = isReview ? 'success' : 'brand'
 
@@ -144,6 +153,9 @@ export default function ClaimFlow({
             )}
           {state.step === 2 && state.claimType === 'change_of_mind' && (
             <Step2Reason state={state} dispatch={dispatch} />
+          )}
+          {state.step === 2 && state.claimType === 'compensation' && (
+            <Step2Compensation state={state} dispatch={dispatch} />
           )}
           {state.step === 3 && (
             <Step3DevicePrep
@@ -262,6 +274,25 @@ function buildClaim({ state, order, claimRef }) {
       slot: '10 AM – 12 PM',
     },
     timeline: { initiated: initiatedStamp },
+  }
+
+  if (state.claimType === 'compensation') {
+    // Customer keeps the device: no scheduled pickup, device prep, or
+    // pickup details, and no `expectedRefund` — the amount is confirmed by
+    // support after the evidence review (claim.amountPending). Lands on the
+    // compensation pipeline's `initiated` ("Claim submitted") state.
+    return {
+      claimRef,
+      claimStatusId: 'initiated',
+      type: 'compensation',
+      submittedAt,
+      units: state.units || 1,
+      compensationSubtype: state.compensationSubtype,
+      issueDetails: { ...state.issueDetails },
+      refundMethod: state.refundMethod,
+      amountPending: true,
+      timeline: { initiated: initiatedStamp },
+    }
   }
 
   if (state.claimType === 'change_of_mind') {

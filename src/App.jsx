@@ -150,7 +150,8 @@ export default function App() {
   // Customer-triggered journey advance from the real ClaimFlow submit.
   // Mirrors handleCancelOrder: refund-method ids (wallet / original) map
   // to the journey's refund-branch suffix on refund flows; warranty
-  // submits have no refund method and target a single submit node.
+  // submits have no refund method and target a single submit node;
+  // compensation submits fork on sub-type (shipping_refund / charger).
   // validNext gates an out-of-sequence submit (e.g. journey isn't on the
   // claim_change_of_mind branch). Non-journey mode keeps the existing
   // seed-claim + undo flow.
@@ -162,7 +163,9 @@ export default function App() {
       const target =
         claim.type === 'warranty'
           ? 'claim_submitted_warranty'
-          : `claim_submitted_${claim.refundMethod === 'wallet' ? 'wallet' : 'card'}`
+          : claim.type === 'compensation'
+            ? `claim_submitted_${claim.compensationSubtype}`
+            : `claim_submitted_${claim.refundMethod === 'wallet' ? 'wallet' : 'card'}`
       if (journey.validNext().some((n) => n.id === target)) {
         journey.advance(target)
       }

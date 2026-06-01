@@ -1,6 +1,6 @@
 # Warranties & compensations
 
-> Coverage of two Step 1 entries on the returns flow. **Warranty** is wired end-to-end (intake submits an in-session claim that flips the order to a `WarrantyClaimCard`); two hand-seeded mocks also exercise the post-pickup heroes that the prototype can't reach without ops simulation. **Compensation** is still stub end-to-end. This doc covers the wired warranty intake + tracking card plus the open scope on the compensation branch.
+> Coverage of two Step 1 entries on the returns flow. **Warranty** is wired end-to-end (intake submits an in-session claim that flips the order to a `WarrantyClaimCard`); two hand-seeded mocks also exercise the post-pickup heroes that the prototype can't reach without ops simulation. **Compensation** is now also wired end-to-end (refund-only, no pickup — intake submits an in-session claim tracked on `ClaimCard`); three hand-seeded mocks exercise the under-review / refunded / closed-invalid surfaces. This doc covers both intakes + their tracking cards.
 
 ## 1. Status
 
@@ -11,9 +11,9 @@ Step 1's full option set across the returns flow:
 | `I changed my mind` | — | **Wired** — see [returns/change_of_mind.md](./returns/change_of_mind.md) |
 | `Something's wrong with my device` | `Return for a refund or replacement` | **Wired** — see [returns/issue.md](./returns/issue.md) |
 | `Something's wrong with my device` | `Use my warranty` | **Wired** — intake + tracking — covered here (§2) |
-| `Request compensation` | shipping refund / faulty accessory — keep the item | **Stub** — covered here (§3) |
+| `Request compensation` | shipping refund / faulty charger — keep the item | **Wired** — intake + tracking — covered here (§3) |
 
-Selecting the still-stubbed `Request compensation` entry renders an inline `not part of this build` note instead of setting a `claimType`; `canAdvance` requires `change_of_mind`, `issue`, or `warranty`, so the compensation entry can't advance past Step 1. The **warranty tracking card** has two hand-seeded mocks (89610, 89580) to exercise the `under_repair` and `ship_back` heroes that the in-session pipeline can't reach without ops simulation — see §2.
+Selecting `Request compensation` now dispatches `SET_CLAIM_TYPE: 'compensation'` (the old inline `not part of this build` note is gone); `canAdvance` accepts `change_of_mind`, `issue`, `warranty`, **and** `compensation`. The **warranty tracking card** has two hand-seeded mocks (89610, 89580) to exercise the `under_repair` and `ship_back` heroes that the in-session pipeline can't reach without ops simulation — see §2. The **compensation tracking card** has three hand-seeded mocks (89630 under review, 89605 refunded, 89572 closed-invalid) — see §3.8.
 
 ## 2. Warranty (repair-and-return)
 
@@ -183,61 +183,114 @@ No `refundMethod` / `expectedRefund` fields are needed — the warranty branch h
 - **Repair-window source.** Today `claim.repairWindow.expectedComplete` is either hand-written (mocks) or computed from `expectedCompletionFor('warranty')` (in-session submit). Production needs either a per-supplier SLA-driven estimate or a seller-input field at intake.
 - **Single warranty branch or sub-branched intake?** Warranty coverage varies (manufacturer's warranty / Revibe Care add-on / extended warranty). The current intake collapses to one branch; production may want to split at Step 2 with the source determined backend-side.
 
-## 3. Compensation (shipping refund / faulty accessory)
+## 3. Compensation (shipping refund / faulty charger)
 
 ### 3.1 Scope
 
-The customer reports a problem but **keeps the device**. Likely sub-cases:
+The customer reports a problem but **keeps the device** — the outcome is always a **refund, never a return**. Two sub-cases (`src/components/ClaimFlow/compensationSubtypes.js`):
 
-- **Shipping refund** — courier delay, damaged packaging, or a duplicate ship-fee charge. Customer gets the shipping amount back (or a goodwill credit).
-- **Faulty accessory** — the device is fine but a bundled accessory (cable, adapter, case) is defective. Customer gets a partial refund or a replacement accessory.
+- **`shipping_refund`** — the customer was charged shipping they shouldn't have paid. They get the shipping amount back.
+- **`charger`** — the device is fine but the bundled charger is faulty. They get a refund (no replacement accessory is shipped).
+
+The customer uploads evidence for either case; support reviews it and reaches a **valid / invalid** decision. Valid → refund; invalid → the claim closes with no refund (and, since nothing was shipped, nothing to send back). The refund **amount is unknown at submission** — support confirms it after the review — so every customer-facing surface reads "amount confirmed by support after review" rather than a figure.
 
 ### 3.2 Divergence from the wired branches
 
-| Aspect | Wired branches | Compensation branch |
+| Aspect | Refund / warranty branches | Compensation branch |
 |---|---|---|
-| Device pickup | Always required (Step 4) | **Not required** — the customer keeps the device |
-| Device prep (Step 3) | Required (factory reset or credentials) | **Not required** |
-| Refund math | Computed on `gross` | Computed on a sub-amount (shipping fee, accessory price) |
-| Operational flow | Country routing → collection → QC → refund | Goes straight to `refund_issued` (or to an agent-review state) |
+| Device prep (Step 3) | Required | **Skipped** |
+| Packing (Step 4) | Required | **Skipped** |
+| Pickup (Step 5) | Required | **Skipped** — the customer keeps the device |
+| Refund amount | Computed (`refundBreakdown`) | **Unknown at submission** — confirmed by support after review |
+| Pipeline | 5-state refund / 6-state warranty | 4-state, no Pickup leg (§3.5) |
+| Invalid verdict | Pay return shipping (`InvalidClaimCard`) | Claim closed, no refund — nothing to ship back (§3.7) |
 
-This is the simplest of the three stubbed branches *structurally* — it skips Steps 3 and 4 entirely — but the hardest to scope, because the compensation amount and approval rules are case-by-case.
+Structurally the simplest of the three — it skips three steps — and the only one where the figure is deferred.
 
-### 3.3 Hook-in points
+### 3.3 Intake flow
 
-- `flowReducer.js` would gain a `'compensation'` claim type.
-- Step 2 needs a compensation sub-type picker (likely a flat list: shipping refund / damaged packaging / faulty accessory / other) similar to `issueSubtypes.js`.
-- Step 2 needs an evidence section similar to the issue branch (description + attachment).
-- Steps 3 and 4 are **skipped** by the reducer — the flow jumps from Step 2 to Step 5.
-- Step 5 needs a compensation-specific refund-method card (wallet vs original payment, but with a smaller `gross`).
-- Step 6 + Step 7 are reusable with copy tweaks.
-- A new operational sub-flow doc would live in `docs/input/return_flow_compensation.md` (drawio source pending).
+Total visible step count is **5** (1, 2, 6, 7, 8); Steps 3/4/5 are skipped by the reducer. The progress bar reads "Step X of 5". Internally `state.step` still uses 1..8 indexing so Step 6 = refund destination, Step 7 = review and Step 8 = confirmation stay aligned across all claim types. Routing lives in `flowReducer.js`:
 
-### 3.4 UX considerations
+- `visibleStepCount('compensation')` → `TOTAL_STEPS - 3` = 5.
+- `visibleStepIndex(step, 'compensation')` → `step >= 6 ? step - 3 : step` (1→1, 2→2, 6→3, 7→4, 8→5).
+- `NEXT` from Step 2 jumps to Step 6 (skips 3/4/5); `BACK` from Step 6 returns to Step 2. `GO_TO_STEP` edit links from Review only target Step 2 and Step 6.
 
-- Compensation amount is often unknown at submission — it needs an agent to assess. Step 5 may need to communicate "expected within X days, amount to be confirmed by support" rather than a precise figure.
-- For faulty-accessory cases, customers may prefer a **replacement accessory** over a partial refund. Step 5 could carry a replace-or-refund choice.
-- The submission shouldn't promise instant refund timing (unlike the wired Wallet path), because the agent review adds latency.
+| Step | Behaviour on compensation |
+|---|---|
+| 1 — Claim type | `Request compensation` dispatches `SET_CLAIM_TYPE: 'compensation'` and highlights (no longer a stub). |
+| 2 — What happened | **`Step2Compensation.jsx`** — a two-option sub-type picker (`shipping_refund` / `charger`, each with a "what we need" evidence hint) + description + attachment. `canAdvance` requires `compensationSubtype` + a non-empty description + an attachment. Description/attachment reuse `state.issueDetails`; the sub-type is `state.compensationSubtype` (set via `SET_COMPENSATION_SUBTYPE`). |
+| 3 — Device prep | **Skipped.** |
+| 4 — Packing | **Skipped.** |
+| 5 — Pickup | **Skipped.** |
+| 6 — Refund destination | `Step5RefundMethod`'s `CompensationDestination` branch — Wallet vs original payment, **no amount/bonus/restocking** math. Each card shows "Amount confirmed by support after review" in place of a figure. `canAdvance` requires `refundMethod` set. |
+| 7 — Review | `Step6Review` compensation branch — a **What happened** section (sub-type + description + proof) and a **Refund** section showing the chosen destination + "To be confirmed" / "Confirmed by support after review". No Device prep / Packing / Pickup sections, and **no ack cards** (nothing to reset or pack), so `ClaimFlow.handlePrimary` skips the factory-reset/packing gate for compensation. CTA reads `Submit compensation request`. |
+| 8 — Confirmation | Title swaps to "Your compensation request is in"; chip reads `Compensation`; the middle row shows "Amount confirmed after review · {destination}" (Clock glyph) with a "You keep the device…" note; the Device-preparation row is dropped. Secondary CTA reads "Track this compensation". |
 
-## 4. Data model — compensation
+On submit, `ClaimFlow.buildClaim` builds a compensation-shaped claim (§3.6) and bubbles it via `onSubmitClaim(orderId, claim)`. `App.jsx` projects it over `ORDERS`; the order re-renders as a `ClaimCard` on the compensation pipeline's `initiated` ("Claim submitted") state. The `UndoSnackbar` slides up so reviewers can revert. In-session only — cleared on refresh.
 
-(Warranty data model lives in §2.7.) Compensation is still stub end-to-end. When wired, the `claim` shape would extend:
+### 3.4 Card routing
 
-| New field | Type | Used by |
+A compensation claim is **not** a takeover and **not** warranty, so `App.jsx` routes it through the generic `ClaimCard` fallback (`hasActiveClaim` → in progress; `isClaimRefunded` → past). The only exception is an invalid verdict: `claim.invalidClaim` is checked ahead of the `ClaimCard` fallback, so a closed-invalid compensation claim routes to `InvalidClaimCard`, which short-circuits to its compensation branch (§3.7).
+
+### 3.5 Compensation pipeline
+
+4-state customer-facing chain in `COMPENSATION_CLAIM_STATUSES` (`src/lib/claims.js`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> initiated: Step 7 submit
+    initiated --> qc
+    qc --> refund_issued
+    refund_issued --> refund_credited
+    refund_credited --> [*]
+```
+
+Reuses the refund status **ids** (`initiated` / `qc` / `refund_issued` / `refund_credited`) so `claimToneFor` and `claimPhaseTag` apply unchanged — only the labels differ (`initiated` → "Claim submitted", `qc` → "Under review"). There is **no Pickup leg** (nothing is collected). `claimStatusesFor(claim)` returns this list when `claim.type === 'compensation'` (and `WARRANTY_CLAIM_STATUSES` is unaffected — warranty has its own dedicated functions); `ClaimCard`'s dot timeline and `claimStatusHeadline` resolve through it. Tone progression is identical to the refund pipeline: warn (initiated/qc) → brand (refund_issued) → success (refund_credited). `hasActiveClaim` / `isClaimRefunded` work as-is (terminal is `refund_credited`).
+
+### 3.6 ClaimCard — compensation specifics
+
+`ClaimCard` renders compensation claims with two adjustments:
+
+- **Dot timeline** uses `claimStatusesFor(claim)` (4 dots, no Pickup) instead of hard-coding `CLAIM_STATUSES`.
+- **Hero amount** falls back to "To be confirmed" when `claim.expectedRefund` is absent (the in-session submit and the under-review mock carry no figure). A refunded mock that carries `expectedRefund` shows the real amount.
+
+`ClaimDetailsSheet` is compensation-aware: the Summary shows the claim sub-type + description (no Reason / Device-prep / Pickup rows), the refund destination row drops the "10% restocking fee" sub, and the Refund card shows the amount if known else "To be confirmed" with a "you keep the device" note.
+
+### 3.7 Invalid verdict — compensation closed card
+
+When support can't approve the claim, `InvalidClaimCard` short-circuits to **`CompensationClosedCard`** (when `claim.type === 'compensation'`) instead of its return-shipping machinery. Muted-danger terminal mirroring `ClaimClosedCard`'s chrome: a "Claim closed" pill, a `ShieldX` "No refund issued" tag, the headline "Claim closed — no refund", a body line ("…you keep your device"), the Revibe Quality ops message (if present on `claim.invalidClaim.opsMessage`), and a **"Discuss with support"** CTA (decorative). No payment gate, no reversal-to-pay — there's nothing to ship back.
+
+### 3.8 Mocked vs production
+
+- **In-session submit only.** Same as warranty (§2.8) — stored in `App.jsx`'s `submittedClaims`, projected over `ORDERS`, cleared on refresh, undoable via `UndoSnackbar`. Submits always land on `initiated`.
+- **Pipeline progression isn't simulated.** Three hand-seeded mocks exercise the later surfaces: **89630** (`qc`, shipping refund — "Under review", TBD amount), **89605** (`refund_credited`, charger — past, with a real `expectedRefund`), **89572** (`qc` + `invalidClaim`, charger — `CompensationClosedCard`). Production needs the same webhook / polling mechanism as the refund flow to move a claim through the four states and to set the amount on `refund_issued`.
+- **Amount is always deferred.** `buildClaim` sets `amountPending: true` and omits `expectedRefund`; the figure is hand-written only on the refunded mock. Production fills it from the agent's assessment.
+- **No operational sub-flow doc yet.** A `docs/input/return_flow_compensation.md` (drawio source) is still pending.
+
+### 3.9 Open questions — compensation
+
+- **Compensation approval gate.** Whether the review is a hard gate or a soft gate (claim advances; agent intervenes only for fraud).
+- **`HistoryThread` on a compensation claim.** With no pickup or device prep the history is short (placed → delivered). The `'claim'` mode works today; a `'compensation'` variant may read better.
+- **Charger verification cutoff.** A faulty charger may operationally need shipping back for verification; the prototype assumes refund-on-evidence. Production needs a policy on the value cutoff.
+- **Where the refund lands when the amount is a goodwill credit.** The destination picker offers Wallet vs original payment, but a goodwill credit may be Wallet-only.
+
+## 4. Data model
+
+### 4.1 Warranty-specific fields
+
+(See §2.7.)
+
+### 4.2 Compensation-specific fields
+
+On top of the standard claim shape (`claimRef`, `claimStatusId`, `type`, `submittedAt`, `units`, `timeline`, `refundMethod`), compensation claims carry:
+
+| Field | Type | Used by |
 |---|---|---|
-| `claim.type` | `'compensation'` (in addition to `'change_of_mind'` / `'issue'` / `'warranty'`) | Routing surfaces |
-| `claim.compensationDetails` | `{ subtype, description, attachmentName, amountClaimed }` | Step 2 compensation intake |
-| `claim.expectedRefund` | (existing shape) | Reused with a smaller `gross` (shipping fee or accessory price) |
+| `claim.type` | `'compensation'` | Routing; `claimStatusesFor`; sheet branching |
+| `claim.compensationSubtype` | `'shipping_refund'` \| `'charger'` | Step 2 intake; Review / sheet labels |
+| `claim.issueDetails` | `{ description, attachmentName }` | Evidence (reused from the issue branch) |
+| `claim.amountPending` | `true` on submit | Marker that the amount is deferred (no `expectedRefund`) |
+| `claim.expectedRefund` *(optional)* | (existing shape) | Only present once support confirms a figure (refunded mock) — `ClaimCard` / sheet show "To be confirmed" when absent |
+| `claim.invalidClaim` *(optional)* | `{ determinedAt, opsName, opsRole, opsMessage }` | `CompensationClosedCard` — note the **absence** of `returnShipping` / `returnShipment` distinguishes it from a refund-flow invalid claim |
 
-`CLAIM_STATUSES` can likely reuse `qc` → `refund_issued` → `refund_credited` as-is for compensation — no new terminal needed.
-
-## 5. Open questions — compensation
-
-(Warranty open questions live in §2.9.)
-
-- **Single warranty branch or sub-branched?** Warranty coverage varies (manufacturer's warranty / Revibe Care add-on / extended warranty). Intake currently collapses to one branch with the source determined backend-side; production may want to split at Step 2 like the change-of-mind / issue divergence. (Note: the **tracking** card already collapses these into one neutral "Under repair" surface — see §2.2; the question here is about intake. Also discussed under warranty open questions §2.9.)
-- **Compensation approval gate.** Whether the agent review is a hard gate (claim doesn't even reach `pickup` without it) or a soft gate (the claim moves forward and the agent intervenes for fraud detection).
-- **Replace vs refund on faulty accessory.** Does the customer choose, or does the agent dictate based on stock?
-- **Pickup-less claims and `pickupDetails`.** The compensation branch skips Step 4. Does `claim.pickupDetails` stay as a required field on the claim object (filled with the order's defaults so the operational flow is uniform), or does it become optional? Cleaner shape vs ops-pipeline uniformity — pick one.
-- **History thread on a compensation claim.** With no pickup or device prep, the history is shorter. The `HistoryThread` mode may need a `'compensation'` variant.
-- **Faulty-accessory routing.** Operationally, a faulty cable may need to be shipped back for verification; in practice ops may waive that for low-value items. The flow needs a policy decision on the cutoff.
+Compensation carries **no** `scheduledPickup` / `devicePrep` / `pickupDetails` — those steps are skipped. `COMPENSATION_CLAIM_STATUSES` reuses the refund status ids, so no new terminal is needed.

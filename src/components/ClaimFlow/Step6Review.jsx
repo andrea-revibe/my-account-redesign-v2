@@ -18,6 +18,7 @@ import { refundBreakdown, formatMoney } from '../../lib/returns'
 import { expectedCompletionFor } from '../../lib/claims'
 import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
 import { PACKING_LABELS } from './Step4Packing'
+import { findCompensationSubtype } from './compensationSubtypes'
 
 const REASON_LABELS = {
   no_fit: "Didn't suit my needs",
@@ -41,7 +42,8 @@ export default function Step6Review({
   const currency = order.currency
   const isIssue = state.claimType === 'issue'
   const isWarranty = state.claimType === 'warranty'
-  const refund = isWarranty
+  const isCompensation = state.claimType === 'compensation'
+  const refund = isWarranty || isCompensation
     ? null
     : refundBreakdown(
         order,
@@ -89,7 +91,13 @@ export default function Step6Review({
   return (
     <>
       <StepHeading
-        title={isWarranty ? 'Review your warranty claim' : 'Review your return'}
+        title={
+          isWarranty
+            ? 'Review your warranty claim'
+            : isCompensation
+              ? 'Review your compensation request'
+              : 'Review your return'
+        }
         subtitle="Double-check before you submit. You can edit any section."
       />
 
@@ -120,7 +128,14 @@ export default function Step6Review({
           </div>
         </div>
 
-        {isIssue || isWarranty ? (
+        {isCompensation ? (
+          <Section title="What happened" onEdit={() => goTo(2)}>
+            <CompensationSummary
+              issueDetails={state.issueDetails}
+              subtypeId={state.compensationSubtype}
+            />
+          </Section>
+        ) : isIssue || isWarranty ? (
           <Section
             title={isWarranty ? 'Fault' : 'Issue'}
             onEdit={() => goTo(2)}
@@ -143,6 +158,8 @@ export default function Step6Review({
           </Section>
         )}
 
+        {!isCompensation && (
+        <>
         <Section
           title="Device preparation"
           onEdit={() => goTo(3)}
@@ -215,6 +232,8 @@ export default function Step6Review({
             />
           </div>
         </Section>
+        </>
+        )}
 
         {isWarranty ? (
           <Section title="What you'll get back">
@@ -241,6 +260,13 @@ export default function Step6Review({
                 </div>
               </div>
             </div>
+          </Section>
+        ) : isCompensation ? (
+          <Section title="Refund" onEdit={() => goTo(6)}>
+            <CompensationRefundBody
+              refundMethod={state.refundMethod}
+              order={order}
+            />
           </Section>
         ) : (
           <Section title="Refund" onEdit={() => goTo(6)}>
@@ -347,6 +373,113 @@ function AckCheckboxRow({ checked, error, onChange, title, subtitle }) {
         )}
       </span>
     </label>
+  )
+}
+
+function CompensationSummary({ issueDetails, subtypeId }) {
+  const { description, attachmentName } = issueDetails
+  const subtype = subtypeId ? findCompensationSubtype(subtypeId) : null
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
+          Claim
+        </div>
+        <div
+          className={`mt-0.5 text-[13.5px] leading-[1.4] ${
+            subtype ? 'text-ink' : 'text-muted italic'
+          }`}
+        >
+          {subtype ? subtype.label : 'Not selected'}
+        </div>
+      </div>
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
+          Description
+        </div>
+        <div
+          className={`mt-0.5 text-[13.5px] leading-[1.4] whitespace-pre-line break-words ${
+            description ? 'text-ink' : 'text-muted italic'
+          }`}
+        >
+          {description || 'Not provided'}
+        </div>
+      </div>
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
+          Proof
+        </div>
+        {attachmentName ? (
+          <div className="mt-1 inline-flex items-center gap-2 rounded-[10px] border border-line bg-line-2/40 px-2.5 py-1.5 max-w-full">
+            <FileImage
+              size={12}
+              strokeWidth={1.75}
+              className="text-brand shrink-0"
+            />
+            <span className="text-[12.5px] text-ink truncate">
+              {attachmentName}
+            </span>
+          </div>
+        ) : (
+          <div className="mt-0.5 text-[13.5px] text-muted italic">
+            Not provided
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CompensationRefundBody({ refundMethod, order }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-[13.5px] text-ink flex items-center gap-1.5">
+          {refundMethod === 'wallet' ? (
+            <>
+              <img
+                src={REVIBE_WALLET_ICON}
+                alt=""
+                aria-hidden
+                className="w-3.5 h-3.5 object-contain"
+              />
+              <span>Revibe Wallet</span>
+              <WalletInfoTooltip stopPropagation />
+            </>
+          ) : (
+            <>
+              <CreditCard
+                size={13}
+                strokeWidth={1.75}
+                className="text-ink-2"
+              />
+              <span>
+                {isBnpl(order)
+                  ? order.paymentMethod.brand
+                  : `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`}
+              </span>
+              {isBnpl(order) && (
+                <BnplDisclaimerTooltip
+                  provider={order.paymentMethod.provider}
+                  align="left"
+                />
+              )}
+            </>
+          )}
+        </div>
+        <div className="text-[11.5px] text-muted mt-0.5 leading-[1.4]">
+          Confirmed by support after review
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted">
+          You'll receive
+        </div>
+        <div className="text-[13px] font-semibold text-ink leading-[1.2] mt-1">
+          To be confirmed
+        </div>
+      </div>
+    </div>
   )
 }
 

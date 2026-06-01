@@ -3,18 +3,25 @@ import { ORDERS } from '../../data/orders'
 export const TOTAL_STEPS = 8
 
 // Warranty submissions skip Step 6 (refund method) — no money changes
-// hands. Customer-visible step count therefore drops by one on warranty,
-// and NEXT / BACK / GO_TO_STEP step over the refund step.
+// hands, so the customer-visible step count drops by one. Compensation
+// claims keep the device, so they skip Steps 3 (device prep), 4 (packing)
+// and 5 (pickup) entirely — 5 visible steps (1, 2, 6, 7, 8). NEXT / BACK /
+// GO_TO_STEP step over the skipped screens for each type.
 export function visibleStepCount(claimType) {
-  return claimType === 'warranty' ? TOTAL_STEPS - 1 : TOTAL_STEPS
+  if (claimType === 'warranty') return TOTAL_STEPS - 1
+  if (claimType === 'compensation') return TOTAL_STEPS - 3
+  return TOTAL_STEPS
 }
 
 // Maps a state.step (1..8 internally — 4 = packing, 5 = pickup, 6 =
 // refund method, 7 = review, 8 = confirmation) onto the position the
 // user sees in the progress bar (1..visibleStepCount).
 export function visibleStepIndex(step, claimType) {
-  if (claimType !== 'warranty') return step
-  return step >= 6 ? step - 1 : step
+  if (claimType === 'warranty') return step >= 6 ? step - 1 : step
+  // Compensation collapses 3/4/5 — only 1, 2, 6, 7, 8 are reachable, so
+  // everything from the refund step on shifts down by three.
+  if (claimType === 'compensation') return step >= 6 ? step - 3 : step
+  return step
 }
 
 export function initialState({ initialOrderId = null, initialOrder = null } = {}) {
@@ -31,6 +38,7 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     claimType: null,
     issueScope: null,
     issueSubtypeId: null,
+    compensationSubtype: null,
     orderId: initialOrderId,
     units: 1,
     reason: { value: null, otherText: '' },
@@ -74,6 +82,8 @@ export function flowReducer(state, action) {
         claimType: action.value,
         issueScope: usesIssuePicker ? state.issueScope : null,
         issueSubtypeId: usesIssuePicker ? state.issueSubtypeId : null,
+        compensationSubtype:
+          action.value === 'compensation' ? state.compensationSubtype : null,
       }
     }
     case 'SET_ISSUE_SUBTYPE':
@@ -82,6 +92,8 @@ export function flowReducer(state, action) {
         issueScope: action.scope,
         issueSubtypeId: action.id,
       }
+    case 'SET_COMPENSATION_SUBTYPE':
+      return { ...state, compensationSubtype: action.value }
     case 'SET_REASON':
       return { ...state, reason: { ...state.reason, ...action.value } }
     case 'SET_ISSUE_DETAILS':
@@ -117,13 +129,25 @@ export function flowReducer(state, action) {
     }
     case 'NEXT': {
       const next = state.step + 1
-      const skipRefund = state.claimType === 'warranty' && next === 6
-      return { ...state, step: Math.min(TOTAL_STEPS, skipRefund ? 7 : next) }
+      // Warranty skips Step 6 (refund); compensation skips 3/4/5 (device
+      // prep, packing, pickup) — from Step 2 it jumps straight to refund.
+      if (state.claimType === 'warranty' && next === 6) {
+        return { ...state, step: 7 }
+      }
+      if (state.claimType === 'compensation' && next === 3) {
+        return { ...state, step: 6 }
+      }
+      return { ...state, step: Math.min(TOTAL_STEPS, next) }
     }
     case 'BACK': {
       const prev = state.step - 1
-      const skipRefund = state.claimType === 'warranty' && prev === 6
-      return { ...state, step: Math.max(1, skipRefund ? 5 : prev) }
+      if (state.claimType === 'warranty' && prev === 6) {
+        return { ...state, step: 5 }
+      }
+      if (state.claimType === 'compensation' && prev === 5) {
+        return { ...state, step: 2 }
+      }
+      return { ...state, step: Math.max(1, prev) }
     }
     case 'SUBMIT':
       return { ...state, claimRef: action.value, step: TOTAL_STEPS }
@@ -139,13 +163,22 @@ export function canAdvance(state) {
       return (
         state.claimType === 'change_of_mind' ||
         state.claimType === 'issue' ||
-        state.claimType === 'warranty'
+        state.claimType === 'warranty' ||
+        state.claimType === 'compensation'
       )
     case 2: {
       if (state.claimType === 'issue' || state.claimType === 'warranty') {
         const id = state.issueDetails
         return Boolean(
           state.issueSubtypeId &&
+            id.description.trim().length > 0 &&
+            id.attachmentName,
+        )
+      }
+      if (state.claimType === 'compensation') {
+        const id = state.issueDetails
+        return Boolean(
+          state.compensationSubtype &&
             id.description.trim().length > 0 &&
             id.attachmentName,
         )

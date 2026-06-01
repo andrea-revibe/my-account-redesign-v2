@@ -36,6 +36,7 @@ export default function Step1ClaimType({ state, dispatch }) {
   )
 
   const changeOfMindSelected = state.claimType === 'change_of_mind'
+  const compensationSelected = state.claimType === 'compensation'
 
   return (
     <>
@@ -173,11 +174,21 @@ export default function Step1ClaimType({ state, dispatch }) {
         <button
           type="button"
           onClick={() => {
-            setStub('compensation')
+            setStub(null)
+            setExpanded(false)
+            dispatch({ type: 'SET_CLAIM_TYPE', value: 'compensation' })
           }}
-          className="w-full text-left rounded-[14px] border border-line bg-surface hover:bg-line-2/40 px-4 py-3.5 flex items-center gap-3 transition-colors"
+          className={`w-full text-left rounded-[14px] border px-4 py-3.5 flex items-center gap-3 transition-colors ${
+            compensationSelected
+              ? 'border-brand bg-brand-bg/50'
+              : 'border-line bg-surface hover:bg-line-2/40'
+          }`}
         >
-          <span className="w-10 h-10 rounded-[10px] grid place-items-center shrink-0 bg-line-2 text-ink-2">
+          <span
+            className={`w-10 h-10 rounded-[10px] grid place-items-center shrink-0 ${
+              compensationSelected ? 'bg-brand text-white' : 'bg-line-2 text-ink-2'
+            }`}
+          >
             <Coins size={18} strokeWidth={1.75} />
           </span>
           <span className="flex-1 min-w-0">
