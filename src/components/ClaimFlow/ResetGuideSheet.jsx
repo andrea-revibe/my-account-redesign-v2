@@ -23,6 +23,10 @@ import {
   RotateCcw,
   Apple,
   Volume2,
+  Smartphone,
+  Laptop,
+  Menu,
+  ChevronUp,
 } from 'lucide-react'
 
 // Guided iPhone reset — a focused, one-step-per-screen walkthrough launched
@@ -85,6 +89,16 @@ const REMOTE_STEPS = [
     trouble: {
       label: 'What if it’s still online?',
       body: 'If the iPhone is offline, Activation Lock lifts straight away (and it drops off Find My after 30 days). If it’s still online it can’t be removed yet — tap Continue to mark it “Ready for Repair / Trade In” for 30 days. One catch: if it later comes back online while still signed in, it can reappear and re-lock — so if you can still reach the device, also sign out of iCloud on it. You can do the same from appleid.apple.com › Devices.',
+    },
+  },
+  {
+    Mock: AccountRemoveCarousel,
+    title: 'Or unlink it from your account',
+    lead: 'No iCloud access? On any device open account.apple.com and sign in. Open the menu, tap Devices, pick this iPhone, scroll to About, then tap Remove from account. Swipe the screens with the arrows.',
+    why: 'Removing it from your Apple Account lifts Activation Lock too — same result as the iCloud step, just a different route.',
+    trouble: {
+      label: 'Which one should I use?',
+      body: 'Either lifts the lock. Use icloud.com/find if the phone is lost or you also want to erase it remotely. Use account.apple.com › Devices when you just need to unlink a phone you still have in hand.',
     },
   },
 ]
@@ -809,6 +823,270 @@ function ICloudRemove() {
         </div>
       </div>
     </MiniPhone>
+  )
+}
+
+// Remote · account.apple.com route — a four-screen swipeable walkthrough of
+// removing the device from the Apple Account (menu › Devices › pick › About ›
+// Remove from account). Same polished CSS-mock language as ICloudRemove; the
+// account holder's details are masked since this is a removal-from-account
+// surface, not a sign-in one.
+const ACCOUNT_SCREENS = [
+  { Screen: AcctMenu, caption: 'Open the menu, tap Devices' },
+  { Screen: AcctDeviceList, caption: 'Pick this iPhone' },
+  { Screen: AcctDeviceDetail, caption: 'Open it, scroll to About' },
+  { Screen: AcctRemove, caption: 'Tap Remove from account' },
+]
+
+function AccountRemoveCarousel() {
+  const [idx, setIdx] = useState(0)
+  const [dir, setDir] = useState(1)
+  const last = ACCOUNT_SCREENS.length - 1
+  const go = (n) => {
+    setDir(n > idx ? 1 : -1)
+    setIdx(n)
+  }
+  const { Screen, caption } = ACCOUNT_SCREENS[idx]
+  return (
+    <div className="w-full">
+      <div className="relative flex justify-center">
+        <button
+          onClick={() => idx > 0 && go(idx - 1)}
+          disabled={idx === 0}
+          aria-label="Previous screen"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-surface border border-line shadow-sm2 grid place-items-center text-ink disabled:opacity-30 active:scale-95 transition-transform"
+        >
+          <ChevronLeft size={18} strokeWidth={2.2} />
+        </button>
+        <div key={idx} style={{ animation: stepAnim(dir) }}>
+          <MiniPhone>
+            <Screen />
+          </MiniPhone>
+        </div>
+        <button
+          onClick={() => idx < last && go(idx + 1)}
+          disabled={idx === last}
+          aria-label="Next screen"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-surface border border-line shadow-sm2 grid place-items-center text-ink disabled:opacity-30 active:scale-95 transition-transform"
+        >
+          <ChevronRight size={18} strokeWidth={2.2} />
+        </button>
+      </div>
+      <div className="mt-3 flex items-center justify-center gap-1.5">
+        {ACCOUNT_SCREENS.map((_, d) => (
+          <button
+            key={d}
+            onClick={() => go(d)}
+            aria-label={`Screen ${d + 1}`}
+            className={`h-1.5 rounded-full transition-all ${
+              d === idx ? 'w-5 bg-brand' : 'w-1.5 bg-line'
+            }`}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-[12px] font-semibold text-ink-2">
+        {idx + 1}. {caption}
+      </p>
+    </div>
+  )
+}
+
+// Shared chrome for the account.apple.com screens — status bar + URL pill.
+function AcctScreen({ children }) {
+  return (
+    <>
+      <StatusBar />
+      <div className="px-2.5 mt-1.5">
+        <div className="flex items-center justify-center gap-1.5 bg-black/5 rounded-full px-2.5 h-[22px]">
+          <Lock size={9} strokeWidth={2.2} className="text-muted" />
+          <span className="text-[9px] text-ink-2 font-medium truncate">
+            account.apple.com
+          </span>
+        </div>
+      </div>
+      {children}
+    </>
+  )
+}
+
+function AcctSignOut({ collapsed }) {
+  const Chevron = collapsed ? ChevronDown : ChevronUp
+  return (
+    <div className="px-2.5 mt-2.5 flex items-center justify-between">
+      <span className="text-[13px] font-bold text-ink">Apple Account</span>
+      <div className="flex items-center gap-1.5">
+        <Chevron size={12} strokeWidth={2.4} className="text-ink" />
+        <span className="rounded-full bg-[#0071e3] text-white text-[8.5px] font-semibold px-2 py-[3px]">
+          Sign Out
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// 1 · Account menu expanded — the Devices row glowing as the route to take.
+function AcctMenu() {
+  const items = [
+    'Personal Information',
+    'Sign-In and Security',
+    'Payment & Shipping',
+    'Subscriptions',
+    'Family Sharing',
+    'Devices',
+    'Privacy',
+  ]
+  return (
+    <AcctScreen>
+      <div className="px-2.5 mt-2.5 flex items-center justify-between">
+        <Apple size={13} strokeWidth={1} className="text-ink fill-ink" />
+        <div className="flex items-center gap-2 text-ink/70">
+          <Search size={11} strokeWidth={2} />
+          <Package size={11} strokeWidth={2} />
+          <Menu size={12} strokeWidth={2.4} />
+        </div>
+      </div>
+      <AcctSignOut />
+      <div className="px-2.5 mt-2">
+        <div className="border-t border-line-2 divide-y divide-line-2">
+          {items.map((label) => {
+            const highlight = label === 'Devices'
+            return (
+              <div
+                key={label}
+                className="relative px-1.5 py-[8px]"
+                style={highlight ? HILITE : undefined}
+              >
+                <span
+                  className={`text-[10.5px] ${
+                    highlight ? 'font-semibold text-brand' : 'font-medium text-ink'
+                  }`}
+                >
+                  {label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      <div className="mt-1.5 flex items-center justify-center gap-1 text-[8.5px] font-semibold text-brand">
+        <ArrowRight size={9} strokeWidth={2.6} /> tap Devices
+      </div>
+    </AcctScreen>
+  )
+}
+
+// 2 · Devices list — this iPhone picked out of the account's devices.
+function AcctDeviceList() {
+  return (
+    <AcctScreen>
+      <AcctSignOut collapsed />
+      <div className="px-2.5 mt-2 border-t border-line-2 pt-2 text-[9px] text-muted leading-snug">
+        See details for the devices associated with your account.
+      </div>
+      <div className="px-2.5 mt-2.5 space-y-2">
+        <div
+          className="relative rounded-[11px] border border-line bg-white shadow-sm2 p-2.5"
+          style={HILITE}
+        >
+          <div className="flex items-start gap-2">
+            <span className="flex-1 min-w-0">
+              <span className="block text-[11px] font-bold text-ink leading-tight">
+                Your iPhone
+              </span>
+              <span className="block text-[9px] text-muted mt-0.5">iPhone 17</span>
+            </span>
+            <Smartphone size={20} strokeWidth={1.6} className="text-ink/70" />
+          </div>
+        </div>
+        <div className="rounded-[11px] border border-line bg-white shadow-sm2 p-2.5 flex items-start gap-2">
+          <span className="flex-1 min-w-0">
+            <span className="block text-[11px] font-bold text-ink leading-tight">
+              Your MacBook Air
+            </span>
+            <span className="block text-[9px] text-muted mt-0.5">
+              MacBook Air 13″
+            </span>
+          </span>
+          <Laptop size={20} strokeWidth={1.6} className="text-ink/70" />
+        </div>
+      </div>
+    </AcctScreen>
+  )
+}
+
+// 3 · Device detail — Backup & Security; a hint to scroll down to About.
+function AcctDeviceDetail() {
+  return (
+    <AcctScreen>
+      <div className="px-2.5 mt-1.5">
+        <X size={13} strokeWidth={2.2} className="text-ink" />
+      </div>
+      <div className="flex flex-col items-center mt-0.5">
+        <Smartphone size={26} strokeWidth={1.4} className="text-ink/70" />
+        <span className="mt-1 text-[12px] font-bold text-ink">Your iPhone</span>
+        <span className="text-[9.5px] text-ink-2">iPhone 17</span>
+        <span className="text-[8.5px] text-muted mt-0.5">
+          Serial Number: ••••••••
+        </span>
+      </div>
+      <div className="px-2.5 mt-3">
+        <div className="text-[11px] font-bold text-ink">Backup &amp; Security</div>
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted">—</span>
+            <span className="text-[9.5px] text-muted">iCloud Backup</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 size={12} strokeWidth={2.2} className="text-success" />
+            <span className="text-[9.5px] text-ink">Find My iPhone</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 size={12} strokeWidth={2.2} className="text-success" />
+            <span className="text-[9.5px] text-ink">Trusted Device</span>
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-center gap-1 text-[8.5px] font-semibold text-brand">
+        scroll down to About
+        <ChevronDown size={10} strokeWidth={2.6} />
+      </div>
+    </AcctScreen>
+  )
+}
+
+// 4 · About — masked details + the Remove from account button glowing.
+function AcctRemove() {
+  const rows = [
+    ['Model', 'iPhone 17'],
+    ['Version', 'iOS 26.5'],
+    ['Phone Number', '+•• ••• ••• ••••'],
+    ['Serial Number', '••••••••••'],
+    ['IMEI', '•• •••••• •••••• •'],
+  ]
+  return (
+    <AcctScreen>
+      <div className="px-2.5 mt-1.5">
+        <X size={13} strokeWidth={2.2} className="text-ink" />
+      </div>
+      <div className="px-2.5 mt-1">
+        <div className="text-[12px] font-bold text-ink">About</div>
+        <div className="mt-2 space-y-[7px]">
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <div className="text-[8.5px] text-muted leading-none">{k}</div>
+              <div className="text-[10px] font-medium text-ink mt-[2px]">{v}</div>
+            </div>
+          ))}
+        </div>
+        <div className="relative mt-3 rounded-[8px]" style={HILITE}>
+          <div className="rounded-[8px] border border-brand/60 px-2.5 py-[8px] text-center">
+            <span className="text-[10.5px] font-semibold text-brand">
+              Remove from account
+            </span>
+          </div>
+        </div>
+      </div>
+    </AcctScreen>
   )
 }
 

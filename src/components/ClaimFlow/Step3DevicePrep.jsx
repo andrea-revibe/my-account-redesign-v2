@@ -434,30 +434,7 @@ function ResetPanel({
                 : 'border-brand bg-brand-bg/60 hover:bg-brand-bg/80'
           }`}
         >
-          {!guideSeen && !showError && (
-            <>
-              <span
-                aria-hidden
-                className="absolute right-0 -bottom-1 w-[84px] h-[84px] rounded-full bg-brand/25 blur-2xl pointer-events-none"
-              />
-              {/* The asset is a phone centred on an opaque white square;
-                  multiply drops the white into the card so only the phone
-                  shows, and the mask softens its inner edge. */}
-              <img
-                src="/iphone-midnight.png"
-                alt=""
-                className="absolute -right-5 -bottom-8 w-[140px] h-[140px] object-contain pointer-events-none"
-                style={{
-                  mixBlendMode: 'multiply',
-                  WebkitMaskImage:
-                    'linear-gradient(to top left, #000 52%, transparent 88%)',
-                  maskImage:
-                    'linear-gradient(to top left, #000 52%, transparent 88%)',
-                }}
-              />
-            </>
-          )}
-          <span className="relative flex items-center gap-3 pr-12">
+          <span className="relative flex items-center gap-3">
             <span
               className={`w-10 h-10 rounded-full grid place-items-center shrink-0 ${
                 guideSeen
