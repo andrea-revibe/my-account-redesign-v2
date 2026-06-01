@@ -53,6 +53,54 @@ export const CLAIM_STATUSES = [
   },
 ]
 
+// Compensation pipeline — a 4-state refund chain for claims where the
+// customer keeps the device (shipping refund / faulty charger). No pickup
+// leg: the evidence is reviewed remotely, then the refund is issued. Reuses
+// the refund status ids (`initiated` / `qc` / `refund_issued` /
+// `refund_credited`) so `claimToneFor` / `claimPhaseTag` apply unchanged;
+// only the labels differ (Submitted / Under review). Routed to ClaimCard,
+// which swaps in this list for the dot timeline when `claim.type ===
+// 'compensation'`. See docs/output/warranties_compensations.md §3.
+export const COMPENSATION_CLAIM_STATUSES = [
+  {
+    id: 'initiated',
+    label: 'Claim submitted',
+    short: 'Submitted',
+    headline: 'Claim submitted',
+    icon: FileText,
+  },
+  {
+    id: 'qc',
+    label: 'Under review',
+    short: 'Review',
+    headline: 'Under review',
+    icon: ShieldCheck,
+  },
+  {
+    id: 'refund_issued',
+    label: 'Refund issued',
+    short: 'Refund issued',
+    headline: 'Refund issued',
+    icon: Receipt,
+  },
+  {
+    id: 'refund_credited',
+    label: 'Refund credited',
+    short: 'Refund credited',
+    headline: 'Refund credited',
+    icon: CircleDollarSign,
+  },
+]
+
+// The status list backing a claim's progress timeline + headline. Warranty
+// has its own dedicated functions (warrantyClaim*); refund and compensation
+// both flow through the ClaimCard, so this resolver picks the right list.
+export function claimStatusesFor(claim) {
+  return claim?.type === 'compensation'
+    ? COMPENSATION_CLAIM_STATUSES
+    : CLAIM_STATUSES
+}
+
 // Tone progression: amber while the unit is leaving the customer or being
 // verified, brand-purple once we're staging the payout, success-green when
 // the money has moved. Matches the conventions used by `PastOrderCard` for
@@ -128,7 +176,7 @@ export function claimPhaseTag(claimStatusId) {
 }
 
 export function claimStatusHeadline(claim) {
-  const step = CLAIM_STATUSES.find((s) => s.id === claim.claimStatusId)
+  const step = claimStatusesFor(claim).find((s) => s.id === claim.claimStatusId)
   return step ? step.headline : 'Claim'
 }
 
@@ -275,6 +323,7 @@ export const CLAIM_TYPE_LABELS = {
   change_of_mind: 'Change of mind',
   issue: 'Issue',
   warranty: 'Warranty',
+  compensation: 'Compensation',
 }
 
 export function claimTypeLabel(typeOrClaim) {

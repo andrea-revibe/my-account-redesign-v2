@@ -10,10 +10,9 @@ import {
   MapPin,
 } from 'lucide-react'
 import {
-  CLAIM_STATUSES,
   CLAIM_TRANSIT_SUB_STATUSES,
+  claimStatusesFor,
   claimToneFor,
-  claimProgressIndex,
   claimPhaseTag,
   claimStatusHeadline,
   claimStatusSubline,
@@ -204,11 +203,19 @@ function ClaimHero({ order, claim, tone }) {
             <DestinationChip claim={claim} order={order} accent={isWallet} />
           </div>
         </div>
-        <div
-          className={`text-[22px] font-bold tabular-nums leading-none shrink-0 ${t.text}`}
-        >
-          {order.currency} {claim.expectedRefund.net.toLocaleString()}
-        </div>
+        {claim.expectedRefund ? (
+          <div
+            className={`text-[22px] font-bold tabular-nums leading-none shrink-0 ${t.text}`}
+          >
+            {order.currency} {claim.expectedRefund.net.toLocaleString()}
+          </div>
+        ) : (
+          <div
+            className={`text-[13px] font-bold leading-[1.2] text-right shrink-0 ${t.text}`}
+          >
+            To be confirmed
+          </div>
+        )}
       </div>
     </div>
   )
@@ -437,8 +444,8 @@ function TransitSubItem({ label, timestamp, state, isLast }) {
 
 function ClaimProgressDots({ claim, tone }) {
   const t = TONE[tone]
-  const steps = CLAIM_STATUSES
-  const curIdx = claimProgressIndex(claim.claimStatusId)
+  const steps = claimStatusesFor(claim)
+  const curIdx = steps.findIndex((s) => s.id === claim.claimStatusId)
 
   return (
     <ol className="flex items-start justify-between gap-0.5">

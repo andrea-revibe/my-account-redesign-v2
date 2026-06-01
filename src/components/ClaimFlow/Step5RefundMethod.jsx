@@ -11,6 +11,9 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
   if (!order) return null
   const currency = order.currency
   const claimType = state.claimType
+  if (claimType === 'compensation') {
+    return <CompensationDestination state={state} dispatch={dispatch} order={order} />
+  }
   const isIssue = claimType === 'issue'
   const wallet = refundBreakdown(order, state.units, 'wallet', claimType)
   const original = refundBreakdown(order, state.units, 'original', claimType)
@@ -127,6 +130,78 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
   )
 }
 
+// Compensation refund destination. Same Wallet-vs-original choice as the
+// refund flows, but the amount is unknown at submission — support confirms
+// it after reviewing the evidence — so each card shows a "confirmed after
+// review" note in place of a figure (no bonus / restocking math).
+function CompensationDestination({ state, dispatch, order }) {
+  const reviewNote = 'Amount confirmed by support after review'
+  return (
+    <>
+      <StepHeading
+        title="Where should your refund go?"
+        subtitle="Pick where the money lands. We'll confirm the exact amount after reviewing your claim."
+      />
+      <div className="px-4 flex flex-col gap-2.5">
+        <RefundCard
+          selected={state.refundMethod === 'wallet'}
+          onSelect={() =>
+            dispatch({ type: 'SET_REFUND_METHOD', value: 'wallet' })
+          }
+          title={
+            <span className="flex items-center gap-1.5">
+              <img
+                src={REVIBE_WALLET_ICON}
+                alt=""
+                aria-hidden
+                className="w-4 h-4 object-contain"
+              />
+              <span>Revibe Wallet</span>
+              <WalletInfoTooltip stopPropagation />
+            </span>
+          }
+        >
+          <div className="text-[13px] font-semibold text-ink-2">{reviewNote}</div>
+          <div className="mt-1.5 text-[12.5px] font-semibold text-success leading-[1.4]">
+            Lands instantly once your claim is approved
+          </div>
+        </RefundCard>
+        <RefundCard
+          selected={state.refundMethod === 'original'}
+          onSelect={() =>
+            dispatch({ type: 'SET_REFUND_METHOD', value: 'original' })
+          }
+          title={
+            <span className="flex items-center gap-1.5">
+              <CreditCard size={14} strokeWidth={1.75} className="text-ink-2" />
+              {isBnpl(order) ? (
+                <>
+                  <span>{order.paymentMethod.brand}</span>
+                  <BnplDisclaimerTooltip
+                    provider={order.paymentMethod.provider}
+                    align="left"
+                  />
+                </>
+              ) : (
+                <span>
+                  {order.paymentMethod?.brand || 'Card'} ••{' '}
+                  {order.paymentMethod?.last4 || '0000'}
+                </span>
+              )}
+            </span>
+          }
+        >
+          <div className="text-[13px] font-semibold text-ink-2">{reviewNote}</div>
+          <div className="mt-1.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2 leading-[1.4]">
+            <Clock size={12} strokeWidth={2} className="text-ink-2 shrink-0" />
+            5–10 business days once your claim is approved
+          </div>
+        </RefundCard>
+      </div>
+    </>
+  )
+}
+
 function RefundCard({ selected, onSelect, title, amount, children }) {
   return (
     <button
@@ -148,10 +223,12 @@ function RefundCard({ selected, onSelect, title, amount, children }) {
         </span>
         <div className="flex-1 min-w-0">
           <div className="text-[14.5px] font-semibold text-ink">{title}</div>
-          <div className="mt-2 text-[22px] font-bold text-ink tabular-nums leading-none">
-            {amount}
-          </div>
-          {children}
+          {amount && (
+            <div className="mt-2 text-[22px] font-bold text-ink tabular-nums leading-none">
+              {amount}
+            </div>
+          )}
+          <div className={amount ? '' : 'mt-2'}>{children}</div>
         </div>
       </div>
     </button>

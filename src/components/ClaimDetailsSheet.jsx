@@ -6,6 +6,7 @@ import {
   refundMethodLabel,
   claimTypeLabel,
 } from '../lib/claims'
+import { COMPENSATION_SUBTYPE_LABELS } from './ClaimFlow/compensationSubtypes'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 
 // Bottom sheet surfacing the full set of choices captured during the
@@ -34,6 +35,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
   const pickup = claim.pickupDetails || {}
   const isWallet = claim.refundMethod === 'wallet'
   const isWarranty = claim.type === 'warranty'
+  const isCompensation = claim.type === 'compensation'
 
   return (
     <div
@@ -71,11 +73,27 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           <SectionCard title="Summary">
             <Row label="Claim type" value={claimTypeLabel(claim)} />
-            <Row label="Reason" value={reasonText(claim)} />
-            <Row label="Device preparation" value={devicePrepText(claim)} />
-            <Row label="Pickup address" value={pickup.address || '—'} />
-            <Row label="Pickup email" value={pickup.email || '—'} />
-            <Row label="Pickup phone" value={pickup.phone || '—'} />
+            {isCompensation ? (
+              <>
+                <Row
+                  label="Claim"
+                  value={
+                    COMPENSATION_SUBTYPE_LABELS[claim.compensationSubtype] || '—'
+                  }
+                />
+                {claim.issueDetails?.description && (
+                  <Row label="Description" value={claim.issueDetails.description} />
+                )}
+              </>
+            ) : (
+              <>
+                <Row label="Reason" value={reasonText(claim)} />
+                <Row label="Device preparation" value={devicePrepText(claim)} />
+                <Row label="Pickup address" value={pickup.address || '—'} />
+                <Row label="Pickup email" value={pickup.email || '—'} />
+                <Row label="Pickup phone" value={pickup.phone || '—'} />
+              </>
+            )}
             {!isWarranty && (
               <Row
                 label="Refund destination"
@@ -100,7 +118,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
                   </span>
                 }
                 sub={
-                  claim.refundMethod === 'original'
+                  claim.refundMethod === 'original' && !isCompensation
                     ? 'Includes 10% restocking fee'
                     : null
                 }
@@ -133,6 +151,25 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
               </div>
               <div className="mt-1 text-[11.5px] text-muted">
                 No refund is issued — the same device is returned to you after repair.
+              </div>
+            </SectionCard>
+          ) : isCompensation ? (
+            <SectionCard title="Refund">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] text-ink-2">
+                  {claim.claimStatusId === 'refund_credited'
+                    ? 'Refunded'
+                    : 'Expected refund'}
+                </span>
+                <span className="text-[15px] font-bold tabular-nums text-ink">
+                  {claim.expectedRefund
+                    ? `${currency} ${claim.expectedRefund.net.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                    : 'To be confirmed'}
+                </span>
+              </div>
+              <div className="mt-1 text-[11.5px] text-muted">
+                You keep the device — the amount is confirmed by support after
+                reviewing your evidence.
               </div>
             </SectionCard>
           ) : (

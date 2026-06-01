@@ -71,6 +71,18 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
     }
   }, [order.claim.invalidClaim?.paidAt, order.claim.invalidClaim?.declinedAt, mode])
 
+  // Compensation claims keep the device, so an invalid verdict has no
+  // return-shipping gate — it's a plain "claim closed, no refund" terminal.
+  if (order.claim.type === 'compensation') {
+    return (
+      <CompensationClosedCard
+        order={order}
+        expanded={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+      />
+    )
+  }
+
   if (mode === 'paid') {
     return (
       <PaidShipBackCard
@@ -424,6 +436,92 @@ function ClaimClosedCard({ order, expanded, onToggle, onReverse, onUndo }) {
           >
             <RotateCcw size={13} strokeWidth={2} />
             Undo · replay the demo
+          </button>
+        </div>
+      )}
+    </article>
+  )
+}
+
+// Compensation invalid terminal. The customer kept the device, so there's
+// nothing to ship back and no fee to pay — the claim simply closes with no
+// refund. Muted danger tone, mirroring ClaimClosedCard's chrome, but with a
+// "Discuss with support" affordance instead of the pay-shipping reversal.
+function CompensationClosedCard({ order, expanded, onToggle }) {
+  const claim = order.claim
+  const inv = claim.invalidClaim || {}
+
+  return (
+    <article className="bg-surface rounded-card border border-line overflow-hidden relative animate-fadeIn">
+      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 bg-muted/60" />
+
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
+            Order · #{order.id} · Claim {claim.claimRef}
+          </div>
+          <span
+            aria-hidden
+            className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
+            style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
+          >
+            <ChevronDown size={12} strokeWidth={1.75} />
+          </span>
+        </div>
+
+        <span className="self-start inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px] bg-line-2 text-ink-2">
+          <ClipboardList size={11} strokeWidth={2.2} />
+          Claim closed
+        </span>
+
+        <div className="rounded-[14px] border border-line bg-line-2/40 p-3.5 flex flex-col gap-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
+              Compensation claim
+            </div>
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-muted whitespace-nowrap shrink-0">
+              <ShieldX size={11} strokeWidth={2.2} />
+              No refund issued
+            </span>
+          </div>
+          <div className="text-[18px] font-bold leading-[1.15] tracking-[-0.01em] text-ink">
+            Claim closed — no refund
+          </div>
+          <div className="text-[11.5px] text-ink-2 leading-snug">
+            We reviewed your evidence and couldn't approve this claim, so no
+            refund will be issued. You keep your device.
+          </div>
+        </div>
+
+        <ProductRow order={order} />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3.5 animate-slideDown">
+          {inv.opsMessage && (
+            <CourierMessage
+              name={inv.opsName}
+              role={inv.opsRole}
+              message={inv.opsMessage}
+              timestamp={inv.determinedAt}
+            />
+          )}
+
+          <div className="rounded-[12px] border border-line bg-surface px-3.5 py-3 text-[11.5px] text-ink-2 leading-snug">
+            <span className="font-semibold text-ink">Think this is wrong?</span>{' '}
+            If you have additional proof, our support team can take another look.
+          </div>
+
+          <button
+            type="button"
+            className="h-[44px] rounded-[10px] bg-surface border border-line text-ink font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
+          >
+            Discuss with support
           </button>
         </div>
       )}

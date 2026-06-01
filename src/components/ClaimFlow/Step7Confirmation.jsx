@@ -16,7 +16,8 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
   const [copied, setCopied] = useState(false)
   if (!order) return null
   const isWarranty = state.claimType === 'warranty'
-  const refund = isWarranty
+  const isCompensation = state.claimType === 'compensation'
+  const refund = isWarranty || isCompensation
     ? null
     : refundBreakdown(
         order,
@@ -52,7 +53,9 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
         <h1 className="m-0 text-[24px] leading-[1.15] font-bold text-ink tracking-[-0.01em]">
           {isWarranty
             ? 'Your warranty claim is in'
-            : 'Your return request is in'}
+            : isCompensation
+              ? 'Your compensation request is in'
+              : 'Your return request is in'}
         </h1>
         <div className="mt-3 inline-flex items-center rounded-full bg-brand-bg text-brand font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px]">
           {claimTypeLabel(state.claimType)}
@@ -95,10 +98,35 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
       <div className="px-4 pt-3 pb-4">
         <div className="rounded-[14px] border border-line bg-surface divide-y divide-line">
           <Row Icon={Mail} title="Check your inbox">
-            We've sent {isWarranty ? 'warranty claim' : 'return'} instructions
-            and your pickup details to your email.
+            {isCompensation
+              ? "We've sent your compensation request details to your email."
+              : `We've sent ${isWarranty ? 'warranty claim' : 'return'} instructions and your pickup details to your email.`}
           </Row>
-          {isWarranty ? (
+          {isCompensation ? (
+            <Row Icon={Clock} title="Expected refund">
+              <span className="text-ink font-semibold">
+                Amount confirmed after review
+              </span>{' '}
+              ·{' '}
+              {state.refundMethod === 'wallet' ? (
+                'Revibe Wallet'
+              ) : isBnpl(order) ? (
+                <span className="inline-flex items-center gap-1">
+                  {order.paymentMethod.brand}
+                  <BnplDisclaimerTooltip
+                    provider={order.paymentMethod.provider}
+                    align="left"
+                  />
+                </span>
+              ) : (
+                `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`
+              )}
+              <span className="block mt-1 text-[12px] text-muted">
+                You keep the device. We'll review your evidence and confirm the
+                amount before refunding.
+              </span>
+            </Row>
+          ) : isWarranty ? (
             <Row Icon={Wrench} title="Expected back">
               <span className="text-ink font-semibold">
                 {warrantyEta?.long || 'Soon'}
@@ -132,9 +160,11 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
               </span>
             </Row>
           )}
-          <Row Icon={ShieldCheck} title="Device preparation">
-            {devicePrepLine}
-          </Row>
+          {!isCompensation && (
+            <Row Icon={ShieldCheck} title="Device preparation">
+              {devicePrepLine}
+            </Row>
+          )}
         </div>
       </div>
 
@@ -151,7 +181,11 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
           onClick={() => (onTrack ? onTrack(order?.id) : onClose())}
           className="flex-1 h-[48px] rounded-[12px] inline-flex items-center justify-center bg-brand text-white border border-brand font-semibold text-[14px]"
         >
-          {isWarranty ? 'Track this claim' : 'Track this return'}
+          {isWarranty
+            ? 'Track this claim'
+            : isCompensation
+              ? 'Track this compensation'
+              : 'Track this return'}
         </button>
       </div>
     </div>
