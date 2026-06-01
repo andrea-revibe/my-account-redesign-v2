@@ -71,6 +71,16 @@ The selected row carries an `X` button that clears the selection and reopens the
 
 The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` consumes `issueSubtypeId` (via `findSubtype(id)` in `issueSubtypes.js`) and `issueScope`.
 
+**Optional battery check (battery sub-type only).** When `issueSubtypeId === 'battery'`, a `BatteryHealthCheck` card renders under the selected-sub-type guidance (in both the issue **and** the warranty Step 2 — both reuse `Step2IssueDetails`). It lets the customer self-assess against the §7.2 Battery Standards before committing:
+
+- A **capacity %** input (the figure from Settings → Battery → Battery Health) and a **non-original part** self-report toggle. Both live in `state.batteryCheck` (`SET_BATTERY_CHECK`); **fully optional** — never gates `canAdvance`, so the customer can skip it and submit proof + description as usual.
+- The card derives the device's guaranteed floor from its condition grade (last segment of `product.variant`): `excellent` 95, `very good` 90, `good` 85, `fair` 85 (no published floor — treated as Good). Time-since-delivery comes from `deliveredOn`.
+- A live, **generic** verdict (no flow-switching nudge) computed by `assessBattery(...)` in `src/lib/returns.js`, evaluated most-favourable-first: non-original part → **full refund**; > 3% degradation within 10 days → **full refund**; > 10% within 6 months **or** > 20% within 12 months → **free battery replacement**; otherwise **normal wear, not a covered defect** (still submittable). Each remedy names its delivery window (10 days / 6 months / 12 months) so the **time component is visible**, and every verdict carries an "estimate only — QC confirms after inspection" caveat.
+- The **time component is part of the math, not just the copy**: each tier requires both the degradation threshold *and* its window, checked against `deliveredOn` vs today (`daysSinceDelivery` + month math in `assessBattery`). The card surfaces this directly — it shows how many days ago the device was delivered next to the guaranteed floor.
+- A collapsible **"What counts as a battery defect?"** disclosure (`BatteryThresholds`) lists all three §7.2 thresholds (window + degradation + remedy) plus the normal-wear / non-original-part rules, so a customer who just wants to understand normal battery usage can read the policy without entering anything.
+
+The filled-in result is carried onto the claim as `claim.batteryAssessment` (`{ capacity, baseline, degradation, nonOriginal, remedy, reason }`) for the issue and warranty shapes — data only; no tracking-card surface reads it yet. Logic + thresholds live in `src/lib/returns.js` (`BATTERY_BASELINE_BY_GRADE`, `conditionGradeOf`, `batteryBaselineFor`, `assessBattery`).
+
 ### 2.3 Steps 3 – 5 — Device prep + packing + pickup (shared)
 
 Identical to the change-of-mind branch. See [change_of_mind.md](./change_of_mind.md) §2.4–2.6 (Step 3 device prep, Step 4 packing radio pick, Step 5 pickup details).
@@ -163,7 +173,7 @@ How the customer-facing UI surfaces backend state:
 
 ### 6.1 Order fields read by the flow
 
-Same as change of mind. See [change_of_mind.md](./change_of_mind.md) §6.1.
+Same as change of mind (see [change_of_mind.md](./change_of_mind.md) §6.1), plus — for the optional battery check on the `battery` sub-type — `order.product.variant` (the condition grade is its last `·`-separated segment) and `order.deliveredOn` (delivery date for the time-window math). Both are read through `conditionGradeOf` / `batteryBaselineFor` / `daysSinceDelivery` in `src/lib/returns.js`.
 
 ### 6.2 Claim object written by Step 7 (issue shape)
 
@@ -173,6 +183,7 @@ The full claim-object reference (including takeover-card extensions) lives in [c
 |---|---|---|
 | `claim.type` | `'issue'` | Constant for this branch. |
 | `claim.issueDetails` | `{ category, description, attachmentName }` | `category` is one of `battery` / `software` / `physical` / `screen` / `charger` / `overheating` / `camera` (resolved via `issueSubtypes.js`); `description` is the customer's free-text; `attachmentName` is a stub filename today. |
+| `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Written **only** when the `battery` sub-type's optional check was filled in (a capacity entered or the non-original toggle ticked). `remedy` is `'refund'` / `'replacement'` / `'none'` / `null`; `reason` is `'non_original'` / `'refund_10d'` / `'replacement_6m'` / `'replacement_12m'` / `'normal_wear'` / `null`. Computed by `assessBattery(...)` in `src/lib/returns.js`. Data only — no tracking-card / `ClaimDetailsSheet` surface reads it yet. |
 | `claim.expectedRefund.bonus` | number | `ISSUE_WALLET_BONUS` (`100`) when `refundMethod === 'wallet'`; `0` otherwise. |
 
 Fields common to both branches (`claimRef`, `claimStatusId`, `submittedAt`, `units`, `devicePrep`, `pickupDetails`, `refundMethod`, `expectedRefund`, `timeline`) are documented in [change_of_mind.md](./change_of_mind.md) §6.2.
@@ -185,11 +196,14 @@ Same shared components as change of mind. Issue-specific surfaces:
 
 ```
 src/components/ClaimFlow/
-├── Step2IssueDetails.jsx       Two-scope picker + required description + fake attachment slot
+├── Step2IssueDetails.jsx       Two-scope picker + required description + fake attachment slot.
+│                               Private BatteryHealthCheck + BatteryVerdict + BatteryThresholds
+│                               render on the `battery` sub-type (also used by the warranty flow,
+│                               which reuses this component). Receives `order`.
 └── issueSubtypes.js            ISSUE_SCOPES (2) + SUBTYPES (15 + 4); findSubtype(id) resolver
 ```
 
-`refundBreakdown` (`src/lib/returns.js`) branches on the 4th argument (`claimType`); the issue branch flows through `case 'issue'`.
+`refundBreakdown` (`src/lib/returns.js`) branches on the 4th argument (`claimType`); the issue branch flows through `case 'issue'`. The battery check's logic also lives in `src/lib/returns.js` (`BATTERY_BASELINE_BY_GRADE`, `conditionGradeOf`, `batteryBaselineFor`, `daysSinceDelivery`, `assessBattery`); `ClaimFlow.buildClaim` attaches the result via the private `batteryAssessmentForClaim(state, order)` helper.
 
 ## 8. Mocked vs production
 
@@ -199,6 +213,7 @@ src/components/ClaimFlow/
 - **Sub-issue guidance copy is hardcoded** in `issueSubtypes.js`. Production should source from a content management system so non-engineers can revise.
 - **No de-duplication / fraud check.** Production needs to flag repeat claimants and stop submission before it reaches ops.
 - **`Try this first` preflight steps are placeholders.** Real preflight scripts (factory reset, signal-strength check, charge-cycle test) need to be sourced from device-care content.
+- **Battery check is a customer-facing estimate, not a verified reading.** The capacity % is hand-typed (no Battery Health screenshot parsing / OCR), the condition grade is parsed from the `product.variant` string, and `deliveredOn` drives the time window. The verdict is advisory — `assessBattery` runs entirely client-side and the real eligibility is decided by QC. `claim.batteryAssessment` is captured but not surfaced on any tracking card / review screen / ops surface yet. Thresholds (3% / 10% / 20%, 10 days / 6 / 12 months) and grade baselines (95 / 90 / 85, fair→85) are hardcoded in `src/lib/returns.js` — production should source them from the same policy config as §7.2.
 
 ## 9. Open questions
 
@@ -207,3 +222,4 @@ src/components/ClaimFlow/
 - **Wrong device flow.** The `I received the wrong device` scope today flows through the same Steps 3–7 as a normal issue claim. In practice the device prep step is moot (the customer doesn't own the wrong device's iCloud account). Worth gating Step 3 off when `issueScope === 'wrong_device'`.
 - **Bonus tuning.** AED 100 is a fixed placeholder. Production may want to scale by item price, by historical claim rate, or A/B test against alternative incentives (instant replacement, expedited shipping).
 - **Replacement-vs-refund branching.** Today the flow always lands on a refund. A `Replace` option (ship a working unit, take the broken one back on the same AWB) is a natural addition for issue claims.
+- **Battery check → flow routing.** The check verdict is deliberately generic and never steers the customer between the return (refund) and warranty (replacement) flows, even when the computed remedy points at the other one. A future iteration could nudge (e.g. "your numbers point to a battery replacement — use your warranty instead") or surface `batteryAssessment` on Review / `ClaimDetailsSheet` / the QC ops view so the self-reported figure travels with the claim.

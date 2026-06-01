@@ -7,7 +7,7 @@ import {
   canAdvance,
   TOTAL_STEPS,
 } from './flowReducer'
-import { generateClaimRef, refundBreakdown } from '../../lib/returns'
+import { generateClaimRef, refundBreakdown, assessBattery } from '../../lib/returns'
 import { expectedCompletionFor } from '../../lib/claims'
 import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
@@ -149,7 +149,11 @@ export default function ClaimFlow({
           )}
           {state.step === 2 &&
             (state.claimType === 'issue' || state.claimType === 'warranty') && (
-              <Step2IssueDetails state={state} dispatch={dispatch} />
+              <Step2IssueDetails
+                state={state}
+                dispatch={dispatch}
+                order={order}
+              />
             )}
           {state.step === 2 && state.claimType === 'change_of_mind' && (
             <Step2Reason state={state} dispatch={dispatch} />
@@ -255,10 +259,30 @@ function formatScheduledPickup(today = new Date()) {
 // Shape mirrors the seeded mocks in src/data/orders.js — refund flows
 // land on ClaimCard; warranty flows land on WarrantyClaimCard via the
 // type === 'warranty' branch in App.jsx routing.
+// Carry the optional Step-2 battery self-check onto the claim when it was
+// filled in for a battery sub-type. Data only — no tracking-card surface
+// reads it yet (see docs/output/returns/issue.md §battery check).
+function batteryAssessmentForClaim(state, order) {
+  if (state.issueSubtypeId !== 'battery') return null
+  const { capacity, nonOriginal } = state.batteryCheck
+  const filled = nonOriginal || (capacity !== '' && capacity != null)
+  if (!filled) return null
+  const a = assessBattery({ order, capacity, nonOriginal })
+  return {
+    capacity: a.capacity,
+    baseline: a.baseline,
+    degradation: a.degradation,
+    nonOriginal,
+    remedy: a.remedy,
+    reason: a.reason,
+  }
+}
+
 function buildClaim({ state, order, claimRef }) {
   const now = new Date()
   const submittedAt = formatSubmittedAt(now)
   const initiatedStamp = formatStamp(now)
+  const batteryAssessment = batteryAssessmentForClaim(state, order)
 
   const base = {
     claimRef,
@@ -315,6 +339,7 @@ function buildClaim({ state, order, claimRef }) {
       issueDetails: { ...state.issueDetails },
       issueScope: state.issueScope,
       issueSubtypeId: state.issueSubtypeId,
+      ...(batteryAssessment ? { batteryAssessment } : {}),
       refundMethod: state.refundMethod,
       expectedRefund: refundBreakdown(
         order,
@@ -334,6 +359,7 @@ function buildClaim({ state, order, claimRef }) {
     issueDetails: { ...state.issueDetails },
     issueScope: state.issueScope,
     issueSubtypeId: state.issueSubtypeId,
+    ...(batteryAssessment ? { batteryAssessment } : {}),
     repairWindow: {
       expectedComplete: eta.short,
       expectedCompleteLong: eta.long,

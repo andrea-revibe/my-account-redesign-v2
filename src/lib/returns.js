@@ -158,3 +158,109 @@ export function formatShortDate(date) {
 export function generateClaimRef() {
   return 'IXipP8'
 }
+
+// ----- Battery health (§7.2 Battery Standards) --------------------------
+// A refurbished grade guarantees a minimum battery capacity at delivery.
+// "Very good" isn't in the current catalog but is kept for completeness;
+// "Fair" has no published battery floor, so it's treated as Good (85%).
+export const BATTERY_BASELINE_BY_GRADE = {
+  excellent: 95,
+  'very good': 90,
+  good: 85,
+  fair: 85,
+}
+
+// Condition grade is the last `·`-separated segment of product.variant,
+// e.g. "Midnight · 128 GB · Good" → "good".
+export function conditionGradeOf(order) {
+  const variant = order?.product?.variant
+  if (!variant) return null
+  const seg = variant.split('·').pop()?.trim().toLowerCase()
+  return seg || null
+}
+
+export function batteryBaselineFor(order) {
+  const grade = conditionGradeOf(order)
+  return grade ? BATTERY_BASELINE_BY_GRADE[grade] ?? null : null
+}
+
+function addMonths(date, months) {
+  const d = new Date(date)
+  d.setMonth(d.getMonth() + months)
+  return d
+}
+
+export function daysSinceDelivery(order, today = new Date()) {
+  const delivered = deliveryDateOf(order)
+  if (!delivered) return null
+  return Math.floor((startOfDay(today) - startOfDay(delivered)) / MS_PER_DAY)
+}
+
+// §7.2 remedies, evaluated most-favourable-first. A "non-original
+// battery/part" message is a full-refund trigger on its own (capacity is
+// irrelevant). Otherwise the remedy depends on how far the battery has
+// degraded below its guaranteed floor (degradation = baseline − reported)
+// and how long ago the device was delivered:
+//   > 3% within 10 days   → full refund
+//   > 10% within 6 months → free battery replacement
+//   > 20% within 12 months → free battery replacement
+//   else                  → normal wear, not a covered defect
+// Returns `remedy: null` when there's nothing to assess yet (no capacity
+// entered and the non-original toggle is off).
+export function assessBattery({ order, capacity, nonOriginal = false, today = new Date() }) {
+  const baseline = batteryBaselineFor(order)
+  const delivered = deliveryDateOf(order)
+  const days = daysSinceDelivery(order, today)
+  const cap = Number(capacity)
+  const hasCapacity =
+    capacity !== '' &&
+    capacity != null &&
+    !Number.isNaN(cap) &&
+    cap > 0 &&
+    cap <= 100
+
+  if (nonOriginal) {
+    return {
+      baseline,
+      days,
+      capacity: hasCapacity ? cap : null,
+      degradation:
+        hasCapacity && baseline != null ? Math.max(0, baseline - cap) : null,
+      remedy: 'refund',
+      reason: 'non_original',
+    }
+  }
+
+  if (!hasCapacity || baseline == null || !delivered) {
+    return {
+      baseline,
+      days,
+      capacity: hasCapacity ? cap : null,
+      degradation: null,
+      remedy: null,
+      reason: null,
+    }
+  }
+
+  const degradation = Math.max(0, baseline - cap)
+  const now = startOfDay(today)
+  const from = startOfDay(delivered)
+  const within10Days = now <= addDays(from, 10)
+  const within6Months = now <= addMonths(from, 6)
+  const within12Months = now <= addMonths(from, 12)
+
+  let remedy = 'none'
+  let reason = 'normal_wear'
+  if (within10Days && degradation > 3) {
+    remedy = 'refund'
+    reason = 'refund_10d'
+  } else if (within6Months && degradation > 10) {
+    remedy = 'replacement'
+    reason = 'replacement_6m'
+  } else if (within12Months && degradation > 20) {
+    remedy = 'replacement'
+    reason = 'replacement_12m'
+  }
+
+  return { baseline, days, capacity: cap, degradation, remedy, reason }
+}

@@ -94,7 +94,7 @@ The warranty intake reuses the existing returns-flow chrome and most of the exis
 | Step | Behaviour on warranty |
 |---|---|
 | 1 — Claim type | `Use my warranty` row is in-scope. Selecting it dispatches `SET_CLAIM_TYPE: 'warranty'` and unlocks Continue. |
-| 2 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch). Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
+| 2 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch), including the optional **battery check** that surfaces on the `battery` sub-type (capacity % + non-original-part toggle → §7.2 Battery Standards verdict; see [returns/issue.md](./returns/issue.md) §2.2). A filled-in result rides onto the warranty claim as `claim.batteryAssessment`. Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
 | 3 — Device prep | Shared with refund flows (factory reset or credentials). |
 | 4 — Packing | Shared with refund flows. Radio pick between original Revibe box and sturdy post box with bubble wrap — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.5. |
 | 5 — Pickup details | Shared with refund flows. The Step 5 "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → QC → Under repair → On its way back → Device returned). |
@@ -161,6 +161,7 @@ On top of the standard claim shape (`claimRef`, `claimStatusId`, `type`, `submit
 | `claim.type` | `'warranty'` | Routing in `App.jsx`; hero copy; sheet branching |
 | `claim.repairWindow` *(optional)* | `{ expectedComplete, expectedCompleteLong, note? }` | `under_repair` hero strip |
 | `claim.shipBack` *(optional)* | `{ courier, awb, estimatedDelivery, estimatedDeliveryLong, subStatusId, subTimeline, deliveredOn?, deliveredOnLong? }` | `ship_back` hero + detailed-tracking dropdown; `device_returned` hero strip |
+| `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Set when the optional Step-2 battery check (§7.2) was filled in on the `battery` sub-type — same shape and helper (`assessBattery`) as the issue branch (see [returns/issue.md](./returns/issue.md) §6.2). Data only; no warranty-card surface reads it yet. |
 
 `claim.shipBack.subStatusId` is one of the four `SHIPPING_SUB_STATUSES` ids (`arrived_destination`, `cleared_customs`, `forwarded_to_agent`, `out_for_delivery`). `claim.shipBack.subTimeline` is a map keyed by the same ids with human-readable timestamps (e.g. `'19 May · 4:45 PM'`).
 
@@ -266,6 +267,7 @@ When support can't approve the claim, `InvalidClaimCard` short-circuits to **`Co
 - **Pipeline progression isn't simulated.** Three hand-seeded mocks exercise the later surfaces: **89630** (`qc`, shipping refund — "Under review", TBD amount), **89605** (`refund_credited`, charger — past, with a real `expectedRefund`), **89572** (`qc` + `invalidClaim`, charger — `CompensationClosedCard`). Production needs the same webhook / polling mechanism as the refund flow to move a claim through the four states and to set the amount on `refund_issued`.
 - **Amount is always deferred.** `buildClaim` sets `amountPending: true` and omits `expectedRefund`; the figure is hand-written only on the refunded mock. Production fills it from the agent's assessment.
 - **No operational sub-flow doc yet.** A `docs/input/return_flow_compensation.md` (drawio source) is still pending.
+- **Replay journey.** `?journey=claim_compensation` exercises the full lifecycle as a journey-mode replay (submit → under review → refund issued/credited, plus the unclear-evidence and invalid-verdict forks) without the hand-seeded mocks — the amount is revealed at `refund_issued`, and the invalid fork lands on `CompensationClosedCard`. See [journey_backend_spec.md](./journey_backend_spec.md).
 
 ### 3.9 Open questions — compensation
 
