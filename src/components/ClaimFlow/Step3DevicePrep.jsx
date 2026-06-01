@@ -10,8 +10,11 @@ import {
   Apple,
   Smartphone,
   BadgeCheck,
+  BookOpen,
+  AlertTriangle,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
+import ResetGuideSheet from './ResetGuideSheet'
 
 const RESET_GUIDE = {
   ios: [
@@ -140,7 +143,7 @@ const UNLINK_LINKS = {
 
 const PASSCODE_LEN = 6
 
-export default function Step3DevicePrep({ state, dispatch, order }) {
+export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
   const dp = state.devicePrep
   const defaultOs = order?.deviceOs || 'ios'
   const os = dp.os || defaultOs
@@ -186,6 +189,26 @@ export default function Step3DevicePrep({ state, dispatch, order }) {
                   value: { resetConfirmed: value },
                 })
               }
+              guideChecks={dp.resetGuideChecks || {}}
+              onGuideCheck={(id, checked) =>
+                dispatch({
+                  type: 'SET_DEVICE_PREP',
+                  value: {
+                    resetGuideChecks: {
+                      ...(dp.resetGuideChecks || {}),
+                      [id]: checked,
+                    },
+                  },
+                })
+              }
+              guideSeen={dp.resetGuideSeen}
+              onGuideDone={() =>
+                dispatch({
+                  type: 'SET_DEVICE_PREP',
+                  value: { resetGuideSeen: true },
+                })
+              }
+              attempted={attempted}
             />
           )}
         </OptionCard>
@@ -371,38 +394,112 @@ function GuideStep({ index, step }) {
   )
 }
 
-function ResetPanel({ os, onOsChange, confirmed, onConfirmChange }) {
+function ResetPanel({
+  os,
+  onOsChange,
+  confirmed,
+  onConfirmChange,
+  guideChecks,
+  onGuideCheck,
+  guideSeen,
+  onGuideDone,
+  attempted,
+}) {
   const [open, setOpen] = useState(true)
+  const [guideOpen, setGuideOpen] = useState(false)
   const guide = RESET_GUIDE[os]
+  // On iOS the confirm checkbox is locked until the customer has been
+  // through the guide (opened it and pressed Done). Android keeps its
+  // inline accordion, so there's nothing to gate on.
+  const confirmLocked = os === 'ios' && !guideSeen
+  // Set when the customer clicks Continue before completing the guide —
+  // escalates the guide button + gate message into a red error state.
+  const showError = attempted && confirmLocked
   return (
     <div className="pt-3 flex flex-col gap-3">
       <OsTabs os={os} onChange={onOsChange} />
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center justify-between text-[12.5px] font-semibold text-ink-2 py-1"
-      >
-        <span>How to factory reset</span>
-        <ChevronDown
-          size={14}
-          strokeWidth={1.75}
-          className="transition-transform"
-          style={{ transform: open ? 'rotate(180deg)' : 'none' }}
-        />
-      </button>
-      {open && (
-        <ol className="flex flex-col gap-3.5 animate-slideDown">
-          {guide.map((step, i) => (
-            <GuideStep key={i} index={i} step={step} />
-          ))}
-        </ol>
+
+      {os === 'ios' ? (
+        <button
+          type="button"
+          onClick={() => setGuideOpen(true)}
+          className={`flex items-center justify-between gap-2 rounded-[12px] border px-3.5 py-3 text-left transition-colors ${
+            showError
+              ? 'border-danger bg-danger-bg/60 hover:bg-danger-bg/80'
+              : 'border-brand/30 bg-brand-bg/30 hover:bg-brand-bg/50'
+          }`}
+        >
+          <span className="flex items-start gap-2.5">
+            <BookOpen
+              size={16}
+              strokeWidth={1.9}
+              className={`shrink-0 mt-0.5 ${
+                showError ? 'text-danger' : 'text-brand'
+              }`}
+            />
+            <span>
+              <span className="block text-[13px] font-semibold text-ink leading-snug">
+                Open the step-by-step reset guide
+              </span>
+              <span className="block mt-0.5 text-[11.5px] text-muted">
+                Two paths, troubleshooting, and a checklist · ~10 min
+              </span>
+            </span>
+          </span>
+          <ExternalLink
+            size={14}
+            strokeWidth={2}
+            className={`shrink-0 ${showError ? 'text-danger' : 'text-brand'}`}
+          />
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="flex items-center justify-between text-[12.5px] font-semibold text-ink-2 py-1"
+          >
+            <span>How to factory reset</span>
+            <ChevronDown
+              size={14}
+              strokeWidth={1.75}
+              className="transition-transform"
+              style={{ transform: open ? 'rotate(180deg)' : 'none' }}
+            />
+          </button>
+          {open && (
+            <ol className="flex flex-col gap-3.5 animate-slideDown">
+              {guide.map((step, i) => (
+                <GuideStep key={i} index={i} step={step} />
+              ))}
+            </ol>
+          )}
+        </>
       )}
-      <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+
+      {guideOpen && (
+        <ResetGuideSheet
+          checks={guideChecks}
+          onToggle={onGuideCheck}
+          onDone={() => {
+            onGuideDone()
+            setGuideOpen(false)
+          }}
+          onClose={() => setGuideOpen(false)}
+        />
+      )}
+
+      <label
+        className={`flex items-start gap-2.5 pt-1 ${
+          confirmLocked ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'
+        }`}
+      >
         <span className="relative mt-px shrink-0">
           <input
             type="checkbox"
             checked={confirmed}
+            disabled={confirmLocked}
             onChange={(e) => onConfirmChange(e.target.checked)}
             className="peer sr-only"
           />
@@ -417,9 +514,30 @@ function ResetPanel({ os, onOsChange, confirmed, onConfirmChange }) {
           </span>
         </span>
         <span className="text-[13px] text-ink leading-[1.4]">
-          I confirm this device has been factory reset.
+          I confirm this device has been unlinked and factory reset.
         </span>
       </label>
+      {confirmLocked &&
+        (showError ? (
+          <p className="-mt-1.5 ml-[28px] flex items-start gap-1.5 text-[11.5px] font-medium text-danger leading-snug animate-slideDown">
+            <AlertTriangle
+              size={13}
+              strokeWidth={2.2}
+              className="shrink-0 mt-px"
+            />
+            <span>
+              Open the guide above and tap{' '}
+              <span className="font-semibold">Done</span> before you can
+              confirm.
+            </span>
+          </p>
+        ) : (
+          <p className="-mt-1.5 ml-[28px] text-[11.5px] text-muted leading-snug">
+            Open the guide above and tap{' '}
+            <span className="font-semibold text-ink-2">Done</span> before you
+            can confirm.
+          </p>
+        ))}
     </div>
   )
 }

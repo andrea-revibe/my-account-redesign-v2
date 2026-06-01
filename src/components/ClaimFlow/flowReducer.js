@@ -44,6 +44,8 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       resetConfirmed: false,
       accountUnlinked: false,
       passcode: '',
+      resetGuideChecks: {},
+      resetGuideSeen: false,
     },
     pickupDetails: {
       address: order?.address || '',
@@ -152,7 +154,14 @@ export function canAdvance(state) {
     }
     case 3: {
       const dp = state.devicePrep
-      if (dp.option === 'reset') return dp.resetConfirmed === true
+      if (dp.option === 'reset') {
+        // On iOS, keep Continue clickable until the guide has been opened
+        // and completed, so a premature click can surface the "open the
+        // guide" gate (ClaimFlow.handlePrimary) rather than silently
+        // disabling the button. Once seen, the confirm checkbox is the gate.
+        if (dp.os === 'ios' && !dp.resetGuideSeen) return true
+        return dp.resetConfirmed === true
+      }
       if (dp.option === 'credentials')
         return dp.accountUnlinked === true && dp.passcode.length === 6
       return false
