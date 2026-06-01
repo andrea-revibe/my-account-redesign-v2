@@ -46,6 +46,13 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       description: '',
       attachmentName: '',
     },
+    // Optional battery-health self-check (§7.2). Only surfaced on the
+    // `battery` sub-type; never gates progression — the customer can skip
+    // it and submit proof + description instead.
+    batteryCheck: {
+      capacity: '',
+      nonOriginal: false,
+    },
     devicePrep: {
       option: null,
       os: 'ios',
@@ -100,6 +107,11 @@ export function flowReducer(state, action) {
       return {
         ...state,
         issueDetails: { ...state.issueDetails, ...action.value },
+      }
+    case 'SET_BATTERY_CHECK':
+      return {
+        ...state,
+        batteryCheck: { ...state.batteryCheck, ...action.value },
       }
     case 'SET_DEVICE_PREP':
       return { ...state, devicePrep: { ...state.devicePrep, ...action.value } }
