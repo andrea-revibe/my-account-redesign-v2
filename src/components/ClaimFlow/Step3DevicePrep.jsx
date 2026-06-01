@@ -10,8 +10,8 @@ import {
   Apple,
   Smartphone,
   BadgeCheck,
-  BookOpen,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import ResetGuideSheet from './ResetGuideSheet'
@@ -152,16 +152,15 @@ export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
     <>
       <StepHeading
         title="Prepare your device for return"
-        subtitle="Refunds are delayed significantly when this step is skipped. Pick one of the two paths below."
+        subtitle="Returns are delayed when this step is skipped. Pick one of the two paths below."
       />
 
       <div className="px-4 flex flex-col gap-3">
         <Callout>
           <span className="font-semibold text-ink">
-            The device must be unlocked before we can refund you.
+            Unlock the device before we can refund you.
           </span>{' '}
-          We can't access the device's data — this is so it can be reset and
-          resold.
+          We can't access its data — this lets it be reset and resold.
         </Callout>
 
         <OptionCard
@@ -222,7 +221,7 @@ export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
             })
           }
           title="I can't factory reset it"
-          subtitle="Share your passcode and unlink it — we'll wipe it on pickup. Slower to process."
+          subtitle="Share your passcode and unlink it — we'll wipe it on pickup. Slower."
           slower
         >
           {dp.option === 'credentials' && (
@@ -260,10 +259,10 @@ export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
 
 function Callout({ children }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-[12px] border border-warn-bg bg-warn-bg/70 px-3.5 py-3 text-[12.5px] text-ink leading-[1.45]">
+    <div className="flex items-start gap-2.5 rounded-[14px] border border-warn-bg bg-warn-bg/70 px-3.5 py-3 text-[12.5px] text-ink leading-[1.45]">
       <ShieldAlert
-        size={16}
-        strokeWidth={1.75}
+        size={17}
+        strokeWidth={1.9}
         className="text-warn shrink-0 mt-px"
       />
       <span>{children}</span>
@@ -282,7 +281,7 @@ function OptionCard({
 }) {
   return (
     <div
-      className={`rounded-[14px] border-2 transition-colors ${
+      className={`rounded-[16px] border-2 transition-colors ${
         selected
           ? 'border-brand bg-brand-bg/30'
           : 'border-line bg-surface'
@@ -292,43 +291,47 @@ function OptionCard({
         type="button"
         onClick={onSelect}
         aria-pressed={selected}
-        className="w-full text-left px-3.5 py-3 flex items-start gap-3"
+        className="w-full text-left px-4 py-3.5 flex items-start gap-3"
       >
         <span
           aria-hidden
-          className={`mt-0.5 w-[18px] h-[18px] rounded-full border-2 grid place-items-center shrink-0 ${
+          className={`mt-0.5 w-[20px] h-[20px] rounded-full border-2 grid place-items-center shrink-0 ${
             selected ? 'border-brand' : 'border-line'
           }`}
         >
-          {selected && <span className="w-2 h-2 rounded-full bg-brand" />}
+          {selected && <span className="w-2.5 h-2.5 rounded-full bg-brand" />}
         </span>
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-2 flex-wrap">
-            <span className="text-[14.5px] font-semibold text-ink">
-              {title}
-            </span>
-            {recommended && (
-              <span className="inline-flex items-center rounded-full bg-success-bg text-success font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
-                Recommended
-              </span>
-            )}
-            {slower && (
-              <span className="inline-flex items-center rounded-full bg-warn-bg text-warn font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
-                Slower
-              </span>
-            )}
+            <span className="text-[15px] font-semibold text-ink">{title}</span>
+            {recommended && <Badge tone="success">Recommended</Badge>}
+            {slower && <Badge tone="warn">Slower</Badge>}
           </span>
-          <span className="block mt-0.5 text-[12px] text-muted">
+          <span className="block mt-0.5 text-[12.5px] text-muted leading-snug">
             {subtitle}
           </span>
         </span>
       </button>
       {children && (
-        <div className="px-3.5 pb-3.5 pt-1 border-t border-line/60 animate-slideDown">
+        <div className="px-4 pb-4 pt-1 border-t border-line/60 animate-slideDown">
           {children}
         </div>
       )}
     </div>
+  )
+}
+
+function Badge({ tone = 'success', children }) {
+  const tones = {
+    success: 'bg-success-bg text-success',
+    warn: 'bg-warn-bg text-warn',
+  }
+  return (
+    <span
+      className={`inline-flex items-center rounded-full h-5 px-2 text-[10px] font-bold uppercase tracking-[0.06em] ${tones[tone]}`}
+    >
+      {children}
+    </span>
   )
 }
 
@@ -423,34 +426,41 @@ function ResetPanel({
         <button
           type="button"
           onClick={() => setGuideOpen(true)}
-          className={`flex items-center justify-between gap-2 rounded-[12px] border px-3.5 py-3 text-left transition-colors ${
+          className={`relative overflow-hidden rounded-[16px] border-2 px-4 py-3.5 text-left transition-colors ${
             showError
-              ? 'border-danger bg-danger-bg/60 hover:bg-danger-bg/80'
-              : 'border-brand/30 bg-brand-bg/30 hover:bg-brand-bg/50'
+              ? 'border-danger bg-danger-bg/60'
+              : guideSeen
+                ? 'border-success/40 bg-success-bg/50'
+                : 'border-brand bg-brand-bg/60 hover:bg-brand-bg/80'
           }`}
         >
-          <span className="flex items-start gap-2.5">
-            <BookOpen
-              size={16}
-              strokeWidth={1.9}
-              className={`shrink-0 mt-0.5 ${
-                showError ? 'text-danger' : 'text-brand'
+          <span className="relative flex items-center gap-3">
+            <span
+              className={`w-10 h-10 rounded-full grid place-items-center shrink-0 ${
+                guideSeen
+                  ? 'bg-success text-white'
+                  : showError
+                    ? 'bg-danger text-white'
+                    : 'bg-brand text-white'
               }`}
-            />
-            <span>
-              <span className="block text-[13px] font-semibold text-ink leading-snug">
-                Open the step-by-step reset guide
+            >
+              {guideSeen ? (
+                <Check size={19} strokeWidth={1.9} />
+              ) : (
+                <Sparkles size={19} strokeWidth={1.9} />
+              )}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[14.5px] font-semibold text-ink leading-snug">
+                {guideSeen ? 'Guided reset completed' : 'Start the guided reset'}
               </span>
-              <span className="block mt-0.5 text-[11.5px] text-muted">
-                Two paths, troubleshooting, and a checklist · ~10 min
+              <span className="block mt-0.5 text-[12px] text-muted">
+                {guideSeen
+                  ? 'Tap to run through it again'
+                  : 'One step at a time · about 10 min'}
               </span>
             </span>
           </span>
-          <ExternalLink
-            size={14}
-            strokeWidth={2}
-            className={`shrink-0 ${showError ? 'text-danger' : 'text-brand'}`}
-          />
         </button>
       ) : (
         <>
@@ -504,12 +514,12 @@ function ResetPanel({
             className="peer sr-only"
           />
           <span
-            className={`w-[18px] h-[18px] rounded-[5px] border-2 grid place-items-center transition-colors ${
+            className={`w-[20px] h-[20px] rounded-[6px] border-2 grid place-items-center transition-colors ${
               confirmed ? 'bg-brand border-brand' : 'border-line bg-surface'
             }`}
           >
             {confirmed && (
-              <Check size={12} strokeWidth={3} className="text-white" />
+              <Check size={13} strokeWidth={3} className="text-white" />
             )}
           </span>
         </span>
@@ -517,27 +527,32 @@ function ResetPanel({
           I confirm this device has been unlinked and factory reset.
         </span>
       </label>
-      {confirmLocked &&
-        (showError ? (
-          <p className="-mt-1.5 ml-[28px] flex items-start gap-1.5 text-[11.5px] font-medium text-danger leading-snug animate-slideDown">
+      {confirmLocked && (
+        <p
+          className={`-mt-1.5 ml-[30px] flex items-start gap-1.5 text-[11.5px] leading-snug ${
+            showError
+              ? 'font-medium text-danger animate-slideDown'
+              : 'text-muted'
+          }`}
+        >
+          {showError && (
             <AlertTriangle
               size={13}
               strokeWidth={2.2}
               className="shrink-0 mt-px"
             />
-            <span>
-              Open the guide above and tap{' '}
-              <span className="font-semibold">Done</span> before you can
-              confirm.
-            </span>
-          </p>
-        ) : (
-          <p className="-mt-1.5 ml-[28px] text-[11.5px] text-muted leading-snug">
-            Open the guide above and tap{' '}
-            <span className="font-semibold text-ink-2">Done</span> before you
-            can confirm.
-          </p>
-        ))}
+          )}
+          <span>
+            Run the guide above and tap{' '}
+            <span
+              className={showError ? 'font-semibold' : 'font-semibold text-ink-2'}
+            >
+              Done
+            </span>{' '}
+            to confirm.
+          </span>
+        </p>
+      )}
     </div>
   )
 }
