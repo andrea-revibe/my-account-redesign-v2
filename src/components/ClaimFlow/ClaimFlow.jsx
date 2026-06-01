@@ -34,6 +34,7 @@ export default function ClaimFlow({
     initialState,
   )
   const [submitAttempted, setSubmitAttempted] = useState(false)
+  const [devicePrepAttempted, setDevicePrepAttempted] = useState(false)
 
   // Lock background scroll while the overlay is up; restore on unmount.
   useEffect(() => {
@@ -68,6 +69,18 @@ export default function ClaimFlow({
         onSubmitClaim(order.id, buildClaim({ state, order, claimRef }))
       }
       dispatch({ type: 'SUBMIT', value: claimRef })
+      return
+    }
+    // Reset option on iOS: the customer must go through the guide (open it
+    // and tap Done) before they can confirm. Surface the gate on a
+    // premature Continue instead of advancing.
+    if (
+      state.step === 3 &&
+      state.devicePrep.option === 'reset' &&
+      state.devicePrep.os === 'ios' &&
+      !state.devicePrep.resetGuideSeen
+    ) {
+      setDevicePrepAttempted(true)
       return
     }
     dispatch({ type: 'NEXT' })
@@ -133,7 +146,12 @@ export default function ClaimFlow({
             <Step2Reason state={state} dispatch={dispatch} />
           )}
           {state.step === 3 && (
-            <Step3DevicePrep state={state} dispatch={dispatch} order={order} />
+            <Step3DevicePrep
+              state={state}
+              dispatch={dispatch}
+              order={order}
+              attempted={devicePrepAttempted}
+            />
           )}
           {state.step === 4 && (
             <Step4Packing state={state} dispatch={dispatch} />
