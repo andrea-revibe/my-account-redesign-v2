@@ -30,7 +30,7 @@ flowchart TD
   s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
   s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
   s2 -->|Scope + sub-issue + description + attachment| s3[Step 3 — Device prep]
-  s3 -->|Reset confirmed OR credentials provided| s4[Step 4 — Packing]
+  s3 -->|Guided reset completed + confirmed| s4[Step 4 — Packing]
   s4 -->|Original Revibe box OR sturdy post box selected| s5[Step 5 — Pickup details]
   s5 -->|3 fields confirmed + checkbox| s6[Step 6 — Refund method]
   s6 -->|Wallet +100 AED or Original payment| s7[Step 7 — Review & submit]
@@ -99,7 +99,7 @@ Sectioned summary. Issue-specific section:
 
 - **Issue** — category label (resolved via `findSubtype(id)` against `issueSubtypes.js`) + description + attachment chip.
 
-Shared sections: Device prep (masked to `Factory reset confirmed` / `Credentials provided`), Packing summary (with the chosen method label), Pickup, Refund.
+Shared sections: Device prep (shows `Factory reset confirmed` — the single guided-reset path; `Credentials provided` survives only for seeded credentials mocks), Packing summary (with the chosen method label), Pickup, Refund.
 
 Two soft-validated ack cards sit inside the Review surface — **☑︎ I have factory reset my device** directly under Device preparation, **☑︎ I have packed the device properly** directly under the Packing summary. Submit stays clickable; clicking with either unchecked flips the topmost unchecked card into a danger-toned error state and blocks submission. Same `AckCard` chrome as the change-of-mind branch — see [change_of_mind.md](./change_of_mind.md) §2.8 for the full soft-validation contract.
 

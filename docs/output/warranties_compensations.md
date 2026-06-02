@@ -95,7 +95,7 @@ The warranty intake reuses the existing returns-flow chrome and most of the exis
 |---|---|
 | 1 — Claim type | `Use my warranty` row is in-scope. Selecting it dispatches `SET_CLAIM_TYPE: 'warranty'`. Continue is always clickable; tapping it with no type picked surfaces an inline error (flow-wide soft validation — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.1.1). |
 | 2 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch), including the optional **battery check** that surfaces on the `battery` sub-type (capacity % + non-original-part toggle → §7.2 Battery Standards verdict; see [returns/issue.md](./returns/issue.md) §2.2). A filled-in result rides onto the warranty claim as `claim.batteryAssessment`. Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
-| 3 — Device prep | Shared with refund flows (factory reset or credentials). |
+| 3 — Device prep | Shared with refund flows — single guided-reset path (see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.4). |
 | 4 — Packing | Shared with refund flows. Radio pick between original Revibe box and sturdy post box with bubble wrap — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.5. |
 | 5 — Pickup details | Shared with refund flows. The Step 5 "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → QC → Under repair → On its way back → Device returned). |
 | 6 — Refund method | **Skipped.** |

@@ -53,12 +53,14 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       capacity: '',
       nonOriginal: false,
     },
+    // Only one device-prep path remains: the guided reset (which itself
+    // covers locked / broken devices via its remote route). `option` is
+    // pinned to 'reset' so the downstream Review / Confirmation summaries
+    // and `devicePrepText` keep rendering the reset branch.
     devicePrep: {
-      option: null,
+      option: 'reset',
       os: 'ios',
       resetConfirmed: false,
-      accountUnlinked: false,
-      passcode: '',
       resetGuideChecks: {},
       resetGuideSeen: false,
     },
@@ -207,18 +209,9 @@ export function stepError(state) {
     }
     case 3: {
       const dp = state.devicePrep
-      if (!dp.option) return 'devicePrepOption'
-      if (dp.option === 'reset') {
-        if (!dp.resetGuideSeen) return 'resetGuide'
-        if (dp.resetConfirmed !== true) return 'resetConfirm'
-        return null
-      }
-      if (dp.option === 'credentials') {
-        if (dp.accountUnlinked !== true) return 'unlink'
-        if (dp.passcode.length !== 6) return 'passcode'
-        return null
-      }
-      return 'devicePrepOption'
+      if (!dp.resetGuideSeen) return 'resetGuide'
+      if (dp.resetConfirmed !== true) return 'resetConfirm'
+      return null
     }
     case 4:
       return state.packingMethod !== null ? null : 'packing'
@@ -270,17 +263,12 @@ export function canAdvance(state) {
     }
     case 3: {
       const dp = state.devicePrep
-      if (dp.option === 'reset') {
-        // Keep Continue clickable until the guide has been opened and
-        // completed, so a premature click can surface the "open the guide"
-        // gate (ClaimFlow.handlePrimary) rather than silently disabling the
-        // button. Once seen, the confirm checkbox is the gate.
-        if (!dp.resetGuideSeen) return true
-        return dp.resetConfirmed === true
-      }
-      if (dp.option === 'credentials')
-        return dp.accountUnlinked === true && dp.passcode.length === 6
-      return false
+      // Keep Continue clickable until the guide has been opened and
+      // completed, so a premature click can surface the "open the guide"
+      // gate (ClaimFlow.handlePrimary) rather than silently disabling the
+      // button. Once seen, the confirm checkbox is the gate.
+      if (!dp.resetGuideSeen) return true
+      return dp.resetConfirmed === true
     }
     case 4:
       return state.packingMethod !== null
