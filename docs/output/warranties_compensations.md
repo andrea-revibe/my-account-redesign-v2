@@ -93,7 +93,7 @@ The warranty intake reuses the existing returns-flow chrome and most of the exis
 
 | Step | Behaviour on warranty |
 |---|---|
-| 1 — Claim type | `Use my warranty` row is in-scope. Selecting it dispatches `SET_CLAIM_TYPE: 'warranty'` and unlocks Continue. |
+| 1 — Claim type | `Use my warranty` row is in-scope. Selecting it dispatches `SET_CLAIM_TYPE: 'warranty'`. Continue is always clickable; tapping it with no type picked surfaces an inline error (flow-wide soft validation — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.1.1). |
 | 2 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch), including the optional **battery check** that surfaces on the `battery` sub-type (capacity % + non-original-part toggle → §7.2 Battery Standards verdict; see [returns/issue.md](./returns/issue.md) §2.2). A filled-in result rides onto the warranty claim as `claim.batteryAssessment`. Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
 | 3 — Device prep | Shared with refund flows (factory reset or credentials). |
 | 4 — Packing | Shared with refund flows. Radio pick between original Revibe box and sturdy post box with bubble wrap — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.5. |
@@ -219,11 +219,11 @@ Total visible step count is **5** (1, 2, 6, 7, 8); Steps 3/4/5 are skipped by th
 | Step | Behaviour on compensation |
 |---|---|
 | 1 — Claim type | `Request compensation` dispatches `SET_CLAIM_TYPE: 'compensation'` and highlights (no longer a stub). |
-| 2 — What happened | **`Step2Compensation.jsx`** — a two-option sub-type picker (`shipping_refund` / `charger`, each with a "what we need" evidence hint) + description + attachment. `canAdvance` requires `compensationSubtype` + a non-empty description + an attachment. Description/attachment reuse `state.issueDetails`; the sub-type is `state.compensationSubtype` (set via `SET_COMPENSATION_SUBTYPE`). |
+| 2 — What happened | **`Step2Compensation.jsx`** — a two-option sub-type picker (`shipping_refund` / `charger`, each with a "what we need" evidence hint) + description + attachment. Gates on `compensationSubtype` + a non-empty description + an attachment, one at a time via the flow-wide soft validation (`stepError` order `subtype` → `description` → `attachment`; see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.1.1). Description/attachment reuse `state.issueDetails`; the sub-type is `state.compensationSubtype` (set via `SET_COMPENSATION_SUBTYPE`). |
 | 3 — Device prep | **Skipped.** |
 | 4 — Packing | **Skipped.** |
 | 5 — Pickup | **Skipped.** |
-| 6 — Refund destination | `Step5RefundMethod`'s `CompensationDestination` branch — Wallet vs original payment, **no amount/bonus/restocking** math. Each card shows "Amount confirmed by support after review" in place of a figure. `canAdvance` requires `refundMethod` set. |
+| 6 — Refund destination | `Step5RefundMethod`'s `CompensationDestination` branch — Wallet vs original payment, **no amount/bonus/restocking** math. Each card shows "Amount confirmed by support after review" in place of a figure. Gates on `refundMethod` (`stepError` key `refundMethod`); Continue stays clickable and reddens both cards on a premature tap (§2.1.1). |
 | 7 — Review | `Step6Review` compensation branch — a **What happened** section (sub-type + description + proof) and a **Refund** section showing the chosen destination + "To be confirmed" / "Confirmed by support after review". No Device prep / Packing / Pickup sections, and **no ack cards** (nothing to reset or pack), so `ClaimFlow.handlePrimary` skips the factory-reset/packing gate for compensation. CTA reads `Submit compensation request`. |
 | 8 — Confirmation | Title swaps to "Your compensation request is in"; chip reads `Compensation`; the middle row shows "Amount confirmed after review · {destination}" (Clock glyph) with a "You keep the device…" note; the Device-preparation row is dropped. Secondary CTA reads "Track this compensation". |
 

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useEffect, useMemo, useReducer } from 'react'
 import { ChevronLeft, X } from 'lucide-react'
 import { ORDERS } from '../../data/orders'
 import {
   flowReducer,
   initialState,
-  canAdvance,
+  stepError,
   TOTAL_STEPS,
 } from './flowReducer'
 import { generateClaimRef, refundBreakdown, assessBattery } from '../../lib/returns'
@@ -34,8 +34,9 @@ export default function ClaimFlow({
     { initialOrderId, initialOrder },
     initialState,
   )
-  const [submitAttempted, setSubmitAttempted] = useState(false)
-  const [devicePrepAttempted, setDevicePrepAttempted] = useState(false)
+  // Soft-validation lives in the reducer (state.attempted): ATTEMPT sets it,
+  // every step-changing action clears it in the same dispatch — so the next
+  // step never flashes its errors before the user tries to advance.
 
   // Lock background scroll while the overlay is up; restore on unmount.
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function ClaimFlow({
         requiresAcks &&
         (!state.factoryResetConfirmed || !state.packingConfirmed)
       ) {
-        setSubmitAttempted(true)
+        dispatch({ type: 'ATTEMPT' })
         return
       }
       const claimRef = generateClaimRef()
@@ -78,20 +79,16 @@ export default function ClaimFlow({
       dispatch({ type: 'SUBMIT', value: claimRef })
       return
     }
-    // Reset option on iOS: the customer must go through the guide (open it
-    // and tap Done) before they can confirm. Surface the gate on a
-    // premature Continue instead of advancing.
-    if (
-      state.step === 3 &&
-      state.devicePrep.option === 'reset' &&
-      state.devicePrep.os === 'ios' &&
-      !state.devicePrep.resetGuideSeen
-    ) {
-      setDevicePrepAttempted(true)
+    // Button is never disabled: a premature Continue surfaces the step's
+    // first unmet requirement inline (stepError) instead of advancing.
+    if (stepError(state)) {
+      dispatch({ type: 'ATTEMPT' })
       return
     }
     dispatch({ type: 'NEXT' })
   }
+
+  const errorKey = state.attempted ? stepError(state) : null
 
   const handleBack = () => {
     if (state.step === 1 || isConfirmation) {
@@ -145,7 +142,7 @@ export default function ClaimFlow({
 
         <main className="flex-1 overflow-y-auto pb-4">
           {state.step === 1 && (
-            <Step1ClaimType state={state} dispatch={dispatch} />
+            <Step1ClaimType state={state} dispatch={dispatch} error={errorKey} />
           )}
           {state.step === 2 &&
             (state.claimType === 'issue' || state.claimType === 'warranty') && (
@@ -153,33 +150,35 @@ export default function ClaimFlow({
                 state={state}
                 dispatch={dispatch}
                 order={order}
+                error={errorKey}
               />
             )}
           {state.step === 2 && state.claimType === 'change_of_mind' && (
             <Step2Reason state={state} dispatch={dispatch} />
           )}
           {state.step === 2 && state.claimType === 'compensation' && (
-            <Step2Compensation state={state} dispatch={dispatch} />
+            <Step2Compensation state={state} dispatch={dispatch} error={errorKey} />
           )}
           {state.step === 3 && (
             <Step3DevicePrep
               state={state}
               dispatch={dispatch}
               order={order}
-              attempted={devicePrepAttempted}
+              error={errorKey}
             />
           )}
           {state.step === 4 && (
-            <Step4Packing state={state} dispatch={dispatch} />
+            <Step4Packing state={state} dispatch={dispatch} error={errorKey} />
           )}
           {state.step === 5 && (
-            <Step4PickupDetails state={state} dispatch={dispatch} />
+            <Step4PickupDetails state={state} dispatch={dispatch} error={errorKey} />
           )}
           {state.step === 6 && (
             <Step5RefundMethod
               state={state}
               dispatch={dispatch}
               order={order}
+              error={errorKey}
             />
           )}
           {state.step === 7 && (
@@ -187,7 +186,7 @@ export default function ClaimFlow({
               state={state}
               dispatch={dispatch}
               order={order}
-              submitAttempted={submitAttempted}
+              submitAttempted={state.attempted}
             />
           )}
           {isConfirmation && (
@@ -204,7 +203,7 @@ export default function ClaimFlow({
           <StickyActionBar
             primaryLabel={primaryLabel}
             primaryVariant={primaryVariant}
-            primaryDisabled={!canAdvance(state)}
+            primaryDisabled={false}
             onPrimary={handlePrimary}
             secondaryLabel={
               state.step === 2 && state.claimType === 'change_of_mind'

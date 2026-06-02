@@ -9,6 +9,7 @@ import {
   Coins,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
+import InlineError from './InlineError'
 
 const ISSUE_SUBTYPES = [
   {
@@ -29,7 +30,7 @@ const ISSUE_SUBTYPES = [
 
 const ISSUE_SUB_IDS = ISSUE_SUBTYPES.map((t) => t.id)
 
-export default function Step1ClaimType({ state, dispatch }) {
+export default function Step1ClaimType({ state, dispatch, error }) {
   const [stub, setStub] = useState(null)
   const [expanded, setExpanded] = useState(
     ISSUE_SUB_IDS.includes(state.claimType),
@@ -45,6 +46,11 @@ export default function Step1ClaimType({ state, dispatch }) {
         subtitle="Tell us what's going on and we'll take it from there."
       />
       <div className="px-4 flex flex-col gap-2">
+        {error === 'claimType' && (
+          <InlineError className="mb-0.5">
+            Pick an option to continue.
+          </InlineError>
+        )}
         <button
           type="button"
           onClick={() => {

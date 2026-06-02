@@ -6,7 +6,9 @@ import {
   ChevronRight,
   FileCheck,
 } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import StepHeading from './StepHeading'
+import InlineError from './InlineError'
 import { COMPENSATION_SUBTYPES, findCompensationSubtype } from './compensationSubtypes'
 
 // Stub filenames cycled when the user "uploads" — there is no real file
@@ -17,11 +19,18 @@ const STUB_FILES = [
   'order_confirmation.png',
 ]
 
-export default function Step2Compensation({ state, dispatch }) {
+export default function Step2Compensation({ state, dispatch, error }) {
   const { description, attachmentName } = state.issueDetails
   const selected = state.compensationSubtype
     ? findCompensationSubtype(state.compensationSubtype)
     : null
+
+  const errorRef = useRef(null)
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [error])
 
   const pickStub = () => {
     const idx = Math.floor(Math.random() * STUB_FILES.length)
@@ -39,7 +48,10 @@ export default function Step2Compensation({ state, dispatch }) {
       />
 
       <div className="px-4 flex flex-col gap-4">
-        <section className="flex flex-col gap-2">
+        <section
+          className="flex flex-col gap-2"
+          ref={error === 'subtype' ? errorRef : null}
+        >
           <SectionLabel>What happened?</SectionLabel>
           <div className="flex flex-col gap-2">
             {COMPENSATION_SUBTYPES.map((t) => {
@@ -99,9 +111,15 @@ export default function Step2Compensation({ state, dispatch }) {
               </div>
             </div>
           )}
+          {error === 'subtype' && (
+            <InlineError>Pick what happened to continue.</InlineError>
+          )}
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section
+          className="flex flex-col gap-2"
+          ref={error === 'description' ? errorRef : null}
+        >
           <SectionLabel>Describe what happened</SectionLabel>
           <textarea
             value={description}
@@ -113,14 +131,28 @@ export default function Step2Compensation({ state, dispatch }) {
               })
             }
             placeholder="Tell us what went wrong and anything that helps us confirm it…"
-            className="w-full rounded-[12px] border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted resize-none min-h-[112px] outline-none focus:border-brand"
+            className={`w-full rounded-[12px] border bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted resize-none min-h-[112px] outline-none ${
+              error === 'description'
+                ? 'border-danger focus:border-danger'
+                : 'border-line focus:border-brand'
+            }`}
           />
-          <div className="text-right text-[11px] text-muted tabular-nums">
-            {description.length}/500
+          <div className="flex items-center justify-between gap-2">
+            {error === 'description' ? (
+              <InlineError>Describe what happened so we can review it.</InlineError>
+            ) : (
+              <span />
+            )}
+            <div className="text-right text-[11px] text-muted tabular-nums shrink-0">
+              {description.length}/500
+            </div>
           </div>
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section
+          className="flex flex-col gap-2"
+          ref={error === 'attachment' ? errorRef : null}
+        >
           <SectionLabel>Proof</SectionLabel>
           {attachmentName ? (
             <div className="rounded-[12px] border border-line bg-surface px-3.5 py-3 flex items-center gap-3">
@@ -151,7 +183,11 @@ export default function Step2Compensation({ state, dispatch }) {
             <button
               type="button"
               onClick={pickStub}
-              className="w-full rounded-[12px] border-2 border-dashed border-line bg-surface hover:border-brand hover:bg-brand-bg/20 px-4 py-5 flex flex-col items-center gap-1.5 transition-colors"
+              className={`w-full rounded-[12px] border-2 border-dashed bg-surface hover:bg-brand-bg/20 px-4 py-5 flex flex-col items-center gap-1.5 transition-colors ${
+                error === 'attachment'
+                  ? 'border-danger'
+                  : 'border-line hover:border-brand'
+              }`}
             >
               <span className="w-10 h-10 rounded-full bg-brand-bg text-brand grid place-items-center">
                 <Paperclip size={18} strokeWidth={1.75} />
@@ -174,6 +210,9 @@ export default function Step2Compensation({ state, dispatch }) {
               Required — claims without proof are often rejected or delayed.
             </span>
           </div>
+          {error === 'attachment' && (
+            <InlineError>Attach proof — it's required.</InlineError>
+          )}
         </section>
       </div>
     </>

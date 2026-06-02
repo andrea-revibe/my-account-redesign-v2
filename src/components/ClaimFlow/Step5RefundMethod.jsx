@@ -1,5 +1,6 @@
 import { CreditCard, Clock, Sparkles } from 'lucide-react'
 import StepHeading from './StepHeading'
+import InlineError from './InlineError'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
@@ -7,12 +8,20 @@ import { refundBreakdown, formatMoney } from '../../lib/returns'
 const REVIBE_CARE_ICON =
   'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
 
-export default function Step5RefundMethod({ state, dispatch, order }) {
+export default function Step5RefundMethod({ state, dispatch, order, error }) {
   if (!order) return null
   const currency = order.currency
   const claimType = state.claimType
+  const showError = error === 'refundMethod'
   if (claimType === 'compensation') {
-    return <CompensationDestination state={state} dispatch={dispatch} order={order} />
+    return (
+      <CompensationDestination
+        state={state}
+        dispatch={dispatch}
+        order={order}
+        showError={showError}
+      />
+    )
   }
   const isIssue = claimType === 'issue'
   const wallet = refundBreakdown(order, state.units, 'wallet', claimType)
@@ -28,8 +37,12 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
         subtitle={subtitle}
       />
       <div className="px-4 flex flex-col gap-2.5">
+        {showError && (
+          <InlineError>Choose how you'd like your refund to continue.</InlineError>
+        )}
         <RefundCard
           selected={state.refundMethod === 'wallet'}
+          error={showError}
           onSelect={() =>
             dispatch({ type: 'SET_REFUND_METHOD', value: 'wallet' })
           }
@@ -61,6 +74,7 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
         </RefundCard>
         <RefundCard
           selected={state.refundMethod === 'original'}
+          error={showError}
           onSelect={() =>
             dispatch({ type: 'SET_REFUND_METHOD', value: 'original' })
           }
@@ -134,7 +148,7 @@ export default function Step5RefundMethod({ state, dispatch, order }) {
 // refund flows, but the amount is unknown at submission — support confirms
 // it after reviewing the evidence — so each card shows a "confirmed after
 // review" note in place of a figure (no bonus / restocking math).
-function CompensationDestination({ state, dispatch, order }) {
+function CompensationDestination({ state, dispatch, order, showError }) {
   const reviewNote = 'Amount confirmed by support after review'
   return (
     <>
@@ -143,8 +157,12 @@ function CompensationDestination({ state, dispatch, order }) {
         subtitle="Pick where the money lands. We'll confirm the exact amount after reviewing your claim."
       />
       <div className="px-4 flex flex-col gap-2.5">
+        {showError && (
+          <InlineError>Pick where your refund should go to continue.</InlineError>
+        )}
         <RefundCard
           selected={state.refundMethod === 'wallet'}
+          error={showError}
           onSelect={() =>
             dispatch({ type: 'SET_REFUND_METHOD', value: 'wallet' })
           }
@@ -168,6 +186,7 @@ function CompensationDestination({ state, dispatch, order }) {
         </RefundCard>
         <RefundCard
           selected={state.refundMethod === 'original'}
+          error={showError}
           onSelect={() =>
             dispatch({ type: 'SET_REFUND_METHOD', value: 'original' })
           }
@@ -202,14 +221,18 @@ function CompensationDestination({ state, dispatch, order }) {
   )
 }
 
-function RefundCard({ selected, onSelect, title, amount, children }) {
+function RefundCard({ selected, onSelect, title, amount, children, error }) {
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
       className={`w-full text-left rounded-[14px] border-2 px-3.5 py-3.5 transition-colors ${
-        selected ? 'border-brand bg-brand-bg/30' : 'border-line bg-surface'
+        selected
+          ? 'border-brand bg-brand-bg/30'
+          : error
+            ? 'border-danger bg-surface'
+            : 'border-line bg-surface'
       }`}
     >
       <div className="flex items-start gap-3">
