@@ -28,8 +28,9 @@ const REVIBE_CARE_ICON =
 // (requested / refund_pending / refunded) render the refund-hero card,
 // which leads with the refund amount and destination rather than the
 // fulfilment journey.
-export default function PastOrderCard({ order, onRaiseClaim }) {
-  if (order.state === 'cancelled') return <CancelledOrderCard order={order} />
+export default function PastOrderCard({ order, onRaiseClaim, onKeep }) {
+  if (order.state === 'cancelled')
+    return <CancelledOrderCard order={order} onKeep={onKeep} />
   return <DeliveredOrderCard order={order} onRaiseClaim={onRaiseClaim} />
 }
 
@@ -169,14 +170,14 @@ const TONE = {
   success: { text: 'text-success', bg: 'bg-success', softBg: 'bg-success-bg', softText: 'text-success', border: 'border-[#c6ebd9]' },
 }
 
-function CancelledOrderCard({ order }) {
+function CancelledOrderCard({ order, onKeep }) {
   const [expanded, setExpanded] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [keepOpen, setKeepOpen] = useState(false)
   const tone = toneFor(order.cancellationStatusId)
-  const canKeep =
-    order.cancellationStatusId === 'requested' ||
-    order.cancellationStatusId === 'refund_pending'
+  // Reversible only while the cancellation is still 'requested' — once the
+  // refund is accepted (refund_pending) it's committed and can't be undone.
+  const canKeep = order.cancellationStatusId === 'requested'
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
@@ -253,6 +254,7 @@ function CancelledOrderCard({ order }) {
         <KeepOrderSheet
           order={order}
           open={keepOpen}
+          onKeep={onKeep}
           onClose={() => setKeepOpen(false)}
         />
       )}

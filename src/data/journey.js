@@ -154,28 +154,124 @@ const HAPPY_PATH_NODES = [
   },
 ]
 
-// ----- Cancellation-at-QC journey ---------------------------------------
-// Customer cancels while the device is at quality_check. Two forks:
-//   1. Refund method picked at request time (wallet vs original payment).
-//      Branched here because each path produces a different `refund` shape
-//      (wallet has no fee; card carries the 5% processing fee + ETA gap).
-//   2. Ops review at supplier-confirm time (accepted vs declined). Both
-//      method branches converge on the same `cancellation_declined` node —
-//      decline outcome is identical regardless of refund method (no refund
-//      is ever issued).
+// ----- Cancellation journey ---------------------------------------------
+// One journey, two cancellation entry points off `placed`:
 //
-// Accepted branches terminate at the `refunded_*` node (order drops to
-// Past orders). Declined branch continues through the standard shipping
-// chain so the `Cancel rejected` chip surfaces in HistoryThread on
-// OrderCard / PastOrderCard — demonstrating that the historical event
-// survives across card transitions.
-const CANCEL_AT_QC_NODES = [
+//   A. Before QC (created stage). No supplier review is needed — nothing is
+//      packed yet — so the request lands straight on `refund_pending` (we
+//      still stamp a `requested` timestamp so the stepper reads Requested ✓
+//      → Pending). No accepted/declined fork. Forks only on refund method.
+//
+//   B. At QC (quality_check stage, via `qc_started`). Current behaviour:
+//      the request waits on an ops review (accepted vs declined). Both
+//      method branches converge on the same `cancellation_declined` node —
+//      the decline outcome is identical regardless of refund method (no
+//      refund is ever issued).
+//
+// Each entry point forks on refund method (wallet vs original payment),
+// because each path produces a different `refund` shape (wallet has no fee;
+// card carries the 5% processing fee + ETA gap).
+//
+// Accepted / before-QC branches terminate at a `refunded_*` node (order
+// drops to Past orders). The at-QC declined branch continues through the
+// standard shipping chain so the `Cancel rejected` chip surfaces in
+// HistoryThread on OrderCard / PastOrderCard — demonstrating that the
+// historical event survives across card transitions.
+const CANCELLATION_NODES = [
   {
     id: 'placed',
     label: 'Order placed',
     trigger: 'customer',
     event: 'order.created',
+    next: ['cancel_before_qc_wallet', 'cancel_before_qc_card', 'qc_started'],
     apply: (o) => o,
+  },
+  {
+    id: 'cancel_before_qc_wallet',
+    label: 'Cancellation before QC — wallet refund',
+    trigger: 'customer',
+    event: 'order.cancellation.requested',
+    next: ['refunded_before_qc_wallet'],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationStatusId: 'refund_pending',
+      cancellationRef: 'J0urN0',
+      cancellationTimeline: {
+        requested: '20 May · 8:24 AM',
+        refund_pending: '20 May · 8:24 AM',
+      },
+      refund: {
+        subtotal: 1029,
+        amount: 1029,
+        destination: { kind: 'wallet', label: 'Revibe Wallet' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
+    }),
+  },
+  {
+    id: 'refunded_before_qc_wallet',
+    label: 'Wallet refund credited',
+    trigger: 'system',
+    event: 'order.refund.completed',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refunded',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '20 May · 8:25 AM',
+      },
+      refund: {
+        ...o.refund,
+        fundsAvailable: 'Available now in your wallet',
+      },
+    }),
+  },
+  {
+    id: 'cancel_before_qc_card',
+    label: 'Cancellation before QC — card refund',
+    trigger: 'customer',
+    event: 'order.cancellation.requested',
+    next: ['refunded_before_qc_card'],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationStatusId: 'refund_pending',
+      cancellationRef: 'J0urN0',
+      cancellationTimeline: {
+        requested: '20 May · 8:24 AM',
+        refund_pending: '20 May · 8:24 AM',
+      },
+      refund: {
+        subtotal: 1029,
+        fee: { label: 'Processing fee', rate: 0.05, amount: 51.45 },
+        amount: 977.55,
+        destination: { kind: 'card', label: 'Visa', last4: '4242' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
+    }),
+  },
+  {
+    id: 'refunded_before_qc_card',
+    label: 'Card refund issued',
+    trigger: 'system',
+    event: 'order.refund.completed',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refunded',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '23 May · 9:30 AM',
+      },
+    }),
   },
   {
     id: 'qc_started',
@@ -194,7 +290,7 @@ const CANCEL_AT_QC_NODES = [
     label: 'Cancellation requested — wallet refund',
     trigger: 'customer',
     event: 'order.cancellation.requested',
-    next: ['cancellation_accepted_wallet', 'cancellation_declined'],
+    next: ['cancellation_accepted_wallet', 'cancellation_declined', 'cancellation_kept'],
     apply: (o) => ({
       ...o,
       state: 'cancelled',
@@ -217,6 +313,7 @@ const CANCEL_AT_QC_NODES = [
     label: 'Cancellation accepted',
     trigger: 'system',
     event: 'order.cancellation.accepted',
+    next: ['refunded_wallet'],
     apply: (o) => ({
       ...o,
       cancellationStatusId: 'refund_pending',
@@ -250,7 +347,7 @@ const CANCEL_AT_QC_NODES = [
     label: 'Cancellation requested — card refund',
     trigger: 'customer',
     event: 'order.cancellation.requested',
-    next: ['cancellation_accepted_card', 'cancellation_declined'],
+    next: ['cancellation_accepted_card', 'cancellation_declined', 'cancellation_kept'],
     apply: (o) => ({
       ...o,
       state: 'cancelled',
@@ -274,6 +371,7 @@ const CANCEL_AT_QC_NODES = [
     label: 'Cancellation accepted',
     trigger: 'system',
     event: 'order.cancellation.accepted',
+    next: ['refunded_card'],
     apply: (o) => ({
       ...o,
       cancellationStatusId: 'refund_pending',
@@ -318,6 +416,34 @@ const CANCEL_AT_QC_NODES = [
           "After review, the supplier confirmed your unit had already been packed and we couldn't pull it back.",
       },
       // Refund was never issued — clear the in-flight refund object.
+      refund: undefined,
+    }),
+  },
+  {
+    id: 'cancellation_kept',
+    label: 'Cancellation reversed — order kept',
+    trigger: 'customer',
+    event: 'order.cancellation.reverted',
+    // Only reachable from `requested` (before the refund is accepted). The
+    // customer reverses their own cancellation: state flips back to open,
+    // the in-flight refund is voided, and statusId is left untouched
+    // (quality_check) so the order resumes exactly where it paused. A
+    // `reverted` timestamp + `cancellationReversal` marker survive so the
+    // event shows as a history chip once the order is delivered — parallel
+    // to how the declined branch keeps its rejection trace.
+    next: ['shipped_arrived_destination'],
+    apply: (o) => ({
+      ...o,
+      state: 'open',
+      cancellationStatusId: undefined,
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        reverted: '21 May · 12:05 PM',
+      },
+      cancellationReversal: {
+        ref: 'CXL-J0urN1',
+        reason: 'You reversed the cancellation — fulfilment resumed where it left off.',
+      },
       refund: undefined,
     }),
   },
@@ -415,7 +541,7 @@ const CANCEL_AT_QC_NODES = [
 // Both refund-method branches converge on the same `claim_picked_up` and
 // terminate together at `claim_refund_credited`. Card-vs-wallet processing
 // delay is elided — the journey models wallet-style instant settle for both
-// branches (the cancel_at_qc journey is the canonical example of a
+// branches (the cancellation journey is the canonical example of a
 // timestamp-divergent refund path).
 const CLAIM_COM_NODES = [
   {
@@ -3019,10 +3145,10 @@ export const JOURNEYS = [
     nodes: [],
   },
   {
-    id: 'cancel_at_qc',
-    label: 'Cancellation at QC',
+    id: 'cancellation',
+    label: 'Cancellation',
     initialOrder: INITIAL_ORDER,
-    nodes: CANCEL_AT_QC_NODES,
+    nodes: CANCELLATION_NODES,
   },
   {
     id: 'claim_change_of_mind',

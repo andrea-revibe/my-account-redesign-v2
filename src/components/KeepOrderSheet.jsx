@@ -2,10 +2,11 @@ import { useEffect } from 'react'
 import { X, Info, RotateCcw } from 'lucide-react'
 
 // Single-step bottom sheet for reversing an in-flight cancellation
-// (cancellationStatusId 'requested' or 'refund_pending'). Submit is a
-// prototype stub — closes the sheet, no state mutation. See
+// (cancellationStatusId 'requested'). In journey mode `onKeep` advances the
+// `cancellation_kept` node (reverts to open, resumes fulfilment); outside
+// journey mode it's absent and confirm just closes the sheet. See
 // docs/output/cancellations.md § 9 (Mocked vs production).
-export default function KeepOrderSheet({ order, open, onClose }) {
+export default function KeepOrderSheet({ order, open, onKeep, onClose }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e) => {
@@ -105,7 +106,10 @@ export default function KeepOrderSheet({ order, open, onClose }) {
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              onKeep?.()
+              onClose()
+            }}
             className="flex-1 h-[44px] rounded-[10px] inline-flex items-center justify-center gap-1.5 bg-brand text-white border border-brand font-semibold text-[13.5px]"
           >
             Yes, keep my order

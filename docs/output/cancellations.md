@@ -7,9 +7,11 @@
 Customers can cancel orders themselves from the `created` and `quality_check` states; once an order is `shipped` they have to contact support. Cancellation has two surfaces:
 
 - A **forward** flow — the `Cancel order` bottom sheet (`CancelOrderSheet`) opened from `InProgressCard`. Two- or three-step depending on refund method.
-- A **reverse** flow — the `I want to keep my order` button on the refund-hero variant of `PastOrderCard` while the cancellation is still in flight (`requested` / `refund_pending`). Opens a single-step `KeepOrderSheet` confirm.
+- A **reverse** flow — the `I want to keep my order` button on the refund-hero variant of `PastOrderCard`, shown only while the cancellation is still at `requested` (before the refund is accepted). Opens a single-step `KeepOrderSheet` confirm.
 
 Cancelled orders flip the order's `state` to `cancelled` and add a parallel `cancellationStatusId` / `cancellationTimeline` chain. The `statusId` is **not** changed — a cancelled order keeps the `statusId` it had at cancellation, so the timeline still renders where the order was when the customer pulled the plug.
+
+The **stage at cancellation changes the refund path** (modelled in the `cancellation` journey, `src/data/journey.js`). Cancelling **before QC** (`created`) skips supplier review entirely: nothing is packed yet, so the request lands straight on `refund_pending` — a `requested` timestamp is still stamped so the stepper reads Requested ✓ → Pending. Cancelling **at QC** (`quality_check`) waits on an ops review that can be accepted or declined, since the unit may already be packed.
 
 Refund math + the 5% processing fee + the success-tone wallet recommendation are prototype-only; production will read the eligibility window, fee rate, recommendation policy, and per-line-item amounts from the backend.
 
@@ -105,22 +107,25 @@ stateDiagram-v2
 
 ## 4. Keep-my-order undo (`KeepOrderSheet`)
 
-Once an order has been cancelled but the refund hasn't landed yet (so the card lives in **In progress** as a `PastOrderCard` refund-hero variant — `cancellationStatusId` is `requested` or `refund_pending`), the expanded view carries a primary brand-purple `I want to keep my order` button stacked **above** the existing `View refund details` + icon-only `Download receipt` row. The button is gated on those two states only; on `refunded` the affordance disappears, because the money has already left the company and reversing is no longer a simple cancel-the-cancellation operation.
+Once an order has been cancelled but the refund hasn't been accepted yet (so the card lives in **In progress** as a `PastOrderCard` refund-hero variant — `cancellationStatusId` is `requested`), the expanded view carries a primary brand-purple `I want to keep my order` button stacked **above** the existing `View refund details` + icon-only `Download receipt` row. The button is gated on `requested` only (`canKeep`): once the refund is accepted (`refund_pending`) or credited (`refunded`) the affordance disappears, because the cancellation is committed and reversing it is no longer a simple cancel-the-cancellation operation.
 
 Tapping it opens `KeepOrderSheet` (`src/components/KeepOrderSheet.jsx`), a single-step confirm sheet:
 
 - Header: `Keep your order?` + `#id`, X to dismiss.
 - Hero card: brand-tinted `RotateCcw` icon over *"Your {product} will continue through fulfilment as if it was never cancelled."*
-- On `refund_pending` only, a neutral info strip names the pending refund that will be cancelled: *"Your pending refund of {amount} will be cancelled — no money will be returned to your {destination}."* On `requested` this strip is suppressed (no refund has been issued yet).
 - Footer: outlined `No, continue cancellation` and brand-filled `Yes, keep my order`.
 
-Submit is a stub: both footer buttons just close the sheet. The order shape today has no transition to flip `state` back from `cancelled` to `open` and clean up `cancellationStatusId` / `cancellationTimeline`.
+(The sheet still carries a `refund_pending` info strip — *"Your pending refund of {amount} will be cancelled…"* — but with the window narrowed to `requested` it no longer renders; it's retained as defensive copy in case the window widens.)
+
+**Behaviour.** `Yes, keep my order` calls the `onKeep` prop threaded from `App.jsx` (`PastOrderCard` → `CancelledOrderCard` → `KeepOrderSheet`). In **journey mode** `handleKeepOrder` advances the `cancellation_kept` node, which flips `state` back to `open`, voids the in-flight `refund`, clears `cancellationStatusId`, and leaves `statusId` (`quality_check`) untouched so the order resumes fulfilment exactly where it paused — then re-merges into the shipping chain through to delivery. A `cancellationTimeline.reverted` timestamp + `cancellationReversal` marker survive (see §7.3), so a neutral `Cancellation reversed` chip surfaces in the `HistoryThread` once the order is delivered. Outside journey mode `onKeep` is absent, so confirm just closes the sheet (no static state transition exists).
 
 ## 5. Rejected cancellations
 
 When an order's cancellation request is rejected (the order had already shipped, for example), the rejection survives as a past event on whatever card the order eventually routes to — most commonly a `ClaimCard` once the customer raised a post-delivery return. The rejection is represented inside the expanded body's `HistoryThread` as a neutral `Cancel rejected` row in the vertical timeline; tapping it expands a detail panel that names the rejection ref and the reason copy from `order.cancellationRejection`.
 
 History thread on cancelled refund cards: all three cancelled phases (`requested`, `refund_pending`, `refunded`) render the `HistoryThread` in the expanded body. In `requested` the cancellation itself is the active hero, so the thread carries just `Order placed`. Once the order moves past `requested`, the thread also carries `Cancellation requested` as a second past event. Driven by `getHistoryEvents(order, 'cancellation')` in `src/lib/events.js`.
+
+A **reversed** cancellation (the customer used *Keep my order*) leaves the same kind of trace: `cancellationTimeline.reverted` flips `buildCancellationEvent` to emit a neutral `Cancellation reversed` chip (ref + reason from `order.cancellationReversal`). Because the kept order resumes to delivery, the `delivered` mode of `getHistoryEvents` now also surfaces this cancellation trace (it previously returned only `Order placed`) — so both reversed and declined cancellations read honestly on the eventual `DeliveredOrderCard`.
 
 ## 6. UX decisions
 
@@ -147,7 +152,7 @@ Cancellation- and refund-specific fields. Top-level order fields, status fields,
 | `state` | enum | Set to `cancelled` when the cancellation is committed. `statusId` is **not** changed — a cancelled order keeps the `statusId` it had at cancellation. |
 | `cancellationRef` *(optional)* | string | Customer-facing cancellation reference (e.g. `CXL-7P4w2x`). Surfaced in the hero eyebrow (`Cancellation · #{cancellationRef}`). |
 | `cancellationStatusId` *(optional)* | enum | One of `requested`, `refund_pending`, `refunded`. Drives the refund-hero card's phase tone, section routing (In progress vs Past orders), and the 3-step Cancellation progress stepper. |
-| `cancellationTimeline` *(optional)* | map | Keyed by `cancellationStatusId` (`requested`, `refund_pending`, `refunded`), each entry is a human-readable timestamp at which the cancellation entered that phase. Populated progressively. Also accepts an optional `rejected` key — see §7.3. |
+| `cancellationTimeline` *(optional)* | map | Keyed by `cancellationStatusId` (`requested`, `refund_pending`, `refunded`), each entry is a human-readable timestamp at which the cancellation entered that phase. Populated progressively. Also accepts optional `rejected` / `reverted` keys — see §7.3. |
 
 ### 7.2 Refund object (cancelled past orders only)
 
@@ -162,14 +167,16 @@ Carried under `order.refund`. In-flight cancelled orders (still mid-fulfilment) 
 | `refund.breakdown` | array of `{ label, amount }` | Line items summing to `refund.subtotal`. Rendered inside `RefundDetailsSheet`. |
 | `refund.fundsAvailable` *(optional)* | string | Short status copy shown under the hero amount. Only surfaced on `refunded` orders today; future card-refund ETAs ("Expected by 22 May") could also populate it. |
 
-### 7.3 Rejection fields (optional)
+### 7.3 Rejection / reversal fields (optional)
 
-Set only when an earlier cancellation request was rejected (see §5).
+Set only when an earlier cancellation request was rejected (see §5) or reversed by the customer (see §4).
 
 | Field | Type | Notes |
 |---|---|---|
 | `cancellationTimeline.rejected` *(optional)* | string | Human-readable timestamp at which the cancellation was rejected. Presence of this key changes the `HistoryThread` chip's label from `Cancel requested` to `Cancel rejected` (tone stays neutral). |
 | `cancellationRejection` *(optional)* | `{ ref, reason }` | `ref` is the rejection reference (e.g. `CXL-4BTb2x`) shown in the chip's expanded detail eyebrow; `reason` is the customer-facing explanation rendered inside the detail panel's tinted message bubble. |
+| `cancellationTimeline.reverted` *(optional)* | string | Human-readable timestamp at which the customer reversed the cancellation via *Keep my order*. Presence of this key makes `buildCancellationEvent` emit a `Cancellation reversed` chip (tone neutral). Takes precedence over `rejected` / `requested` in the builder. |
+| `cancellationReversal` *(optional)* | `{ ref, reason }` | Parallel to `cancellationRejection`: `ref` shown in the chip's expanded eyebrow, `reason` in the detail bubble. Set when the order is reverted; `state` returns to `open`, `cancellationStatusId` clears, and `refund` is voided. |
 
 ### 7.4 Fields read by the cancel sheet
 
@@ -194,15 +201,15 @@ src/
 │   ├── HistoryThread.jsx             Drives the Cancel rejected chip on layered cards
 │   └── WalletInfoTooltip.jsx         Shared anywhere "Revibe Wallet" is named
 └── lib/
-    └── events.js                     getHistoryEvents(order, 'cancellation') — builds the refund-hero history thread
+    └── events.js                     getHistoryEvents(order, 'cancellation' | 'delivered') — builds the refund-hero + delivered history thread (incl. Cancellation reversed / rejected chips)
 ```
 
 `CancelOrderSheet` carries the constant `DISSUADE_STATUSES = new Set(['created', 'quality_check'])` that decides whether the middle step renders. Both in-flight demo orders (`89712`, `89510`) carry `subtotal`, `warranty`, `estimatedDeliveryLong`, and `paymentMethod`, so the full flow exercises end-to-end on either.
 
 ## 9. Mocked vs production
 
-- **Cancellation is a stub.** Tapping the final `Cancel order` simply closes the sheet — the order keeps its `created` state. Production should flip `state` to `cancelled` and vary the cancelled-state banner copy by chosen refund method.
-- **`I want to keep my order` is a stub.** Both footer buttons on `KeepOrderSheet` close the sheet; `state` stays `cancelled` and the `cancellationStatusId` / `cancellationTimeline` are untouched. Production needs a reverse-cancellation endpoint and rules for which phases are still reversible (e.g. `refund_pending` becomes irreversible the moment funds are released to the processor).
+- **Cancellation is a stub outside journey mode.** In the static showcase, tapping the final `Cancel order` just closes the sheet — the order keeps its state. In **journey mode** it's wired: `handleCancelOrder` advances the cancellation request node, picking `cancel_before_qc_*` before QC (straight to refund pending) or `cancellation_requested_*` at QC, by refund method. Production should flip `state` to `cancelled` and vary the cancelled-state banner copy by chosen refund method.
+- **`I want to keep my order` is a stub outside journey mode.** In the static showcase confirm just closes the sheet. In **journey mode** `onKeep` → `handleKeepOrder` advances the `cancellation_kept` node (reverts to open, voids the refund, resumes fulfilment, leaves a reversed trace). The window is `requested`-only — production still needs a reverse-cancellation endpoint and the rule for the wider window (e.g. whether `refund_pending` is ever reversible, irreversible the moment funds are released to the processor).
 - **5% fee is hardcoded.** Lives inside `CancelOrderSheet`. Production should read from a backend config per order.
 - **Wallet recommendation styling is hardcoded.** The success-tone detail line is statically positioned on the wallet card. Production should accept a per-order policy flag.
 - **Per-line-item amounts are hand-derived.** The breakdown today is `Product` (= `subtotal`) + `Revibe Care` (= `warranty`) + `Total` (= `total`). Production needs real per-line-item amounts from the backend.
@@ -210,7 +217,7 @@ src/
 
 ## 10. Open questions
 
-- **Reversing `refund_pending` cleanly.** Production decision: at what point does a pending refund become irreversible? The natural cutoff is "the moment funds are released to the processor", but the customer-facing UI needs a separate flag (or a `cancellationStatusId === 'irreversible'` sub-state) to know when to hide the `I want to keep my order` button.
+- **Reversing `refund_pending` cleanly.** The prototype now draws the line at `requested` (keep is hidden once the refund is accepted). Open production decision: is `refund_pending` ever reversible? The natural cutoff is "the moment funds are released to the processor" — if production wants a wider window than `requested`, the UI needs a separate flag (or a `cancellationStatusId === 'irreversible'` sub-state) to know when to hide the `I want to keep my order` button.
 - **Banner copy for cancelled state by refund method.** Once cancellation is wired up, the cancelled-state status banner should vary copy by chosen method (wallet vs original payment) — currently a single placeholder.
 - **Show a "Cancellation history" chip on the refund-hero card.** Today rejected-cancellation chips only appear on layered claim cards. A self-referential cancel-rejected chip on the refund hero would be redundant in normal flow but useful when a customer's first cancel request was rejected and a later one succeeded.
 - **In-flight `Cancel claim` on submitted returns.** Currently no affordance exists for cancelling an in-flight return claim. Likely lives in [returns/claim_tracking.md](./returns/claim_tracking.md) once introduced.
