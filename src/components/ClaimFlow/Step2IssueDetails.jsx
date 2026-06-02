@@ -76,7 +76,7 @@ export default function Step2IssueDetails({ state, dispatch, order, error }) {
     <>
       <StepHeading
         title="Tell us what went wrong"
-        subtitle="Pick what matches your situation, describe it briefly, and attach a photo or short video so QC knows what to look for."
+        subtitle="Pick what matches your situation, describe it briefly, and attach a photo or short video so quality check knows what to look for."
       />
 
       <div className="px-4 flex flex-col gap-4">
@@ -188,7 +188,7 @@ export default function Step2IssueDetails({ state, dispatch, order, error }) {
           />
           <div className="flex items-center justify-between gap-2">
             {error === 'description' ? (
-              <InlineError>Add a short description so QC knows what to look for.</InlineError>
+              <InlineError>Add a short description so quality check knows what to look for.</InlineError>
             ) : (
               <span />
             )}
@@ -573,7 +573,7 @@ function BatteryVerdict({ assessment }) {
     tone = 'muted'
     Icon = Info
     title = 'This looks like normal battery wear'
-    body = `At ${capacity}%, your battery is within the range we’d expect, so it isn’t treated as a defect on its own. You can still submit — QC will take a look.`
+    body = `At ${capacity}%, your battery is within the range we’d expect, so it isn’t treated as a defect on its own. You can still submit — quality check will take a look.`
   }
 
   return (
@@ -596,7 +596,7 @@ function BatteryVerdict({ assessment }) {
         </div>
       </div>
       <div className="text-[10.5px] text-muted leading-[1.4] pl-[23px]">
-        Estimate only — final eligibility is confirmed by QC after inspection.
+        Estimate only — final eligibility is confirmed by quality check after inspection.
       </div>
     </div>
   )

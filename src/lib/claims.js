@@ -33,7 +33,7 @@ export const CLAIM_STATUSES = [
   {
     id: 'qc',
     label: 'Quality Check',
-    short: 'QC',
+    short: 'Quality Check',
     headline: 'Under Quality Check',
     icon: ShieldCheck,
   },
@@ -216,7 +216,7 @@ export const WARRANTY_CLAIM_STATUSES = [
   {
     id: 'qc',
     label: 'Quality Check',
-    short: 'QC',
+    short: 'Quality Check',
     headline: 'Under Quality Check',
     icon: ShieldCheck,
   },
