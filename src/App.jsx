@@ -136,14 +136,27 @@ export default function App() {
 
   // Customer-triggered journey advance from the real cancel sheet.
   // Sheet's `method` ids (store_credit / original) map to the journey's
-  // refund-branch suffix (wallet / card). Guarded by validNext so an
-  // out-of-sequence submit silently no-ops instead of corrupting the path.
+  // refund-branch suffix (wallet / card). The request node differs by stage:
+  // `cancel_before_qc_*` before QC (straight to refund pending), or
+  // `cancellation_requested_*` at QC (awaits supplier review). We advance
+  // whichever is in validNext, so an out-of-sequence submit no-ops instead
+  // of corrupting the path.
   const handleCancelOrder = ({ method }) => {
     if (!journeyMode || isSandbox) return
     const branch = method === 'store_credit' ? 'wallet' : 'card'
-    const target = `cancellation_requested_${branch}`
-    if (journey.validNext().some((n) => n.id === target)) {
-      journey.advance(target)
+    const candidates = [`cancel_before_qc_${branch}`, `cancellation_requested_${branch}`]
+    const target = journey.validNext().find((n) => candidates.includes(n.id))
+    if (target) journey.advance(target.id)
+  }
+
+  // Customer-triggered journey advance from the `keep my order` undo. Reverts
+  // an in-flight cancellation back to its open state; guarded by validNext so
+  // it only fires while `cancellation_kept` is reachable (the `requested`
+  // stage). No-op outside journey mode.
+  const handleKeepOrder = () => {
+    if (!journeyMode || isSandbox) return
+    if (journey.validNext().some((n) => n.id === 'cancellation_kept')) {
+      journey.advance('cancellation_kept')
     }
   }
 
@@ -309,7 +322,13 @@ export default function App() {
                       )
                     }
                     if (isInFlightCancellation(o)) {
-                      return <PastOrderCard key={o.id} order={o} />
+                      return (
+                        <PastOrderCard
+                          key={o.id}
+                          order={o}
+                          onKeep={handleKeepOrder}
+                        />
+                      )
                     }
                     if (o.statusId === 'created' || o.statusId === 'quality_check') {
                       return (

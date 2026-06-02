@@ -15,9 +15,9 @@
 //                    In `requested` the request itself is the hero, so
 //                    only `placed` survives as background context.
 //   'delivered'    — delivery is the active hero (DeliveredOrderCard).
-//                    Past events: placed only. Cancel-rejected can't
-//                    occur on this card (rejected-then-delivered orders
-//                    layer into a ClaimCard once a return is raised).
+//                    Past events: placed, plus a cancellation trace when
+//                    the order was cancelled then reversed/declined before
+//                    resuming to delivery. Clean orders add nothing.
 //
 // An order can opt out of derivation by supplying its own `events: [...]`
 // array (same shape). When that's present we use it verbatim and just
@@ -45,6 +45,20 @@ function buildPlacedEvent(order) {
 function buildCancellationEvent(order) {
   const c = order.cancellationTimeline
   if (!c) return null
+  if (c.reverted) {
+    const requestedDate = c.requested ? c.requested.split(' · ')[0] : null
+    return {
+      id: 'evt-cancel-reverted',
+      kind: 'cancellation',
+      status: 'reverted',
+      tone: 'neutral',
+      title: 'Cancellation reversed',
+      timestamp: c.reverted,
+      detail: requestedDate ? `Requested ${requestedDate}` : undefined,
+      message: order.cancellationReversal?.reason,
+      ref: order.cancellationReversal?.ref || order.cancellationRef,
+    }
+  }
   if (c.rejected) {
     const requestedDate = c.requested ? c.requested.split(' · ')[0] : null
     return {
@@ -125,7 +139,12 @@ export function getHistoryEvents(order, mode = 'claim') {
       if (cancellation) events.push(cancellation)
     }
   } else if (mode === 'delivered') {
-    // Delivery is the active hero; only `placed` survives as background.
+    // Delivery is the active hero. A cancellation that was reversed (or
+    // declined) before the order resumed to delivery survives as a chip so
+    // the lifecycle reads honestly; clean orders have no cancellation
+    // timeline and add nothing here.
+    const cancellation = buildCancellationEvent(order)
+    if (cancellation) events.push(cancellation)
   }
 
   return events
