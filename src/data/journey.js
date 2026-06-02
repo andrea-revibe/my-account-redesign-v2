@@ -49,6 +49,7 @@ export const INITIAL_ORDER = {
   product: {
     name: 'iPhone 13',
     variant: 'Midnight · 128 GB · Good',
+    category_name: 'iPhone',
     image: '/iphone-midnight.png',
   },
 }
@@ -3029,6 +3030,13 @@ export const JOURNEYS = [
     initialOrder: {
       ...INITIAL_ORDER,
       paymentMethod: { type: 'bnpl', provider: 'tabby', brand: 'Tabby' },
+      deviceOs: 'android',
+      product: {
+        name: 'Samsung Galaxy S21',
+        variant: 'Phantom Black · 128 GB · Good',
+        category_name: 'Samsung phone',
+        image: '/iphone-midnight.png',
+      },
     },
     nodes: CLAIM_COM_NODES,
   },

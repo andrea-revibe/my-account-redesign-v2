@@ -1,267 +1,124 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ShieldAlert,
-  ChevronDown,
-  Check,
-  Lock,
-  KeyRound,
   ShieldCheck,
-  ExternalLink,
-  Apple,
-  Smartphone,
-  BadgeCheck,
+  Check,
   AlertTriangle,
   Sparkles,
+  WifiOff,
+  Clock,
+  RotateCcw,
+  ArrowRight,
+  Lock,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
+import { deviceOsForOrder } from '../../lib/devices'
 
-const RESET_GUIDE = {
-  ios: [
-    {
-      title: 'Back up your device',
-      body: "If you want to keep anything on this device, back it up to iCloud or your computer before continuing — the next steps will erase everything.",
-    },
-    {
-      title: 'Sign out of iCloud and turn off Find My',
-      lead: 'This is the single most important step in this entire guide.',
-      body: 'Doing this before the reset is what prevents Activation Lock from blocking the device after the wipe.',
-      subActions: [
-        'Open **Settings**',
-        'Tap your name at the very top',
-        'Scroll all the way to the bottom and tap **Sign Out**',
-        'Enter your Apple ID password when prompted (this is what disables Find My and removes Activation Lock)',
-        "Choose whether to keep a copy of your data on the device (it'll be erased in the next step anyway, so it doesn't matter much)",
-        'Confirm **Sign Out**',
-      ],
-      tip: 'You should now see "Sign in to your iPhone/iPad" at the top of Settings. That confirms iCloud is disconnected.',
-    },
-    {
-      title: 'Erase all content and settings',
-      subActions: [
-        'Open **Settings → General → Transfer or Reset iPhone**',
-        'Tap **Erase All Content and Settings**',
-        'Enter your passcode if prompted, then tap **Continue**',
-        'Confirm the erase',
-      ],
-    },
-    {
-      title: 'Leave the device on the Hello screen',
-      body: "Once it restarts, you'll see the Hello / language picker. Don't set it up — just power it off and pack it for pickup.",
-    },
-  ],
-  android: [
-    {
-      title: 'Back up your device',
-      body: 'Back up photos, contacts, and anything else you want to keep before continuing — the next steps will erase everything.',
-    },
-    {
-      title: 'Sign out of your Google account and turn off Find My Device',
-      lead: 'This is the single most important step in this entire guide.',
-      body: 'Doing this before the reset is what prevents Factory Reset Protection (FRP) from locking the device after the wipe.',
-      subActions: [
-        'Open **Settings**',
-        'Tap **Passwords & accounts** (called **Accounts** on some versions)',
-        'Tap your Google account, then **Remove account**',
-        'Confirm with your screen-lock PIN or pattern if prompted',
-        'Go to **Settings → Security → Find My Device** and toggle it off',
-        'If you have more than one Google account on the device, repeat for each one',
-      ],
-      tip: "Your Google account should no longer appear under Accounts. That confirms Factory Reset Protection won't trigger after the reset.",
-    },
-    {
-      title: 'Erase all data (factory reset)',
-      subActions: [
-        'Open **Settings → System → Reset options**',
-        'Tap **Erase all data (factory reset)**',
-        'Enter your PIN, pattern, or password if prompted',
-        'Confirm the erase',
-      ],
-    },
-    {
-      title: 'Leave the device on the welcome screen',
-      body: "Once it restarts, you'll see the welcome / language picker. Don't set it up — just power it off and pack it for pickup.",
-    },
-  ],
-}
-
-const UNLINK_GUIDE = {
-  ios: [
-    {
-      title: 'Sign in to iCloud.com from any browser',
-      body: 'Use a phone, tablet, or computer — anything with internet. Sign in with the Apple ID linked to the device you are returning.',
-      tip: "If two-factor is on, you'll need a verification code from another trusted Apple device or phone number.",
-    },
-    {
-      title: 'Open Find My, then choose All Devices',
-      body: 'From the iCloud dashboard, open Find My and pick the device you are returning from the All Devices list.',
-    },
-    {
-      title: 'Erase the device, then remove it from your account',
-      lead: 'This is the single most important step in this entire guide.',
-      body: 'This is what switches Activation Lock off so our technician can wipe and resell the device.',
-      subActions: [
-        'Tap **Erase This Device**',
-        'Confirm with your Apple ID password',
-        'Once the device shows as erased, tap **Remove from Account**',
-        'Confirm the removal',
-      ],
-      tip: 'The device should disappear from the All Devices list. That confirms Activation Lock is switched off.',
-    },
-  ],
-  android: [
-    {
-      title: 'Sign in to android.com/find from any browser',
-      body: 'Use a phone, tablet, or computer with internet. Sign in with the Google account linked to the device you are returning.',
-    },
-    {
-      title: 'Open Find My Device, then pick this device',
-      body: 'Select the device you are returning from the list of devices on your account.',
-    },
-    {
-      title: 'Erase the device, then sign out of your Google account',
-      lead: 'This is the single most important step in this entire guide.',
-      body: 'This is what clears Factory Reset Protection so our technician can wipe and resell the device.',
-      subActions: [
-        'Tap **Erase device**',
-        'Confirm with your Google password',
-        'Open **myaccount.google.com → Security → Your devices**',
-        'Find the returned device and tap **Sign out**',
-      ],
-      tip: 'The device should disappear from Find My Device. That confirms Factory Reset Protection has been cleared.',
-    },
-  ],
-}
-
-const UNLINK_LINKS = {
-  ios: { href: 'https://www.icloud.com/find', label: 'Open iCloud' },
-  android: {
-    href: 'https://www.google.com/android/find',
-    label: 'Open Find My Device',
-  },
-}
-
-const PASSCODE_LEN = 6
-
+// Step 3 — a single, mandatory path: run the guided reset, then confirm it.
+// The guide itself branches (reset on-device vs erase remotely from
+// iCloud / Google), so it now covers the customer who can't physically
+// unlock or power on the device — there's no separate passcode-handover
+// option anymore. The confirm checkbox is the gate; it stays locked until
+// the guide has been opened and finished.
+//
+// Visual direction: "Refined card" — an elevated hero launcher (gradient
+// icon coin, decorative ring texture, meta chips, a tap affordance), a
+// data-safety reassurance line near the launcher (the screen's emotional
+// crux — "am I about to lose my photos?"), and a confirm gate that reads as
+// the clear final action.
 export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const dp = state.devicePrep
-  const defaultOs = order?.deviceOs || 'ios'
-  const os = dp.os || defaultOs
+  // The guide platform is driven by the order's category (set in the reducer
+  // from category_name); there's no manual picker. deviceOsForOrder is a
+  // defensive fallback should dp.os ever be unset.
+  const os = dp.os || deviceOsForOrder(order)
 
-  const optionRef = useRef(null)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const guideSeen = dp.resetGuideSeen
+  const confirmed = dp.resetConfirmed
+  const confirmLocked = !guideSeen
+
+  // Premature Continue before completing the guide — escalates the guide
+  // launcher + gate message into a red error state.
+  const showGuideError = error === 'resetGuide'
+  // Guide done but the confirm checkbox is still unticked.
+  const confirmError = error === 'resetConfirm'
+
+  const confirmRef = useRef(null)
   useEffect(() => {
-    if (error === 'devicePrepOption' && optionRef.current) {
-      optionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (confirmError && confirmRef.current) {
+      confirmRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
-  }, [error])
+  }, [confirmError])
 
   return (
     <>
       <StepHeading
         title="Prepare your device for return"
-        subtitle="Returns are delayed when this step is skipped. Pick one of the two paths below."
+        subtitle="Returns are delayed when this step is skipped. The guided reset walks you through it — even if the device is broken or you can't unlock it."
       />
 
       <div className="px-4 flex flex-col gap-3">
-        <Callout>
-          <span className="font-semibold text-ink">
-            Unlock the device before we can refund you.
-          </span>{' '}
-          We can't access its data — this lets it be reset and resold.
-        </Callout>
+        <Callout />
 
-        {error === 'devicePrepOption' && (
-          <div ref={optionRef}>
-            <InlineError>Pick how you'll prepare your device to continue.</InlineError>
-          </div>
+        <HeroLauncher
+          guideSeen={guideSeen}
+          showError={showGuideError}
+          onOpen={() => setGuideOpen(true)}
+        />
+
+        <SafetyNote os={os} />
+
+        <div className="flex items-start gap-2 px-1 text-[11.5px] text-muted leading-[1.45]">
+          <WifiOff size={13} strokeWidth={2} className="text-muted shrink-0 mt-0.5" />
+          <span>
+            Can't unlock or power on the device? The guide has a remote path —
+            you'll erase it from{' '}
+            {os === 'ios' ? 'iCloud' : 'your Google account'} instead.
+          </span>
+        </div>
+
+        {guideOpen && (
+          <ResetGuideSheet
+            os={os}
+            checks={dp.resetGuideChecks || {}}
+            onToggle={(id, checked) =>
+              dispatch({
+                type: 'SET_DEVICE_PREP',
+                value: {
+                  resetGuideChecks: {
+                    ...(dp.resetGuideChecks || {}),
+                    [id]: checked,
+                  },
+                },
+              })
+            }
+            onDone={() => {
+              dispatch({
+                type: 'SET_DEVICE_PREP',
+                value: { resetGuideSeen: true },
+              })
+              setGuideOpen(false)
+            }}
+            onClose={() => setGuideOpen(false)}
+          />
         )}
 
-        <OptionCard
-          selected={dp.option === 'reset'}
-          onSelect={() =>
+        <ConfirmGate
+          ref={confirmRef}
+          confirmed={confirmed}
+          setConfirmed={(checked) =>
             dispatch({
               type: 'SET_DEVICE_PREP',
-              value: { option: 'reset' },
+              value: { resetConfirmed: checked },
             })
           }
-          title="I've factory reset the device"
-          subtitle="Recommended — fastest to process."
-          recommended
-        >
-          {dp.option === 'reset' && (
-            <ResetPanel
-              os={os}
-              onOsChange={(value) =>
-                dispatch({ type: 'SET_DEVICE_PREP', value: { os: value } })
-              }
-              confirmed={dp.resetConfirmed}
-              onConfirmChange={(value) =>
-                dispatch({
-                  type: 'SET_DEVICE_PREP',
-                  value: { resetConfirmed: value },
-                })
-              }
-              guideChecks={dp.resetGuideChecks || {}}
-              onGuideCheck={(id, checked) =>
-                dispatch({
-                  type: 'SET_DEVICE_PREP',
-                  value: {
-                    resetGuideChecks: {
-                      ...(dp.resetGuideChecks || {}),
-                      [id]: checked,
-                    },
-                  },
-                })
-              }
-              guideSeen={dp.resetGuideSeen}
-              onGuideDone={() =>
-                dispatch({
-                  type: 'SET_DEVICE_PREP',
-                  value: { resetGuideSeen: true },
-                })
-              }
-              error={error}
-            />
-          )}
-        </OptionCard>
-
-        <OptionCard
-          selected={dp.option === 'credentials'}
-          onSelect={() =>
-            dispatch({
-              type: 'SET_DEVICE_PREP',
-              value: { option: 'credentials' },
-            })
-          }
-          title="I can't factory reset it"
-          subtitle="Share your passcode and unlink it — we'll wipe it on pickup. Slower."
-          slower
-        >
-          {dp.option === 'credentials' && (
-            <UnlinkPanel
-              os={os}
-              onOsChange={(value) =>
-                dispatch({ type: 'SET_DEVICE_PREP', value: { os: value } })
-              }
-              accountUnlinked={dp.accountUnlinked}
-              onUnlinkChange={(value) =>
-                dispatch({
-                  type: 'SET_DEVICE_PREP',
-                  value: { accountUnlinked: value },
-                })
-              }
-              passcode={dp.passcode}
-              onPasscodeChange={(value) =>
-                dispatch({
-                  type: 'SET_DEVICE_PREP',
-                  value: { passcode: value },
-                })
-              }
-              error={error}
-            />
-          )}
-        </OptionCard>
+          locked={confirmLocked}
+          confirmError={confirmError}
+          showGuideError={showGuideError}
+        />
 
         <div className="mt-1 text-[11.5px] text-muted leading-[1.45]">
           If you leave this flow, you'll need to start over — your inputs
@@ -272,269 +129,200 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
   )
 }
 
-function Callout({ children }) {
+function Callout() {
   return (
-    <div className="flex items-start gap-2.5 rounded-[14px] border border-warn-bg bg-warn-bg/70 px-3.5 py-3 text-[12.5px] text-ink leading-[1.45]">
-      <ShieldAlert
-        size={17}
-        strokeWidth={1.9}
-        className="text-warn shrink-0 mt-px"
-      />
-      <span>{children}</span>
-    </div>
-  )
-}
-
-function OptionCard({
-  selected,
-  onSelect,
-  title,
-  subtitle,
-  recommended,
-  slower,
-  children,
-}) {
-  return (
-    <div
-      className={`rounded-[16px] border-2 transition-colors ${
-        selected
-          ? 'border-brand bg-brand-bg/30'
-          : 'border-line bg-surface'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        aria-pressed={selected}
-        className="w-full text-left px-4 py-3.5 flex items-start gap-3"
+    <div className="flex items-start gap-3 rounded-[14px] border border-warn-bg bg-warn-bg/70 px-3.5 py-3">
+      <span
+        className="w-7 h-7 rounded-full grid place-items-center shrink-0 mt-px text-warn"
+        style={{ background: 'rgb(196 105 0 / 0.14)' }}
       >
-        <span
-          aria-hidden
-          className={`mt-0.5 w-[20px] h-[20px] rounded-full border-2 grid place-items-center shrink-0 ${
-            selected ? 'border-brand' : 'border-line'
-          }`}
-        >
-          {selected && <span className="w-2.5 h-2.5 rounded-full bg-brand" />}
-        </span>
-        <span className="flex-1 min-w-0">
-          <span className="flex items-center gap-2 flex-wrap">
-            <span className="text-[15px] font-semibold text-ink">{title}</span>
-            {recommended && <Badge tone="success">Recommended</Badge>}
-            {slower && <Badge tone="warn">Slower</Badge>}
-          </span>
-          <span className="block mt-0.5 text-[12.5px] text-muted leading-snug">
-            {subtitle}
-          </span>
-        </span>
-      </button>
-      {children && (
-        <div className="px-4 pb-4 pt-1 border-t border-line/60 animate-slideDown">
-          {children}
-        </div>
-      )}
+        <ShieldAlert size={16} strokeWidth={2} />
+      </span>
+      <p className="text-[12.5px] text-ink leading-[1.45]">
+        <span className="font-semibold text-ink">
+          Unlock the device before we can refund you.
+        </span>{' '}
+        We can't access its data — this lets it be reset and resold.
+      </p>
     </div>
   )
 }
 
-function Badge({ tone = 'success', children }) {
-  const tones = {
-    success: 'bg-success-bg text-success',
-    warn: 'bg-warn-bg text-warn',
-  }
+// The one prominent action on the step: an elevated hero launcher with a
+// gradient icon coin, decorative ring texture, and meta chips. Turns green
+// once completed, red (and shakes) if Continue is pressed before it's run.
+function HeroLauncher({ guideSeen, showError, onOpen }) {
+  const tone = showError ? 'error' : guideSeen ? 'done' : 'default'
+  const surface =
+    tone === 'error'
+      ? {
+          background: 'linear-gradient(165deg,#fff,rgb(253,232,235))',
+          borderColor: 'rgb(200,36,58)',
+        }
+      : tone === 'done'
+        ? {
+            background: 'linear-gradient(165deg,#fff,rgb(230,246,240))',
+            borderColor: 'rgb(0 150 106 / 0.4)',
+          }
+        : {
+            background:
+              'linear-gradient(165deg,#fff 12%,rgb(243,237,251) 130%)',
+            borderColor: 'rgb(80 25 160 / 0.28)',
+            boxShadow:
+              '0 16px 40px -16px rgba(80,25,160,0.28), 0 2px 6px rgba(20,12,40,0.05)',
+          }
+  const coin =
+    tone === 'error'
+      ? { background: 'linear-gradient(150deg,#e0566d,rgb(200,36,58))' }
+      : tone === 'done'
+        ? { background: 'linear-gradient(150deg,#2bbd92,rgb(0,150,106))' }
+        : {
+            background:
+              'linear-gradient(150deg,rgb(122,61,211),rgb(80,25,160))',
+          }
+
   return (
-    <span
-      className={`inline-flex items-center rounded-full h-5 px-2 text-[10px] font-bold uppercase tracking-[0.06em] ${tones[tone]}`}
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`relative w-full overflow-hidden rounded-[18px] border-[1.5px] px-4 py-4 text-left transition-all ${
+        showError ? 'animate-shakeX' : ''
+      }`}
+      style={surface}
     >
-      {children}
-    </span>
-  )
-}
+      {/* decorative concentric rings, brand-tinted texture */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -right-10 -top-12 w-40 h-40 rounded-full"
+        style={{
+          background:
+            'radial-gradient(circle, rgb(80 25 160 / 0.06) 0%, transparent 62%)',
+          border: '1px solid rgb(80 25 160 / 0.06)',
+        }}
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute right-2 top-2 w-24 h-24 rounded-full border"
+        style={{ borderColor: 'rgb(80 25 160 / 0.05)' }}
+      />
 
-function renderBold(text) {
-  if (!text) return null
-  const parts = String(text).split(/(\*\*[^*]+\*\*)/g)
-  return parts.map((p, i) =>
-    p.startsWith('**') && p.endsWith('**') ? (
-      <strong key={i} className="font-semibold text-ink">
-        {p.slice(2, -2)}
-      </strong>
-    ) : (
-      <span key={i}>{p}</span>
-    ),
-  )
-}
-
-function GuideStep({ index, step }) {
-  return (
-    <li className="flex gap-2.5 items-start">
-      <span className="w-6 h-6 rounded-full bg-brand text-white grid place-items-center shrink-0 text-[11px] font-bold tabular-nums mt-px">
-        {index + 1}
-      </span>
-      <div className="flex-1 min-w-0 pt-0.5">
-        <div className="text-[13px] font-semibold text-ink leading-snug">
-          {step.title}
-        </div>
-        {(step.lead || step.body) && (
-          <div className="text-[12px] text-ink-2 leading-[1.5] mt-1">
-            {step.lead && (
-              <span className="font-semibold text-ink">{step.lead} </span>
-            )}
-            {step.body && renderBold(step.body)}
-          </div>
-        )}
-        {step.subActions && (
-          <ol className="flex flex-col gap-1.5 mt-2">
-            {step.subActions.map((sa, j) => (
-              <li
-                key={j}
-                className="flex gap-2 items-start text-[12px] text-ink-2 leading-[1.5]"
-              >
-                <span className="text-muted shrink-0 tabular-nums font-medium min-w-[14px]">
-                  {j + 1}.
-                </span>
-                <span>{renderBold(sa)}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-        {step.tip && (
-          <div className="mt-2 flex items-start gap-1.5 rounded-[8px] bg-success-bg/40 border border-success-bg px-2.5 py-2 text-[11.5px] text-ink-2 leading-snug">
-            <BadgeCheck
-              size={13}
-              strokeWidth={2}
-              className="text-success shrink-0 mt-0.5"
-            />
-            <span>{renderBold(step.tip)}</span>
-          </div>
-        )}
-      </div>
-    </li>
-  )
-}
-
-function ResetPanel({
-  os,
-  onOsChange,
-  confirmed,
-  onConfirmChange,
-  guideChecks,
-  onGuideCheck,
-  guideSeen,
-  onGuideDone,
-  error,
-}) {
-  const [open, setOpen] = useState(true)
-  const [guideOpen, setGuideOpen] = useState(false)
-  const guide = RESET_GUIDE[os]
-  // On iOS the confirm checkbox is locked until the customer has been
-  // through the guide (opened it and pressed Done). Android keeps its
-  // inline accordion, so there's nothing to gate on.
-  const confirmLocked = os === 'ios' && !guideSeen
-  // Premature Continue before completing the guide — escalates the guide
-  // button + gate message into a red error state.
-  const showError = error === 'resetGuide'
-  // Guide done (or Android) but the confirm checkbox is still unticked.
-  const confirmError = error === 'resetConfirm'
-  const confirmRef = useRef(null)
-  useEffect(() => {
-    if (confirmError && confirmRef.current) {
-      confirmRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [confirmError])
-  return (
-    <div className="pt-3 flex flex-col gap-3">
-      <OsTabs os={os} onChange={onOsChange} />
-
-      {os === 'ios' ? (
-        <button
-          type="button"
-          onClick={() => setGuideOpen(true)}
-          className={`relative overflow-hidden rounded-[16px] border-2 px-4 py-3.5 text-left transition-colors ${
-            showError
-              ? 'border-danger bg-danger-bg/60'
-              : guideSeen
-                ? 'border-success/40 bg-success-bg/50'
-                : 'border-brand bg-brand-bg/60 hover:bg-brand-bg/80'
-          }`}
+      <div className="relative flex items-center gap-3.5">
+        <span
+          className="relative w-[52px] h-[52px] rounded-full grid place-items-center shrink-0 text-white shadow-md2"
+          style={coin}
         >
-          <span className="relative flex items-center gap-3">
-            <span
-              className={`w-10 h-10 rounded-full grid place-items-center shrink-0 ${
-                guideSeen
-                  ? 'bg-success text-white'
-                  : showError
-                    ? 'bg-danger text-white'
-                    : 'bg-brand text-white'
-              }`}
-            >
-              {guideSeen ? (
-                <Check size={19} strokeWidth={1.9} />
-              ) : (
-                <Sparkles size={19} strokeWidth={1.9} />
-              )}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[14.5px] font-semibold text-ink leading-snug">
-                {guideSeen ? 'Guided reset completed' : 'Start the guided reset'}
-              </span>
-              <span className="block mt-0.5 text-[12px] text-muted">
-                {guideSeen
-                  ? 'Tap to run through it again'
-                  : 'One step at a time · about 10 min'}
-              </span>
-            </span>
-          </span>
-        </button>
-      ) : (
-        <>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            className="flex items-center justify-between text-[12.5px] font-semibold text-ink-2 py-1"
-          >
-            <span>How to factory reset</span>
-            <ChevronDown
-              size={14}
-              strokeWidth={1.75}
-              className="transition-transform"
-              style={{ transform: open ? 'rotate(180deg)' : 'none' }}
-            />
-          </button>
-          {open && (
-            <ol className="flex flex-col gap-3.5 animate-slideDown">
-              {guide.map((step, i) => (
-                <GuideStep key={i} index={i} step={step} />
-              ))}
-            </ol>
+          <span
+            aria-hidden
+            className="absolute inset-[3px] rounded-full"
+            style={{ boxShadow: 'inset 0 1px 1px rgb(255 255 255 / 0.45)' }}
+          />
+          {tone === 'done' ? (
+            <Check size={24} strokeWidth={2.4} />
+          ) : tone === 'error' ? (
+            <AlertTriangle size={22} strokeWidth={2} />
+          ) : (
+            <Sparkles size={23} strokeWidth={1.9} />
           )}
-        </>
-      )}
+        </span>
 
-      {guideOpen && (
-        <ResetGuideSheet
-          checks={guideChecks}
-          onToggle={onGuideCheck}
-          onDone={() => {
-            onGuideDone()
-            setGuideOpen(false)
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15.5px] font-bold text-ink leading-snug tracking-[-0.01em]">
+            {tone === 'done' ? 'Guided reset completed' : 'Start the guided reset'}
+          </span>
+          {tone === 'done' ? (
+            <span className="mt-0.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-success">
+              <RotateCcw size={12} strokeWidth={2.2} /> Tap to run through it again
+            </span>
+          ) : (
+            <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-surface/80 border border-line px-2 h-[22px] text-[11px] font-semibold text-ink-2">
+                <Clock size={11} strokeWidth={2.2} /> ~10 min
+              </span>
+              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-surface/80 border border-line px-2 h-[22px] text-[11px] font-semibold text-ink-2">
+                3 simple steps
+              </span>
+            </span>
+          )}
+        </span>
+
+        <span
+          className={`w-8 h-8 rounded-full grid place-items-center shrink-0 ${
+            tone === 'done'
+              ? 'text-success'
+              : tone === 'error'
+                ? 'text-danger'
+                : 'text-brand'
+          }`}
+          style={{
+            background:
+              tone === 'done'
+                ? 'rgb(0 150 106 / 0.12)'
+                : tone === 'error'
+                  ? 'rgb(200 36 58 / 0.12)'
+                  : 'rgb(80 25 160 / 0.1)',
           }}
-          onClose={() => setGuideOpen(false)}
-        />
-      )}
+        >
+          {tone === 'done' ? (
+            <Check size={16} strokeWidth={2.6} />
+          ) : (
+            <ArrowRight size={16} strokeWidth={2.4} />
+          )}
+        </span>
+      </div>
+    </button>
+  )
+}
 
+// Data-safety reassurance — the screen's emotional crux ("am I about to lose
+// my photos?"). One quiet, warm line that lifts completion more than any
+// visual polish.
+function SafetyNote({ os }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-[12px] border border-line bg-line-2/40 px-3 py-2.5">
+      <span
+        className="w-6 h-6 rounded-full grid place-items-center shrink-0 mt-px text-success"
+        style={{ background: 'rgb(230,246,240)' }}
+      >
+        <ShieldCheck size={14} strokeWidth={2} />
+      </span>
+      <p className="text-[12px] text-ink-2 leading-[1.45]">
+        <span className="font-semibold text-ink">Worried about your photos?</span>{' '}
+        The reset only erases the copy on this device — your{' '}
+        {os === 'ios' ? 'iCloud' : 'Google'} backup stays safe.
+      </p>
+    </div>
+  )
+}
+
+// The confirm gate, restyled as a bordered card whose border / fill track
+// locked → error → checked → default. The clear final action of the step.
+function ConfirmGate({
+  ref,
+  confirmed,
+  setConfirmed,
+  locked,
+  confirmError,
+  showGuideError,
+}) {
+  return (
+    <div ref={ref} className="pt-1">
       <label
-        ref={confirmRef}
-        className={`flex items-start gap-2.5 pt-1 ${
-          confirmLocked ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'
+        className={`flex items-start gap-2.5 rounded-[14px] border px-3.5 py-3 transition-colors ${
+          locked
+            ? 'cursor-not-allowed border-line bg-line-2/30'
+            : confirmError
+              ? 'cursor-pointer border-danger bg-danger-bg/40'
+              : confirmed
+                ? 'cursor-pointer border-brand/40 bg-brand-bg/40'
+                : 'cursor-pointer border-line bg-surface hover:border-brand/40'
         }`}
       >
         <span className="relative mt-px shrink-0">
           <input
             type="checkbox"
             checked={confirmed}
-            disabled={confirmLocked}
-            onChange={(e) => onConfirmChange(e.target.checked)}
+            disabled={locked}
+            onChange={(e) => setConfirmed(e.target.checked)}
             className="peer sr-only"
           />
           <span
@@ -543,32 +331,42 @@ function ResetPanel({
                 ? 'bg-brand border-brand'
                 : confirmError
                   ? 'border-danger bg-surface'
-                  : 'border-line bg-surface'
+                  : locked
+                    ? 'border-line bg-line-2/40'
+                    : 'border-line bg-surface'
             }`}
           >
-            {confirmed && (
+            {confirmed ? (
               <Check size={13} strokeWidth={3} className="text-white" />
-            )}
+            ) : locked ? (
+              <Lock size={11} strokeWidth={2.4} className="text-muted" />
+            ) : null}
           </span>
         </span>
-        <span className="text-[13px] text-ink leading-[1.4]">
-          I confirm this device has been unlinked and factory reset.
+        <span
+          className={`text-[13px] leading-[1.4] ${
+            locked ? 'text-muted' : 'text-ink'
+          }`}
+        >
+          I confirm I've completed the guided reset — this device is unlinked
+          and erased.
         </span>
       </label>
+
       {confirmError && (
-        <InlineError className="-mt-1.5 ml-[30px]">
-          Confirm you've reset the device before continuing.
+        <InlineError className="mt-1.5 ml-1">
+          Confirm you've completed the reset before continuing.
         </InlineError>
       )}
-      {confirmLocked && (
+      {locked && (
         <p
-          className={`-mt-1.5 ml-[30px] flex items-start gap-1.5 text-[11.5px] leading-snug ${
-            showError
+          className={`mt-1.5 ml-1 flex items-start gap-1.5 text-[11.5px] leading-snug ${
+            showGuideError
               ? 'font-medium text-danger animate-slideDown'
               : 'text-muted'
           }`}
         >
-          {showError && (
+          {showGuideError && (
             <AlertTriangle
               size={13}
               strokeWidth={2.2}
@@ -578,7 +376,9 @@ function ResetPanel({
           <span>
             Run the guide above and tap{' '}
             <span
-              className={showError ? 'font-semibold' : 'font-semibold text-ink-2'}
+              className={
+                showGuideError ? 'font-semibold' : 'font-semibold text-ink-2'
+              }
             >
               Done
             </span>{' '}
@@ -590,208 +390,3 @@ function ResetPanel({
   )
 }
 
-function UnlinkPanel({
-  os,
-  onOsChange,
-  accountUnlinked,
-  onUnlinkChange,
-  passcode,
-  onPasscodeChange,
-  error,
-}) {
-  const guide = UNLINK_GUIDE[os]
-  const link = UNLINK_LINKS[os]
-  const accountLabel = os === 'ios' ? 'iCloud account' : 'Google account'
-
-  return (
-    <div className="pt-3 flex flex-col gap-3">
-      <OsTabs os={os} onChange={onOsChange} />
-
-      <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
-        <div className="px-3.5 py-2.5 flex items-center justify-between gap-2 bg-line-2/30 border-b border-line">
-          <div className="flex items-center gap-2">
-            <Lock size={13} strokeWidth={2} className="text-muted" />
-            <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink">
-              Remove device from your {accountLabel}
-            </span>
-          </div>
-          <a
-            href={link.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-[11px] font-semibold text-brand inline-flex items-center gap-1 hover:underline"
-          >
-            {link.label}
-            <ExternalLink size={11} strokeWidth={2} />
-          </a>
-        </div>
-        <ol className="px-3.5 py-3.5 flex flex-col gap-3.5">
-          {guide.map((step, i) => (
-            <GuideStep key={i} index={i} step={step} />
-          ))}
-        </ol>
-      </div>
-
-      <UnlinkToggle
-        accountLabel={accountLabel}
-        checked={accountUnlinked}
-        onChange={onUnlinkChange}
-        error={error === 'unlink'}
-      />
-
-      <PasscodeField
-        value={passcode}
-        onChange={onPasscodeChange}
-        error={error === 'passcode'}
-      />
-
-      <div className="rounded-[10px] border border-line bg-line-2/40 px-3 py-2.5 text-[11.5px] leading-snug flex items-start gap-2 text-ink">
-        <ShieldCheck
-          size={13}
-          strokeWidth={2}
-          className="text-ink-2 mt-0.5 shrink-0"
-        />
-        <span>
-          Your passcode is encrypted and used only by our technician during the
-          reset. It's deleted once the device is wiped.
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function UnlinkToggle({ accountLabel, checked, onChange, error }) {
-  const toggleRef = useRef(null)
-  useEffect(() => {
-    if (error && toggleRef.current) {
-      toggleRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [error])
-  return (
-    <div className="flex flex-col gap-1.5">
-      <button
-        ref={toggleRef}
-        type="button"
-        onClick={() => onChange(!checked)}
-        role="checkbox"
-        aria-checked={checked}
-        className={`w-full rounded-[12px] border px-3.5 py-3 flex items-start gap-2.5 text-left transition ${
-          checked
-            ? 'bg-success/5 border-success/40'
-            : error
-              ? 'bg-surface border-danger'
-              : 'bg-surface border-line hover:bg-line-2/40'
-        }`}
-      >
-        <span
-          aria-hidden
-          className={`w-5 h-5 rounded-[6px] border-2 grid place-items-center shrink-0 mt-0.5 transition ${
-            checked
-              ? 'bg-success border-success text-white'
-              : error
-                ? 'bg-surface border-danger'
-                : 'bg-surface border-line'
-          }`}
-        >
-          {checked && <Check size={12} strokeWidth={2.5} />}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-ink leading-snug">
-            I've removed this device from my {accountLabel}
-          </div>
-          <div className="text-[11.5px] text-muted leading-snug mt-0.5">
-            Required so our technician can complete the wipe.
-          </div>
-        </div>
-      </button>
-      {error && (
-        <InlineError>Confirm you've removed the device to continue.</InlineError>
-      )}
-    </div>
-  )
-}
-
-function PasscodeField({ value, onChange, error }) {
-  const handleChange = (e) => {
-    const digits = e.target.value.replace(/\D/g, '').slice(0, PASSCODE_LEN)
-    onChange(digits)
-  }
-  const complete = value.length === PASSCODE_LEN
-  const fieldRef = useRef(null)
-  useEffect(() => {
-    if (error && fieldRef.current) {
-      fieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [error])
-
-  return (
-    <div className="flex flex-col gap-1.5" ref={fieldRef}>
-      <label className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5">
-          <KeyRound size={12} strokeWidth={2.2} className="text-muted" />
-          Device passcode
-        </span>
-        <span
-          className={`text-[10.5px] tabular-nums font-medium ${
-            complete ? 'text-success' : 'text-muted'
-          }`}
-        >
-          {value.length}/{PASSCODE_LEN}
-        </span>
-      </label>
-      <input
-        type="password"
-        inputMode="numeric"
-        autoComplete="off"
-        value={value}
-        onChange={handleChange}
-        placeholder="6-digit passcode"
-        className={`w-full h-[46px] rounded-[10px] border bg-surface px-3.5 text-[15px] text-ink tracking-[0.4em] font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 ${
-          complete
-            ? 'border-success/50'
-            : error
-              ? 'border-danger focus:border-danger'
-              : 'border-line focus:border-brand'
-        }`}
-      />
-      {error ? (
-        <InlineError>Enter the 6-digit device passcode to continue.</InlineError>
-      ) : (
-        <div className="text-[11px] text-muted leading-snug">
-          Enter the passcode you set on this device. If it's 4 digits, pad with
-          zeros at the end.
-        </div>
-      )}
-    </div>
-  )
-}
-
-function OsTabs({ os, onChange }) {
-  const opts = [
-    { id: 'ios', label: 'iPhone', Icon: Apple },
-    { id: 'android', label: 'Android', Icon: Smartphone },
-  ]
-  return (
-    <div className="inline-flex p-1 rounded-[10px] bg-line-2/70 self-start">
-      {opts.map(({ id, label, Icon }) => {
-        const active = os === id
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onChange(id)}
-            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12.5px] font-semibold transition-colors ${
-              active
-                ? 'bg-surface text-ink shadow-sm2'
-                : 'text-muted hover:text-ink-2'
-            }`}
-          >
-            <Icon size={13} strokeWidth={1.75} />
-            {label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
