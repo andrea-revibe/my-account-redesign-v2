@@ -76,10 +76,14 @@ The reducer stores `devicePrep: { option, os, resetConfirmed, accountUnlinked, p
 
 ### 2.5 Step 4 — Packing (shared)
 
-Two stacked radio cards, each with a 9 mm brand-tinted icon tile (`Package` / `ShieldAlert`), title, one-line subtitle, and a bullet list of packing instructions. The selection is the gate: `canAdvance` requires `packingMethod !== null`. No ack checkbox on this step — the *"I have packed the device properly"* acknowledgment lives on the Review step (§2.8) so it's enforced right before submission.
+Top of the step is a **packing-demo video** (`PackingDemo`) — a brand-framed, full-width square (`/revibe_packing_guide.mp4`, 720×720, ~12s) that autoplays silently on loop (`autoPlay loop muted playsInline`) with a "Watch first" brand chip and a bottom gradient bar ("Packing demo · 12 sec" + "Tap to expand"). Tapping opens `DemoLightbox` — a `createPortal` dark-backdrop modal (Esc / backdrop / × to close, body-scroll locked) replaying the clip full-width with native `controls` (so the customer can scrub and unmute).
 
-- **Option A — `Use the original Revibe box`.** Re-use the device's original shipping box. Bullets: replace in the original tray/sleeve; include all accessories (charger, cable, SIM tool); nothing loose; seal seams.
-- **Option B — `Use any sturdy post box`.** Fallback when the original box is gone. Bullets: wrap fully in bubble wrap (2+ layers); cushion top/bottom/sides; tape all seams; mark "Fragile".
+Below the demo, two stacked radio cards, each with a 9 mm brand-tinted icon tile (`Package` / `ShieldAlert`), title, and one-line subtitle. The selection is the gate: `canAdvance` requires `packingMethod !== null`. No ack checkbox on this step — the *"I have packed the device properly"* acknowledgment lives on the Review step (§2.8) so it's enforced right before submission.
+
+- **Option A — `Use the original Revibe box`.** Re-use the device's original shipping box.
+- **Option B — `Use any sturdy post box`.** Fallback when the original box is gone.
+
+Under the options sits a single collapsible **Packing tips** disclosure (`PackingTips`) — a brand-tinted card with a filled-brand `Lightbulb` badge, collapsed by default. Open, it lists three general tips (`PACKING_TIPS`): nothing loose inside / seal all seams with tape / mark the box "Fragile". A muted footnote warns that poorly-packed devices may be returned at the customer's cost.
 
 The reducer stores `packingMethod: 'original_box' | 'post_box'`. The chosen label is surfaced on Review's Packing summary card via `PACKING_LABELS` (exported from `Step4Packing.jsx`); the Review's edit link returns the user here.
 
