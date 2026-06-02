@@ -22,6 +22,7 @@ import {
   NOT_WORKING_SUBTYPES,
   WRONG_DEVICE_SUBTYPES,
   PROOF_GUIDE_LABEL,
+  DEFAULT_PROOF_GUIDE_URL,
   scopeForSubtype,
   findSubtype,
 } from './issueSubtypes'
@@ -202,6 +203,10 @@ export default function Step2IssueDetails({ state, dispatch, order, error }) {
           ref={error === 'attachment' ? errorRef : null}
         >
           <SectionLabel>Photo or video of the issue</SectionLabel>
+          {selectedSubtype && <ProofGuidance sub={selectedSubtype} />}
+          {issueSubtypeId === 'physical' && (
+            <PhysicalConditionNote order={order} />
+          )}
           {attachmentName ? (
             <div className="rounded-[12px] border border-line bg-surface px-3.5 py-3 flex items-center gap-3">
               <span className="w-9 h-9 rounded-[10px] bg-brand-bg text-brand grid place-items-center shrink-0">
@@ -304,40 +309,67 @@ function SelectedSubtype({ sub, onRemove }) {
           <X size={15} strokeWidth={1.75} />
         </button>
       </div>
-      <div className="mt-1.5 rounded-[10px] border border-brand/30 bg-brand-bg/30 px-3 py-2.5 flex flex-col gap-2">
-        {sub.tryFirst && (
-          <div className="flex items-start gap-2">
-            <Lightbulb
-              size={13}
-              strokeWidth={1.75}
-              className="text-ink-2 shrink-0 mt-0.5"
-            />
-            <div className="text-[11.5px] leading-[1.45] text-ink-2">
-              <span className="font-semibold text-ink">Try this first.</span>{' '}
-              {sub.tryFirst}
-            </div>
-          </div>
-        )}
-        <div className="flex items-start gap-2">
-          <FileCheck
+      {sub.tryFirst && (
+        <div className="mt-1.5 rounded-[10px] border border-brand/30 bg-brand-bg/30 px-3 py-2.5 flex items-start gap-2">
+          <Lightbulb
             size={13}
             strokeWidth={1.75}
             className="text-ink-2 shrink-0 mt-0.5"
           />
           <div className="text-[11.5px] leading-[1.45] text-ink-2">
-            <span className="font-semibold text-ink">What we need.</span>{' '}
-            {sub.need}
+            <span className="font-semibold text-ink">Try this first.</span>{' '}
+            {sub.tryFirst}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={(e) => e.preventDefault()}
-          className="self-start inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline"
-        >
-          {PROOF_GUIDE_LABEL}
-          <ExternalLink size={11} strokeWidth={2} />
-        </button>
+      )}
+    </div>
+  )
+}
+
+function ProofGuidance({ sub }) {
+  return (
+    <div className="rounded-[10px] border border-brand/30 bg-brand-bg/30 px-3 py-2.5 flex flex-col gap-2">
+      <div className="flex items-start gap-2">
+        <FileCheck
+          size={13}
+          strokeWidth={1.75}
+          className="text-ink-2 shrink-0 mt-0.5"
+        />
+        <div className="text-[11.5px] leading-[1.45] text-ink-2">
+          <span className="font-semibold text-ink">What we need.</span>{' '}
+          {sub.need}
+        </div>
       </div>
+      <a
+        href={sub.proofGuideUrl || DEFAULT_PROOF_GUIDE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="self-start inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline"
+      >
+        {PROOF_GUIDE_LABEL}
+        <ExternalLink size={11} strokeWidth={2} />
+      </a>
+    </div>
+  )
+}
+
+function PhysicalConditionNote({ order }) {
+  const grade = conditionGradeOf(order)
+  if (!grade || grade === 'excellent') return null
+  const gradeLabel = grade.charAt(0).toUpperCase() + grade.slice(1)
+  return (
+    <div className="flex items-start gap-2 rounded-[12px] border border-warn-bg bg-warn-bg/60 px-3 py-2.5 text-[12px] text-ink leading-[1.4]">
+      <AlertTriangle
+        size={14}
+        strokeWidth={1.75}
+        className="text-warn shrink-0 mt-px"
+      />
+      <span>
+        Your device is graded{' '}
+        <span className="font-semibold">{gradeLabel}</span>, so some signs of
+        previous use — light scratches or surface marks — are expected at this
+        grade and aren’t treated as a defect.
+      </span>
     </div>
   )
 }

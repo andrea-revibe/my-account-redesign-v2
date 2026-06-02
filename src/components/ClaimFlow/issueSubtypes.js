@@ -8,6 +8,14 @@
 
 export const PROOF_GUIDE_LABEL = 'How to provide valid proof'
 
+// Fallback help-centre article for issues without a more specific guide.
+export const DEFAULT_PROOF_GUIDE_URL =
+  'https://help.revibe.me/en-US/how-to-show-us-your-issue-960883'
+
+// Shared help-centre article covering microphone / speaker / camera / button faults.
+const HARDWARE_PROOF_GUIDE_URL =
+  'https://help.revibe.me/en-US/hardware-issue-(microphone--speaker-(audio)--camera--buttons)-960927?_gl=1*17pnefx*_gcl_au*MTU2NDEzOTE4NC4xNzMzOTgyMTY1*FPAU*MTU2NDEzOTE4NC4xNzMzOTgyMTY1*_ga*MTk2ODQ5NzkxNC4xNzMzOTgyMTY2*_ga_96V2M67WKP*MTczNDUxNDczNS4yLjEuMTczNDUxNjcwMS4wLjAuMTYzOTc5MzY0NA..*_fplc*VGI1bGF5YUI1SWxWcDBOQ3JxSzlnJTJGWFNJUDZYMlc1b0w2aExFTlk5ZFp3VmV4QkJJY3NkJTJGNzhXcHl6dnlJSmZ3U0lHUnpBRU54bWdXWlJOMldrV2I3b0clMkJyeElqMkZURWtGaThYQWJPWTZBcnhWak5lOFJTTnZoayUyQkpPY1ElM0QlM0Q.'
+
 export const ISSUE_SCOPES = [
   {
     id: 'not_working',
@@ -26,6 +34,8 @@ export const NOT_WORKING_SUBTYPES = [
     id: 'battery',
     label: 'Battery draining',
     need: 'A screenshot of Settings → Battery → Battery Health showing the current capacity %.',
+    proofGuideUrl:
+      'https://help.revibe.me/en-US/battery-draining-960854?_gl=1*1m6h8ve*_gcl_au*MTU2NDEzOTE4NC4xNzMzOTgyMTY1*FPAU*MTU2NDEzOTE4NC4xNzMzOTgyMTY1*_ga*MTk2ODQ5NzkxNC4xNzMzOTgyMTY2*_ga_96V2M67WKP*MTczNDUxNDczNS4yLjEuMTczNDUxNjcwMS4wLjAuMTYzOTc5MzY0NA..*_fplc*VGI1bGF5YUI1SWxWcDBOQ3JxSzlnJTJGWFNJUDZYMlc1b0w2aExFTlk5ZFp3VmV4QkJJY3NkJTJGNzhXcHl6dnlJSmZ3U0lHUnpBRU54bWdXWlJOMldrV2I3b0clMkJyeElqMkZURWtGaThYQWJPWTZBcnhWak5lOFJTTnZoayUyQkpPY1ElM0QlM0Q.',
   },
   {
     id: 'software',
@@ -36,6 +46,8 @@ export const NOT_WORKING_SUBTYPES = [
     id: 'physical',
     label: 'Physical condition',
     need: 'A photo or short video of the damage, taken with another device. Show the affected area in good lighting.',
+    proofGuideUrl:
+      'https://help.revibe.me/en-US/what-are-revibe-device-conditions-352750',
   },
   {
     id: 'screen',
@@ -60,21 +72,25 @@ export const NOT_WORKING_SUBTYPES = [
     id: 'camera',
     label: 'Camera issue',
     need: 'A short video showing the camera fault, filmed with another device.',
+    proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'microphone',
     label: 'Microphone issue',
     need: 'A short voice memo or video where the microphone problem is audible.',
+    proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'button',
     label: 'Button issue',
     need: 'A short video showing the unresponsive button, filmed with another device.',
+    proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'speaker',
     label: 'Speaker issue',
     need: 'A short video where the speaker fault is audible, filmed with another device.',
+    proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'software_updates',
