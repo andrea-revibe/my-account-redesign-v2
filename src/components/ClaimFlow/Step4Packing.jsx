@@ -10,6 +10,7 @@ import {
   Lightbulb,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
+import InlineError from './InlineError'
 
 export const PACKING_OPTIONS = [
   {
@@ -36,7 +37,7 @@ export const PACKING_LABELS = Object.fromEntries(
   PACKING_OPTIONS.map((o) => [o.id, o.title]),
 )
 
-export default function Step4Packing({ state, dispatch }) {
+export default function Step4Packing({ state, dispatch, error }) {
   const selected = state.packingMethod
   return (
     <>
@@ -48,11 +49,16 @@ export default function Step4Packing({ state, dispatch }) {
       <div className="px-4 flex flex-col gap-3">
         <PackingDemo />
 
+        {error === 'packing' && (
+          <InlineError>Pick a packing method to continue.</InlineError>
+        )}
+
         {PACKING_OPTIONS.map((opt) => (
           <OptionCard
             key={opt.id}
             option={opt}
             selected={selected === opt.id}
+            error={error === 'packing'}
             onSelect={() =>
               dispatch({ type: 'SET_PACKING_METHOD', value: opt.id })
             }
@@ -205,7 +211,7 @@ function PackingTips() {
   )
 }
 
-function OptionCard({ option, selected, onSelect }) {
+function OptionCard({ option, selected, onSelect, error }) {
   const { Icon, title, subtitle } = option
   return (
     <button
@@ -215,7 +221,9 @@ function OptionCard({ option, selected, onSelect }) {
       className={`w-full text-left rounded-[14px] border-2 px-3.5 py-3 transition-colors ${
         selected
           ? 'border-brand bg-brand-bg/30'
-          : 'border-line bg-surface hover:bg-line-2/40'
+          : error
+            ? 'border-danger bg-surface'
+            : 'border-line bg-surface hover:bg-line-2/40'
       }`}
     >
       <div className="flex items-start gap-3">

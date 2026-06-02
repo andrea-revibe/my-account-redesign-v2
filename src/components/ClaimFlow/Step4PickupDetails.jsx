@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MapPin,
   Mail,
@@ -10,6 +10,7 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
+import InlineError from './InlineError'
 import {
   CLAIM_STATUSES,
   CLAIM_SLAS,
@@ -49,7 +50,7 @@ const FIELDS = [
   },
 ]
 
-export default function Step4PickupDetails({ state, dispatch }) {
+export default function Step4PickupDetails({ state, dispatch, error }) {
   const { pickupDetails } = state
   const [editingKey, setEditingKey] = useState(null)
   const editingField = FIELDS.find((f) => f.key === editingKey) || null
@@ -58,6 +59,17 @@ export default function Step4PickupDetails({ state, dispatch }) {
     () => expectedCompletionFor(state.claimType),
     [state.claimType],
   )
+
+  const errorRef = useRef(null)
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [error])
+
+  // Address / email / phone errors point at a row; pickupConfirm at the
+  // checkbox. Only the topmost unmet field carries the error key.
+  const fieldError = ['address', 'email', 'phone'].includes(error) ? error : null
 
   return (
     <>
@@ -71,16 +83,22 @@ export default function Step4PickupDetails({ state, dispatch }) {
           {FIELDS.map((field, i) => {
             const value = pickupDetails[field.key]
             const Icon = field.Icon
+            const rowError = fieldError === field.key
             return (
               <button
                 key={field.key}
                 type="button"
+                ref={rowError ? errorRef : null}
                 onClick={() => setEditingKey(field.key)}
-                className={`w-full text-left px-3.5 py-3 flex items-start gap-3 hover:bg-line-2/40 transition-colors ${
+                className={`w-full text-left px-3.5 py-3 flex items-start gap-3 transition-colors ${
                   i > 0 ? 'border-t border-line' : ''
-                }`}
+                } ${rowError ? 'bg-danger-bg/40' : 'hover:bg-line-2/40'}`}
               >
-                <span className="w-9 h-9 rounded-[10px] grid place-items-center shrink-0 bg-line-2 text-ink-2">
+                <span
+                  className={`w-9 h-9 rounded-[10px] grid place-items-center shrink-0 ${
+                    rowError ? 'bg-danger/10 text-danger' : 'bg-line-2 text-ink-2'
+                  }`}
+                >
                   <Icon size={16} strokeWidth={1.75} />
                 </span>
                 <span className="flex-1 min-w-0">
@@ -94,6 +112,11 @@ export default function Step4PickupDetails({ state, dispatch }) {
                   >
                     {value || 'Not provided'}
                   </span>
+                  {rowError && (
+                    <InlineError className="mt-1">
+                      Add your {field.label.toLowerCase()} to continue.
+                    </InlineError>
+                  )}
                 </span>
                 <ChevronRight
                   size={18}
@@ -119,6 +142,8 @@ export default function Step4PickupDetails({ state, dispatch }) {
         <ConfirmationCheckbox
           checked={state.pickupConfirmed}
           isWarranty={isWarranty}
+          error={error === 'pickupConfirm'}
+          confirmRef={error === 'pickupConfirm' ? errorRef : null}
           onChange={(value) =>
             dispatch({ type: 'SET_PICKUP_CONFIRMED', value })
           }
@@ -254,13 +279,16 @@ function ProcessRow({ step, isFirst, isLast }) {
   )
 }
 
-function ConfirmationCheckbox({ checked, isWarranty, onChange }) {
+function ConfirmationCheckbox({ checked, isWarranty, error, confirmRef, onChange }) {
   return (
     <label
+      ref={confirmRef}
       className={`mt-1 flex items-start gap-3 rounded-[14px] border-2 px-3.5 py-3 cursor-pointer transition-colors ${
         checked
           ? 'border-brand bg-brand-bg/30'
-          : 'border-line bg-surface hover:bg-line-2/40'
+          : error
+            ? 'border-danger bg-danger-bg/40'
+            : 'border-line bg-surface hover:bg-line-2/40'
       }`}
     >
       <span className="relative mt-0.5 shrink-0">
@@ -272,7 +300,11 @@ function ConfirmationCheckbox({ checked, isWarranty, onChange }) {
         />
         <span
           className={`w-[20px] h-[20px] rounded-[6px] border-2 grid place-items-center transition-colors ${
-            checked ? 'bg-brand border-brand' : 'border-line bg-surface'
+            checked
+              ? 'bg-brand border-brand'
+              : error
+                ? 'border-danger bg-surface'
+                : 'border-line bg-surface'
           }`}
         >
           {checked && (
@@ -289,6 +321,11 @@ function ConfirmationCheckbox({ checked, isWarranty, onChange }) {
             ? 'Each step has its own SLA — most warranty repairs complete in ~2 weeks, longer if parts are scarce.'
             : 'Each step has its own SLA — most returns complete in 5–7 business days, longer if expert inspection is needed.'}
         </span>
+        {error && (
+          <InlineError className="mt-2">
+            Confirm the pickup details to continue.
+          </InlineError>
+        )}
       </span>
     </label>
   )

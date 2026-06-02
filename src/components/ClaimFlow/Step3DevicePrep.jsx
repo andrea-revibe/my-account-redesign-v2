@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ShieldAlert,
   ChevronDown,
@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
+import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
 
 const RESET_GUIDE = {
@@ -143,10 +144,17 @@ const UNLINK_LINKS = {
 
 const PASSCODE_LEN = 6
 
-export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
+export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const dp = state.devicePrep
   const defaultOs = order?.deviceOs || 'ios'
   const os = dp.os || defaultOs
+
+  const optionRef = useRef(null)
+  useEffect(() => {
+    if (error === 'devicePrepOption' && optionRef.current) {
+      optionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [error])
 
   return (
     <>
@@ -162,6 +170,12 @@ export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
           </span>{' '}
           We can't access its data — this lets it be reset and resold.
         </Callout>
+
+        {error === 'devicePrepOption' && (
+          <div ref={optionRef}>
+            <InlineError>Pick how you'll prepare your device to continue.</InlineError>
+          </div>
+        )}
 
         <OptionCard
           selected={dp.option === 'reset'}
@@ -207,7 +221,7 @@ export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
                   value: { resetGuideSeen: true },
                 })
               }
-              attempted={attempted}
+              error={error}
             />
           )}
         </OptionCard>
@@ -244,6 +258,7 @@ export default function Step3DevicePrep({ state, dispatch, order, attempted }) {
                   value: { passcode: value },
                 })
               }
+              error={error}
             />
           )}
         </OptionCard>
@@ -406,7 +421,7 @@ function ResetPanel({
   onGuideCheck,
   guideSeen,
   onGuideDone,
-  attempted,
+  error,
 }) {
   const [open, setOpen] = useState(true)
   const [guideOpen, setGuideOpen] = useState(false)
@@ -415,9 +430,17 @@ function ResetPanel({
   // through the guide (opened it and pressed Done). Android keeps its
   // inline accordion, so there's nothing to gate on.
   const confirmLocked = os === 'ios' && !guideSeen
-  // Set when the customer clicks Continue before completing the guide —
-  // escalates the guide button + gate message into a red error state.
-  const showError = attempted && confirmLocked
+  // Premature Continue before completing the guide — escalates the guide
+  // button + gate message into a red error state.
+  const showError = error === 'resetGuide'
+  // Guide done (or Android) but the confirm checkbox is still unticked.
+  const confirmError = error === 'resetConfirm'
+  const confirmRef = useRef(null)
+  useEffect(() => {
+    if (confirmError && confirmRef.current) {
+      confirmRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [confirmError])
   return (
     <div className="pt-3 flex flex-col gap-3">
       <OsTabs os={os} onChange={onOsChange} />
@@ -501,6 +524,7 @@ function ResetPanel({
       )}
 
       <label
+        ref={confirmRef}
         className={`flex items-start gap-2.5 pt-1 ${
           confirmLocked ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'
         }`}
@@ -515,7 +539,11 @@ function ResetPanel({
           />
           <span
             className={`w-[20px] h-[20px] rounded-[6px] border-2 grid place-items-center transition-colors ${
-              confirmed ? 'bg-brand border-brand' : 'border-line bg-surface'
+              confirmed
+                ? 'bg-brand border-brand'
+                : confirmError
+                  ? 'border-danger bg-surface'
+                  : 'border-line bg-surface'
             }`}
           >
             {confirmed && (
@@ -527,6 +555,11 @@ function ResetPanel({
           I confirm this device has been unlinked and factory reset.
         </span>
       </label>
+      {confirmError && (
+        <InlineError className="-mt-1.5 ml-[30px]">
+          Confirm you've reset the device before continuing.
+        </InlineError>
+      )}
       {confirmLocked && (
         <p
           className={`-mt-1.5 ml-[30px] flex items-start gap-1.5 text-[11.5px] leading-snug ${
@@ -564,6 +597,7 @@ function UnlinkPanel({
   onUnlinkChange,
   passcode,
   onPasscodeChange,
+  error,
 }) {
   const guide = UNLINK_GUIDE[os]
   const link = UNLINK_LINKS[os]
@@ -603,9 +637,14 @@ function UnlinkPanel({
         accountLabel={accountLabel}
         checked={accountUnlinked}
         onChange={onUnlinkChange}
+        error={error === 'unlink'}
       />
 
-      <PasscodeField value={passcode} onChange={onPasscodeChange} />
+      <PasscodeField
+        value={passcode}
+        onChange={onPasscodeChange}
+        error={error === 'passcode'}
+      />
 
       <div className="rounded-[10px] border border-line bg-line-2/40 px-3 py-2.5 text-[11.5px] leading-snug flex items-start gap-2 text-ink">
         <ShieldCheck
@@ -622,50 +661,72 @@ function UnlinkPanel({
   )
 }
 
-function UnlinkToggle({ accountLabel, checked, onChange }) {
+function UnlinkToggle({ accountLabel, checked, onChange, error }) {
+  const toggleRef = useRef(null)
+  useEffect(() => {
+    if (error && toggleRef.current) {
+      toggleRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [error])
   return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      role="checkbox"
-      aria-checked={checked}
-      className={`w-full rounded-[12px] border px-3.5 py-3 flex items-start gap-2.5 text-left transition ${
-        checked
-          ? 'bg-success/5 border-success/40'
-          : 'bg-surface border-line hover:bg-line-2/40'
-      }`}
-    >
-      <span
-        aria-hidden
-        className={`w-5 h-5 rounded-[6px] border-2 grid place-items-center shrink-0 mt-0.5 transition ${
+    <div className="flex flex-col gap-1.5">
+      <button
+        ref={toggleRef}
+        type="button"
+        onClick={() => onChange(!checked)}
+        role="checkbox"
+        aria-checked={checked}
+        className={`w-full rounded-[12px] border px-3.5 py-3 flex items-start gap-2.5 text-left transition ${
           checked
-            ? 'bg-success border-success text-white'
-            : 'bg-surface border-line'
+            ? 'bg-success/5 border-success/40'
+            : error
+              ? 'bg-surface border-danger'
+              : 'bg-surface border-line hover:bg-line-2/40'
         }`}
       >
-        {checked && <Check size={12} strokeWidth={2.5} />}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink leading-snug">
-          I've removed this device from my {accountLabel}
+        <span
+          aria-hidden
+          className={`w-5 h-5 rounded-[6px] border-2 grid place-items-center shrink-0 mt-0.5 transition ${
+            checked
+              ? 'bg-success border-success text-white'
+              : error
+                ? 'bg-surface border-danger'
+                : 'bg-surface border-line'
+          }`}
+        >
+          {checked && <Check size={12} strokeWidth={2.5} />}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-semibold text-ink leading-snug">
+            I've removed this device from my {accountLabel}
+          </div>
+          <div className="text-[11.5px] text-muted leading-snug mt-0.5">
+            Required so our technician can complete the wipe.
+          </div>
         </div>
-        <div className="text-[11.5px] text-muted leading-snug mt-0.5">
-          Required so our technician can complete the wipe.
-        </div>
-      </div>
-    </button>
+      </button>
+      {error && (
+        <InlineError>Confirm you've removed the device to continue.</InlineError>
+      )}
+    </div>
   )
 }
 
-function PasscodeField({ value, onChange }) {
+function PasscodeField({ value, onChange, error }) {
   const handleChange = (e) => {
     const digits = e.target.value.replace(/\D/g, '').slice(0, PASSCODE_LEN)
     onChange(digits)
   }
   const complete = value.length === PASSCODE_LEN
+  const fieldRef = useRef(null)
+  useEffect(() => {
+    if (error && fieldRef.current) {
+      fieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [error])
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5" ref={fieldRef}>
       <label className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5">
           <KeyRound size={12} strokeWidth={2.2} className="text-muted" />
@@ -687,13 +748,21 @@ function PasscodeField({ value, onChange }) {
         onChange={handleChange}
         placeholder="6-digit passcode"
         className={`w-full h-[46px] rounded-[10px] border bg-surface px-3.5 text-[15px] text-ink tracking-[0.4em] font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 ${
-          complete ? 'border-success/50' : 'border-line focus:border-brand'
+          complete
+            ? 'border-success/50'
+            : error
+              ? 'border-danger focus:border-danger'
+              : 'border-line focus:border-brand'
         }`}
       />
-      <div className="text-[11px] text-muted leading-snug">
-        Enter the passcode you set on this device. If it's 4 digits, pad with
-        zeros at the end.
-      </div>
+      {error ? (
+        <InlineError>Enter the 6-digit device passcode to continue.</InlineError>
+      ) : (
+        <div className="text-[11px] text-muted leading-snug">
+          Enter the passcode you set on this device. If it's 4 digits, pad with
+          zeros at the end.
+        </div>
+      )}
     </div>
   )
 }

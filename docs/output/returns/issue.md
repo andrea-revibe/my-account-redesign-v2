@@ -46,7 +46,7 @@ See [change_of_mind.md](./change_of_mind.md) §2.2. The issue branch is reached 
 
 ### 2.2 Step 2 — Issue details (issue branch, required)
 
-A required structured-evidence form. `Skip` is hidden; `canAdvance` requires `issueSubtypeId` + non-empty description + a stubbed filename.
+A required structured-evidence form. `Skip` is hidden; the step gates on `issueSubtypeId` + non-empty description + a stubbed filename, surfaced one at a time via the flow-wide soft validation (`stepError` order: `subtype` → `description` → `attachment`; Continue never grays — see [change_of_mind.md](./change_of_mind.md) §2.1.1).
 
 **Two-scope sub-issue picker.** Sourced from `src/components/ClaimFlow/issueSubtypes.js`:
 
@@ -159,7 +159,7 @@ How the customer-facing UI surfaces backend state:
 
 **Per-sub-issue guidance, not a generic ask.** Once a sub-issue is picked, the panel shows what evidence is needed *for that specific issue* (`What we need` line). Generic asks ("Please provide photo evidence") got ignored. Specific asks ("A 30-second video showing the battery draining…") get followed.
 
-**Attachment is required, no submit without it.** Earlier drafts let the customer submit without a file. Ops spent half their time chasing customers for evidence. The required attachment is enforced in `canAdvance` and reinforced by the warn-tinted banner above the slot.
+**Attachment is required, no submit without it.** Earlier drafts let the customer submit without a file. Ops spent half their time chasing customers for evidence. The requirement is enforced as the `attachment` gate in `stepError` (a Continue click with no file reddens the dropzone + shows *"Attach a photo or video — it's required."*) and reinforced by the warn-tinted banner above the slot.
 
 **No restocking fee on the original-payment path.** The customer didn't choose to return — the seller messed up. Charging a fee felt like punishing the customer for a Revibe-side problem.
 

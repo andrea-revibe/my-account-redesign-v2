@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Paperclip,
   X,
@@ -16,6 +16,7 @@ import {
   Check,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
+import InlineError from './InlineError'
 import {
   ISSUE_SCOPES,
   NOT_WORKING_SUBTYPES,
@@ -39,7 +40,7 @@ const STUB_FILES = [
   'photo_back.heic',
 ]
 
-export default function Step2IssueDetails({ state, dispatch, order }) {
+export default function Step2IssueDetails({ state, dispatch, order, error }) {
   const { description, attachmentName } = state.issueDetails
   const { issueScope, issueSubtypeId } = state
 
@@ -48,6 +49,13 @@ export default function Step2IssueDetails({ state, dispatch, order }) {
   )
 
   const selectedSubtype = issueSubtypeId ? findSubtype(issueSubtypeId) : null
+
+  const errorRef = useRef(null)
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [error])
 
   const clearSelection = () => {
     // Preserve the scope so the picker reopens on the same list
@@ -71,7 +79,10 @@ export default function Step2IssueDetails({ state, dispatch, order }) {
       />
 
       <div className="px-4 flex flex-col gap-4">
-        <section className="flex flex-col gap-2">
+        <section
+          className="flex flex-col gap-2"
+          ref={error === 'subtype' ? errorRef : null}
+        >
           <SectionLabel>What's the issue?</SectionLabel>
           {selectedSubtype ? (
             <>
@@ -148,9 +159,15 @@ export default function Step2IssueDetails({ state, dispatch, order }) {
               })}
             </div>
           )}
+          {error === 'subtype' && (
+            <InlineError>Select what's wrong to continue.</InlineError>
+          )}
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section
+          className="flex flex-col gap-2"
+          ref={error === 'description' ? errorRef : null}
+        >
           <SectionLabel>Describe the issue</SectionLabel>
           <textarea
             value={description}
@@ -162,14 +179,28 @@ export default function Step2IssueDetails({ state, dispatch, order }) {
               })
             }
             placeholder="What happens, when it started, anything you've already tried…"
-            className="w-full rounded-[12px] border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted resize-none min-h-[112px] outline-none focus:border-brand"
+            className={`w-full rounded-[12px] border bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted resize-none min-h-[112px] outline-none ${
+              error === 'description'
+                ? 'border-danger focus:border-danger'
+                : 'border-line focus:border-brand'
+            }`}
           />
-          <div className="text-right text-[11px] text-muted tabular-nums">
-            {description.length}/500
+          <div className="flex items-center justify-between gap-2">
+            {error === 'description' ? (
+              <InlineError>Add a short description so QC knows what to look for.</InlineError>
+            ) : (
+              <span />
+            )}
+            <div className="text-right text-[11px] text-muted tabular-nums shrink-0">
+              {description.length}/500
+            </div>
           </div>
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section
+          className="flex flex-col gap-2"
+          ref={error === 'attachment' ? errorRef : null}
+        >
           <SectionLabel>Photo or video of the issue</SectionLabel>
           {attachmentName ? (
             <div className="rounded-[12px] border border-line bg-surface px-3.5 py-3 flex items-center gap-3">
@@ -202,7 +233,11 @@ export default function Step2IssueDetails({ state, dispatch, order }) {
             <button
               type="button"
               onClick={pickStub}
-              className="w-full rounded-[12px] border-2 border-dashed border-line bg-surface hover:border-brand hover:bg-brand-bg/20 px-4 py-5 flex flex-col items-center gap-1.5 transition-colors"
+              className={`w-full rounded-[12px] border-2 border-dashed bg-surface hover:bg-brand-bg/20 px-4 py-5 flex flex-col items-center gap-1.5 transition-colors ${
+                error === 'attachment'
+                  ? 'border-danger'
+                  : 'border-line hover:border-brand'
+              }`}
             >
               <span className="w-10 h-10 rounded-full bg-brand-bg text-brand grid place-items-center">
                 <Paperclip size={18} strokeWidth={1.75} />
@@ -225,6 +260,9 @@ export default function Step2IssueDetails({ state, dispatch, order }) {
               Required — claims without proof are often rejected or delayed.
             </span>
           </div>
+          {error === 'attachment' && (
+            <InlineError>Attach a photo or video — it's required.</InlineError>
+          )}
         </section>
       </div>
     </>

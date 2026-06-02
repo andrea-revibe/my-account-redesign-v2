@@ -73,6 +73,11 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     packingConfirmed: false,
     factoryResetConfirmed: false,
     claimRef: null,
+    // Soft-validation flag: set by ATTEMPT when Continue is clicked with a
+    // required input still missing, and cleared atomically by every
+    // step-changing action (NEXT / BACK / GO_TO_STEP / SUBMIT) so the next
+    // step never paints its errors before the user has tried to advance.
+    attempted: false,
   }
 }
 
@@ -130,6 +135,8 @@ export function flowReducer(state, action) {
       return { ...state, packingConfirmed: action.value }
     case 'SET_FACTORY_RESET_CONFIRMED':
       return { ...state, factoryResetConfirmed: action.value }
+    case 'ATTEMPT':
+      return { ...state, attempted: true }
     case 'GO_TO_STEP': {
       // Edit links from Review must never land the user on Step 6 when
       // there is no refund-method step in the warranty flow.
@@ -137,34 +144,98 @@ export function flowReducer(state, action) {
         state.claimType === 'warranty' && action.value === 6
           ? 5
           : action.value
-      return { ...state, step: target }
+      return { ...state, step: target, attempted: false }
     }
     case 'NEXT': {
       const next = state.step + 1
       // Warranty skips Step 6 (refund); compensation skips 3/4/5 (device
       // prep, packing, pickup) — from Step 2 it jumps straight to refund.
       if (state.claimType === 'warranty' && next === 6) {
-        return { ...state, step: 7 }
+        return { ...state, step: 7, attempted: false }
       }
       if (state.claimType === 'compensation' && next === 3) {
-        return { ...state, step: 6 }
+        return { ...state, step: 6, attempted: false }
       }
-      return { ...state, step: Math.min(TOTAL_STEPS, next) }
+      return { ...state, step: Math.min(TOTAL_STEPS, next), attempted: false }
     }
     case 'BACK': {
       const prev = state.step - 1
       if (state.claimType === 'warranty' && prev === 6) {
-        return { ...state, step: 5 }
+        return { ...state, step: 5, attempted: false }
       }
       if (state.claimType === 'compensation' && prev === 5) {
-        return { ...state, step: 2 }
+        return { ...state, step: 2, attempted: false }
       }
-      return { ...state, step: Math.max(1, prev) }
+      return { ...state, step: Math.max(1, prev), attempted: false }
     }
     case 'SUBMIT':
-      return { ...state, claimRef: action.value, step: TOTAL_STEPS }
+      return { ...state, claimRef: action.value, step: TOTAL_STEPS, attempted: false }
     default:
       return state
+  }
+}
+
+// First unmet requirement for the current step, in the order we want to
+// surface them ("one at a time" — only the topmost missing input lights
+// up). Returns a stable key the step component matches against, or null
+// when the step is complete. This is the gate `ClaimFlow.handlePrimary`
+// reads on a Continue click: a non-null key blocks advancement and flips
+// the step into its attempted/error state instead of graying the button.
+//
+// Note this intentionally diverges from `canAdvance` on the iOS reset
+// path: there `canAdvance` returns true (so the button was never
+// disabled) and the premature-Continue gate lives here as 'resetGuide'.
+export function stepError(state) {
+  switch (state.step) {
+    case 1:
+      return state.claimType ? null : 'claimType'
+    case 2: {
+      const id = state.issueDetails
+      if (state.claimType === 'issue' || state.claimType === 'warranty') {
+        if (!state.issueSubtypeId) return 'subtype'
+        if (id.description.trim().length === 0) return 'description'
+        if (!id.attachmentName) return 'attachment'
+        return null
+      }
+      if (state.claimType === 'compensation') {
+        if (!state.compensationSubtype) return 'subtype'
+        if (id.description.trim().length === 0) return 'description'
+        if (!id.attachmentName) return 'attachment'
+        return null
+      }
+      return null
+    }
+    case 3: {
+      const dp = state.devicePrep
+      if (!dp.option) return 'devicePrepOption'
+      if (dp.option === 'reset') {
+        if (dp.os === 'ios' && !dp.resetGuideSeen) return 'resetGuide'
+        if (dp.resetConfirmed !== true) return 'resetConfirm'
+        return null
+      }
+      if (dp.option === 'credentials') {
+        if (dp.accountUnlinked !== true) return 'unlink'
+        if (dp.passcode.length !== 6) return 'passcode'
+        return null
+      }
+      return 'devicePrepOption'
+    }
+    case 4:
+      return state.packingMethod !== null ? null : 'packing'
+    case 5: {
+      const pd = state.pickupDetails
+      if (pd.address.trim().length === 0) return 'address'
+      if (pd.email.trim().length === 0) return 'email'
+      if (pd.phone.trim().length === 0) return 'phone'
+      if (state.pickupConfirmed !== true) return 'pickupConfirm'
+      return null
+    }
+    case 6:
+      return state.refundMethod === 'wallet' || state.refundMethod === 'original'
+        ? null
+        : 'refundMethod'
+    default:
+      return null
   }
 }
 
