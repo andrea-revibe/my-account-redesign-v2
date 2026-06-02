@@ -3,8 +3,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Check,
-  Apple,
-  Smartphone,
   AlertTriangle,
   Sparkles,
   WifiOff,
@@ -16,6 +14,7 @@ import {
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
+import { deviceOsForOrder } from '../../lib/devices'
 
 // Step 3 — a single, mandatory path: run the guided reset, then confirm it.
 // The guide itself branches (reset on-device vs erase remotely from
@@ -31,8 +30,10 @@ import ResetGuideSheet from './ResetGuideSheet'
 // the clear final action.
 export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const dp = state.devicePrep
-  const defaultOs = order?.deviceOs || 'ios'
-  const os = dp.os || defaultOs
+  // The guide platform is driven by the order's category (set in the reducer
+  // from category_name); there's no manual picker. deviceOsForOrder is a
+  // defensive fallback should dp.os ever be unset.
+  const os = dp.os || deviceOsForOrder(order)
 
   const [guideOpen, setGuideOpen] = useState(false)
   const guideSeen = dp.resetGuideSeen
@@ -52,9 +53,6 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
     }
   }, [confirmError])
 
-  const setOs = (value) =>
-    dispatch({ type: 'SET_DEVICE_PREP', value: { os: value } })
-
   return (
     <>
       <StepHeading
@@ -64,8 +62,6 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
 
       <div className="px-4 flex flex-col gap-3">
         <Callout />
-
-        <OsTabs os={os} onChange={setOs} />
 
         <HeroLauncher
           guideSeen={guideSeen}
@@ -394,31 +390,3 @@ function ConfirmGate({
   )
 }
 
-function OsTabs({ os, onChange }) {
-  const opts = [
-    { id: 'ios', label: 'iPhone', Icon: Apple },
-    { id: 'android', label: 'Android', Icon: Smartphone },
-  ]
-  return (
-    <div className="inline-flex p-1 rounded-[10px] bg-line-2/70 self-start">
-      {opts.map(({ id, label, Icon }) => {
-        const active = os === id
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onChange(id)}
-            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12.5px] font-semibold transition-colors ${
-              active
-                ? 'bg-surface text-ink shadow-sm2'
-                : 'text-muted hover:text-ink-2'
-            }`}
-          >
-            <Icon size={13} strokeWidth={1.75} />
-            {label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}

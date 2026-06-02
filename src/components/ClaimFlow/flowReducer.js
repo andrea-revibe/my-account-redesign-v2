@@ -1,4 +1,5 @@
 import { ORDERS } from '../../data/orders'
+import { deviceOsForOrder } from '../../lib/devices'
 
 export const TOTAL_STEPS = 8
 
@@ -59,7 +60,7 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     // and `devicePrepText` keep rendering the reset branch.
     devicePrep: {
       option: 'reset',
-      os: 'ios',
+      os: deviceOsForOrder(order),
       resetConfirmed: false,
       resetGuideChecks: {},
       resetGuideSeen: false,
