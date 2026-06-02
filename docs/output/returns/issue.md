@@ -55,19 +55,20 @@ A required structured-evidence form. `Skip` is hidden; the step gates on `issueS
 | `Device not working as expected` | 15 items (battery, software, physical, screen, charger, overheating, camera, etc.) |
 | `I received the wrong device` | 4 items |
 
-Scopes are mutually exclusive expandable sections; tapping a sub-issue commits the selection (`issueScope` + `issueSubtypeId`) and collapses the picker down to just the chosen row + its guidance panel:
+Scopes are mutually exclusive expandable sections; tapping a sub-issue commits the selection (`issueScope` + `issueSubtypeId`) and collapses the picker down to just the chosen row. The selected row shows only the optional `Try this first` preflight tip (e.g. "Have you tried a soft reset?"), rendered only when the sub-type defines one. It carries an `X` button that clears the selection and reopens the picker on the same scope so the user can pick again.
 
-- Optional `Try this first` preflight tip (e.g. "Have you tried a soft reset?").
-- One-line `What we need` evidence ask (e.g. "A 30-second video showing the issue").
-- A shared `How to provide valid proof` link.
-
-The selected row carries an `X` button that clears the selection and reopens the picker on the same scope so the user can pick again.
+The per-issue **`What we need`** evidence ask + the **`How to provide valid proof`** link have moved out of the selected-row panel and down into the **Photo or video of the issue** section (see below) — guidance now sits where the customer actually attaches proof.
 
 **Description and attachment.** Below the picker:
 
 - A required free-text description (500-char max).
+- The **Photo or video of the issue** section. Once a sub-type is picked it leads with a brand-tinted `ProofGuidance` box — the sub-type's one-line `What we need` ask + a `How to provide valid proof` link — placed above the upload box. Before a sub-type is picked, the section shows just the upload box (no guidance).
 - A **fake** attachment slot — clicking the dashed drop-zone stubs in a filename; the prototype has no real file picker.
-- A warn-tinted banner reinforces that attachments are required.
+- A warn-tinted banner reinforces that attachments are required (kept alongside the per-issue guidance).
+
+**Real proof-guide links.** `How to provide valid proof` is a live `<a target="_blank">` (no longer a placeholder). It resolves per sub-type via `sub.proofGuideUrl`, falling back to `DEFAULT_PROOF_GUIDE_URL` ("how-to-show-us-your-issue") for any sub-type without its own article. Specific articles today: `battery` → battery-draining guide; `physical` → device-conditions guide; the four hardware sub-types (`camera` / `microphone` / `button` / `speaker`) share one `HARDWARE_PROOF_GUIDE_URL`. All defined in `issueSubtypes.js`.
+
+**Physical-condition disclaimer.** When `issueSubtypeId === 'physical'` and the device's condition grade (from `conditionGradeOf(order)`) is known and **not `excellent`** (i.e. very good / good / fair), an amber `PhysicalConditionNote` renders in the photo section beside the guidance. It names the grade ("Your device is graded **Good**…") and explains that some signs of previous use are expected at that grade and aren't treated as a defect. Renders nothing for Excellent-grade devices or when the grade can't be derived.
 
 The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` consumes `issueSubtypeId` (via `findSubtype(id)` in `issueSubtypes.js`) and `issueScope`.
 

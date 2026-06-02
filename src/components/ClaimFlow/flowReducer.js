@@ -209,7 +209,7 @@ export function stepError(state) {
       const dp = state.devicePrep
       if (!dp.option) return 'devicePrepOption'
       if (dp.option === 'reset') {
-        if (dp.os === 'ios' && !dp.resetGuideSeen) return 'resetGuide'
+        if (!dp.resetGuideSeen) return 'resetGuide'
         if (dp.resetConfirmed !== true) return 'resetConfirm'
         return null
       }
@@ -271,11 +271,11 @@ export function canAdvance(state) {
     case 3: {
       const dp = state.devicePrep
       if (dp.option === 'reset') {
-        // On iOS, keep Continue clickable until the guide has been opened
-        // and completed, so a premature click can surface the "open the
-        // guide" gate (ClaimFlow.handlePrimary) rather than silently
-        // disabling the button. Once seen, the confirm checkbox is the gate.
-        if (dp.os === 'ios' && !dp.resetGuideSeen) return true
+        // Keep Continue clickable until the guide has been opened and
+        // completed, so a premature click can surface the "open the guide"
+        // gate (ClaimFlow.handlePrimary) rather than silently disabling the
+        // button. Once seen, the confirm checkbox is the gate.
+        if (!dp.resetGuideSeen) return true
         return dp.resetConfirmed === true
       }
       if (dp.option === 'credentials')

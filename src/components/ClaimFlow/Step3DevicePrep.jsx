@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ShieldAlert,
-  ChevronDown,
   Check,
   Lock,
   KeyRound,
@@ -16,75 +15,6 @@ import {
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
-
-const RESET_GUIDE = {
-  ios: [
-    {
-      title: 'Back up your device',
-      body: "If you want to keep anything on this device, back it up to iCloud or your computer before continuing — the next steps will erase everything.",
-    },
-    {
-      title: 'Sign out of iCloud and turn off Find My',
-      lead: 'This is the single most important step in this entire guide.',
-      body: 'Doing this before the reset is what prevents Activation Lock from blocking the device after the wipe.',
-      subActions: [
-        'Open **Settings**',
-        'Tap your name at the very top',
-        'Scroll all the way to the bottom and tap **Sign Out**',
-        'Enter your Apple ID password when prompted (this is what disables Find My and removes Activation Lock)',
-        "Choose whether to keep a copy of your data on the device (it'll be erased in the next step anyway, so it doesn't matter much)",
-        'Confirm **Sign Out**',
-      ],
-      tip: 'You should now see "Sign in to your iPhone/iPad" at the top of Settings. That confirms iCloud is disconnected.',
-    },
-    {
-      title: 'Erase all content and settings',
-      subActions: [
-        'Open **Settings → General → Transfer or Reset iPhone**',
-        'Tap **Erase All Content and Settings**',
-        'Enter your passcode if prompted, then tap **Continue**',
-        'Confirm the erase',
-      ],
-    },
-    {
-      title: 'Leave the device on the Hello screen',
-      body: "Once it restarts, you'll see the Hello / language picker. Don't set it up — just power it off and pack it for pickup.",
-    },
-  ],
-  android: [
-    {
-      title: 'Back up your device',
-      body: 'Back up photos, contacts, and anything else you want to keep before continuing — the next steps will erase everything.',
-    },
-    {
-      title: 'Sign out of your Google account and turn off Find My Device',
-      lead: 'This is the single most important step in this entire guide.',
-      body: 'Doing this before the reset is what prevents Factory Reset Protection (FRP) from locking the device after the wipe.',
-      subActions: [
-        'Open **Settings**',
-        'Tap **Passwords & accounts** (called **Accounts** on some versions)',
-        'Tap your Google account, then **Remove account**',
-        'Confirm with your screen-lock PIN or pattern if prompted',
-        'Go to **Settings → Security → Find My Device** and toggle it off',
-        'If you have more than one Google account on the device, repeat for each one',
-      ],
-      tip: "Your Google account should no longer appear under Accounts. That confirms Factory Reset Protection won't trigger after the reset.",
-    },
-    {
-      title: 'Erase all data (factory reset)',
-      subActions: [
-        'Open **Settings → System → Reset options**',
-        'Tap **Erase all data (factory reset)**',
-        'Enter your PIN, pattern, or password if prompted',
-        'Confirm the erase',
-      ],
-    },
-    {
-      title: 'Leave the device on the welcome screen',
-      body: "Once it restarts, you'll see the welcome / language picker. Don't set it up — just power it off and pack it for pickup.",
-    },
-  ],
-}
 
 const UNLINK_GUIDE = {
   ios: [
@@ -423,13 +353,10 @@ function ResetPanel({
   onGuideDone,
   error,
 }) {
-  const [open, setOpen] = useState(true)
   const [guideOpen, setGuideOpen] = useState(false)
-  const guide = RESET_GUIDE[os]
-  // On iOS the confirm checkbox is locked until the customer has been
-  // through the guide (opened it and pressed Done). Android keeps its
-  // inline accordion, so there's nothing to gate on.
-  const confirmLocked = os === 'ios' && !guideSeen
+  // The confirm checkbox is locked until the customer has been through the
+  // guided reset (opened it and pressed Done) — same gate for both platforms.
+  const confirmLocked = !guideSeen
   // Premature Continue before completing the guide — escalates the guide
   // button + gate message into a red error state.
   const showError = error === 'resetGuide'
@@ -445,74 +372,49 @@ function ResetPanel({
     <div className="pt-3 flex flex-col gap-3">
       <OsTabs os={os} onChange={onOsChange} />
 
-      {os === 'ios' ? (
-        <button
-          type="button"
-          onClick={() => setGuideOpen(true)}
-          className={`relative overflow-hidden rounded-[16px] border-2 px-4 py-3.5 text-left transition-colors ${
-            showError
-              ? 'border-danger bg-danger-bg/60'
-              : guideSeen
-                ? 'border-success/40 bg-success-bg/50'
-                : 'border-brand bg-brand-bg/60 hover:bg-brand-bg/80'
-          }`}
-        >
-          <span className="relative flex items-center gap-3">
-            <span
-              className={`w-10 h-10 rounded-full grid place-items-center shrink-0 ${
-                guideSeen
-                  ? 'bg-success text-white'
-                  : showError
-                    ? 'bg-danger text-white'
-                    : 'bg-brand text-white'
-              }`}
-            >
-              {guideSeen ? (
-                <Check size={19} strokeWidth={1.9} />
-              ) : (
-                <Sparkles size={19} strokeWidth={1.9} />
-              )}
+      <button
+        type="button"
+        onClick={() => setGuideOpen(true)}
+        className={`relative overflow-hidden rounded-[16px] border-2 px-4 py-3.5 text-left transition-colors ${
+          showError
+            ? 'border-danger bg-danger-bg/60'
+            : guideSeen
+              ? 'border-success/40 bg-success-bg/50'
+              : 'border-brand bg-brand-bg/60 hover:bg-brand-bg/80'
+        }`}
+      >
+        <span className="relative flex items-center gap-3">
+          <span
+            className={`w-10 h-10 rounded-full grid place-items-center shrink-0 ${
+              guideSeen
+                ? 'bg-success text-white'
+                : showError
+                  ? 'bg-danger text-white'
+                  : 'bg-brand text-white'
+            }`}
+          >
+            {guideSeen ? (
+              <Check size={19} strokeWidth={1.9} />
+            ) : (
+              <Sparkles size={19} strokeWidth={1.9} />
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14.5px] font-semibold text-ink leading-snug">
+              {guideSeen ? 'Guided reset completed' : 'Start the guided reset'}
             </span>
-            <span className="min-w-0">
-              <span className="block text-[14.5px] font-semibold text-ink leading-snug">
-                {guideSeen ? 'Guided reset completed' : 'Start the guided reset'}
-              </span>
-              <span className="block mt-0.5 text-[12px] text-muted">
-                {guideSeen
-                  ? 'Tap to run through it again'
-                  : 'One step at a time · about 10 min'}
-              </span>
+            <span className="block mt-0.5 text-[12px] text-muted">
+              {guideSeen
+                ? 'Tap to run through it again'
+                : 'One step at a time · about 10 min'}
             </span>
           </span>
-        </button>
-      ) : (
-        <>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            className="flex items-center justify-between text-[12.5px] font-semibold text-ink-2 py-1"
-          >
-            <span>How to factory reset</span>
-            <ChevronDown
-              size={14}
-              strokeWidth={1.75}
-              className="transition-transform"
-              style={{ transform: open ? 'rotate(180deg)' : 'none' }}
-            />
-          </button>
-          {open && (
-            <ol className="flex flex-col gap-3.5 animate-slideDown">
-              {guide.map((step, i) => (
-                <GuideStep key={i} index={i} step={step} />
-              ))}
-            </ol>
-          )}
-        </>
-      )}
+        </span>
+      </button>
 
       {guideOpen && (
         <ResetGuideSheet
+          os={os}
           checks={guideChecks}
           onToggle={onGuideCheck}
           onDone={() => {
