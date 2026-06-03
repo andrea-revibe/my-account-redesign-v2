@@ -1,5 +1,5 @@
 import { ORDERS } from '../../data/orders'
-import { deviceOsForOrder } from '../../lib/devices'
+import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
 
 export const TOTAL_STEPS = 8
 
@@ -34,6 +34,13 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
   const order =
     initialOrder ??
     (initialOrderId ? ORDERS.find((o) => o.id === initialOrderId) : null)
+  // For the OS-ambiguous `Tablet` category, preselect the iPad guide (the
+  // customer can switch to Android in Step 3). Everything else resolves
+  // directly from the category.
+  const resolvedType = deviceTypeForOrder(order)
+  const initialDevice = resolvedType === 'tablet' ? 'ipad' : resolvedType
+  const initialOs =
+    resolvedType === 'tablet' ? 'ios' : deviceOsForOrder(order)
   return {
     step: 1,
     claimType: null,
@@ -60,7 +67,8 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     // and `devicePrepText` keep rendering the reset branch.
     devicePrep: {
       option: 'reset',
-      os: deviceOsForOrder(order),
+      os: initialOs,
+      device: initialDevice,
       resetConfirmed: false,
       resetGuideChecks: {},
       resetGuideSeen: false,
