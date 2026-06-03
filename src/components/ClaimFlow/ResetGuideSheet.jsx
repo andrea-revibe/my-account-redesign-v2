@@ -24,7 +24,9 @@ import {
   Apple,
   Volume2,
   Smartphone,
+  Tablet,
   Laptop,
+  Globe,
   Menu,
   ChevronUp,
   MoreVertical,
@@ -58,7 +60,7 @@ const stepAnim = (dir) =>
   `${dir < 0 ? 'gSlideL' : 'gSlideR'} 0.34s cubic-bezier(0.32,0.72,0,1)`
 
 const DEVICE_STEPS = {
-  ios: [
+  iphone: [
     {
       Mock: SettingsSignOut,
       title: 'Sign out of iCloud',
@@ -84,6 +86,70 @@ const DEVICE_STEPS = {
       trouble: {
         label: 'I see a passcode or “Locked to Owner” screen',
         body: 'A passcode keypad means the erase didn’t run — redo the erase step. An Apple ID / “iPhone Locked to Owner” prompt means it’s wiped but still linked — finish it on the remote path.',
+        escalate: true,
+      },
+    },
+  ],
+  ipad: [
+    {
+      Mock: IpadSettingsSignOut,
+      title: 'Sign out of iCloud',
+      lead: 'Open Settings, tap your name at the top, scroll to the bottom and tap Sign Out. Enter your Apple ID password to confirm.',
+      why: 'This is the one step that removes Activation Lock.',
+      trouble: {
+        label: "It won’t let me sign out",
+        body: 'On iPadOS 17.3+, Stolen Device Protection can add a 1-hour delay away from home or work — do it at home, or turn it off under Settings › Face ID & Passcode. Forgot the password or the screen’s broken? Switch to the remote path.',
+        escalate: true,
+      },
+    },
+    {
+      Mock: IpadSettingsErase,
+      title: 'Erase all content',
+      lead: 'Go to Settings › General › Transfer or Reset iPad, then tap Erase All Content and Settings. It takes 2–10 minutes — don’t interrupt it.',
+      why: 'Not the “Reset” sub-menu — that only clears network & keyboard settings.',
+    },
+    {
+      Mock: IpadHelloScreen,
+      title: 'Restart and check',
+      lead: 'When it reboots you’ll see the rotating “hello” screen and a language picker — not an Apple ID prompt. Then power it off and pack it.',
+      why: 'No Apple ID prompt means Activation Lock is off — you’re done.',
+      trouble: {
+        label: 'I see a passcode or “Locked to Owner” screen',
+        body: 'A passcode keypad means the erase didn’t run — redo the erase step. An Apple ID / “iPad Locked to Owner” prompt means it’s wiped but still linked — finish it on the remote path.',
+        escalate: true,
+      },
+    },
+  ],
+  mac: [
+    {
+      Mock: MacSignOut,
+      title: 'Sign out of your Apple Account',
+      lead: 'Open System Settings, click your name at the top of the sidebar, scroll down and click Sign Out. Enter your Apple ID password to confirm.',
+      why: 'Signing out turns off Find My and lifts Activation Lock on Apple silicon and T2 Macs.',
+      trouble: {
+        label: "It won’t let me sign out",
+        body: 'Find My asks for your Apple ID password before it releases the Mac. Forgot it, or the Mac won’t start up? Switch to the remote path and unlink it from your account instead.',
+        escalate: true,
+      },
+    },
+    {
+      Mock: MacErase,
+      title: 'Erase all content and settings',
+      lead: 'Go to System Settings › General › Transfer or Reset, then click Erase All Content and Settings. The Erase Assistant wipes the Mac and signs you out automatically.',
+      why: 'On Apple silicon and 2018-or-newer (T2) Macs this is the clean one-click wipe — the same idea as on iPhone.',
+      trouble: {
+        label: "I don’t see Erase All Content and Settings",
+        body: 'Older Intel Macs without the T2 chip don’t have it. Restart holding ⌘-R to enter Recovery, open Disk Utility and erase Macintosh HD, then reinstall macOS from the Recovery menu.',
+      },
+    },
+    {
+      Mock: MacWelcome,
+      title: 'Restart and check',
+      lead: 'When it reboots you’ll see the Setup Assistant — the globe and “Select Your Country or Region” — not a login or Apple ID prompt. Then shut it down and pack it.',
+      why: 'Landing on Setup Assistant with no account prompt means Activation Lock is off — you’re done.',
+      trouble: {
+        label: 'I see a login window or Activation Lock',
+        body: 'A login window means the erase didn’t run — redo the erase step. An “Activation Lock” / Apple ID prompt means it’s wiped but still linked — finish it on the remote path.',
         escalate: true,
       },
     },
@@ -131,29 +197,65 @@ const DEVICE_STEPS = {
   ],
 }
 
-const REMOTE_STEPS = {
-  ios: [
+// iPhone & iPad unlink the same way (icloud.com/find + account.apple.com ›
+// Devices) on a portrait touch device, so they share one factory — only the
+// device noun and the frame change. Mac uses a desktop-Safari layout (see
+// MAC_REMOTE_STEPS). Android keeps its own two-account remote path below.
+function appleRemoteSteps(noun, Frame = MiniPhone) {
+  const a = /^[aeiou]/i.test(noun) ? 'an' : 'a'
+  return [
     {
-      Mock: ICloudRemove,
+      Mock: () => <ICloudRemove noun={noun} Frame={Frame} />,
       title: 'Remove it from iCloud',
-      lead: 'On any device, open icloud.com/find and sign in with the Apple ID that was on this iPhone. Pick the device, then tap Remove This Device — not Erase.',
+      lead: `On any device, open icloud.com/find and sign in with the Apple ID that was on this ${noun}. Pick the device, then tap Remove This Device — not Erase.`,
       why: 'Remove This Device is what unlinks it and lifts Activation Lock. Erase only wipes the data — the lock stays on.',
       trouble: {
         label: 'What if it’s still online?',
-        body: 'If the iPhone is offline, Activation Lock lifts straight away (and it drops off Find My after 30 days). If it’s still online it can’t be removed yet — tap Continue to mark it “Ready for Repair / Trade In” for 30 days. One catch: if it later comes back online while still signed in, it can reappear and re-lock — so if you can still reach the device, also sign out of iCloud on it. You can do the same from appleid.apple.com › Devices.',
+        body: `If the ${noun} is offline, Activation Lock lifts straight away (and it drops off Find My after 30 days). If it’s still online it can’t be removed yet — tap Continue to mark it “Ready for Repair / Trade In” for 30 days. One catch: if it later comes back online while still signed in, it can reappear and re-lock — so if you can still reach the device, also sign out of iCloud on it. You can do the same from appleid.apple.com › Devices.`,
       },
     },
     {
-      Mock: AccountRemoveCarousel,
+      Mock: makeAccountCarousel(noun, Frame),
       title: 'Or unlink it from your account',
-      lead: 'No iCloud access? On any device open account.apple.com and sign in. Open the menu, tap Devices, pick this iPhone, scroll to About, then tap Remove from account. Swipe the screens with the arrows.',
+      lead: `No iCloud access? On any device open account.apple.com and sign in. Open the menu, tap Devices, pick this ${noun}, scroll to About, then tap Remove from account. Swipe the screens with the arrows.`,
       why: 'Removing it from your Apple Account lifts Activation Lock too — same result as the iCloud step, just a different route.',
       trouble: {
         label: 'Which one should I use?',
-        body: 'Either lifts the lock. Use icloud.com/find if the phone is lost or you also want to erase it remotely. Use account.apple.com › Devices when you just need to unlink a phone you still have in hand.',
+        body: `Either lifts the lock. Use icloud.com/find if the ${noun} is lost or you also want to erase it remotely. Use account.apple.com › Devices when you just need to unlink ${a} ${noun} you still have in hand.`,
       },
     },
-  ],
+  ]
+}
+
+// Mac remote path — a Mac is unlocked from a desktop browser, so the screens
+// render in the laptop shell with Safari-window chrome rather than a phone.
+const MAC_REMOTE_STEPS = [
+  {
+    Mock: MacICloudRemove,
+    title: 'Remove it from iCloud',
+    lead: 'On any computer, open icloud.com/find and sign in with the Apple ID that was on this Mac. Select the Mac, then click Remove This Device — not Erase.',
+    why: 'Remove This Device unlinks it and lifts Activation Lock. Erase only wipes the data — the lock stays on.',
+    trouble: {
+      label: 'What if it’s still online?',
+      body: 'If the Mac is offline, Activation Lock lifts straight away (and it drops off Find My after 30 days). If it’s still online it can’t be removed yet — sign out of iCloud on the Mac itself, or remove it from account.apple.com › Devices once it’s offline.',
+    },
+  },
+  {
+    Mock: MacAccountRemove,
+    title: 'Or unlink it from your account',
+    lead: 'No iCloud access? Open account.apple.com, sign in, go to Devices, select this Mac, then click Remove from account.',
+    why: 'Removing it from your Apple Account lifts Activation Lock too — same result as the iCloud step, just a different route.',
+    trouble: {
+      label: 'Which one should I use?',
+      body: 'Either lifts the lock. Use icloud.com/find if the Mac is lost or you also want to erase it remotely. Use account.apple.com › Devices when you just need to unlink a Mac you still have in hand.',
+    },
+  },
+]
+
+const REMOTE_STEPS = {
+  iphone: appleRemoteSteps('iPhone'),
+  ipad: appleRemoteSteps('iPad', MiniTablet),
+  mac: MAC_REMOTE_STEPS,
   android: [
     {
       Mock: GoogleRemoveRemote,
@@ -179,10 +281,22 @@ const REMOTE_STEPS = {
 }
 
 const FINAL_CHECKS = {
-  ios: [
+  iphone: [
     { id: 'gf_sim', Icon: SimCard, label: 'Remove SIM / delete eSIM' },
     { id: 'gf_watch', Icon: Watch, label: 'Unpair Apple Watch' },
     { id: 'gf_imei', Icon: Camera, label: 'Photo the IMEI for warranty' },
+    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
+  ],
+  ipad: [
+    { id: 'gf_sim', Icon: SimCard, label: 'Remove SIM / delete eSIM (cellular)' },
+    { id: 'gf_pencil', Icon: Watch, label: 'Unpair Apple Pencil & accessories' },
+    { id: 'gf_serial', Icon: Camera, label: 'Photo the serial for warranty' },
+    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
+  ],
+  mac: [
+    { id: 'gf_bt', Icon: Watch, label: 'Unpair Bluetooth mouse & keyboard' },
+    { id: 'gf_charger', Icon: Package, label: 'Include the charger & cable' },
+    { id: 'gf_serial', Icon: Camera, label: 'Photo the serial for warranty' },
     { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
   ],
   android: [
@@ -195,7 +309,7 @@ const FINAL_CHECKS = {
 }
 
 const COPY = {
-  ios: {
+  iphone: {
     fallbackTitle: 'Reset your iPhone',
     introTitle: 'Let’s unlock your iPhone',
     introSub:
@@ -205,6 +319,32 @@ const COPY = {
     no: 'No — it’s broken or won’t turn on',
     noSub: 'We’ll erase it remotely instead',
     doneTitle: 'Your iPhone is ready to ship',
+    doneSub:
+      'It’s erased and unlinked. Before you box it up, a few quick optional checks:',
+  },
+  ipad: {
+    fallbackTitle: 'Reset your iPad',
+    introTitle: 'Let’s unlock your iPad',
+    introSub:
+      'We’ll go one step at a time. First — can you still unlock and use this iPad?',
+    yes: 'Yes, I can unlock it',
+    yesSub: 'Reset right from the device · most people',
+    no: 'No — it’s broken or won’t turn on',
+    noSub: 'We’ll erase it remotely instead',
+    doneTitle: 'Your iPad is ready to ship',
+    doneSub:
+      'It’s erased and unlinked. Before you box it up, a few quick optional checks:',
+  },
+  mac: {
+    fallbackTitle: 'Reset your MacBook',
+    introTitle: 'Let’s wipe your MacBook',
+    introSub:
+      'We’ll go one step at a time. First — can you still log in and use this Mac?',
+    yes: 'Yes, I can log in',
+    yesSub: 'Erase right from the Mac · most people',
+    no: 'No — it’s broken or won’t start up',
+    noSub: 'We’ll unlink it remotely instead',
+    doneTitle: 'Your MacBook is ready to ship',
     doneSub:
       'It’s erased and unlinked. Before you box it up, a few quick optional checks:',
   },
@@ -223,14 +363,21 @@ const COPY = {
   },
 }
 
+const DEVICE_LABEL = {
+  iphone: 'iPhone',
+  ipad: 'iPad',
+  mac: 'MacBook',
+  android: 'Samsung',
+}
+
 export default function ResetGuideSheet({
-  os = 'ios',
+  device = 'iphone',
   checks,
   onToggle,
   onDone,
   onClose,
 }) {
-  const c = COPY[os] || COPY.ios
+  const c = COPY[device] || COPY.iphone
   const [phase, setPhase] = useState('intro')
   const [route, setRoute] = useState(null)
   const [i, setI] = useState(0)
@@ -255,9 +402,9 @@ export default function ResetGuideSheet({
     }
   }, [onClose])
 
-  const deviceSteps = DEVICE_STEPS[os] || DEVICE_STEPS.ios
-  const remoteSteps = REMOTE_STEPS[os] || REMOTE_STEPS.ios
-  const finalChecks = FINAL_CHECKS[os] || FINAL_CHECKS.ios
+  const deviceSteps = DEVICE_STEPS[device] || DEVICE_STEPS.iphone
+  const remoteSteps = REMOTE_STEPS[device] || REMOTE_STEPS.iphone
+  const finalChecks = FINAL_CHECKS[device] || FINAL_CHECKS.iphone
   const steps = route === 'remote' ? remoteSteps : deviceSteps
 
   // A step is a carousel when its Mock exposes a `.screens` array (see
@@ -312,7 +459,7 @@ export default function ResetGuideSheet({
       className="fixed inset-0 z-[60] flex justify-center"
       role="dialog"
       aria-modal="true"
-      aria-label={`Guided ${os === 'android' ? 'Samsung' : 'iPhone'} reset`}
+      aria-label={`Guided ${DEVICE_LABEL[device] || 'device'} reset`}
     >
       <style>{STEP_ANIM_CSS}</style>
       <button
@@ -353,7 +500,7 @@ export default function ResetGuideSheet({
         <div className="flex-1 min-h-0 overflow-y-auto">
           {phase === 'intro' && (
             <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center animate-fadeIn">
-              <IntroDevice os={os} />
+              <IntroDevice device={device} />
               <h2 className="mt-3 text-[21px] font-bold text-ink leading-tight">
                 {c.introTitle}
               </h2>
@@ -761,10 +908,11 @@ function Row({ Icon, iconBg, label, value, highlight, danger, chevron = true }) 
   )
 }
 
-// 1 · Sign out of iCloud — Apple-ID card + the Sign Out row glowing.
-function SettingsSignOut() {
+// 1 · Sign out of iCloud — Apple-ID card + the Sign Out row glowing. `Frame`
+// lets the iPad guide reuse this exact content inside a tablet shell.
+function SettingsSignOut({ Frame = MiniPhone }) {
   return (
-    <MiniPhone>
+    <Frame>
       <StatusBar />
       <div className="px-2.5 pt-1.5">
         <div className="text-[15px] font-bold text-ink px-1">Settings</div>
@@ -809,14 +957,14 @@ function SettingsSignOut() {
           <ArrowRight size={9} strokeWidth={2.6} /> at the very bottom
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
 // 2 · Erase — Transfer or Reset list with the destructive action glowing.
-function SettingsErase() {
+function SettingsErase({ Frame = MiniPhone, noun = 'iPhone' }) {
   return (
-    <MiniPhone>
+    <Frame>
       <StatusBar />
       <div className="px-2.5 pt-1.5 flex items-center gap-0.5 text-brand">
         <ChevronLeft size={13} strokeWidth={2.4} />
@@ -824,12 +972,12 @@ function SettingsErase() {
       </div>
       <div className="px-2.5 mt-1">
         <div className="text-[13px] font-bold text-ink px-1 leading-tight">
-          Transfer or Reset iPhone
+          Transfer or Reset {noun}
         </div>
       </div>
       <div className="px-2.5 mt-3">
         <div className="bg-white rounded-[11px] overflow-hidden divide-y divide-line-2 shadow-sm2">
-          <Row Icon={Package} iconBg="#34c759" label="Prepare for New iPhone" />
+          <Row Icon={Package} iconBg="#34c759" label={`Prepare for New ${noun}`} />
         </div>
       </div>
       <div className="px-2.5 mt-2.5">
@@ -846,14 +994,14 @@ function SettingsErase() {
           keyboard settings.
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
 // 3 · Confirm it worked — the rotating Hello screen means you're unlocked.
-function HelloScreen() {
+function HelloScreen({ Frame = MiniPhone }) {
   return (
-    <MiniPhone>
+    <Frame>
       <StatusBar />
       <div className="h-full flex flex-col items-center justify-center -mt-8">
         <div
@@ -884,16 +1032,17 @@ function HelloScreen() {
           No Apple ID prompt
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
 // Remote · the iCloud Find Devices sheet in a browser. Mirrors the real
-// UI: the device card, Play Sound / Lost iPhone actions, and the Erase /
-// Remove list — with Remove glowing as the correct choice.
-function ICloudRemove() {
+// UI: the device card, Play Sound / Mark As Lost actions, and the Erase /
+// Remove list — with Remove glowing as the correct choice. `noun` keeps the
+// copy correct for iPhone / iPad / Mac.
+function ICloudRemove({ noun = 'iPhone', Frame = MiniPhone }) {
   return (
-    <MiniPhone>
+    <Frame>
       <StatusBar />
       <div className="px-2.5 mt-1.5">
         <div className="flex items-center justify-center gap-1.5 bg-black/5 rounded-full px-2.5 h-[22px]">
@@ -910,10 +1059,10 @@ function ICloudRemove() {
       </div>
       <div className="px-2.5 mt-2.5">
         <div className="text-[11.5px] font-bold text-ink leading-tight">
-          This iPhone
+          This {noun}
         </div>
         <div className="text-[8.5px] text-muted mt-0.5">
-          iPhone · Offline · 6 min ago
+          {noun} · Offline · 6 min ago
         </div>
 
         <div className="mt-2.5 grid grid-cols-2 gap-1.5">
@@ -933,7 +1082,7 @@ function ICloudRemove() {
               <Lock size={10} strokeWidth={2.4} />
             </span>
             <span className="text-[9px] font-semibold text-ink leading-none">
-              Lost iPhone
+              Lost {noun}
             </span>
           </div>
         </div>
@@ -954,7 +1103,7 @@ function ICloudRemove() {
           Erase.
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
@@ -963,26 +1112,65 @@ function ICloudRemove() {
 // Remove from account). Same polished CSS-mock language as ICloudRemove; the
 // account holder's details are masked since this is a removal-from-account
 // surface, not a sign-in one.
-const ACCOUNT_SCREENS = [
-  { Screen: AcctMenu, caption: 'Open the menu, tap Devices' },
-  { Screen: AcctDeviceList, caption: 'Pick this iPhone' },
-  { Screen: AcctDeviceDetail, caption: 'Open it, scroll to About' },
-  { Screen: AcctRemove, caption: 'Tap Remove from account' },
-]
-
-function AccountRemoveCarousel(props) {
-  return <MockCarousel screens={ACCOUNT_SCREENS} {...props} />
+// Per-device model metadata for the account-removal screens. The highlighted
+// device + the "About" rows read correctly whether you're unlinking an
+// iPhone, iPad, or Mac.
+const DEVICE_META = {
+  iPhone: {
+    name: 'Your iPhone',
+    model: 'iPhone 17',
+    version: 'iOS 26.5',
+    Icon: Smartphone,
+    extraRows: [
+      ['Phone Number', '+•• ••• ••• ••••'],
+      ['IMEI', '•• •••••• •••••• •'],
+    ],
+    other: { name: 'Your MacBook Air', model: 'MacBook Air 13″', Icon: Laptop },
+  },
+  iPad: {
+    name: 'Your iPad',
+    model: 'iPad Pro 11″',
+    version: 'iPadOS 26.5',
+    Icon: Tablet,
+    extraRows: [],
+    other: { name: 'Your iPhone', model: 'iPhone 17', Icon: Smartphone },
+  },
+  Mac: {
+    name: 'Your MacBook',
+    model: 'MacBook Air 13″',
+    version: 'macOS 26.5',
+    Icon: Laptop,
+    extraRows: [],
+    other: { name: 'Your iPhone', model: 'iPhone 17', Icon: Smartphone },
+  },
 }
-// `.screens` lets ResetGuideSheet detect a carousel step and gate its footer
-// button on reaching the last screen.
-AccountRemoveCarousel.screens = ACCOUNT_SCREENS
+
+// Builds the four-screen account.apple.com carousel for a given device. The
+// returned component carries `.screens` so ResetGuideSheet detects it as a
+// carousel step and gates its footer button on reaching the last screen.
+function makeAccountCarousel(noun, Frame = MiniPhone) {
+  const screens = [
+    { Screen: AcctMenu, caption: 'Open the menu, tap Devices' },
+    { Screen: () => <AcctDeviceList noun={noun} />, caption: `Pick this ${noun}` },
+    {
+      Screen: () => <AcctDeviceDetail noun={noun} />,
+      caption: 'Open it, scroll to About',
+    },
+    { Screen: () => <AcctRemove noun={noun} />, caption: 'Tap Remove from account' },
+  ]
+  function AccountRemoveCarousel(props) {
+    return <MockCarousel screens={screens} Frame={Frame} {...props} />
+  }
+  AccountRemoveCarousel.screens = screens
+  return AccountRemoveCarousel
+}
 
 // Arrow-swipeable strip of mock screens with dot pagination + a numbered
 // caption — shared by the iOS account-removal walkthrough and the Android
 // Samsung sign-out step. `camera` is forwarded to each MiniPhone frame.
 // Controlled: the parent owns `idx` so the guide's footer button can walk the
 // screens; the arrows and dots call `onIdxChange` too.
-function MockCarousel({ screens, camera, idx = 0, onIdxChange }) {
+function MockCarousel({ screens, camera, Frame = MiniPhone, idx = 0, onIdxChange }) {
   const prevIdx = useRef(idx)
   const dir = idx >= prevIdx.current ? 1 : -1
   useEffect(() => {
@@ -1003,9 +1191,9 @@ function MockCarousel({ screens, camera, idx = 0, onIdxChange }) {
           <ChevronLeft size={18} strokeWidth={2.2} />
         </button>
         <div key={idx} style={{ animation: stepAnim(dir) }}>
-          <MiniPhone camera={camera}>
+          <Frame camera={camera}>
             <Screen />
-          </MiniPhone>
+          </Frame>
         </div>
         <button
           onClick={() => idx < last && go(idx + 1)}
@@ -1119,8 +1307,11 @@ function AcctMenu() {
   )
 }
 
-// 2 · Devices list — this iPhone picked out of the account's devices.
-function AcctDeviceList() {
+// 2 · Devices list — this device picked out of the account's devices.
+function AcctDeviceList({ noun = 'iPhone' }) {
+  const meta = DEVICE_META[noun] || DEVICE_META.iPhone
+  const HiIcon = meta.Icon
+  const OtherIcon = meta.other.Icon
   return (
     <AcctScreen>
       <AcctSignOut collapsed />
@@ -1135,23 +1326,25 @@ function AcctDeviceList() {
           <div className="flex items-start gap-2">
             <span className="flex-1 min-w-0">
               <span className="block text-[11px] font-bold text-ink leading-tight">
-                Your iPhone
+                {meta.name}
               </span>
-              <span className="block text-[9px] text-muted mt-0.5">iPhone 17</span>
+              <span className="block text-[9px] text-muted mt-0.5">
+                {meta.model}
+              </span>
             </span>
-            <Smartphone size={20} strokeWidth={1.6} className="text-ink/70" />
+            <HiIcon size={20} strokeWidth={1.6} className="text-ink/70" />
           </div>
         </div>
         <div className="rounded-[11px] border border-line bg-white shadow-sm2 p-2.5 flex items-start gap-2">
           <span className="flex-1 min-w-0">
             <span className="block text-[11px] font-bold text-ink leading-tight">
-              Your MacBook Air
+              {meta.other.name}
             </span>
             <span className="block text-[9px] text-muted mt-0.5">
-              MacBook Air 13″
+              {meta.other.model}
             </span>
           </span>
-          <Laptop size={20} strokeWidth={1.6} className="text-ink/70" />
+          <OtherIcon size={20} strokeWidth={1.6} className="text-ink/70" />
         </div>
       </div>
     </AcctScreen>
@@ -1159,16 +1352,18 @@ function AcctDeviceList() {
 }
 
 // 3 · Device detail — Backup & Security; a hint to scroll down to About.
-function AcctDeviceDetail() {
+function AcctDeviceDetail({ noun = 'iPhone' }) {
+  const meta = DEVICE_META[noun] || DEVICE_META.iPhone
+  const DetailIcon = meta.Icon
   return (
     <AcctScreen>
       <div className="px-2.5 mt-1.5">
         <X size={13} strokeWidth={2.2} className="text-ink" />
       </div>
       <div className="flex flex-col items-center mt-0.5">
-        <Smartphone size={26} strokeWidth={1.4} className="text-ink/70" />
-        <span className="mt-1 text-[12px] font-bold text-ink">Your iPhone</span>
-        <span className="text-[9.5px] text-ink-2">iPhone 17</span>
+        <DetailIcon size={26} strokeWidth={1.4} className="text-ink/70" />
+        <span className="mt-1 text-[12px] font-bold text-ink">{meta.name}</span>
+        <span className="text-[9.5px] text-ink-2">{meta.model}</span>
         <span className="text-[8.5px] text-muted mt-0.5">
           Serial Number: ••••••••
         </span>
@@ -1182,7 +1377,7 @@ function AcctDeviceDetail() {
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 size={12} strokeWidth={2.2} className="text-success" />
-            <span className="text-[9.5px] text-ink">Find My iPhone</span>
+            <span className="text-[9.5px] text-ink">Find My {noun}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 size={12} strokeWidth={2.2} className="text-success" />
@@ -1199,13 +1394,13 @@ function AcctDeviceDetail() {
 }
 
 // 4 · About — masked details + the Remove from account button glowing.
-function AcctRemove() {
+function AcctRemove({ noun = 'iPhone' }) {
+  const meta = DEVICE_META[noun] || DEVICE_META.iPhone
   const rows = [
-    ['Model', 'iPhone 17'],
-    ['Version', 'iOS 26.5'],
-    ['Phone Number', '+•• ••• ••• ••••'],
+    ['Model', meta.model],
+    ['Version', meta.version],
     ['Serial Number', '••••••••••'],
-    ['IMEI', '•• •••••• •••••• •'],
+    ...meta.extraRows,
   ]
   return (
     <AcctScreen>
@@ -1582,10 +1777,10 @@ function SamsungRemoveRemote() {
   )
 }
 
-// Intro illustration — the iOS PNG, or an asset-free CSS Galaxy slab for
-// Android, both behind the same brand-bg glow.
-function IntroDevice({ os }) {
-  if (os !== 'android') {
+// Intro illustration — the iPhone PNG, or an asset-free CSS slab for each
+// other device (iPad, MacBook, Galaxy), all behind the same brand-bg glow.
+function IntroDevice({ device }) {
+  if (device === 'iphone') {
     return (
       <div className="relative">
         <div
@@ -1600,6 +1795,9 @@ function IntroDevice({ os }) {
       </div>
     )
   }
+  if (device === 'ipad') return <IntroTablet />
+  if (device === 'mac') return <IntroLaptop />
+  // Android — CSS Galaxy slab.
   return (
     <div className="relative grid place-items-center" style={{ width: 148, height: 148 }}>
       <div className="absolute inset-0 -m-1 rounded-full blur-2xl bg-brand-bg" aria-hidden />
@@ -1626,6 +1824,512 @@ function IntroDevice({ os }) {
         </div>
       </div>
     </div>
+  )
+}
+
+// CSS iPad slab — uniform slim bezel, top-edge camera, a Lock on the locked
+// screen. Same brand-bg glow as the other intro illustrations.
+function IntroTablet() {
+  return (
+    <div className="relative grid place-items-center" style={{ width: 148, height: 148 }}>
+      <div className="absolute inset-0 -m-1 rounded-full blur-2xl bg-brand-bg" aria-hidden />
+      <div
+        className="relative rounded-[20px]"
+        style={{
+          width: 104,
+          height: 138,
+          padding: 6,
+          background: 'linear-gradient(155deg,#3a3a42,#0c0c10)',
+          boxShadow:
+            '0 16px 34px -14px rgba(40,20,80,0.5), inset 0 1px 1px rgba(255,255,255,0.25)',
+        }}
+      >
+        <div
+          className="relative w-full h-full rounded-[14px] overflow-hidden grid place-items-center"
+          style={{
+            background:
+              'radial-gradient(120% 90% at 50% 0%, #2a3350 0%, #07070b 70%)',
+          }}
+        >
+          <div className="absolute top-[6px] left-1/2 -translate-x-1/2 w-[5px] h-[5px] rounded-full bg-black" />
+          <Lock size={28} strokeWidth={1.5} className="text-white/80" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// CSS MacBook — an open laptop (lid + deck) with a Lock on the screen.
+function IntroLaptop() {
+  return (
+    <div className="relative grid place-items-center" style={{ width: 168, height: 148 }}>
+      <div className="absolute inset-0 -m-1 rounded-full blur-2xl bg-brand-bg" aria-hidden />
+      <div className="relative">
+        <div
+          className="relative rounded-[12px] mx-auto"
+          style={{
+            width: 142,
+            height: 92,
+            padding: 6,
+            background: 'linear-gradient(155deg,#3a3a42,#0c0c10)',
+            boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.22)',
+          }}
+        >
+          <div className="absolute top-[2px] left-1/2 -translate-x-1/2 w-[4px] h-[4px] rounded-full bg-white/25" />
+          <div
+            className="relative w-full h-full rounded-[6px] overflow-hidden grid place-items-center"
+            style={{
+              background:
+                'radial-gradient(120% 110% at 50% 0%, #2a3350 0%, #07070b 72%)',
+            }}
+          >
+            <Lock size={24} strokeWidth={1.5} className="text-white/80" />
+          </div>
+        </div>
+        <div
+          className="relative mx-auto"
+          style={{
+            width: 164,
+            height: 10,
+            marginTop: -1,
+            background: 'linear-gradient(180deg,#cfcbd9,#9d97ad)',
+            borderBottomLeftRadius: 9,
+            borderBottomRightRadius: 9,
+            boxShadow: '0 10px 20px -8px rgba(40,20,80,0.5)',
+          }}
+        >
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[40px] h-[4px] rounded-b-[6px] bg-black/15" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------- iPad mock screens */
+// iPadOS resets exactly like iOS — same Settings path, same Activation Lock —
+// so the iPad guide reuses the iOS screen content inside a tablet shell. Only
+// the device noun ("iPad") and the frame differ.
+
+// Tablet shell — uniform slim bezel + a single top-edge camera, no notch.
+// Same 384-tall inner viewport as MiniPhone so the shared iOS content drops
+// in without clipping; just wider.
+function MiniTablet({ children }) {
+  const W = 230
+  const H = 384
+  const S = 1.06
+  const outerW = W + 18
+  const outerH = H + 18
+  return (
+    <div className="mx-auto" style={{ width: outerW * S, height: outerH * S }}>
+      <div
+        className="relative rounded-[30px] p-[9px]"
+        style={{
+          width: outerW,
+          height: outerH,
+          transform: `scale(${S})`,
+          transformOrigin: 'top left',
+          background: 'linear-gradient(160deg,#e9e6f0,#c6bfd6)',
+          boxShadow:
+            '0 18px 40px -16px rgba(40,20,80,0.45), 0 2px 6px rgba(40,20,80,0.18), inset 0 1px 1px rgba(255,255,255,0.5)',
+        }}
+      >
+        <div
+          className="relative rounded-[22px] overflow-hidden bg-[#f1f1f6]"
+          style={{ width: W, height: H }}
+        >
+          <div className="absolute top-[7px] left-1/2 -translate-x-1/2 w-[6px] h-[6px] bg-black/70 rounded-full z-20" />
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function IpadSettingsSignOut() {
+  return <SettingsSignOut Frame={MiniTablet} />
+}
+function IpadSettingsErase() {
+  return <SettingsErase Frame={MiniTablet} noun="iPad" />
+}
+function IpadHelloScreen() {
+  return <HelloScreen Frame={MiniTablet} />
+}
+
+/* -------------------------------------------------------- Mac mock screens */
+// macOS reset differs from iOS — System Settings (sidebar + content) and a
+// landscape screen — so the Mac guide gets its own laptop shell + screens.
+
+// Laptop shell — a landscape lid over a thin keyboard deck wedge.
+function MiniLaptop({ children }) {
+  const W = 320
+  const H = 196
+  const S = 1.02
+  return (
+    <div className="mx-auto" style={{ width: (W + 60) * S }}>
+      <div style={{ transform: `scale(${S})`, transformOrigin: 'top center' }}>
+        <div
+          className="relative mx-auto rounded-[12px] p-[8px]"
+          style={{
+            width: W + 16,
+            background: 'linear-gradient(160deg,#2a2a30,#0a0a0c)',
+            boxShadow:
+              '0 16px 34px -16px rgba(40,20,80,0.5), inset 0 1px 1px rgba(255,255,255,0.18)',
+          }}
+        >
+          <div className="absolute top-[3px] left-1/2 -translate-x-1/2 w-[4px] h-[4px] rounded-full bg-white/30" />
+          <div
+            className="relative rounded-[5px] overflow-hidden bg-[#edeaf2]"
+            style={{ width: W, height: H }}
+          >
+            {children}
+          </div>
+        </div>
+        <div
+          className="relative mx-auto"
+          style={{
+            width: W + 56,
+            height: 11,
+            background: 'linear-gradient(180deg,#d3d0db,#a9a3b8)',
+            borderBottomLeftRadius: 11,
+            borderBottomRightRadius: 11,
+            boxShadow: '0 9px 16px -7px rgba(40,20,80,0.42)',
+          }}
+        >
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[64px] h-[4px] rounded-b-[6px] bg-black/15" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// macOS menu bar — Apple logo + the active app's menus, clock at the right.
+function MacMenuBar({ app = 'System Settings' }) {
+  return (
+    <div className="flex items-center gap-2 px-2 h-[15px] bg-white/65 border-b border-black/10 text-[7px] text-ink/80 backdrop-blur">
+      <Apple size={8} strokeWidth={1.5} className="text-ink fill-ink" />
+      <span className="font-bold text-ink">{app}</span>
+      <span>File</span>
+      <span>Edit</span>
+      <span>View</span>
+      <span className="ml-auto flex items-center gap-1.5">
+        <Search size={7} strokeWidth={2.2} />
+        9:41
+      </span>
+    </div>
+  )
+}
+
+// Shared System Settings chrome — sidebar (search + items) on the left,
+// content pane on the right. `selected` highlights the active sidebar row.
+function MacSettings({ sidebar, account, children }) {
+  return (
+    <MiniLaptop>
+      <MacMenuBar />
+      <div className="flex" style={{ height: 181 }}>
+        <div className="w-[118px] shrink-0 bg-black/[0.04] border-r border-black/10 p-1.5">
+          <div className="flex items-center gap-1 bg-black/5 rounded-[5px] px-1.5 h-[15px] mb-1.5">
+            <Search size={7} strokeWidth={2.2} className="text-muted" />
+            <span className="text-[6.5px] text-muted">Search</span>
+          </div>
+          {account && (
+            <div
+              className={`flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 mb-1.5 ${
+                account.selected ? 'bg-[#0071e3]' : ''
+              }`}
+            >
+              <span
+                className="w-[16px] h-[16px] rounded-full grid place-items-center text-white text-[7px] font-bold shrink-0"
+                style={{
+                  background: `linear-gradient(145deg, rgb(${BRAND2}), rgb(${BRAND}))`,
+                }}
+              >
+                A
+              </span>
+              <span className="min-w-0">
+                <span
+                  className={`block text-[7px] font-semibold leading-tight ${
+                    account.selected ? 'text-white' : 'text-ink'
+                  }`}
+                >
+                  Your Name
+                </span>
+                <span
+                  className={`block text-[6px] ${
+                    account.selected ? 'text-white/80' : 'text-muted'
+                  }`}
+                >
+                  Apple Account
+                </span>
+              </span>
+            </div>
+          )}
+          <div className="space-y-[3px]">
+            {sidebar.map((row) => (
+              <div
+                key={row.label}
+                className={`rounded-[5px] px-1.5 py-[5px] text-[7px] ${
+                  row.selected
+                    ? 'bg-[#0071e3] text-white font-semibold'
+                    : 'text-ink/80'
+                }`}
+              >
+                {row.label}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 p-2 min-w-0">{children}</div>
+      </div>
+    </MiniLaptop>
+  )
+}
+
+// 1 · Sign out — System Settings › Apple Account, Sign Out glowing.
+function MacSignOut() {
+  return (
+    <MacSettings
+      account={{ selected: true }}
+      sidebar={[
+        { label: 'Wi-Fi' },
+        { label: 'Bluetooth' },
+        { label: 'Network' },
+        { label: 'General' },
+      ]}
+    >
+      <div className="flex items-center gap-1.5">
+        <span
+          className="w-[24px] h-[24px] rounded-full grid place-items-center text-white text-[10px] font-bold shrink-0"
+          style={{
+            background: `linear-gradient(145deg, rgb(${BRAND2}), rgb(${BRAND}))`,
+          }}
+        >
+          A
+        </span>
+        <div className="min-w-0">
+          <div className="text-[8.5px] font-bold text-ink leading-tight">
+            Your Name
+          </div>
+          <div className="text-[6.5px] text-muted truncate">your@email.com</div>
+        </div>
+      </div>
+      <div className="mt-2 rounded-[6px] bg-white border border-black/10 overflow-hidden divide-y divide-black/5 shadow-sm2">
+        {['iCloud', 'Media & Purchases', 'Sign-In & Security'].map((x) => (
+          <div
+            key={x}
+            className="flex items-center justify-between px-1.5 py-[5px] text-[7.5px] text-ink"
+          >
+            {x}
+            <ChevronRight size={8} strokeWidth={2.2} className="text-muted/50" />
+          </div>
+        ))}
+      </div>
+      <div className="relative mt-2 rounded-[6px] bg-white shadow-sm2" style={HILITE}>
+        <div className="px-2 py-[6px] text-[8px] font-semibold text-danger">
+          Sign Out…
+        </div>
+      </div>
+      <div className="mt-1.5 flex items-center gap-1 text-[6.5px] font-semibold text-brand">
+        <ArrowRight size={7} strokeWidth={2.6} /> scroll to the bottom
+      </div>
+    </MacSettings>
+  )
+}
+
+// 2 · Erase — System Settings › General › Transfer or Reset, EACAS glowing.
+function MacErase() {
+  return (
+    <MacSettings
+      sidebar={[
+        { label: 'General', selected: true },
+        { label: 'Appearance' },
+        { label: 'Accessibility' },
+        { label: 'Control Center' },
+      ]}
+    >
+      <div className="flex items-center gap-0.5 text-brand">
+        <ChevronLeft size={9} strokeWidth={2.4} />
+        <span className="text-[7px] font-medium">General</span>
+      </div>
+      <div className="text-[9px] font-bold text-ink mt-1">Transfer or Reset</div>
+      <div className="mt-2 rounded-[6px] bg-white border border-black/10 p-1.5 shadow-sm2">
+        <div className="text-[7px] text-ink-2 leading-snug">
+          Erase all content, settings, and apps from this Mac, restoring it to
+          factory settings.
+        </div>
+        <div className="relative mt-1.5 rounded-[6px]" style={HILITE}>
+          <div className="rounded-[6px] border border-brand/50 px-1.5 py-[6px] text-center text-[7.5px] font-semibold text-brand">
+            Erase All Content and Settings…
+          </div>
+        </div>
+      </div>
+      <div className="mt-1.5 px-0.5 text-[6.5px] text-muted leading-snug">
+        The Erase Assistant signs you out and turns off Activation Lock for you.
+      </div>
+    </MacSettings>
+  )
+}
+
+// 3 · Confirm it worked — the macOS Setup Assistant, no login / Apple ID.
+function MacWelcome() {
+  return (
+    <MiniLaptop>
+      <div
+        className="h-full flex flex-col items-center justify-center"
+        style={{
+          height: 196,
+          background: 'radial-gradient(120% 100% at 50% 0%, #eceaf3 0%, #d6d2e0 75%)',
+        }}
+      >
+        <Globe size={30} strokeWidth={1.3} className="text-ink/70" />
+        <div className="mt-2.5 text-[11px] font-semibold text-ink">
+          Select Your Country or Region
+        </div>
+        <div className="mt-1 text-[8px] text-muted">United Arab Emirates</div>
+        <div className="mt-3 flex items-center gap-1 rounded-full bg-success-bg border border-success/30 px-2.5 h-6 text-[8.5px] font-semibold text-success">
+          <CheckCircle2 size={11} strokeWidth={2.4} />
+          No login or Apple ID prompt
+        </div>
+      </div>
+    </MiniLaptop>
+  )
+}
+
+// Safari window chrome — traffic lights + a centered address pill. Sits at
+// the top of the laptop screen for the desktop remote-path mocks.
+function MacBrowserBar({ url }) {
+  return (
+    <div className="flex items-center gap-1.5 px-2 h-[16px] bg-white/85 border-b border-black/10">
+      <span className="w-[5px] h-[5px] rounded-full bg-[#ff5f57]" />
+      <span className="w-[5px] h-[5px] rounded-full bg-[#febc2e]" />
+      <span className="w-[5px] h-[5px] rounded-full bg-[#28c840]" />
+      <div className="mx-auto flex items-center gap-1 bg-black/5 rounded-[5px] h-[11px] px-2.5">
+        <Lock size={6} strokeWidth={2.4} className="text-muted" />
+        <span className="text-[6.5px] text-ink-2">{url}</span>
+      </div>
+    </div>
+  )
+}
+
+// Remote 1 · Mac — iCloud Find Devices in Safari, This Mac picked out and
+// Remove This Device glowing as the correct choice.
+function MacICloudRemove() {
+  return (
+    <MiniLaptop>
+      <MacBrowserBar url="icloud.com/find" />
+      <div className="flex bg-white" style={{ height: 180 }}>
+        <div className="w-[124px] shrink-0 border-r border-black/10 bg-black/[0.03] p-1.5 space-y-1">
+          <div className="flex items-center gap-1 mb-0.5">
+            <Apple size={9} strokeWidth={1.5} className="text-ink fill-ink" />
+            <span className="text-[8px] font-bold text-ink">Find Devices</span>
+          </div>
+          <div
+            className="relative rounded-[6px] bg-white border border-line shadow-sm2 px-1.5 py-1 flex items-center gap-1.5"
+            style={HILITE}
+          >
+            <Laptop size={13} strokeWidth={1.6} className="text-ink/70 shrink-0" />
+            <span className="min-w-0">
+              <span className="block text-[7.5px] font-bold text-ink leading-tight">
+                This Mac
+              </span>
+              <span className="block text-[6px] text-muted">Offline</span>
+            </span>
+          </div>
+          <div className="rounded-[6px] px-1.5 py-1 flex items-center gap-1.5">
+            <Smartphone size={13} strokeWidth={1.6} className="text-ink/45 shrink-0" />
+            <span className="text-[7.5px] text-ink/70">Your iPhone</span>
+          </div>
+        </div>
+        <div className="flex-1 p-2 min-w-0">
+          <div className="text-[9px] font-bold text-ink leading-tight">This Mac</div>
+          <div className="text-[6.5px] text-muted mt-0.5">
+            MacBook Air 13″ · Offline
+          </div>
+          <div className="mt-2 flex gap-1.5">
+            <div className="rounded-[6px] bg-white border border-line shadow-sm2 px-1.5 py-1 flex items-center gap-1 text-[7px] font-semibold text-ink">
+              <Volume2 size={9} strokeWidth={2.2} />
+              Play Sound
+            </div>
+            <div className="rounded-[6px] bg-white border border-line shadow-sm2 px-1.5 py-1 flex items-center gap-1 text-[7px] font-semibold text-ink">
+              <Lock size={9} strokeWidth={2.2} />
+              Mark As Lost
+            </div>
+          </div>
+          <div className="mt-2 w-[140px] rounded-[6px] overflow-hidden border border-line bg-white shadow-sm2">
+            <div className="px-2 py-[6px] text-[7.5px] text-muted">Erase Mac</div>
+            <div className="relative border-t border-line-2" style={HILITE}>
+              <div className="px-2 py-[6px] text-[7.5px] font-bold text-brand">
+                Remove This Device
+              </div>
+            </div>
+          </div>
+          <div className="mt-1.5 text-[6.5px] text-muted leading-snug">
+            Click <span className="font-semibold text-ink-2">Remove This Device</span>{' '}
+            — not Erase.
+          </div>
+        </div>
+      </div>
+    </MiniLaptop>
+  )
+}
+
+// Remote 2 · Mac — account.apple.com › Devices, the Mac's About panel with
+// Remove from account glowing.
+function MacAccountRemove() {
+  return (
+    <MiniLaptop>
+      <MacBrowserBar url="account.apple.com" />
+      <div className="flex bg-white" style={{ height: 180 }}>
+        <div className="w-[120px] shrink-0 border-r border-black/10 bg-black/[0.03] p-1.5 space-y-[3px]">
+          <div className="flex items-center gap-1 mb-1">
+            <Apple size={9} strokeWidth={1.5} className="text-ink fill-ink" />
+            <span className="text-[7.5px] font-bold text-ink">Apple Account</span>
+          </div>
+          {['Personal Information', 'Sign-In & Security', 'Payment & Shipping', 'Devices'].map(
+            (x) => {
+              const hl = x === 'Devices'
+              return (
+                <div
+                  key={x}
+                  className={`rounded-[5px] px-1.5 py-[4px] text-[7px] ${
+                    hl ? 'bg-[#0071e3] text-white font-semibold' : 'text-ink/80'
+                  }`}
+                >
+                  {x}
+                </div>
+              )
+            },
+          )}
+        </div>
+        <div className="flex-1 p-2 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Laptop size={18} strokeWidth={1.6} className="text-ink/70" />
+            <div className="min-w-0">
+              <div className="text-[8.5px] font-bold text-ink leading-tight">
+                Your MacBook
+              </div>
+              <div className="text-[6.5px] text-muted">MacBook Air 13″</div>
+            </div>
+          </div>
+          <div className="mt-2 rounded-[6px] bg-white border border-black/10 p-1.5 shadow-sm2 space-y-[5px]">
+            {[
+              ['Model', 'MacBook Air 13″'],
+              ['Version', 'macOS 26.5'],
+              ['Serial Number', '••••••••••'],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <div className="text-[6px] text-muted leading-none">{k}</div>
+                <div className="text-[7px] font-medium text-ink mt-[1px]">{v}</div>
+              </div>
+            ))}
+          </div>
+          <div className="relative mt-2 rounded-[6px]" style={HILITE}>
+            <div className="rounded-[6px] border border-brand/60 px-2 py-[6px] text-center text-[7.5px] font-semibold text-brand">
+              Remove from account
+            </div>
+          </div>
+        </div>
+      </div>
+    </MiniLaptop>
   )
 }
 

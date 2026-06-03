@@ -1,5 +1,5 @@
 import { ORDERS } from '../../data/orders'
-import { deviceOsForOrder } from '../../lib/devices'
+import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
 
 export const TOTAL_STEPS = 8
 
@@ -61,6 +61,7 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     devicePrep: {
       option: 'reset',
       os: deviceOsForOrder(order),
+      device: deviceTypeForOrder(order),
       resetConfirmed: false,
       resetGuideChecks: {},
       resetGuideSeen: false,

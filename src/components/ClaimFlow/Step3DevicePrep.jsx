@@ -14,7 +14,7 @@ import {
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
-import { deviceOsForOrder } from '../../lib/devices'
+import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
 
 // Step 3 — a single, mandatory path: run the guided reset, then confirm it.
 // The guide itself branches (reset on-device vs erase remotely from
@@ -31,9 +31,13 @@ import { deviceOsForOrder } from '../../lib/devices'
 export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const dp = state.devicePrep
   // The guide platform is driven by the order's category (set in the reducer
-  // from category_name); there's no manual picker. deviceOsForOrder is a
-  // defensive fallback should dp.os ever be unset.
+  // from category_name); there's no manual picker. The fallbacks are
+  // defensive should dp.os / dp.device ever be unset. `os` (ios|android)
+  // drives the iCloud-vs-Google copy; `device` (iphone|ipad|mac|android)
+  // selects which walkthrough the guide shows.
   const os = dp.os || deviceOsForOrder(order)
+  const device = dp.device || deviceTypeForOrder(order)
+  const stepCount = device === 'android' ? 4 : 3
 
   const [guideOpen, setGuideOpen] = useState(false)
   const guideSeen = dp.resetGuideSeen
@@ -66,6 +70,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
         <HeroLauncher
           guideSeen={guideSeen}
           showError={showGuideError}
+          stepCount={stepCount}
           onOpen={() => setGuideOpen(true)}
         />
 
@@ -82,7 +87,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
 
         {guideOpen && (
           <ResetGuideSheet
-            os={os}
+            device={device}
             checks={dp.resetGuideChecks || {}}
             onToggle={(id, checked) =>
               dispatch({
@@ -151,7 +156,7 @@ function Callout() {
 // The one prominent action on the step: an elevated hero launcher with a
 // gradient icon coin, decorative ring texture, and meta chips. Turns green
 // once completed, red (and shakes) if Continue is pressed before it's run.
-function HeroLauncher({ guideSeen, showError, onOpen }) {
+function HeroLauncher({ guideSeen, showError, stepCount = 3, onOpen }) {
   const tone = showError ? 'error' : guideSeen ? 'done' : 'default'
   const surface =
     tone === 'error'
@@ -239,7 +244,7 @@ function HeroLauncher({ guideSeen, showError, onOpen }) {
                 <Clock size={11} strokeWidth={2.2} /> ~10 min
               </span>
               <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-surface/80 border border-line px-2 h-[22px] text-[11px] font-semibold text-ink-2">
-                3 simple steps
+                {stepCount} simple steps
               </span>
             </span>
           )}
