@@ -195,6 +195,49 @@ const DEVICE_STEPS = {
       },
     },
   ],
+  // Android tablet — identical One UI steps to the Samsung phone guide, just
+  // rendered in the wider tablet frame (MiniTablet) and worded "tablet".
+  android_tablet: [
+    {
+      Mock: AndroidTabletRemoveGoogle,
+      title: 'Remove your Google account',
+      lead: 'Open Settings › Accounts and backup › Manage accounts, tap your Google account, then Remove account. Repeat for every Google account signed in.',
+      why: 'This is what stops Factory Reset Protection (FRP) locking the device after the wipe.',
+      trouble: {
+        label: 'I forgot my Google password',
+        body: 'Stop here and reset it at accounts.google.com/signin/recovery before you reset the tablet — without it you can’t clear FRP afterwards, and there’s no workaround we or Google can offer. If the tablet is broken and you can’t reach this screen, switch to the remote path.',
+        escalate: true,
+      },
+    },
+    {
+      Mock: AndroidTabletSignOutCarousel,
+      title: 'Sign out of Samsung & turn off Find My Mobile',
+      lead: 'Settings › Security and privacy › Find My Mobile — toggle it off (and Reactivation lock if shown). Then Accounts and backup › Manage accounts › your Samsung account › Sign out.',
+      why: 'Leaving the Samsung account signed in keeps Reactivation Lock active — it’ll block the device after reset even with Google removed.',
+      trouble: {
+        label: 'It needs my fingerprint or face',
+        body: 'On One UI 6.1+ (most 2024-or-newer Galaxy devices) Identity Check can require biometric verification before you can sign out. Turn it off under Settings › Security and privacy › Lost device protection. If your fingerprint sensor or front camera is broken, switch to the remote path instead.',
+        escalate: true,
+      },
+    },
+    {
+      Mock: AndroidTabletFactoryReset,
+      title: 'Remove the screen lock, then factory reset',
+      lead: 'First set Settings › Lock screen › Screen lock type to None. Then Settings › General management › Reset › Factory data reset › Reset › Delete all.',
+      why: 'Pick “Factory data reset” — not “Reset settings” or “Reset network settings”, which only clear preferences and are the #1 reason people think they’ve reset but haven’t.',
+    },
+    {
+      Mock: AndroidTabletWelcome,
+      title: 'Restart and check',
+      lead: 'When it reboots you’ll see the Samsung welcome screen with a language picker — not a Google or Samsung sign-in. Then power it off and pack it. Don’t connect to Wi-Fi or finish setup.',
+      why: 'No account prompt means FRP and Reactivation Lock are both off — you’re done.',
+      trouble: {
+        label: 'I see a PIN or an account sign-in',
+        body: 'A PIN/pattern keypad means the erase didn’t run — redo the factory reset step. A “Verify your account” (Google) or “Sign in to your Samsung account” prompt means it’s wiped but still linked — finish it on the remote path.',
+        escalate: true,
+      },
+    },
+  ],
 }
 
 // iPhone & iPad unlink the same way (icloud.com/find + account.apple.com ›
@@ -278,6 +321,28 @@ const REMOTE_STEPS = {
       },
     },
   ],
+  android_tablet: [
+    {
+      Mock: AndroidTabletGoogleRemoveRemote,
+      title: 'Remove it from your Google account',
+      lead: 'On any device, open myaccount.google.com/device-activity and sign in with the Google account that was on this tablet. Find the device, open the ⋮ menu, and tap Sign out.',
+      why: 'This clears Factory Reset Protection so our technician can wipe and resell the device.',
+      trouble: {
+        label: 'How long does this take?',
+        body: 'Google’s FRP cache can take up to 72 hours to fully clear after a remote sign-out. If you’re shipping urgently and still remember the password, signing in on the device once is faster.',
+      },
+    },
+    {
+      Mock: AndroidTabletSamsungRemoveRemote,
+      title: 'And remove it from your Samsung account',
+      lead: 'Open account.samsung.com, sign in, go to Devices, find this tablet and tap Remove.',
+      why: 'This lifts Samsung’s Reactivation Lock — the same result as on-device, just remote.',
+      trouble: {
+        label: 'Do I need to do both?',
+        body: 'Yes. Google and Samsung locks are separate systems — removing only one still leaves the other able to block the device. Do both before you ship.',
+      },
+    },
+  ],
 }
 
 const FINAL_CHECKS = {
@@ -304,6 +369,13 @@ const FINAL_CHECKS = {
     { id: 'gf_sd', Icon: Package, label: 'Remove the microSD card' },
     { id: 'gf_galaxy', Icon: Watch, label: 'Unpair Galaxy Watch / Buds' },
     { id: 'gf_imei', Icon: Camera, label: 'Photo the IMEI for warranty' },
+    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
+  ],
+  android_tablet: [
+    { id: 'gf_sim', Icon: SimCard, label: 'Remove SIM / delete eSIM (cellular)' },
+    { id: 'gf_sd', Icon: Package, label: 'Remove the microSD card' },
+    { id: 'gf_spen', Icon: Watch, label: 'Pack the S Pen & accessories' },
+    { id: 'gf_serial', Icon: Camera, label: 'Photo the serial for warranty' },
     { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
   ],
 }
@@ -361,6 +433,19 @@ const COPY = {
     doneSub:
       'It’s erased and unlinked from your Google and Samsung accounts. Before you box it up, a few quick optional checks:',
   },
+  android_tablet: {
+    fallbackTitle: 'Reset your Samsung tablet',
+    introTitle: 'Let’s unlock your Samsung tablet',
+    introSub:
+      'We’ll go one step at a time. First — can you still unlock and use this tablet?',
+    yes: 'Yes, I can unlock it',
+    yesSub: 'Reset right from the device · most people',
+    no: 'No — it’s broken or won’t turn on',
+    noSub: 'We’ll erase it remotely instead',
+    doneTitle: 'Your tablet is ready to ship',
+    doneSub:
+      'It’s erased and unlinked from your Google and Samsung accounts. Before you box it up, a few quick optional checks:',
+  },
 }
 
 const DEVICE_LABEL = {
@@ -368,6 +453,7 @@ const DEVICE_LABEL = {
   ipad: 'iPad',
   mac: 'MacBook',
   android: 'Samsung',
+  android_tablet: 'Samsung tablet',
 }
 
 export default function ResetGuideSheet({
@@ -1446,7 +1532,7 @@ function OneUiHeader({ title, back = true }) {
           <ChevronLeft size={14} strokeWidth={2.4} />
         </div>
       )}
-      <div className="text-[15px] font-bold text-ink px-1 mt-0.5 leading-tight">
+      <div className="text-[15px] font-bold text-ink px-1 mt-0.5 leading-tight text-left">
         {title}
       </div>
     </div>
@@ -1474,7 +1560,7 @@ function ToggleRow({ label, sub, on, highlight }) {
       className="relative flex items-center gap-2 px-2.5 py-[9px]"
       style={highlight ? HILITE : undefined}
     >
-      <span className="flex-1 min-w-0">
+      <span className="flex-1 min-w-0 text-left">
         <span className="block text-[10.5px] font-medium text-ink leading-tight truncate">
           {label}
         </span>
@@ -1524,15 +1610,15 @@ function UrlPill({ url }) {
 
 // 1 · Remove Google account — the account detail screen with Remove account
 // glowing (mirrors the iOS Sign Out row).
-function SamsungRemoveGoogle() {
+function SamsungRemoveGoogle({ Frame = MiniPhone }) {
   return (
-    <MiniPhone camera="hole">
+    <Frame camera="hole">
       <StatusBar />
       <OneUiHeader title="Manage accounts" />
       <div className="px-2.5 mt-2">
         <div className="bg-white rounded-[14px] px-2.5 py-2.5 shadow-sm2 flex items-center gap-2">
           <GoogleG />
-          <span className="flex-1 min-w-0">
+          <span className="flex-1 min-w-0 text-left">
             <span className="block text-[10.5px] font-semibold text-ink leading-tight">
               Your Name
             </span>
@@ -1556,7 +1642,7 @@ function SamsungRemoveGoogle() {
           <ArrowRight size={9} strokeWidth={2.6} /> repeat for every Google account
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
@@ -1581,7 +1667,7 @@ function FmmScreen() {
     <>
       <StatusBar />
       <OneUiHeader title="Find My Mobile" />
-      <div className="px-3.5 mt-1.5 text-[8.5px] text-muted leading-snug">
+      <div className="px-3.5 mt-1.5 text-[8.5px] text-muted leading-snug text-left">
         Locate this device remotely and protect your data.
       </div>
       <div className="px-2.5 mt-2.5">
@@ -1609,7 +1695,7 @@ function SamsungAcctSignOutScreen() {
           >
             S
           </span>
-          <span className="flex-1 min-w-0">
+          <span className="flex-1 min-w-0 text-left">
             <span className="block text-[10.5px] font-semibold text-ink leading-tight">
               Your Name
             </span>
@@ -1639,9 +1725,9 @@ function SamsungAcctSignOutScreen() {
 
 // 3 · Factory data reset — the Reset list with the destructive action glowing,
 // the preference-only resets above it.
-function SamsungFactoryReset() {
+function SamsungFactoryReset({ Frame = MiniPhone }) {
   return (
-    <MiniPhone camera="hole">
+    <Frame camera="hole">
       <StatusBar />
       <OneUiHeader title="Reset" />
       <div className="px-2.5 mt-2.5">
@@ -1659,18 +1745,18 @@ function SamsungFactoryReset() {
             </div>
           </div>
         </div>
-        <div className="mt-2 px-1 text-[8px] text-muted leading-snug">
+        <div className="mt-2 px-1 text-[8px] text-muted leading-snug text-left">
           Not the “Reset” rows above — those only clear preferences.
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
 // 4 · Confirm it worked — the Samsung welcome screen, no account prompt.
-function SamsungWelcome() {
+function SamsungWelcome({ Frame = MiniPhone }) {
   return (
-    <MiniPhone camera="hole">
+    <Frame camera="hole">
       <StatusBar />
       <div className="h-full flex flex-col items-center justify-center -mt-8">
         <div className="text-ink text-[26px] font-bold leading-none">Welcome</div>
@@ -1689,15 +1775,16 @@ function SamsungWelcome() {
           No account prompt
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
 // Remote 1 · Google — the Your devices page with the ⋮ menu open and Sign out
 // glowing.
-function GoogleRemoveRemote() {
+function GoogleRemoveRemote({ Frame = MiniPhone, tablet = false }) {
+  const DeviceIcon = tablet ? Tablet : Smartphone
   return (
-    <MiniPhone camera="hole">
+    <Frame camera="hole">
       <StatusBar />
       <UrlPill url="myaccount.google.com" />
       <div className="px-2.5 mt-2.5 flex items-center gap-1.5">
@@ -1705,44 +1792,47 @@ function GoogleRemoveRemote() {
         <span className="text-[11px] font-bold text-ink">Your devices</span>
       </div>
       <div className="px-2.5 mt-2">
-        <div className="text-[8.5px] text-muted leading-snug px-0.5">
+        <div className="text-[8.5px] text-muted leading-snug px-0.5 text-left">
           Where you’re signed in to your Google Account.
         </div>
         <div className="mt-2 rounded-[12px] border border-line bg-white shadow-sm2 p-2.5">
           <div className="flex items-start gap-2">
-            <Smartphone size={18} strokeWidth={1.6} className="text-ink/70 shrink-0" />
-            <span className="flex-1 min-w-0">
+            <DeviceIcon size={18} strokeWidth={1.6} className="text-ink/70 shrink-0" />
+            <span className="flex-1 min-w-0 text-left">
               <span className="block text-[10.5px] font-bold text-ink leading-tight">
-                This phone
+                {tablet ? 'This tablet' : 'This phone'}
               </span>
               <span className="block text-[8.5px] text-muted mt-0.5">
-                Galaxy · Active 6 min ago
+                {tablet ? 'Galaxy Tab · Active 6 min ago' : 'Galaxy · Active 6 min ago'}
               </span>
             </span>
             <MoreVertical size={13} strokeWidth={2.2} className="text-ink/60 shrink-0" />
           </div>
         </div>
-        <div className="mt-1.5 ml-auto w-[96px] rounded-[10px] border border-line bg-white shadow-sm2 overflow-hidden">
-          <div className="px-2.5 py-[7px] text-[9.5px] text-ink">Manage</div>
+        <div className="mt-1.5 rounded-[10px] overflow-hidden border border-line bg-white shadow-sm2">
+          <div className="px-2.5 py-[10px] text-[11px] font-medium text-muted text-left">
+            Manage
+          </div>
           <div className="relative border-t border-line-2" style={HILITE}>
-            <div className="px-2.5 py-[7px] text-[9.5px] font-bold text-brand">
+            <div className="px-2.5 py-[10px] text-[11px] font-bold text-brand text-left">
               Sign out
             </div>
           </div>
         </div>
-        <div className="mt-2 px-1 text-[8.5px] text-muted leading-snug">
+        <div className="mt-2 px-1 text-[8.5px] text-muted leading-snug text-left">
           Open the ⋮ menu, then tap{' '}
           <span className="font-semibold text-ink-2">Sign out</span>.
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
 }
 
 // Remote 2 · Samsung — the Devices page with the Remove button glowing.
-function SamsungRemoveRemote() {
+function SamsungRemoveRemote({ Frame = MiniPhone, tablet = false }) {
+  const DeviceIcon = tablet ? Tablet : Smartphone
   return (
-    <MiniPhone camera="hole">
+    <Frame camera="hole">
       <StatusBar />
       <UrlPill url="account.samsung.com" />
       <div className="px-2.5 mt-2.5 flex items-center gap-1.5">
@@ -1752,13 +1842,13 @@ function SamsungRemoveRemote() {
       <div className="px-2.5 mt-2.5">
         <div className="rounded-[12px] border border-line bg-white shadow-sm2 p-2.5">
           <div className="flex items-start gap-2">
-            <Smartphone size={18} strokeWidth={1.6} className="text-ink/70 shrink-0" />
-            <span className="flex-1 min-w-0">
+            <DeviceIcon size={18} strokeWidth={1.6} className="text-ink/70 shrink-0" />
+            <span className="flex-1 min-w-0 text-left">
               <span className="block text-[10.5px] font-bold text-ink leading-tight">
-                This phone
+                {tablet ? 'This tablet' : 'This phone'}
               </span>
               <span className="block text-[8.5px] text-muted mt-0.5">
-                Galaxy · Registered
+                {tablet ? 'Galaxy Tab · Registered' : 'Galaxy · Registered'}
               </span>
             </span>
           </div>
@@ -1768,13 +1858,43 @@ function SamsungRemoveRemote() {
             </div>
           </div>
         </div>
-        <div className="mt-2 px-1 text-[8.5px] text-muted leading-snug">
+        <div className="mt-2 px-1 text-[8.5px] text-muted leading-snug text-left">
           Tap <span className="font-semibold text-ink-2">Remove</span> to lift
           Reactivation Lock.
         </div>
       </div>
-    </MiniPhone>
+    </Frame>
   )
+}
+
+// Android-tablet mocks — the same Samsung One UI screens as the phone guide,
+// rendered in the wider MiniTablet shell. The two remote screens also flip to
+// the Tablet icon + "This tablet" wording via the `tablet` flag.
+function AndroidTabletRemoveGoogle() {
+  return <SamsungRemoveGoogle Frame={MiniTablet} />
+}
+function AndroidTabletSignOutCarousel(props) {
+  return (
+    <MockCarousel
+      screens={SAMSUNG_SIGNOUT_SCREENS}
+      camera="hole"
+      Frame={MiniTablet}
+      {...props}
+    />
+  )
+}
+AndroidTabletSignOutCarousel.screens = SAMSUNG_SIGNOUT_SCREENS
+function AndroidTabletFactoryReset() {
+  return <SamsungFactoryReset Frame={MiniTablet} />
+}
+function AndroidTabletWelcome() {
+  return <SamsungWelcome Frame={MiniTablet} />
+}
+function AndroidTabletGoogleRemoveRemote() {
+  return <GoogleRemoveRemote Frame={MiniTablet} tablet />
+}
+function AndroidTabletSamsungRemoveRemote() {
+  return <SamsungRemoveRemote Frame={MiniTablet} tablet />
 }
 
 // Intro illustration — the iPhone PNG, or an asset-free CSS slab for each
@@ -1795,7 +1915,7 @@ function IntroDevice({ device }) {
       </div>
     )
   }
-  if (device === 'ipad') return <IntroTablet />
+  if (device === 'ipad' || device === 'android_tablet') return <IntroTablet />
   if (device === 'mac') return <IntroLaptop />
   // Android — CSS Galaxy slab.
   return (
@@ -1912,11 +2032,13 @@ function IntroLaptop() {
 
 // Tablet shell — uniform slim bezel + a single top-edge camera, no notch.
 // Same 384-tall inner viewport as MiniPhone so the shared iOS content drops
-// in without clipping; just wider.
+// in without clipping, but a proper ~3:4 portrait-tablet width (the phone's
+// 1.32× upscale otherwise leaves the two frames near-identical in width, so a
+// narrower slab reads as a chunky phone rather than a tablet).
 function MiniTablet({ children }) {
-  const W = 230
+  const W = 300
   const H = 384
-  const S = 1.06
+  const S = 1.0
   const outerW = W + 18
   const outerH = H + 18
   return (

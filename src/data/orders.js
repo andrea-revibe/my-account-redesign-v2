@@ -173,7 +173,7 @@ export const ORDERS = [
     product: {
       name: 'iPad Pro 11″',
       variant: 'Space Gray · 256 GB · Excellent',
-      category_name: 'iPad',
+      category_name: 'Tablet',
       image: '/iphone-midnight.png',
     },
   },
@@ -209,7 +209,7 @@ export const ORDERS = [
     product: {
       name: 'MacBook Air 13″',
       variant: 'Midnight · M3 · 512 GB · Excellent',
-      category_name: 'MacBook',
+      category_name: 'Macbook',
       image: '/iphone-midnight.png',
     },
   },

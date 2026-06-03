@@ -14,7 +14,11 @@ import {
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
-import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
+import {
+  deviceOsForOrder,
+  deviceTypeForOrder,
+  isOsAmbiguous,
+} from '../../lib/devices'
 
 // Step 3 — a single, mandatory path: run the guided reset, then confirm it.
 // The guide itself branches (reset on-device vs erase remotely from
@@ -30,14 +34,34 @@ import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
 // the clear final action.
 export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const dp = state.devicePrep
-  // The guide platform is driven by the order's category (set in the reducer
-  // from category_name); there's no manual picker. The fallbacks are
-  // defensive should dp.os / dp.device ever be unset. `os` (ios|android)
-  // drives the iCloud-vs-Google copy; `device` (iphone|ipad|mac|android)
-  // selects which walkthrough the guide shows.
+  // The guide platform is driven by the order's category (seeded in the
+  // reducer from category_name). The only manual input is for the OS-ambiguous
+  // `Tablet` category — `ambiguous` gates the iPad/Android chooser below. The
+  // fallbacks are defensive should dp.os / dp.device ever be unset. `os`
+  // (ios|android) drives the iCloud-vs-Google copy; `device`
+  // (iphone|ipad|mac|android) selects which walkthrough the guide shows.
+  const ambiguous = isOsAmbiguous(order)
   const os = dp.os || deviceOsForOrder(order)
   const device = dp.device || deviceTypeForOrder(order)
-  const stepCount = device === 'android' ? 4 : 3
+  const stepCount = os === 'android' ? 4 : 3
+
+  // Switching tablet OS invalidates any reset already run on the other guide,
+  // so re-gate the confirm checkbox. The Android pick resolves to the dedicated
+  // `android_tablet` guide (tablet-shaped frames + tablet copy), kept distinct
+  // from the `android` Samsung-phone guide.
+  const setTabletOs = (pick) => {
+    const nextDevice = pick === 'android' ? 'android_tablet' : 'ipad'
+    if (nextDevice === device) return
+    dispatch({
+      type: 'SET_DEVICE_PREP',
+      value: {
+        device: nextDevice,
+        os: pick === 'android' ? 'android' : 'ios',
+        resetGuideSeen: false,
+        resetConfirmed: false,
+      },
+    })
+  }
 
   const [guideOpen, setGuideOpen] = useState(false)
   const guideSeen = dp.resetGuideSeen
@@ -66,6 +90,13 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
 
       <div className="px-4 flex flex-col gap-3">
         <Callout />
+
+        {ambiguous && (
+          <TabletPicker
+            value={device === 'android_tablet' ? 'android' : 'ipad'}
+            onChange={setTabletOs}
+          />
+        )}
 
         <HeroLauncher
           guideSeen={guideSeen}
@@ -131,6 +162,55 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
         </div>
       </div>
     </>
+  )
+}
+
+// Shown only for the OS-ambiguous `Tablet` category: a two-option segmented
+// control that resolves the guide to the iPad or the Samsung/Android
+// walkthrough. Preselected to iPad in the reducer.
+function TabletPicker({ value, onChange }) {
+  const opts = [
+    { id: 'ipad', label: 'Apple' },
+    { id: 'android', label: 'Android' },
+  ]
+  return (
+    <div>
+      <div className="mb-1.5 px-0.5 text-[12.5px] font-semibold text-ink">
+        What kind of tablet is this?
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {opts.map((o) => {
+          const active = value === o.id
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onChange(o.id)}
+              className={`rounded-[12px] border-[1.5px] px-3 py-2.5 text-left transition-colors ${
+                active
+                  ? 'border-brand bg-brand-bg/50'
+                  : 'border-line bg-surface hover:border-brand/40'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`w-[15px] h-[15px] rounded-full border-2 grid place-items-center shrink-0 ${
+                    active ? 'border-brand' : 'border-line'
+                  }`}
+                >
+                  {active && (
+                    <span className="w-[7px] h-[7px] rounded-full bg-brand" />
+                  )}
+                </span>
+                <span className="text-[13px] font-semibold text-ink">
+                  {o.label}
+                </span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
