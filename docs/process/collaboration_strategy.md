@@ -26,11 +26,13 @@ Three files dominated read cost; an agent needing one slice had to load thousand
 
 Note on ResetGuideSheet: `resetGuideMocks.jsx` is still ~1685 lines of presentational CSS-art, but it's now isolated from the step/copy logic — editing reset copy reads the 865-line shell, not the art. A future pass could split the mocks by platform (iOS / macOS / Android) if that file becomes an edit hotspot.
 
-### P2 — Cross-cutting mermaid diagrams
+### P2 — Cross-cutting mermaid diagrams _(done)_
 
-The per-feature docs already diagram individual flows. What's missing is the **connective** set — the diagrams a planning agent needs to see impact across flows. Each lives in (or is linked from) `code_map.md` so it's found before exploration:
+`docs/output/diagrams.md` (linked from a `Cross-cutting diagrams` section in `code_map.md`) holds the three diagrams below, each with a "read before / source" pointer back to the code. Hand-maintained (no generator) — update the matching diagram when routing precedence, a claim pipeline, or the submit→render path changes.
 
-1. **Card-routing decision tree.** The ~90-line precedence block in `App.jsx` (≈L285–375) as one mermaid flowchart: `claim.docsRejection` → `pickupFailure` → `resetFailed` → `invalidClaim` → `type==='warranty'` → `hasActiveClaim` → `isWarrantyDelivered` → `isClaimRefunded` → baseline by `statusId`/`state`. A plan agent touching routing reads the diagram, not the file.
+The per-feature docs already diagram individual flows. What's missing is the **connective** set — the diagrams a planning agent needs to see impact across flows. Each is found via `code_map.md` before exploration:
+
+1. **Card-routing decision tree.** `App.jsx`'s routing as one mermaid flowchart — modelled faithfully as the two-stage `isOpen(order)` partition (In progress vs Past) then the precedence ladder inside each section (`docsRejection → pickupFailure → resetFailed → invalidClaim → warranty → hasActiveClaim → in-flight cancellation → created/QC → OrderCard`; past: `isWarrantyDelivered → isClaimRefunded → PastOrderCard`). A plan agent touching routing reads the diagram, not the file.
 2. **Unified claim-lifecycle state diagram.** All four pipelines on one canvas — refund (`CLAIM_STATUSES`), compensation (`COMPENSATION_CLAIM_STATUSES`), warranty (`WARRANTY_CLAIM_STATUSES`), plus the four takeover detours — annotated with which card renders at each state.
 3. **Returns submit→seed→project→render data-flow.** `ClaimFlow.onSubmitClaim` → `App.submittedClaims` → projection over `ORDERS` (≈L204) → card routing. This is the flow most likely to confuse, because the coupling is a runtime projection, not an import.
 
@@ -51,12 +53,24 @@ Treat this as a careful, reviewed edit (judgment about what's load-bearing), not
 - **Plan agents must state blast radius.** Before proposing a multi-file change, a Plan agent looks up the target in code_map's consumers + coupling tables and lists the affected files in its plan.
 - **Optional auto-freshness (opt-in).** Wire `codemap` into a `prebuild` npm script so `npm run build` regenerates the map — zero-discipline freshness without a git hook. Off by default; enable on request.
 
+### P5 — Docs reorg + review strategy _(done)_
+
+The flat `docs/` folder mixed five read-cadences in one space. Reorganised by cadence so the daily working set stays small:
+
+- **`handoff/backend-mapping/`** — the two `db_explorer_*` briefs (read only by the separate backend-mapping project) moved out of the working set and renamed `context.md` / `system_prompt.md`.
+- **`process/`** — this doc moved here (docs-about-the-docs).
+- **Deleted** `output/claim_detailed_tracking.md` — design history of a removed disclosure; its live tables already live in `output/returns/claim_tracking.md` §4, and the reasoning is in git history.
+- `input/` + `output/` names kept (light touch — avoids re-pointing the cross-link web and the external project's references).
+
+The **review strategy** (tiered loading + freshness frontmatter + trigger-based verification + opt-in confidence pass) is documented in `docs/README.md` § "Doc tiers & review strategy". Principle: separate docs by how often they load, then verify on-trigger rather than on a schedule — no cold docs in the working set, no idle audit sweeps.
+
 ## Status
 
 | Item | State |
 |---|---|
 | P0 Code map | Done |
 | P1 File splits | Done |
-| P2 Cross-cutting diagrams | Planned |
+| P2 Cross-cutting diagrams | Done |
 | P3 Slim CLAUDE.md | Planned |
 | P4 Subagent discipline / auto-freshness | Planned |
+| P5 Docs reorg + review strategy | Done |
