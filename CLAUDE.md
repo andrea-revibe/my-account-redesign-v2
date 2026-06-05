@@ -2,6 +2,10 @@
 
 Internal-demo prototype for the Revibe **My Account → Orders** area. Used to evaluate UX/visual changes before specifying them for production. Not a real product.
 
+## Read first — `docs/code_map.md`
+
+Before exploring the tree, read [`docs/code_map.md`](docs/code_map.md). It is the navigation + impact layer: a concept→file→line index (so you can do one targeted read instead of a fan-out search), a string-contract table (the coupling no import graph shows), and a generated dependency/blast-radius map. Locate what you need there, then read the specific slice. Regenerate the generated half with `npm run codemap` after structural changes. Prefer it over spawning an Explore agent for anything it already answers.
+
 ## Where to work
 
 App code lives at the repo root.
@@ -96,6 +100,7 @@ Triage by change type — don't blanket-update everything:
 | Operational state machine (drawio source) | `docs/input/return_flow_*.md` + the `.drawio` source file in lock-step |
 | User-visible copy / style / microcopy only | `CHANGELOG.md` only |
 | Internal refactor, no UX change | Neither |
+| New/moved/renamed file or export, changed imports | run `npm run codemap` (regenerates `docs/code_map.md`); add a curated row if it's a new concept or string contract |
 | New convention, mental model, or gotcha | + this file (`CLAUDE.md`) |
 
 Full doc map and conventions: `docs/README.md`. For `CHANGELOG.md`, add to the top `## Unreleased` block — flat bullets, one line per material change (no Added/Changed/Removed sub-buckets). The diff and the per-feature doc carry the detail; the bullet just names the change. Update repo `README.md` only if "Where things live" or "Scope reminder" needs adjustment.

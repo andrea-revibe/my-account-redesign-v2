@@ -2,6 +2,12 @@
 
 > Internal-demo prototype for the Revibe **My Account → Orders** area. This folder is the living spec for the prototype, organised into **input** (operational source material used to build features) and **output** (UI / feature specs produced from those inputs). For change history see [`../CHANGELOG.md`](../CHANGELOG.md); for repo conventions see [`../CLAUDE.md`](../CLAUDE.md).
 
+## Start here — navigation
+
+[code_map.md](./code_map.md) is the navigation + impact layer for agents: concept→file→line index, the string-contract coupling table, and a generated dependency / blast-radius map (rebuilt by `npm run codemap`). Read it before exploring the tree, then do targeted reads. The per-feature docs below carry the "why"; the code map carries the "where" and "what-breaks-if".
+
+[collaboration_strategy.md](./collaboration_strategy.md) is the roadmap for keeping agent collaboration token-efficient as the codebase grows (P0 code map → P1 file splits → P2 diagrams → P3 slim CLAUDE.md → P4 subagent discipline).
+
 ## Backend-mapping context
 
 For a separate LLM / project tasked with mapping this prototype to real backend tables, start here — these two files are self-contained and don't require any other docs to be read first:

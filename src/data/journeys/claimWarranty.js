@@ -1,0 +1,784 @@
+
+// ----- Warranty claim journey -------------------------------------------
+// Order lifecycle through delivery, then customer raises a warranty claim
+// (battery / not_working scope) and rides the warranty pipeline. Three
+// forks:
+//   1. Courier pickup outcome (succeeded vs failed). Failed branch sets
+//      `claim.pickupFailure` so the order routes to PickupFailedCard, then
+//      `claim_pickup_rescheduled` clears the failure and re-merges into the
+//      transit chain at `claim_transit_arrived_origin_hub`. Same shape as
+//      the CoM journey's pickup-failed branch.
+//   2. QC outcome (valid vs invalid). Valid → seller repair → ship-back →
+//      device_returned (warranty terminal). Invalid → `claim.invalidClaim`
+//      routes to InvalidClaimCard, then customer pays for return shipping
+//      or declines.
+//   3. Invalid-confirmed outcome (paid vs declined). Paid → return-shipment
+//      delivered (no refund, unrepaired unit ships back to the customer).
+//      Declined → terminal "Claim closed, no refund."
+//
+// No refund-method fork: warranty intake skips Step 5, so the claim has no
+// `refundMethod` / `expectedRefund` fields. Cf. `CLAIM_COM_NODES` which
+// branches on refund method at submit.
+export const CLAIM_WARRANTY_NODES = [
+  {
+    id: 'placed',
+    label: 'Order placed',
+    trigger: 'customer',
+    event: 'order.created',
+    apply: (o) => o,
+  },
+  {
+    id: 'qc_started',
+    label: 'Quality check started',
+    trigger: 'system',
+    event: 'order.quality_check.started',
+    apply: (o) => ({
+      ...o,
+      statusId: 'quality_check',
+      timeline: { ...o.timeline, quality_check: '21 May · 9:18 AM' },
+    }),
+  },
+  {
+    id: 'shipped_arrived_destination',
+    label: 'Arrived in destination country',
+    trigger: 'system',
+    event: 'shipment.arrived_destination',
+    apply: (o) => ({
+      ...o,
+      statusId: 'shipped',
+      subStatusId: 'arrived_destination',
+      courier: 'DHL Express',
+      trackingNumber: '25193399',
+      trackingUrl: 'https://www.dhl.com/track',
+      timeline: { ...o.timeline, shipped: '23 May · 11:02 AM' },
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        arrived_destination: '24 May · 8:30 AM',
+      },
+    }),
+  },
+  {
+    id: 'shipped_cleared_customs',
+    label: 'Cleared customs',
+    trigger: 'system',
+    event: 'shipment.cleared_customs',
+    apply: (o) => ({
+      ...o,
+      subStatusId: 'cleared_customs',
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        cleared_customs: '24 May · 11:15 AM',
+      },
+    }),
+  },
+  {
+    id: 'shipped_forwarded_to_agent',
+    label: 'Forwarded to third-party agent',
+    trigger: 'system',
+    event: 'shipment.forwarded_to_agent',
+    apply: (o) => ({
+      ...o,
+      subStatusId: 'forwarded_to_agent',
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        forwarded_to_agent: '24 May · 4:45 PM',
+      },
+    }),
+  },
+  {
+    id: 'shipped_out_for_delivery',
+    label: 'Out for delivery',
+    trigger: 'system',
+    event: 'shipment.out_for_delivery',
+    apply: (o) => ({
+      ...o,
+      subStatusId: 'out_for_delivery',
+      subTimeline: {
+        ...(o.subTimeline ?? {}),
+        out_for_delivery: '25 May · 7:30 AM',
+      },
+    }),
+  },
+  {
+    id: 'delivered',
+    label: 'Delivered',
+    trigger: 'system',
+    event: 'shipment.delivered',
+    next: ['claim_submitted_warranty'],
+    apply: (o) => ({
+      ...o,
+      statusId: 'delivered',
+      state: 'close',
+      subStatusId: null,
+      timeline: { ...o.timeline, delivered: '25 May · 3:14 PM' },
+      deliveredOn: '2026-05-25',
+      deliveredOnLong: 'Monday, 25 May',
+    }),
+  },
+  // ----- Warranty claim submitted (customer-triggered via ClaimFlow) ----
+  {
+    id: 'claim_submitted_warranty',
+    label: 'Warranty claim submitted',
+    trigger: 'customer',
+    event: 'claim.created',
+    next: ['claim_picked_up', 'claim_pickup_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        claimRef: 'WrJrn1',
+        claimStatusId: 'initiated',
+        type: 'warranty',
+        submittedAt: '25 May 2026 · 4:02 PM',
+        units: 1,
+        issueScope: 'not_working',
+        issueSubtypeId: 'battery',
+        issueDetails: {
+          description:
+            'Battery drains in under 4 hours of light use, even after a factory reset.',
+          attachmentName: 'IMG_0710.jpg',
+        },
+        // Shape parity with the refund-flow mocks — warranty intake
+        // doesn't collect a reason field, but ClaimDetailsSheet reads
+        // it defensively in shared rows.
+        reason: { value: 'other', otherText: '' },
+        devicePrep: { option: 'reset', os: 'ios' },
+        pickupDetails: {
+          address: o.address,
+          email: o.email,
+          phone: o.phone,
+        },
+        scheduledPickup: {
+          courier: 'DHL Express',
+          date: 'Wednesday, 27 May',
+          slot: '10 AM – 12 PM',
+        },
+        timeline: { initiated: '25 May · 4:02 PM' },
+        // Placeholder repair window — refined once QC completes and the
+        // claim advances to `under_repair`. Matches `buildClaim`'s
+        // initial-submit shape (expectedCompletionFor('warranty')).
+        repairWindow: {
+          expectedComplete: 'Mon, 8 Jun',
+          expectedCompleteLong: 'Monday, 8 June',
+          note: "We'll confirm the exact repair window after inspection.",
+        },
+      },
+    }),
+  },
+  // ----- Happy pickup → transit → QC → repair → ship-back → returned ---
+  {
+    id: 'claim_picked_up',
+    label: 'Picked up by courier',
+    trigger: 'system',
+    event: 'claim.transit.picked_up',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'pickup',
+        timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
+        transitSubStatusId: 'picked_up',
+        transitSubTimeline: {
+          ...(o.claim.transitSubTimeline ?? {}),
+          picked_up: '28 May · 10:14 AM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_transit_arrived_origin_hub',
+    label: 'Arrived at origin hub',
+    trigger: 'system',
+    event: 'claim.transit.arrived_origin_hub',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        transitSubStatusId: 'arrived_origin_hub',
+        transitSubTimeline: {
+          ...o.claim.transitSubTimeline,
+          arrived_origin_hub: '28 May · 1:22 PM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_transit_in_transit',
+    label: 'In transit',
+    trigger: 'system',
+    event: 'claim.transit.in_transit',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        transitSubStatusId: 'in_transit',
+        transitSubTimeline: {
+          ...o.claim.transitSubTimeline,
+          in_transit: '28 May · 5:42 PM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_transit_arrived_revibe_hub',
+    label: 'Arrived at Revibe hub',
+    trigger: 'system',
+    event: 'claim.transit.arrived_revibe_hub',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        transitSubStatusId: 'arrived_revibe_hub',
+        transitSubTimeline: {
+          ...o.claim.transitSubTimeline,
+          arrived_revibe_hub: '29 May · 9:10 AM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_qc_started',
+    label: 'Claim quality check started',
+    trigger: 'system',
+    event: 'claim.qc.started',
+    next: ['claim_under_repair', 'claim_invalid_confirmed', 'claim_reset_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'qc',
+        timeline: { ...o.claim.timeline, qc: '29 May · 11:00 AM' },
+      },
+    }),
+  },
+  {
+    id: 'claim_under_repair',
+    label: 'Under repair',
+    trigger: 'system',
+    event: 'claim.repair.started',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'under_repair',
+        timeline: { ...o.claim.timeline, under_repair: '30 May · 2:12 PM' },
+        // Sharpen the placeholder repair window now that QC has cleared
+        // and the seller has committed to a fix. Mirrors mock 89610.
+        repairWindow: {
+          expectedComplete: 'Mon, 8 Jun',
+          expectedCompleteLong: 'Monday, 8 June',
+          note: 'Battery replacement — typically wraps up within 7–10 days.',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_ship_back_created',
+    label: 'Ship-back AWB created',
+    trigger: 'system',
+    event: 'claim.ship_back.created',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'ship_back',
+        timeline: { ...o.claim.timeline, ship_back: '8 Jun · 11:05 AM' },
+        shipBack: {
+          courier: 'DHL Express',
+          awb: '25193620',
+          estimatedDelivery: 'Jun 12',
+          estimatedDeliveryLong: 'Friday, 12 June',
+          subStatusId: null,
+          subTimeline: {},
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_ship_back_arrived_destination',
+    label: 'Ship-back arrived in destination country',
+    trigger: 'system',
+    event: 'claim.ship_back.arrived_destination',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        shipBack: {
+          ...o.claim.shipBack,
+          subStatusId: 'arrived_destination',
+          subTimeline: {
+            ...o.claim.shipBack.subTimeline,
+            arrived_destination: '10 Jun · 8:30 AM',
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_ship_back_cleared_customs',
+    label: 'Ship-back cleared customs',
+    trigger: 'system',
+    event: 'claim.ship_back.cleared_customs',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        shipBack: {
+          ...o.claim.shipBack,
+          subStatusId: 'cleared_customs',
+          subTimeline: {
+            ...o.claim.shipBack.subTimeline,
+            cleared_customs: '10 Jun · 11:15 AM',
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_ship_back_forwarded_to_agent',
+    label: 'Ship-back forwarded to third-party agent',
+    trigger: 'system',
+    event: 'claim.ship_back.forwarded_to_agent',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        shipBack: {
+          ...o.claim.shipBack,
+          subStatusId: 'forwarded_to_agent',
+          subTimeline: {
+            ...o.claim.shipBack.subTimeline,
+            forwarded_to_agent: '11 Jun · 4:45 PM',
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_ship_back_out_for_delivery',
+    label: 'Ship-back out for delivery',
+    trigger: 'system',
+    event: 'claim.ship_back.out_for_delivery',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        shipBack: {
+          ...o.claim.shipBack,
+          subStatusId: 'out_for_delivery',
+          subTimeline: {
+            ...o.claim.shipBack.subTimeline,
+            out_for_delivery: '12 Jun · 7:30 AM',
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_device_returned',
+    label: 'Device returned',
+    trigger: 'system',
+    event: 'claim.device.returned',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'device_returned',
+        timeline: { ...o.claim.timeline, device_returned: '12 Jun · 3:14 PM' },
+        shipBack: {
+          ...o.claim.shipBack,
+          deliveredOn: '2026-06-12',
+          deliveredOnLong: 'Friday, 12 June',
+        },
+      },
+    }),
+  },
+  // ----- Pickup-failed sub-branch (placed at the end so default-next
+  //       routing in the happy chain isn't disturbed) ------------------
+  {
+    id: 'claim_pickup_failed',
+    label: 'Pickup failed',
+    trigger: 'system',
+    event: 'claim.pickup.failed',
+    next: ['claim_pickup_rescheduled'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'collection_failed',
+        pickupFailure: {
+          failedAt: '27 May · 8:20 AM',
+          autoCancelAt: '31 May · 8:20 AM',
+          timeLeftLabel: '3 days, 18 hours left',
+          opsName: 'Rashid',
+          opsRole: 'DHL Express',
+          opsMessage:
+            "Hi Andrea — our driver was at your building at 8:20 AM but couldn't reach you on the listed number and there was no answer at the office. Please confirm the address (or add a note for the driver) and we'll dispatch again on the next available slot.",
+          nextPickup: {
+            awb: '25193520',
+            slot: 'Thursday, 28 May · 10 AM – 12 PM',
+            courier: 'DHL Express',
+          },
+        },
+        actionRequired: {
+          kind: 'collection_failed',
+          failedAt: '27 May · 8:20 AM',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_pickup_rescheduled',
+    label: 'Pickup rescheduled',
+    trigger: 'customer',
+    event: 'claim.pickup.rescheduled',
+    // Re-merges into the transit chain past the (now-redundant)
+    // claim_picked_up node — reschedule itself advances claimStatusId to
+    // 'pickup' and seeds the picked_up scan so the detailed-tracking
+    // dropdown is visible immediately after the customer confirms.
+    next: ['claim_transit_arrived_origin_hub'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'pickup',
+        subStatusId: undefined,
+        pickupFailure: undefined,
+        actionRequired: undefined,
+        scheduledPickup: {
+          courier: 'DHL Express',
+          date: 'Thursday, 28 May',
+          slot: '10 AM – 12 PM',
+        },
+        timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
+        transitSubStatusId: 'picked_up',
+        transitSubTimeline: {
+          ...(o.claim.transitSubTimeline ?? {}),
+          picked_up: '28 May · 10:14 AM',
+        },
+      },
+    }),
+  },
+  // ----- Invalid-claim sub-branch (LAB Inspector decision = Invalid in
+  //       the operational diagram). Setting `claim.invalidClaim` routes
+  //       the order to InvalidClaimCard which manages its own internal
+  //       action_needed → paid / declined state. The journey advances
+  //       through the same outcomes via customer-triggered nodes that
+  //       the dev panel surfaces with the `via UI` chip. ---------------
+  {
+    id: 'claim_invalid_confirmed',
+    label: 'Inspection — invalid claim confirmed',
+    trigger: 'system',
+    event: 'claim.inspection.invalid_confirmed',
+    next: ['claim_return_shipping_paid', 'claim_invalid_declined'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        // Pre-takeover sub-status for ops surfaces; the card itself reads
+        // from claim.invalidClaim.
+        subStatusId: 'invalid_confirmed',
+        actionRequired: {
+          kind: 'awaiting_payment',
+          deadline: '6 Jun · 4:18 PM',
+          deadlineLabel: '7 days left',
+        },
+        invalidClaim: {
+          determinedAt: '30 May · 4:18 PM',
+          autoCancelAt: '6 Jun · 4:18 PM',
+          timeLeftLabel: '7 days left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — our technicians ran a full battery diagnostic and the cell health came back at 92%, within the spec we ship at. Standby drain and load tests were also within range. We weren't able to reproduce the issue you described, so we can't approve the warranty claim. To get the device back we'll need you to cover return shipping — otherwise the unit returns to circulation.",
+          returnShipping: {
+            amount: 35,
+            currency: 'AED',
+          },
+          // Pre-seeded shipment shape so the card has something to render
+          // when its internal demo state flips to `paid`. Mirrors the
+          // 12345 mock in src/data/orders.js.
+          returnShipment: {
+            courier: 'DHL Express',
+            estimatedDelivery: 'Jun 8',
+            estimatedDeliveryLong: 'Monday, 8 June',
+            currentStatusId: 'created',
+            timeline: {
+              created: '31 May · 11:00 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_return_shipping_paid',
+    label: 'Customer paid return shipping',
+    trigger: 'customer',
+    event: 'claim.return_shipping.paid',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          paidAt: '31 May · 9:45 AM',
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            currentStatusId: 'shipped',
+            // No sub-status yet — the courier hasn't scanned anything past
+            // dispatch. Subsequent nodes set subStatusId + subTimeline so
+            // the PaidShipBackCard's detailed-tracking dropdown can drill
+            // through the outbound sub-statuses just like a normal order.
+            subStatusId: null,
+            subTimeline: {},
+            timeline: {
+              ...o.claim.invalidClaim.returnShipment.timeline,
+              quality_check: '31 May · 2:30 PM',
+              shipped: '1 Jun · 9:15 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_arrived_destination',
+    label: 'Return — arrived in destination country',
+    trigger: 'system',
+    event: 'claim.return_shipment.arrived_destination',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'arrived_destination',
+            subTimeline: {
+              ...(o.claim.invalidClaim.returnShipment.subTimeline ?? {}),
+              arrived_destination: '3 Jun · 8:30 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_cleared_customs',
+    label: 'Return — cleared customs',
+    trigger: 'system',
+    event: 'claim.return_shipment.cleared_customs',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'cleared_customs',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              cleared_customs: '3 Jun · 11:15 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_forwarded_to_agent',
+    label: 'Return — forwarded to third-party agent',
+    trigger: 'system',
+    event: 'claim.return_shipment.forwarded_to_agent',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'forwarded_to_agent',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              forwarded_to_agent: '3 Jun · 4:45 PM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_out_for_delivery',
+    label: 'Return — out for delivery',
+    trigger: 'system',
+    event: 'claim.return_shipment.out_for_delivery',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            subStatusId: 'out_for_delivery',
+            subTimeline: {
+              ...o.claim.invalidClaim.returnShipment.subTimeline,
+              out_for_delivery: '8 Jun · 7:30 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_return_delivered',
+    label: 'Unrepaired device delivered to customer',
+    trigger: 'system',
+    event: 'claim.return_shipment.delivered',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          returnShipment: {
+            ...o.claim.invalidClaim.returnShipment,
+            currentStatusId: 'delivered',
+            subStatusId: null,
+            timeline: {
+              ...o.claim.invalidClaim.returnShipment.timeline,
+              delivered: '8 Jun · 11:42 AM',
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_invalid_declined',
+    label: 'Customer declined — claim closed',
+    trigger: 'customer',
+    event: 'claim.declined',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        invalidClaim: {
+          ...o.claim.invalidClaim,
+          declinedAt: '31 May · 9:45 AM',
+        },
+      },
+    }),
+  },
+  // ----- Reset-failed sub-branch. Same shape as the change-of-mind /
+  //       issue journeys but re-merges into the warranty QC outcome
+  //       (under_repair + invalid_confirmed). Setting `claim.resetFailed`
+  //       routes the order to ResetFailedCard; one retry loop is allowed
+  //       before the second submission re-enters the QC fork. ---------
+  {
+    id: 'claim_reset_failed',
+    label: 'Reset failed — device still locked',
+    trigger: 'system',
+    event: 'claim.reset.failed',
+    next: ['claim_reset_details_received'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '1 Jun · 11:32 AM',
+          deadlineLabel: '2 days, 22 hours left',
+        },
+        resetFailed: {
+          failedAt: '29 May · 11:32 AM',
+          autoCancelAt: '1 Jun · 11:32 AM',
+          timeLeftLabel: '2 days, 22 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — when we tried to wipe the device, Activation Lock was still on so we couldn't go further. Please remove it from your iCloud account at iCloud.com (Find My → All Devices → Erase, then Remove from Account) and send us the device passcode so we can complete the reset and resume the quality check.",
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_details_received',
+    label: 'Unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.details_received',
+    next: ['claim_under_repair', 'claim_invalid_confirmed', 'claim_reset_retry_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '29 May · 12:48 PM',
+          attempt: 1,
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_failed',
+    label: 'Reset retry failed — still locked',
+    trigger: 'system',
+    event: 'claim.reset.retry_failed',
+    next: ['claim_reset_retry_resubmitted'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'reset_failed',
+        actionRequired: {
+          kind: 'reset_failed',
+          deadline: '2 Jun · 9:14 AM',
+          deadlineLabel: '2 days, 20 hours left',
+        },
+        resetFailed: {
+          failedAt: '30 May · 9:14 AM',
+          autoCancelAt: '2 Jun · 9:14 AM',
+          timeLeftLabel: '2 days, 20 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — thanks for the details, but the device is still showing Activation Lock when we try the wipe. Could you double-check that you signed in to iCloud.com with the same Apple ID that's on this device, and that you tapped Remove from Account at the end of the Erase flow? If your passcode might have a typo, please re-enter it.",
+          attempt: 2,
+        },
+        resetUnlock: undefined,
+      },
+    }),
+  },
+  {
+    id: 'claim_reset_retry_resubmitted',
+    label: 'Updated unlock details received',
+    trigger: 'customer',
+    event: 'claim.reset.retry_resubmitted',
+    next: ['claim_under_repair', 'claim_invalid_confirmed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
+        resetUnlock: {
+          at: '30 May · 10:22 AM',
+          attempt: 2,
+        },
+      },
+    }),
+  },
+]
