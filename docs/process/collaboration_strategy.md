@@ -38,14 +38,16 @@ The per-feature docs already diagram individual flows. What's missing is the **c
 
 Why it saves tokens: one diagram read replaces multi-file reconstruction of control flow.
 
-### P3 — Slim the always-loaded context
+### P3 — Slim the always-loaded context _(done)_
 
-`CLAUDE.md` (~27KB) loads on **every** invocation, so every token shaved is saved on every turn. Its dense "Where things live" / "Mental models" sections now overlap with `code_map.md` (the *where*) and `docs/output/*` (the *why*). Refactor `CLAUDE.md` into a lean **router**:
+`CLAUDE.md` (was ~27KB) loads on **every** invocation, so every token shaved is saved on every turn. Its dense "Where things live" / "Mental models" sections overlapped with `code_map.md` (the *where*) and `docs/output/*` (the *why*). Refactored into a lean **router** (~30% smaller, behaviour-preserving — every trimmed nuance verified present in a target doc, or ported there first):
 
-- Keep: scope, where-to-work, stack, conventions, gotchas, the doc-update protocol, and mental-model **one-liners** that aren't captured elsewhere.
-- Move/trim: per-file "Where things live" prose → `code_map.md`; deep mental-model paragraphs → the relevant `docs/output/*` doc, leaving a one-line pointer.
+- **Kept:** scope, where-to-work, stack, conventions, gotchas, the doc-update protocol, and mental-model **one-liners**.
+- **"Where things live"** collapsed to the top-level shape + pointers (Module index / *Where is X* table in `code_map.md` for symbol→line; `docs/output/*` for per-card behaviour). The **guided-reset device mapping** stayed inline — `code_map.md` names CLAUDE.md as its canonical why-doc, so it has no other home.
+- **Mental models** collapsed to one sentence each + a pointer to the owning `docs/output/*` section, which already carried the deep version (tone resolution → `orders.md` §4.5, card routing → `diagrams.md`, etc.).
+- The `WalletInfoTooltip` reuse rule moved into **Conventions** (the only directive without a doc home).
 
-Treat this as a careful, reviewed edit (judgment about what's load-bearing), not a mechanical cut. Keep `CHANGELOG.md` out of the hot path — it is not auto-loaded; don't add references that pull it in.
+`CHANGELOG.md` was deliberately not touched — doc-infra change, kept out of the hot path.
 
 ### P4 — Subagent discipline + optional auto-freshness
 
@@ -71,6 +73,6 @@ The **review strategy** (tiered loading + freshness frontmatter + trigger-based 
 | P0 Code map | Done |
 | P1 File splits | Done |
 | P2 Cross-cutting diagrams | Done |
-| P3 Slim CLAUDE.md | Planned |
+| P3 Slim CLAUDE.md | Done |
 | P4 Subagent discipline / auto-freshness | Planned |
 | P5 Docs reorg + review strategy | Done |
