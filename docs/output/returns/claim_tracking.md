@@ -191,7 +191,7 @@ When the claim is blocked on a single customer action, the card flips out of `Cl
 |---|---|
 | Tone (initial) | danger red — the claim is blocked on the customer |
 | Tone (post-commit) | warn amber for re-upload / reschedule (live, awaiting verdict); brand purple for paid-and-shipping (forward motion) |
-| Hero | Eyebrow `Order · #{id} · Claim RET-{ref}` → `Action needed` pill → `Tap to fix` footer when collapsed |
+| Hero | Eyebrow `Order · #{id} · Claim RET-{ref}` → `Action needed` pill → `Tap to fix` CTA button (solid danger, shared `TapToFixCta`) when collapsed |
 | Ops message | Avatar + name + role + timestamp + free-text reason (expanded view) |
 | Action gate | Single primary CTA, danger-red filled |
 | Auto-resolve | `autoCancelAt` (or `autoCloseAt`) — claim auto-cancels/closes if ignored |
@@ -210,7 +210,7 @@ stateDiagram-v2
     submitted --> review: ops accepts → ClaimCard resumes
 ```
 
-**Collapsed (rejected state).** Danger-toned left accent strip; eyebrow as above; `Action needed` pill; tinted hero with `Documents rejected` label, headline `We need a few photos re-shot`, one-line truncated ops quote, countdown strip (`2 days, 14 hours left to re-upload · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (rejected state).** Danger-toned left accent strip; eyebrow as above; `Action needed` pill; tinted hero with `Documents rejected` label, headline `We need a few photos re-shot`, one-line truncated ops quote, countdown strip (`2 days, 14 hours left to re-upload · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (rejected state).** Same hero but the ops message expands into a full attributed block (avatar with `opsName` initial, name + role, rejection timestamp, full free-text message). Below the header:
 
@@ -236,7 +236,7 @@ stateDiagram-v2
     rescheduled --> collected: courier succeeds → ClaimCard resumes
 ```
 
-**Collapsed (failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Pickup failed` label, headline `Pickup didn't go through`, one-line truncated courier quote, countdown strip (`3 days, 18 hours left to reschedule · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Pickup failed` label, headline `Pickup didn't go through`, one-line truncated courier quote, countdown strip (`3 days, 18 hours left to reschedule · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (failed state).** Same hero but the courier message expands into a full attributed block (avatar with `opsName` initial — typically the courier's first name). Below the header:
 
@@ -270,7 +270,7 @@ stateDiagram-v2
 
 None of the transitions persist across re-renders or unmounts.
 
-**Collapsed (action_needed).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Return claim` label, `Inspection complete` right-align phase tag (ShieldX glyph), headline `Claim couldn't be approved`, one-line truncated quote from Revibe Quality, countdown strip (`3 days, 8 hours left to pay return shipping · Claim auto-closes {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (action_needed).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Return claim` label, `Inspection complete` right-align phase tag (ShieldX glyph), headline `Claim couldn't be approved`, one-line truncated quote from Revibe Quality, countdown strip (`3 days, 8 hours left to pay return shipping · Claim auto-closes {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (action_needed).** Same hero but the quality message expands into a full attributed block. Below the header:
 
@@ -309,7 +309,7 @@ stateDiagram-v2
     retry_failed --> [*]: customer ignored → auto-cancel
 ```
 
-**Collapsed (reset_failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Device still locked` right-align label (Lock glyph), headline `We couldn't wipe the device`, one-line truncated quote from Revibe Quality, countdown strip (`2 days, 22 hours left to unlock · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (reset_failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Device still locked` right-align label (Lock glyph), headline `We couldn't wipe the device`, one-line truncated quote from Revibe Quality, countdown strip (`2 days, 22 hours left to unlock · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (reset_failed state).** Same hero but the Quality message expands into a full attributed block (avatar with `opsName` initial). Below the header:
 

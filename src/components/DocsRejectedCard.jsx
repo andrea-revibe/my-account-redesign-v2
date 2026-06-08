@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 
 import { ProductSummary } from './ProductSummary'
+import TapToFixCta from './TapToFixCta'
 
 const NOTE_MAX = 280
 
@@ -76,7 +77,7 @@ export default function DocsRejectedCard({
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
+        className="group w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
@@ -131,9 +132,7 @@ export default function DocsRejectedCard({
 
         <ProductSummary order={order} />
 
-        {!expanded && (
-          <div className="text-[11px] text-muted text-center pt-0.5">Tap to fix</div>
-        )}
+        {!expanded && <TapToFixCta />}
       </button>
 
       {expanded && (
