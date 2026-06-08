@@ -83,7 +83,7 @@ The refund-hero card leads with the **refund** as the visual hero rather than th
 
 Expanded reveals a 3-step numbered dot stepper titled "Cancellation progress" (mirrors `ClaimCard`'s "Claim progress" header for symmetry). Both cancellation paths render the same three steps (`Requested` / `Pending` / `Refunded`); the difference is timing — on the created-stage path the `requested` step ticks over instantly (no supplier check needed), while on the `quality_check` path it waits on supplier confirmation. Each reached/current step carries the timestamp it entered that phase underneath its label (sourced from `order.cancellationTimeline[step.id]`); upcoming steps render the label only.
 
-Followed by a two-action footer: `View refund details` + icon-only `Download receipt`. Tapping `View refund details` opens the `RefundDetailsSheet` bottom sheet, which is the canonical surface for the line-item breakdown (product + Revibe Care line items → subtotal → fee (card refunds only) → total refund). Always collapsed by default; no auto-expand.
+Followed by a single-action footer: a full-width `View refund details` button. Tapping it opens the `RefundDetailsSheet` bottom sheet, which is the canonical surface for the line-item breakdown (product + Revibe Care line items → subtotal → fee (card refunds only) → total refund). Always collapsed by default; no auto-expand.
 
 The full `OrderCard` chrome (status banner, sub-timeline, courier banner, order summary) is no longer rendered for cancelled past orders. `CancellationSubTimeline` is retained for in-flight orders that are mid-fulfilment with `state === 'cancelled'`.
 
@@ -107,7 +107,7 @@ stateDiagram-v2
 
 ## 4. Keep-my-order undo (`KeepOrderSheet`)
 
-Once an order has been cancelled but the refund hasn't been accepted yet (so the card lives in **In progress** as a `PastOrderCard` refund-hero variant — `cancellationStatusId` is `requested`), the expanded view carries a primary brand-purple `I want to keep my order` button stacked **above** the existing `View refund details` + icon-only `Download receipt` row. The button is gated on `requested` only (`canKeep`): once the refund is accepted (`refund_pending`) or credited (`refunded`) the affordance disappears, because the cancellation is committed and reversing it is no longer a simple cancel-the-cancellation operation.
+Once an order has been cancelled but the refund hasn't been accepted yet (so the card lives in **In progress** as a `PastOrderCard` refund-hero variant — `cancellationStatusId` is `requested`), the expanded view carries a primary brand-purple `I want to keep my order` button stacked **above** the existing `View refund details` button. The button is gated on `requested` only (`canKeep`): once the refund is accepted (`refund_pending`) or credited (`refunded`) the affordance disappears, because the cancellation is committed and reversing it is no longer a simple cancel-the-cancellation operation.
 
 Tapping it opens `KeepOrderSheet` (`src/components/KeepOrderSheet.jsx`), a single-step confirm sheet:
 
@@ -213,7 +213,6 @@ src/
 - **5% fee is hardcoded.** Lives inside `CancelOrderSheet`. Production should read from a backend config per order.
 - **Wallet recommendation styling is hardcoded.** The success-tone detail line is statically positioned on the wallet card. Production should accept a per-order policy flag.
 - **Per-line-item amounts are hand-derived.** The breakdown today is `Product` (= `subtotal`) + `Revibe Care` (= `warranty`) + `Total` (= `total`). Production needs real per-line-item amounts from the backend.
-- **`Download receipt`** on the refund-hero card is decorative.
 
 ## 10. Open questions
 
