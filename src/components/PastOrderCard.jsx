@@ -225,23 +225,13 @@ function CancelledOrderCard({ order, onKeep }) {
             </button>
           )}
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setDetailsOpen(true)}
-              className="flex-1 h-[42px] rounded-[10px] bg-surface border border-line text-ink font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-            >
-              View refund details
-            </button>
-            <button
-              type="button"
-              aria-label="Download receipt"
-              title="Download receipt"
-              className="w-[42px] h-[42px] rounded-[10px] bg-surface border border-line text-ink-2 inline-flex items-center justify-center hover:bg-line-2"
-            >
-              <Download size={16} strokeWidth={1.75} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="h-[42px] rounded-[10px] bg-surface border border-line text-ink font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
+          >
+            View refund details
+          </button>
         </div>
       )}
 

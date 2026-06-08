@@ -155,7 +155,7 @@ export function statusDescription(order) {
       lead: 'Refund pending',
       body:
         order.statusMessage ??
-        'Your cancellation has been accepted. Your refund is being processed and will land shortly.',
+        'Your cancellation has been accepted. Your refund is being processed and typically lands within 5–7 business days, depending on your payment method.',
     }
   }
 

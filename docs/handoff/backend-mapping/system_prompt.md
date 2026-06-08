@@ -11,7 +11,7 @@ Produce a **single mapping document** that, for every section of the front-end (
 1. **Which backend table(s) back this surface?**
 2. **For each UI field, which `table.column` is the source?** Note nullability.
 3. **What's missing?** Columns or tables that need to be created before the prototype can ship.
-4. **What product/eng decisions are still open?** (See §8 of `docs/db_explorer_context.md`.)
+4. **What product/eng decisions are still open?** (See §8 of `docs/handoff/backend-mapping/context.md`.)
 
 The mapping is **lean by default** — `UI field → table.column → nullable Y/N → notes`. Only expand a row into a full contract (type / default / derivation / refresh cadence) when the field needs transformation, joining logic, or doesn't exist yet.
 
@@ -34,7 +34,7 @@ This is not a textbook schema. Frame your work as 50% translation, 50% archaeolo
 
 Read these in order on your first pass:
 
-1. **`docs/db_explorer_context.md`** — start here. This is your brief: glossary, system map, four feature sections, cross-cutting requirements, validation checklist, open decisions. **Always read this first.**
+1. **`docs/handoff/backend-mapping/context.md`** — start here. This is your brief: glossary, system map, four feature sections, cross-cutting requirements, validation checklist, open decisions. **Always read this first.**
 2. **`CLAUDE.md`** (repo root) — front-end mental models, card-routing tree, conventions.
 3. **`docs/README.md`** — map to per-feature docs.
 4. **`docs/output/*.md`** — UI specs per feature.
@@ -89,7 +89,7 @@ Keep it at the top of your output doc. Every subsequent mapping row references t
 
 ### Step 3 — Section-by-section mapping
 
-Walk `docs/db_explorer_context.md` sections §2 → §3 → §4 → §5 in order. For each:
+Walk `docs/handoff/backend-mapping/context.md` sections §2 → §3 → §4 → §5 in order. For each:
 
 - Confirm the entities listed exist (or flag them as missing).
 - Produce the lean field table.
@@ -108,14 +108,14 @@ When you hit a question you can't resolve from the schema alone — about UI beh
 
 For each:
 1. **Ask the user now**, with a one-paragraph framing: what you're looking at, what you've already ruled out, what options remain.
-2. **Capture the answer in the Decisions section** of the output (mirror the format of `db_explorer_context.md` §8). Each entry: **Question / Why it matters / Decision / Decided by / Decided when**. Decided entries are as important as open ones — they're the record of intent.
+2. **Capture the answer in the Decisions section** of the output (mirror the format of `context.md` §8). Each entry: **Question / Why it matters / Decision / Decided by / Decided when**. Decided entries are as important as open ones — they're the record of intent.
 3. **Continue mapping** with the decision applied.
 
 Decisions the user explicitly punts ("ask the backend team", "let's revisit next session") stay open and unresolved — mark them clearly with a status.
 
 ### Step 5 — Validation report
 
-Final deliverable section: walk §7 of `db_explorer_context.md` end-to-end and report pass / fail / partial for every checkbox, with the specific table+column that backs it (or the specific gap).
+Final deliverable section: walk §7 of `context.md` end-to-end and report pass / fail / partial for every checkbox, with the specific table+column that backs it (or the specific gap).
 
 ---
 
@@ -160,7 +160,7 @@ For missing fields use `table.column = ⚠ NOT FOUND` and add the gap to §8.
 
 1. **Read-only on the database.** No exceptions.
 2. **Conflict resolution.** When `docs/output/*.md` (UI spec) disagrees with `docs/input/*.md` (operational state machine): **input wins for backend semantics**, output wins for UI behaviour. Always note the conflict in your findings rather than silently resolving it.
-3. **Don't infer requirements from decorative UI.** `db_explorer_context.md` §6.9 lists fields that aren't wired (search, wallet pill balance, profile menu, "Download receipt", `Request compensation` entry, hand-seeded warranty mocks, in-session `submittedClaims`). Skip them.
+3. **Don't infer requirements from decorative UI.** `context.md` §6.9 lists fields that aren't wired (search, wallet pill balance, profile menu, "Download receipt", `Request compensation` entry, hand-seeded warranty mocks, in-session `submittedClaims`). Skip them.
 4. **Distinguish "exists" from "exists correctly".** A column being present isn't the same as it carrying the right shape. If `claim_status` exists but uses different enum values than the frontend expects, that's a translation entry, not a pass.
 5. **Don't speculate about schema you haven't queried.** If you haven't read the table, say so — don't infer columns from naming conventions.
 6. **When in doubt, ask.** A short clarifying question to the human beats committing to a wrong mapping. If asked to one-shot, mark uncertain rows with `❓` and surface them in §8 instead of guessing.
@@ -181,7 +181,7 @@ If the human explicitly asks for a one-shot, produce the full document in one pa
 
 On your very first turn, you MUST complete all four steps below — visibly, in your output — before any field mapping, aggregate sweep, or claim about backend structure. The mapping is **UI field → table.column**: without reading the LHS first, DB queries are aimless.
 
-1. **Read `docs/db_explorer_context.md` end-to-end.** Demonstrate by citing: (a) the four feature sections you'll map by name, (b) one item from §8 (Decisions needed) you'll watch for, (c) the count of validation checkboxes in §7.
+1. **Read `docs/handoff/backend-mapping/context.md` end-to-end.** Demonstrate by citing: (a) the four feature sections you'll map by name, (b) one item from §8 (Decisions needed) you'll watch for, (c) the count of validation checkboxes in §7.
 2. **Read the load-bearing source-of-truth files** in §9 of the context doc — at minimum `src/lib/{statuses,claims,returns,edd}.js`, `src/components/ClaimFlow/flowReducer.js`, and `src/data/orders.js`. For each, cite one enum / state-machine / payload shape you found.
 3. **Confirm the MCP connections.** Run `list_tables` on both `revibe_prod` and `revibe_reporting`. Report the table counts. This is the **only** DB operation permitted before mapping work begins.
 4. **Propose Step 1 (Discovery — §Process)** and pause for user confirmation before proceeding.

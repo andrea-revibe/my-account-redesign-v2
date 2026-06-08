@@ -1,3 +1,15 @@
+---
+status: live
+verified_against: c2ca086
+covers:
+  - src/lib/journey.js
+  - src/lib/eddSandbox.js
+  - src/data/journey.js
+  - src/data/journeys
+  - src/components/JourneyDevPanel.jsx
+  - src/components/EddSandboxPanel.jsx
+---
+
 # Journey mode
 
 > Alternate demo for the prototype: `?journey=<id>` replaces the eight-card showcase with a single order replayed through one lifecycle, advanced via the floating `JourneyDevPanel`. Two purposes — immersive end-to-end demo of one customer journey, and the seed for a backend-event spec.
@@ -44,7 +56,7 @@ The other three claim journeys (`claim_change_of_mind`, `claim_issue`, `claim_wa
 
 ## Source files
 
-- `src/data/journey.js` — `INITIAL_ORDER` + `JOURNEYS` array.
+- `src/data/journey.js` — barrel: assembles + exports the `JOURNEYS` array and re-exports `INITIAL_ORDER`. The per-journey node arrays it imports (and their `next:` branching) live in `src/data/journeys/*` — one file per journey (`initialOrder`, `happyPath`, `cancellation`, `claimChangeOfMind`, `claimIssue`, `claimWarranty`, `claimCompensation`).
 - `src/lib/journey.js` — `useJourney(journeyId)` hook (`advance` / `back` / `reset` / `validNext`). Returns `kind: 'replay' | 'sandbox'` so `App.jsx` knows which panel to render.
 - `src/lib/edd.js` — pure EDD model (markets, `workdayIntl`, `calculateEdd`, `orderStatus`, message constants). Port of `brief/edd.py`.
 - `src/lib/eddSandbox.js` — `useEddSandbox(journey)` hook (date/market inputs → synthesised order with `statusBanner` override).
@@ -61,7 +73,7 @@ Bloat-traps that grew the previous version:
 | Don't add | Why |
 |---|---|
 | Per-transition payloads / field deltas / UI-surface notes | This is the backend spec — defer until real-column mapping |
-| ASCII node graphs | Branching is in `src/data/journey.js`; redrawing duplicates and drifts |
+| ASCII node graphs | Branching lives in the per-journey node files under `src/data/journeys/*`; redrawing duplicates and drifts |
 | Worked-example expansions of wiring patterns | One pattern statement in conventions is enough |
 | Per-journey "Open prototype gaps" subsections | Track unfinished work in `CHANGELOG.md` or GitHub issues |
 | New top-level §sections per journey | A new convention is one bullet; a new recipe step is one numbered step |

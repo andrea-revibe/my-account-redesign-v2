@@ -1,6 +1,22 @@
+---
+status: live
+verified_against: 9ff7625
+covers:
+  - src/components/ClaimCard.jsx
+  - src/components/ClaimActionBanner.jsx
+  - src/components/ClaimDetailsSheet.jsx
+  - src/components/DocsRejectedCard.jsx
+  - src/components/PickupFailedCard.jsx
+  - src/components/ResetFailedCard.jsx
+  - src/components/InvalidClaimCard.jsx
+  - src/lib/claims.js
+  - src/lib/events.js
+  - src/data/orders/claims.js
+---
+
 # Returns — Claim tracking
 
-> Once a return claim is submitted, the customer's view of it lives on a new card type that replaces the delivered `PastOrderCard` for that order. This doc covers `ClaimCard` (the 5-state baseline) and the three takeover cards that supersede it when the claim is blocked on a single customer action: `DocsRejectedCard`, `PickupFailedCard`, `InvalidClaimCard`. Includes the canonical sub-status / action-gate / SLA reference tables (these were originally in `../claim_detailed_tracking.md`, which is now design history).
+> Once a return claim is submitted, the customer's view of it lives on a new card type that replaces the delivered `PastOrderCard` for that order. This doc covers `ClaimCard` (the 5-state baseline) and the three takeover cards that supersede it when the claim is blocked on a single customer action: `DocsRejectedCard`, `PickupFailedCard`, `InvalidClaimCard`. Includes the canonical sub-status / action-gate / SLA reference tables.
 
 ## 1. Overview
 
@@ -274,7 +290,7 @@ Phase 30 (PickupFailedCard) and phase 32 (InvalidClaimCard) migrated their gates
 
 ## 4. Sub-status & action-gate reference
 
-These tables are the canonical reference for sub-status copy, action-gate behaviour, and SLA placeholders. Design history (the deprecated `Show detailed tracking` disclosure pattern and its rationale) lives in [`../claim_detailed_tracking.md`](../claim_detailed_tracking.md).
+These tables are the canonical reference for sub-status copy, action-gate behaviour, and SLA placeholders. (The deprecated `Show detailed tracking` disclosure pattern that originally hosted them was removed; its design history is in git history.)
 
 ### 4.1 Sub-status enum (`claim.subStatusId`)
 

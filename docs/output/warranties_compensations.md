@@ -1,3 +1,16 @@
+---
+status: live
+verified_against: 0fa71bb
+covers:
+  - src/components/WarrantyClaimCard.jsx
+  - src/components/ClaimFlow/Step2Compensation.jsx
+  - src/components/ClaimFlow/compensationSubtypes.js
+  - src/components/ClaimFlow/Step5RefundMethod.jsx
+  - src/lib/claims.js
+  - src/data/orders/warranty.js
+  - src/data/orders/compensation.js
+---
+
 # Warranties & compensations
 
 > Coverage of two Step 1 entries on the returns flow. **Warranty** is wired end-to-end (intake submits an in-session claim that flips the order to a `WarrantyClaimCard`); two hand-seeded mocks also exercise the post-pickup heroes that the prototype can't reach without ops simulation. **Compensation** is now also wired end-to-end (refund-only, no pickup — intake submits an in-session claim tracked on `ClaimCard`); three hand-seeded mocks exercise the under-review / refunded / closed-invalid surfaces. This doc covers both intakes + their tracking cards.
