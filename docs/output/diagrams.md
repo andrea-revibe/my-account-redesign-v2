@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 9ff7625
+verified_against: c2ca086
 covers:
   - src/App.jsx
   - src/lib/claims.js
