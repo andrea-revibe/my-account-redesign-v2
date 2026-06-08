@@ -64,21 +64,19 @@ export const STAGE_SHIPPED = 'Shipped'
 export const SLA_ON_TIME = 'on_time'
 export const SLA_LATE = 'late'
 
-// Customer-facing message strings — centralised so future copy edits don't
-// require touching the resolution logic.
-export const MSG_ORDER_ON_TIME = 'Order received. Quality check will begin shortly.'
+// Customer-facing copy for the SLA-divergence messages only. On-time steady
+// states and `delivered` deliberately have no string here — that copy is owned
+// by the card system (statuses.js → STATUS_DESCRIPTIONS) and reused by the
+// sandbox via a null banner, so the two can't drift. buildCustomerMessage
+// still emits a `key` for those states (the sandbox debug panel surfaces it).
 export const MSG_ORDER_LATE =
   "Your order is taking a little longer than usual to start. We're working to move your order forward."
-export const MSG_QC_ON_TIME = "Your order is in quality check. We'll ship it shortly."
 export const MSG_QC_BACK_ON_TRACK =
   "We're back on track. Your order is in quality check and will ship it shortly."
 export const MSG_QC_LATE =
   "Quality check is taking longer than usual. We're working to move your order forward."
-export const MSG_SHIPPED_ON_TIME =
-  'Good news. Your order is on its way and the courier will be in touch with delivery details.'
 export const MSG_SHIPPED_LATE =
   "Your order has been shipped and is currently in transit, though delivery is taking a bit longer than usual. We're on it."
-export const MSG_DELIVERED = 'Your order has been delivered. Enjoy your device!'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -163,18 +161,18 @@ function slaStatus(elapsed, sla) {
 export function buildCustomerMessage(stage, currentSlaStatus, previousSlaStatus) {
   if (stage === STAGE_ORDER_CREATED) {
     return currentSlaStatus === SLA_ON_TIME
-      ? { key: 'order_on_time', body: MSG_ORDER_ON_TIME }
+      ? { key: 'order_on_time', body: null }
       : { key: 'order_late', body: MSG_ORDER_LATE }
   }
   if (stage === STAGE_QC) {
     if (currentSlaStatus === SLA_LATE) return { key: 'qc_late', body: MSG_QC_LATE }
     if (previousSlaStatus === SLA_LATE)
       return { key: 'qc_back_on_track', body: MSG_QC_BACK_ON_TRACK }
-    return { key: 'qc_on_time', body: MSG_QC_ON_TIME }
+    return { key: 'qc_on_time', body: null }
   }
   if (stage === STAGE_SHIPPED) {
     return currentSlaStatus === SLA_ON_TIME
-      ? { key: 'shipped_on_time', body: MSG_SHIPPED_ON_TIME }
+      ? { key: 'shipped_on_time', body: null }
       : { key: 'shipped_late', body: MSG_SHIPPED_LATE }
   }
   return { key: 'unknown', body: '' }

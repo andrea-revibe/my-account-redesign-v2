@@ -87,7 +87,7 @@ The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimC
 - Small `Order · #{id}` eyebrow at the very top.
 - State pill (`Order placed` for `created`, `Quality check` for `quality_check`) with a `Package` / `ShieldCheck` icon, on its own row beneath the eyebrow. Constant brand-purple tone regardless of `delayed`.
 - A brand-purple gradient hero block (`from-brand-bg to-brand-bg2`) carrying `Delivery by` eyebrow + an `On track` tag (`Zap` icon) on the right; a `text-[26px]` headline using `order.estimatedDeliveryLong || order.estimatedDelivery`; the body sentence from `statusDescription(order).body`; and a `Delivering to [Home]` chip below.
-- When `order.delayed === true` the right-side tag swaps to `Clock` + `Taking longer than expected` (still brand-purple — see §8 "Delayed quality_check stays brand"), and the body pulls the delay-flavoured copy from `DELAYED_BODY[statusId]`.
+- When `order.delayed === true` the right-side tag swaps to `Clock` + `Taking longer than expected` and turns **amber** (`text-amber-600`) — the rest of the hero (gradient, ETA headline, state pill) stays brand-purple (see §8 "Delayed in-progress accent"). The body pulls the delay-flavoured copy from `DELAYED_BODY[statusId]`.
 - A compact product row (image / name / variant / `Revibe Care +{currency} {amount}` line / total / chevron). Chevron is decorative; the whole header is one tap target.
 
 **Expanded:**
@@ -180,7 +180,7 @@ There is intentionally no `delivered` sub-status. When the parcel is delivered, 
 | Top-level state | Card | Auto-expanded | Hero / headline | Tone | Hero tag | Footer actions |
 |---|---|---|---|---|---|---|
 | `created` | `InProgressCard` | If most in-flight | `Delivery by` + ETA (`estimatedDeliveryLong`) | brand | "On track" (Zap) | `Cancel order` + `Change details` |
-| `quality_check` | `InProgressCard` | If most in-flight | `Delivery by` + ETA | brand (always — even when `delayed`, see §8) | "On track" (Zap) or "Taking longer than expected" (Clock) when `delayed` | `Cancel order` + `Change details` |
+| `quality_check` | `InProgressCard` | If most in-flight | `Delivery by` + ETA | brand hero; amber tag when `delayed` (see §8) | "On track" (Zap) or amber "Taking longer than expected" (Clock) when `delayed` | `Cancel order` + `Change details` |
 | `shipped` (sub-status drives headline) | `OrderCard` | If most in-flight | status icon + sub-status label (e.g. "Out for delivery") + `Delivery by` ETA subtitle | brand | banner-driven ("On track" / "Arriving today") | `Receipt` + `Get help` |
 | `delivered` | `PastOrderCard` (delivered branch) | Never (no expand) | `Delivered on` + `deliveredOnLong` | success | "Complete" (Check) | `Download receipt` + `Raise a claim` |
 | `cancelled` — in flight (`state === 'cancelled'` + non-terminal `statusId`) | `OrderCard` | Never | "Cancelled" + status banner | danger | n/a | `Get help` |
@@ -191,7 +191,7 @@ There is intentionally no `delivered` sub-status. When the parcel is delivered, 
 `statusDescription(order)` resolves in this order:
 
 1. `state === 'cancelled'` → red "Refund in progress"
-2. `delayed === true` → orange "Taking longer than expected" (`OrderCard` only — `InProgressCard` keeps brand-purple for delayed QC, intentional product decision)
+2. `delayed === true` → orange "Taking longer than expected". On `OrderCard` (shipped) the full warn-amber banner applies; on `InProgressCard` (created/QC) the hero body still uses the delay copy but only the `Clock` tag accent turns amber — the hero gradient/headline/pill stay brand-purple (see §8)
 3. otherwise → `STATUS_DESCRIPTIONS[statusId]` (or `shipped:{subStatusId}`)
 4. `statusMessage` overrides body only
 
@@ -312,7 +312,7 @@ These decisions came out of phase-2 review and inform later phases; future contr
 
 **Status banner sits in the always-visible card header.** Tinted banner with a coloured leading phrase + descriptive sentence. The leading phrase describes *condition* (`On track`, `Arriving today`, `All done`, `Refund in progress`, `Taking longer than expected`) — never the process step, since the headline already shows that. Tone resolution and overrides: see §4.5.
 
-**Delayed `quality_check` stays brand.** `InProgressCard` deliberately ignores `statusDescription`'s warn tone for the in-progress hero — even when `delayed: true`, the hero gradient, headline colour, accent strip, and state pill stay brand-purple. The delay signal is preserved subtler: the right-side tag swaps `Zap`/"On track" for `Clock`/"Taking longer than expected" (still brand-coloured), and the body pulls delay-flavoured copy from `DELAYED_BODY[statusId]`. The warn-amber treatment felt overly alarming for a normal QC slowdown and broke visual cohesion with the other in-progress cards. The full warn-amber treatment still exists for `OrderCard`'s shipped cards via `statusDescription`.
+**Delayed in-progress accent (amber tag, brand hero).** `InProgressCard` still ignores `statusDescription`'s warn tone for the *body* of the in-progress hero — when `delayed: true`, the hero gradient, headline colour, accent strip, and state pill stay brand-purple, preserving visual cohesion with the other in-progress cards. The delay signal is carried by the right-side tag only: it swaps `Zap`/"On track" for `Clock`/"Taking longer than expected" and turns **amber** (`text-amber-600`), and the body pulls delay-flavoured copy from `DELAYED_BODY[statusId]`. This is an "accents only" treatment — earlier the tag stayed brand-purple too (a full warn-amber hero was rejected as overly alarming for a normal QC slowdown), but an amber accent alone reads as the intended "heads up" without flooding the card. The full warn-amber banner treatment still exists for `OrderCard`'s shipped cards via `statusDescription`. The shared `warn` token is deliberately untouched — the hero amber is a local `text-amber-600`, kept distinct from the `warn` tone so `OrderCard`'s late banner and the `Close` chip are unaffected.
 
 **Delivered chip overrides `state: 'close'`.** Delivered orders carry `state: 'close'` in the data, but customers see a green "Delivered" pill instead of the orange "Close" pill. The override lives in `OrderCard`'s `SummaryHeader` so the data shape stays unchanged.
 

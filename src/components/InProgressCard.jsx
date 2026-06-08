@@ -125,7 +125,11 @@ function ETAHero({ order, desc }) {
         <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
           Delivery by
         </div>
-        <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-brand text-right">
+        <span
+          className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-right ${
+            order.delayed ? 'text-amber-600' : 'text-brand'
+          }`}
+        >
           <TagIcon size={11} strokeWidth={2} />
           {desc.lead}
         </span>
