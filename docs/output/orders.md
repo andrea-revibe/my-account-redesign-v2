@@ -94,6 +94,8 @@ Layout (with warranty):
 
 Layout (no warranty, `order.warranty == null`): the Care callout **and** the Total row are both omitted (subtotal === total, so a breakdown would just repeat one number). The row collapses to product + a single right-aligned `Total` eyebrow over the bold total — no empty gap, no leftover divider.
 
+`ProductSummary` is used on **every** card that carries an order, including the cancelled refund-hero card (§3.4 / [cancellations.md](./cancellations.md)). There it sits below the `RefundHero`: the hero states the **refund** amount + destination, while `ProductSummary` states the device + Revibe Care + **Total paid** (the original price) — distinct numbers (they differ by any cancellation fee), so the two read as paid-vs-refunded rather than a repeat.
+
 ### 3.1 InProgressCard (`created`, `quality_check`)
 
 **Collapsed:**
@@ -138,7 +140,7 @@ The delivered card is **not expandable** — there is no chevron and no expanded
 - `Order · #{id}` eyebrow.
 - Success-tinted `Delivered` state pill (`PackageCheck` icon).
 - Success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (falls back to the date part of `order.timeline.delivered`); a `Delivered to [Home]` chip below.
-- The shared `ProductSummary` row (§3.0) — the Revibe Care callout + Total paid are retained on this card (the refunded card omits the money story, which its hero carries). The cancelled refund-hero card keeps its own minimal product-identity row (name + variant only, no money), since the RefundHero already states the refund breakdown.
+- The shared `ProductSummary` row (§3.0). The cancelled refund-hero card (§3.4) also uses `ProductSummary` — the `RefundHero` carries the refund amount, the row carries the device + Revibe Care + Total paid.
 - Right-aligned chip-style footer with `Download receipt` + `Raise a claim`, separated by a top dashed border. `Raise a claim` is the entry point to the returns flow — see [returns/change_of_mind.md](./returns/change_of_mind.md) / [returns/issue.md](./returns/issue.md).
 
 A single-row `HistoryThread` (mode `'delivered'`) carrying just the `Order placed` event sits between the product row and the footer buttons, collapsed by default. Delivery is the active hero so it is intentionally absent from the thread.
