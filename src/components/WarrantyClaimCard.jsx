@@ -2,14 +2,11 @@ import { useEffect, useState } from 'react'
 import {
   ChevronDown,
   Check,
-  Copy,
-  Download,
   Home,
   Wrench,
   CalendarClock,
   MapPin,
   CheckCircle2,
-  Truck,
   Zap,
 } from 'lucide-react'
 import {
@@ -24,11 +21,15 @@ import {
   CLAIM_TRANSIT_SUB_STATUSES,
   transitSubProgressIndex,
 } from '../lib/claims'
-import { SHIPPING_SUB_STATUSES, subProgressIndex } from '../lib/statuses'
 import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import HistoryThread from './HistoryThread'
 import { ProductSummary } from './ProductSummary'
+import {
+  ReturnShipmentTracking,
+  CourierStrip,
+  SubStatusItem,
+} from './ReturnShipmentTracking'
 
 // Tone palette mirrors ClaimCard's so the two card types feel like
 // siblings. Warranty tones: warn while the device is leaving the customer
@@ -104,22 +105,20 @@ export default function WarrantyClaimCard({
             <WarrantyProgressDots claim={claim} tone={tone} />
           </div>
 
-          {/* Pickup-leg detailed tracking — the inverse-journey scan
-              chain (customer → origin hub → flight → Revibe hub). Same
-              data shape as ClaimCard's pickup dropdown; gated on the
-              picked-up scan landing. Neutral chrome so the later
-              ship-back dropdown (brand-toned) reads as the more
-              attention-worthy event. */}
-          {Boolean(claim.transitSubTimeline?.picked_up) && (
+          {/* Pickup-leg (inbound, customer → Revibe) detailed tracking —
+              the inverse-journey scan chain. Neutral chrome. Shown only
+              while the device is still inbound: once the return shipment
+              exists (`shipBack.awb`) the inbound leg disappears so the
+              return shipment is the only detailed tracking on the surface. */}
+          {Boolean(claim.transitSubTimeline?.picked_up) && !claim.shipBack?.awb && (
             <PickupTransitDetail claim={claim} order={order} />
           )}
 
-          {/* Ship-back detailed tracking surfaces once the AWB has been
-              created. Collapsed by default and styled in the brand tone
-              so it reads as an inviting tap target rather than another
-              neutral row. */}
+          {/* Return-shipment (Revibe → customer) detailed tracking,
+              shared with InvalidClaimCard's paid surface. Surfaces once
+              the AWB has been created. */}
           {Boolean(claim.shipBack?.awb) && (
-            <ShipBackDetail claim={claim} order={order} />
+            <ReturnShipmentTracking ship={claim.shipBack} />
           )}
 
           {(() => {
@@ -127,23 +126,13 @@ export default function WarrantyClaimCard({
             return history.length > 0 ? <HistoryThread events={history} /> : null
           })()}
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setDetailsOpen(true)}
-              className="flex-1 h-[42px] rounded-[10px] bg-surface border border-line text-ink font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-            >
-              View claim details
-            </button>
-            <button
-              type="button"
-              aria-label="Download receipt"
-              title="Download receipt"
-              className="w-[42px] h-[42px] rounded-[10px] bg-surface border border-line text-ink-2 inline-flex items-center justify-center hover:bg-line-2"
-            >
-              <Download size={16} strokeWidth={1.75} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="h-[42px] rounded-[10px] bg-surface border border-line text-ink font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
+          >
+            View claim details
+          </button>
         </div>
       )}
 
@@ -381,17 +370,11 @@ function ShipBackHero({ order, claim }) {
     </div>
   )
 }
-// Brand-toned tracking dropdown. Mirrors ClaimCard's ClaimTransitDetail
-// shape but reads from `claim.shipBack.subTimeline / subStatusId` and
-// reuses the SHIPPING_SUB_STATUSES from lib/statuses.js so the
-// milestones match a normal outgoing order (arrived in destination
-// country → cleared customs → forwarded to third-party agent → out for
-// delivery). Collapsed by default; the brand styling cues "tap me" so
-// the customer notices it without it stealing focus from the hero.
-// Pickup-leg detailed tracking — mirrors ClaimCard's ClaimTransitDetail.
-// Uses the inverse-journey stop list (CLAIM_TRANSIT_SUB_STATUSES). Neutral
-// chrome — the ship-back dropdown owns the brand-toned styling, so a
-// warranty claim mid-pickup doesn't have two competing tap targets.
+// Pickup-leg (inbound) detailed tracking — mirrors ClaimCard's
+// ClaimTransitDetail. Uses the inverse-journey stop list
+// (CLAIM_TRANSIT_SUB_STATUSES). Neutral chrome — the shared
+// ReturnShipmentTracking dropdown owns the brand-toned styling, and the
+// two never show together (this is gated to the pre-return window).
 function PickupTransitDetail({ claim, order }) {
   const [show, setShow] = useState(false)
   const cur = transitSubProgressIndex(claim.transitSubStatusId)
@@ -414,10 +397,10 @@ function PickupTransitDetail({ claim, order }) {
       {show && (
         <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
           {(order.courier || order.trackingNumber) && (
-            <PickupCourierStrip order={order} />
+            <CourierStrip courier={order.courier} awb={order.trackingNumber} />
           )}
           {CLAIM_TRANSIT_SUB_STATUSES.map((s, i) => (
-            <TransitSubItem
+            <SubStatusItem
               key={s.id}
               label={s.label}
               timestamp={claim.transitSubTimeline?.[s.id]}
@@ -427,150 +410,6 @@ function PickupTransitDetail({ claim, order }) {
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-function PickupCourierStrip({ order }) {
-  return (
-    <div className="flex items-center gap-2.5 p-2.5 mb-3 rounded-[10px] border border-line bg-surface">
-      <span className="w-9 h-7 rounded-md grid place-items-center text-[11px] font-extrabold tracking-[0.04em] bg-[#ffcc00] text-[#1a1a1a] shrink-0">
-        DHL
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink truncate">
-          {order.courier || 'Courier'}
-        </div>
-        {order.trackingNumber && (
-          <div className="text-[11.5px] text-muted mt-px tabular-nums truncate">
-            AWB #{order.trackingNumber}
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        aria-label="Copy AWB"
-        onClick={() =>
-          order.trackingNumber &&
-          navigator.clipboard?.writeText(order.trackingNumber)
-        }
-        className="w-8 h-8 rounded-lg grid place-items-center border border-line text-ink-2 hover:bg-line-2 shrink-0"
-      >
-        <Copy size={14} strokeWidth={1.75} />
-      </button>
-    </div>
-  )
-}
-
-function ShipBackDetail({ claim, order }) {
-  const [show, setShow] = useState(false)
-  const cur = subProgressIndex(claim.shipBack?.subStatusId)
-
-  return (
-    <div className="px-1">
-      <button
-        type="button"
-        onClick={() => setShow((v) => !v)}
-        aria-expanded={show}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-[10px] border border-brand bg-brand-bg/60 text-[12.5px] font-semibold text-brand hover:bg-brand-bg transition"
-      >
-        <span className="inline-flex items-center gap-1.5">
-          <Truck size={14} strokeWidth={2} />
-          {show ? 'Hide detailed tracking' : 'See detailed tracking'}
-        </span>
-        <ChevronDown
-          size={16}
-          strokeWidth={1.75}
-          className={`text-brand transition-transform ${show ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {show && (
-        <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
-          {(claim.shipBack?.courier || claim.shipBack?.awb) && (
-            <ShipBackCourierStrip shipBack={claim.shipBack} />
-          )}
-          {SHIPPING_SUB_STATUSES.map((s, i) => (
-            <TransitSubItem
-              key={s.id}
-              label={s.label}
-              timestamp={claim.shipBack?.subTimeline?.[s.id]}
-              state={i < cur ? 'done' : i === cur ? 'current' : 'future'}
-              isLast={i === SHIPPING_SUB_STATUSES.length - 1}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ShipBackCourierStrip({ shipBack }) {
-  return (
-    <div className="flex items-center gap-2.5 p-2.5 mb-3 rounded-[10px] border border-line bg-surface">
-      <span className="w-9 h-7 rounded-md grid place-items-center text-[11px] font-extrabold tracking-[0.04em] bg-[#ffcc00] text-[#1a1a1a] shrink-0">
-        DHL
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink truncate">
-          {shipBack.courier || 'Courier'}
-        </div>
-        {shipBack.awb && (
-          <div className="text-[11.5px] text-muted mt-px tabular-nums truncate">
-            AWB #{shipBack.awb}
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        aria-label="Copy AWB"
-        onClick={() => shipBack.awb && navigator.clipboard?.writeText(shipBack.awb)}
-        className="w-8 h-8 rounded-lg grid place-items-center border border-line text-ink-2 hover:bg-line-2 shrink-0"
-      >
-        <Copy size={14} strokeWidth={1.75} />
-      </button>
-    </div>
-  )
-}
-
-function TransitSubItem({ label, timestamp, state, isLast }) {
-  const done = state === 'done'
-  const current = state === 'current'
-  return (
-    <div className="flex gap-3 items-start">
-      <div className="w-[18px] flex flex-col items-center self-stretch">
-        <span
-          className={`w-[14px] h-[14px] rounded-full border-2 grid place-items-center shrink-0 ${
-            done || current
-              ? 'bg-brand border-brand text-white'
-              : 'bg-surface border-line text-muted'
-          } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
-        >
-          {done && <Check size={9} strokeWidth={3} />}
-        </span>
-        {!isLast && (
-          <span
-            className={`flex-1 w-[2px] mt-0.5 ${done ? 'bg-brand' : 'bg-line'}`}
-          />
-        )}
-      </div>
-      <div className={`flex-1 ${isLast ? 'pb-1' : 'pb-3'}`}>
-        <div
-          className={`text-[13px] ${
-            current
-              ? 'text-ink font-bold'
-              : done
-                ? 'text-ink'
-                : 'text-muted'
-          }`}
-        >
-          {label}
-        </div>
-        {timestamp && (
-          <div className="text-[11px] text-muted mt-px tabular-nums">
-            {timestamp}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

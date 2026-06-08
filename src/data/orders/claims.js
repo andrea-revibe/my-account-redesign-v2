@@ -645,9 +645,14 @@ export const CLAIM_ORDERS = [
         },
         returnShipment: {
           courier: 'DHL Express',
+          awb: '25193620',
           estimatedDelivery: 'May 25',
           estimatedDeliveryLong: 'Monday, 25 May',
           currentStatusId: 'shipped',
+          subStatusId: 'arrived_destination',
+          subTimeline: {
+            arrived_destination: '22 May · 7:40 AM',
+          },
           timeline: {
             created: '19 May · 11:00 AM',
             quality_check: '19 May · 2:30 PM',

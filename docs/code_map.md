@@ -26,6 +26,7 @@
 | Cancellation sheet / keep-order undo | `CancelOrderSheet.jsx`, `KeepOrderSheet.jsx` | `output/cancellations.md` |
 | Mock orders / field shapes | `data/orders.js` | `output/orders.md` §7 |
 | Product line-item (thumbnail · name · variant · Revibe Care callout · price breakdown), shared across all cards | `components/ProductSummary.jsx` (exports `REVIBE_CARE_ICON`) | `output/orders.md` §3.0 |
+| Return-shipment (Revibe → customer) `See detailed tracking` dropdown — shared by `WarrantyClaimCard` ship-back + `InvalidClaimCard` paid | `components/ReturnShipmentTracking.jsx` (exports `ReturnShipmentTracking` + `CourierStrip` + `SubStatusItem`) | `output/warranties_compensations.md` §2.3.3, `output/returns/claim_tracking.md` §3.3 |
 
 ## Coupling the import graph can't see
 
@@ -98,7 +99,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/HeroCard.jsx` | 298 | 1 | `HeroCard`·29 |
 | `components/HistoryThread.jsx` | 218 | 3 | `HistoryThread`·86 |
 | `components/InProgressCard.jsx` | 291 | 1 | `InProgressCard`·29 |
-| `components/InvalidClaimCard.jsx` | 877 | 1 | `InvalidClaimCard`·40 |
+| `components/InvalidClaimCard.jsx` | 791 | 1 | `InvalidClaimCard`·37 |
 | `components/JourneyDevPanel.jsx` | 162 | 1 | `JourneyDevPanel`·12 |
 | `components/KeepOrderSheet.jsx` | 122 | 1 | `KeepOrderSheet`·9 |
 | `components/OrderCard.jsx` | 449 | 1 | `OrderCard`·36 |
@@ -108,23 +109,24 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ProductSummary.jsx` | 136 | 13 | `REVIBE_CARE_ICON`·1, `ProductSummary`·12 |
 | `components/RefundDetailsSheet.jsx` | 165 | 1 | `RefundDetailsSheet`·7 |
 | `components/ResetFailedCard.jsx` | 475 | 1 | `ResetFailedCard`·25 |
+| `components/ReturnShipmentTracking.jsx` | 133 | 2 | `ReturnShipmentTracking`·14, `CourierStrip`·62, `SubStatusItem`·95 |
 | `components/ShippingSubTimeline.jsx` | 73 | 1 | `ShippingSubTimeline`·9 |
 | `components/StatusTimeline.jsx` | 62 | 1 | `StatusTimeline`·6 |
 | `components/TapToFixCta.jsx` | 14 | 4 | `TapToFixCta`·3 |
 | `components/UndoSnackbar.jsx` | 44 | 1 | `UndoSnackbar`·8 |
 | `components/WalletInfoTooltip.jsx` | 71 | 4 | `REVIBE_WALLET_ICON`·4, `WalletInfoTooltip`·7 |
-| `components/WarrantyClaimCard.jsx` | 659 | 1 | `WarrantyClaimCard`·50 |
+| `components/WarrantyClaimCard.jsx` | 498 | 1 | `WarrantyClaimCard`·51 |
 | `data/journey.js` | 89 | 3 | `INITIAL_ORDER`·28, `JOURNEYS`·30 |
 | `data/journeys/cancellation.js` | 626 | 1 | `CANCELLATION_NODES`·25 |
 | `data/journeys/claimChangeOfMind.js` | 751 | 1 | `CLAIM_COM_NODES`·19 |
 | `data/journeys/claimCompensation.js` | 349 | 1 | `CLAIM_COMPENSATION_NODES`·29 |
 | `data/journeys/claimIssue.js` | 850 | 1 | `CLAIM_ISSUE_NODES`·27 |
-| `data/journeys/claimWarranty.js` | 839 | 1 | `CLAIM_WARRANTY_NODES`·22 |
+| `data/journeys/claimWarranty.js` | 840 | 1 | `CLAIM_WARRANTY_NODES`·22 |
 | `data/journeys/happyPath.js` | 101 | 1 | `HAPPY_PATH_NODES`·5 |
 | `data/journeys/initialOrder.js` | 37 | 1 | `INITIAL_ORDER`·2 |
 | `data/orders.js` | 20 | 3 | `ORDERS`·14 |
 | `data/orders/baseline.js` | 435 | 1 | `BASELINE_ORDERS`·3 |
-| `data/orders/claims.js` | 661 | 1 | `CLAIM_ORDERS`·4 |
+| `data/orders/claims.js` | 666 | 1 | `CLAIM_ORDERS`·4 |
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
 | `lib/claims.js` | 560 | 10 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `CLAIM_TRANSIT_SUB_STATUSES`·123, `transitSubProgressIndex`·130, `hasActiveClaim`·137, `isClaimRefunded`·145, `canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182, `isWarrantyDelivered`·202, `claimPhaseTag`·212, `claimStatusHeadline`·229, `claimStatusSubline`·234, `WARRANTY_CLAIM_STATUSES`·252, `warrantyClaimToneFor`·300, `warrantyClaimProgressIndex`·308, `warrantyClaimPhaseTag`·312, `warrantyClaimStatusHeadline`·331, `warrantyClaimStatusSubline`·336, `REASON_LABELS`·350, `reasonText`·358, `devicePrepText`·366, `CLAIM_TYPE_LABELS`·373, `claimTypeLabel`·380, `refundMethodLabel`·386, `CLAIM_SLAS`·405, `expectedCompletionFor`·428, `SUB_STATUS_LABELS`·453, `actionGateCopy`·514 |
@@ -144,7 +146,7 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 | Source-of-truth module | Consumers |
 |---|---|
 | `lib/claims.js` | `App.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/WarrantyClaimCard.jsx` |
-| `lib/statuses.js` | `App.jsx`, `components/CancellationSubTimeline.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ShippingSubTimeline.jsx`, `components/StatusTimeline.jsx`, `components/WarrantyClaimCard.jsx` |
+| `lib/statuses.js` | `App.jsx`, `components/CancellationSubTimeline.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ReturnShipmentTracking.jsx`, `components/ShippingSubTimeline.jsx`, `components/StatusTimeline.jsx` |
 | `lib/returns.js` | `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx` |
 | `data/journey.js` | `App.jsx`, `lib/eddSandbox.js`, `lib/journey.js` |
 | `data/orders.js` | `App.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/flowReducer.js` |
@@ -208,6 +210,6 @@ graph LR
   lib_journey_js --> data_journey_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 75 modules, 22350 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 76 modules, 22242 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

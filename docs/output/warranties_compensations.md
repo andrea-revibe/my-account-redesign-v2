@@ -53,7 +53,7 @@ The head (`initiated → pickup → qc`) is shared with the refund pipeline; the
 
 ### 2.3 WarrantyClaimCard
 
-Lives at `src/components/WarrantyClaimCard.jsx`. Mirrors `ClaimCard`'s chrome (left accent strip, eyebrow, state pill, tinted hero, compact product row, expand-on-tap, history thread, view-details + download footer) but the hero block and post-QC tail diverge.
+Lives at `src/components/WarrantyClaimCard.jsx`. Mirrors `ClaimCard`'s chrome (left accent strip, eyebrow, state pill, tinted hero, compact product row, expand-on-tap, history thread, view-details footer) but the hero block and post-QC tail diverge.
 
 #### 2.3.1 Tone progression
 
@@ -72,11 +72,14 @@ Most states reuse a generic claim hero (eyebrow + headline + ref + updated times
 - **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, "Delivering to · Home" chip, claim-ref + type subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
 - **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Returned on {date}".
 
-#### 2.3.3 Detailed tracking dropdown
+#### 2.3.3 Detailed tracking dropdowns
 
-A brand-toned `See detailed tracking` button (Truck glyph, `border-brand bg-brand-bg/60 text-brand`) surfaces in the expanded view whenever `claim.shipBack?.awb` is set — i.e. as soon as the ship-back AWB has been issued. **Collapsed by default**; the brand styling cues "tap me" without stealing focus from the hero.
+The card carries detailed tracking for **one leg at a time**, mirroring the device's physical journey:
 
-The dropdown reuses the standard outbound `SHIPPING_SUB_STATUSES` from `lib/statuses.js` so a warranty return reads with the **same four milestones as a normal outgoing order**:
+- **Inbound (customer → Revibe), neutral chrome.** `PickupTransitDetail` — a neutral-toned `See detailed tracking` button over the 4-stop inverse-journey `CLAIM_TRANSIT_SUB_STATUSES` (Picked up → … → Arrived at Revibe hub) plus a courier strip reading the order's `courier` / `trackingNumber`. Shown only while the device is still inbound: gated on `claim.transitSubTimeline?.picked_up` **and** `!claim.shipBack?.awb`, so the moment the return shipment exists the inbound dropdown disappears and the return one takes its place.
+- **Return (Revibe → customer), brand chrome.** The shared **`ReturnShipmentTracking`** component (`src/components/ReturnShipmentTracking.jsx`) — a brand-toned `See detailed tracking` button (Truck glyph, `border-brand bg-brand-bg/60 text-brand`, **collapsed by default**, the brand styling cues "tap me") surfaced whenever `claim.shipBack?.awb` is set. This is the **single source of truth** for the return leg, shared verbatim with `InvalidClaimCard`'s paid surface so the two return-shipment cards can't drift.
+
+The return dropdown reuses the standard outbound `SHIPPING_SUB_STATUSES` from `lib/statuses.js` so a warranty return reads with the **same four milestones as a normal outgoing order**:
 
 1. Arrived in destination country
 2. Cleared customs
@@ -88,9 +91,9 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 #### 2.3.4 Expanded view
 
 1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`. Same chrome as `ClaimCard`'s 5-dot strip; tone-aware glow on the current step. Step labels: `Initiated · Pickup · QC · Repair · Ship back · Returned`.
-2. **`See detailed tracking` dropdown** (§2.3.3), collapsed by default.
+2. **`See detailed tracking` dropdown** (§2.3.3) — the inbound or return leg, whichever applies, collapsed by default.
 3. **`HistoryThread`** — same `getHistoryEvents(order, 'claim')` source as `ClaimCard`.
-4. **Two-action footer** — `View claim details` (opens `ClaimDetailsSheet` — warranty-aware, see §2.5) + icon-only `Download receipt` (decorative).
+4. **Footer** — a single full-width `View claim details` button (opens `ClaimDetailsSheet` — warranty-aware, see §2.5). (The decorative icon-only `Download receipt` button was removed.)
 5. **Persistent `Cancel claim` strip** — shown (collapsed or expanded) while `canCancelClaim(claim)` is true (`initiated` / `pickup` / `qc` — i.e. before the device enters repair). At `initiated` the cancel is a clean revert to delivered; once the device is collected (`pickup` / `qc`) `cancelNeedsShipBack` routes it through the **pay-return-shipping** flow (`InvalidClaimCard`, `reason: 'cancelled'`) to get the device back. Shared behaviour — see [claim_tracking.md](./returns/claim_tracking.md) §2.8.
 
 #### 2.3.5 Section placement

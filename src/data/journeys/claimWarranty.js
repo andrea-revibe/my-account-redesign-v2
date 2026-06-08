@@ -554,6 +554,7 @@ export const CLAIM_WARRANTY_NODES = [
           // 12345 mock in src/data/orders.js.
           returnShipment: {
             courier: 'DHL Express',
+            awb: '25193620',
             estimatedDelivery: 'Jun 8',
             estimatedDeliveryLong: 'Monday, 8 June',
             currentStatusId: 'created',

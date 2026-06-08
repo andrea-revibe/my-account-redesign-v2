@@ -284,7 +284,7 @@ None of the transitions persist across re-renders or unmounts.
 - Eyebrow rewrites to `Order · #{id} · Return from Claim RET-{ref}` so lineage stays visible.
 - State pill becomes a brand-toned `Return shipment` (Truck glyph).
 - Hero is the gradient brand-bg / brand-bg2 block from `InProgressCard`, carrying `Delivery by` + the estimated delivery date + an `On track` phase tag, with the same `Delivering to · Home` chip beneath.
-- Expanded body renders a 4-step horizontal dot timeline (Placed → Quality Check → Shipped → Delivered) driven by `claim.invalidClaim.returnShipment.timeline` keyed on the standard `STATUSES` ids. A small brand-tinted heads-up strip names the claim ref and reminds the customer no refund will be issued.
+- Expanded body renders a 4-step horizontal dot timeline (Placed → Quality Check → Shipped → Delivered) driven by `claim.invalidClaim.returnShipment.timeline` keyed on the standard `STATUSES` ids. Once the return shipment is dispatched (`returnShipment.currentStatusId === 'shipped'`) the shared **`ReturnShipmentTracking`** dropdown (`src/components/ReturnShipmentTracking.jsx`) renders beneath it — the same brand-toned `See detailed tracking` panel used by `WarrantyClaimCard`'s ship-back leg: a DHL courier strip (`returnShipment.courier` + `returnShipment.awb` + copy) over the 4-stop outbound `SHIPPING_SUB_STATUSES` sub-timeline. A small brand-tinted heads-up strip names the claim ref and reminds the customer no refund will be issued.
 
 **Declined state.** Tapping `Decline` flips the card to a muted neutral-toned terminal:
 
