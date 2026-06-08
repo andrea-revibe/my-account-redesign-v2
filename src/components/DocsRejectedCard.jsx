@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 
 import { ProductSummary } from './ProductSummary'
+import TapToFixCta from './TapToFixCta'
 
 const NOTE_MAX = 280
 
@@ -30,7 +31,11 @@ const FAKE_FILES = [
   { name: 'touch-test.mp4', size: '18 MB', kind: 'video', duration: '0:24' },
 ]
 
-export default function DocsRejectedCard({ order, defaultExpanded = false }) {
+export default function DocsRejectedCard({
+  order,
+  defaultExpanded = false,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [files, setFiles] = useState([])
   const [note, setNote] = useState('')
@@ -72,7 +77,7 @@ export default function DocsRejectedCard({ order, defaultExpanded = false }) {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
+        className="group w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
@@ -127,9 +132,7 @@ export default function DocsRejectedCard({ order, defaultExpanded = false }) {
 
         <ProductSummary order={order} />
 
-        {!expanded && (
-          <div className="text-[11px] text-muted text-center pt-0.5">Tap to fix</div>
-        )}
+        {!expanded && <TapToFixCta />}
       </button>
 
       {expanded && (
@@ -193,6 +196,7 @@ export default function DocsRejectedCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
+              onClick={() => onRequestCancelClaim?.(order.id)}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
               Cancel claim

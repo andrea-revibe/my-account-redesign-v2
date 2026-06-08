@@ -121,7 +121,7 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Warranty claim submitted',
     trigger: 'customer',
     event: 'claim.created',
-    next: ['claim_picked_up', 'claim_pickup_failed'],
+    next: ['claim_picked_up', 'claim_pickup_failed', 'claim_cancelled'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -240,7 +240,12 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Claim quality check started',
     trigger: 'system',
     event: 'claim.qc.started',
-    next: ['claim_under_repair', 'claim_invalid_confirmed', 'claim_reset_failed'],
+    next: [
+      'claim_under_repair',
+      'claim_invalid_confirmed',
+      'claim_reset_failed',
+      'claim_cancelled_shipback',
+    ],
     apply: (o) => ({
       ...o,
       claim: {
@@ -393,6 +398,55 @@ export const CLAIM_WARRANTY_NODES = [
       },
     }),
   },
+  // ----- Customer-cancelled terminal — reachable from the cancellable
+  //       (pre-pickup) submitted node. Strips the claim so the order
+  //       reverts to its delivered PastOrderCard (re-raisable). -------
+  {
+    id: 'claim_cancelled',
+    label: 'Claim cancelled by customer',
+    trigger: 'customer',
+    event: 'claim.cancelled',
+    next: [],
+    apply: (o) => ({ ...o, claim: undefined }),
+  },
+  // ----- Post-collection cancel — the device is already with Revibe, so
+  //       cancelling can't just revert: the customer pays return shipping
+  //       to get it back. Sets the same `invalidClaim` gate (reason
+  //       'cancelled') the invalid verdict uses and points into the
+  //       existing return chain (`claim_return_shipping_paid` → return
+  //       sub-statuses → delivered). Reachable from the QC-phase nodes. -
+  {
+    id: 'claim_cancelled_shipback',
+    label: 'Claim cancelled — pay return shipping',
+    trigger: 'customer',
+    event: 'claim.cancelled',
+    next: ['claim_return_shipping_paid'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        docsRejection: undefined,
+        pickupFailure: undefined,
+        resetFailed: undefined,
+        actionRequired: undefined,
+        subStatusId: null,
+        invalidClaim: {
+          reason: 'cancelled',
+          requestedAt: '30 May · 4:18 PM',
+          autoCancelAt: '6 Jun · 4:18 PM',
+          timeLeftLabel: '7 days left',
+          returnShipping: { amount: 35, currency: 'AED' },
+          returnShipment: {
+            courier: 'DHL Express',
+            estimatedDelivery: 'Jun 8',
+            estimatedDeliveryLong: 'Monday, 8 June',
+            currentStatusId: 'created',
+            timeline: { created: '31 May · 11:00 AM' },
+          },
+        },
+      },
+    }),
+  },
   // ----- Pickup-failed sub-branch (placed at the end so default-next
   //       routing in the happy chain isn't disturbed) ------------------
   {
@@ -500,6 +554,7 @@ export const CLAIM_WARRANTY_NODES = [
           // 12345 mock in src/data/orders.js.
           returnShipment: {
             courier: 'DHL Express',
+            awb: '25193620',
             estimatedDelivery: 'Jun 8',
             estimatedDeliveryLong: 'Monday, 8 June',
             currentStatusId: 'created',
@@ -688,7 +743,7 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Reset failed — device still locked',
     trigger: 'system',
     event: 'claim.reset.failed',
-    next: ['claim_reset_details_received'],
+    next: ['claim_reset_details_received', 'claim_cancelled_shipback'],
     apply: (o) => ({
       ...o,
       claim: {

@@ -1,18 +1,14 @@
-import { useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ChevronLeft, X } from 'lucide-react'
 import { ORDERS } from '../../data/orders'
-import {
-  flowReducer,
-  initialState,
-  stepError,
-  TOTAL_STEPS,
-} from './flowReducer'
+import { flowReducer, initialState, stepError } from './flowReducer'
 import { generateClaimRef, refundBreakdown, assessBattery } from '../../lib/returns'
 import { expectedCompletionFor } from '../../lib/claims'
 import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
 import Step1ClaimType from './Step1ClaimType'
-import Step2Reason from './Step2Reason'
+import Step2Reason, { routeForReason, scopeForReason } from './Step2Reason'
+import SwitchFlowSheet from './SwitchFlowSheet'
 import Step2IssueDetails from './Step2IssueDetails'
 import Step2Compensation from './Step2Compensation'
 import Step3DevicePrep from './Step3DevicePrep'
@@ -38,12 +34,16 @@ export default function ClaimFlow({
   // every step-changing action clears it in the same dispatch — so the next
   // step never flashes its errors before the user tries to advance.
 
+  // Tracks the redirect sheet so Escape closes the sheet (its own handler)
+  // without also tearing down the whole flow here.
+  const switchOpenRef = useRef(false)
+
   // Lock background scroll while the overlay is up; restore on unmount.
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !switchOpenRef.current) onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => {
@@ -57,10 +57,44 @@ export default function ClaimFlow({
     [initialOrder, state.orderId],
   )
 
-  const isConfirmation = state.step === TOTAL_STEPS && state.claimRef
-  const isReview = state.step === 7
+  const isConfirmation = state.step === 'confirm' && state.claimRef
+  const isReview = state.step === 'review'
+  const onReasonStep = state.step === 'reason'
+
+  // The reason picker is the router: each reason resolves to a track. When
+  // that track differs from the flow the customer is in, a confirm sheet
+  // intercepts Continue and offers to switch; when it matches, Continue
+  // advances within the current flow. ROUTE_FROM_REASON carries the target +
+  // any pre-filled issue scope either way.
+  const [switchOpen, setSwitchOpen] = useState(false)
+  switchOpenRef.current = switchOpen
+  const reasonTarget = onReasonStep && state.reason.value
+    ? routeForReason(state.reason.value, state.claimType, order)
+    : null
+  const reasonIsSwitch = Boolean(reasonTarget && reasonTarget !== state.claimType)
+
+  const routeFromReason = () =>
+    dispatch({
+      type: 'ROUTE_FROM_REASON',
+      target: reasonTarget,
+      scope: scopeForReason(state.reason.value),
+    })
 
   const handlePrimary = () => {
+    if (onReasonStep) {
+      if (stepError(state)) {
+        dispatch({ type: 'ATTEMPT' })
+        return
+      }
+      // Mismatched reason → confirm the redirect in a sheet before leaving
+      // the step. Matching reason → advance straight away.
+      if (reasonIsSwitch) {
+        setSwitchOpen(true)
+        return
+      }
+      routeFromReason()
+      return
+    }
     if (isReview) {
       // Compensation keeps the device — no factory-reset / packing acks to
       // gate on. Refund + warranty flows still require both.
@@ -91,7 +125,7 @@ export default function ClaimFlow({
   const errorKey = state.attempted ? stepError(state) : null
 
   const handleBack = () => {
-    if (state.step === 1 || isConfirmation) {
+    if (state.step === 'type' || isConfirmation) {
       onClose()
       return
     }
@@ -120,7 +154,7 @@ export default function ClaimFlow({
             <div className="flex items-center px-2 pt-3 pb-2">
               <button
                 type="button"
-                aria-label={state.step === 1 ? 'Close' : 'Back'}
+                aria-label={state.step === 'type' ? 'Close' : 'Back'}
                 onClick={handleBack}
                 className="w-9 h-9 rounded-full grid place-items-center text-ink hover:bg-line-2"
               >
@@ -141,25 +175,24 @@ export default function ClaimFlow({
         )}
 
         <main className="flex-1 overflow-y-auto pb-4">
-          {state.step === 1 && (
+          {state.step === 'type' && (
             <Step1ClaimType state={state} dispatch={dispatch} error={errorKey} />
           )}
-          {state.step === 2 &&
-            (state.claimType === 'issue' || state.claimType === 'warranty') && (
-              <Step2IssueDetails
-                state={state}
-                dispatch={dispatch}
-                order={order}
-                error={errorKey}
-              />
-            )}
-          {state.step === 2 && state.claimType === 'change_of_mind' && (
-            <Step2Reason state={state} dispatch={dispatch} />
+          {state.step === 'reason' && (
+            <Step2Reason state={state} dispatch={dispatch} error={errorKey} />
           )}
-          {state.step === 2 && state.claimType === 'compensation' && (
+          {state.step === 'issuedetails' && (
+            <Step2IssueDetails
+              state={state}
+              dispatch={dispatch}
+              order={order}
+              error={errorKey}
+            />
+          )}
+          {state.step === 'compsubtype' && (
             <Step2Compensation state={state} dispatch={dispatch} error={errorKey} />
           )}
-          {state.step === 3 && (
+          {state.step === 'deviceprep' && (
             <Step3DevicePrep
               state={state}
               dispatch={dispatch}
@@ -167,13 +200,13 @@ export default function ClaimFlow({
               error={errorKey}
             />
           )}
-          {state.step === 4 && (
+          {state.step === 'packing' && (
             <Step4Packing state={state} dispatch={dispatch} error={errorKey} />
           )}
-          {state.step === 5 && (
+          {state.step === 'pickup' && (
             <Step4PickupDetails state={state} dispatch={dispatch} error={errorKey} />
           )}
-          {state.step === 6 && (
+          {state.step === 'refund' && (
             <Step5RefundMethod
               state={state}
               dispatch={dispatch}
@@ -181,7 +214,7 @@ export default function ClaimFlow({
               error={errorKey}
             />
           )}
-          {state.step === 7 && (
+          {state.step === 'review' && (
             <Step6Review
               state={state}
               dispatch={dispatch}
@@ -205,19 +238,22 @@ export default function ClaimFlow({
             primaryVariant={primaryVariant}
             primaryDisabled={false}
             onPrimary={handlePrimary}
-            secondaryLabel={
-              state.step === 2 && state.claimType === 'change_of_mind'
-                ? 'Skip'
-                : null
-            }
-            onSecondary={
-              state.step === 2 && state.claimType === 'change_of_mind'
-                ? () => dispatch({ type: 'NEXT' })
-                : null
-            }
+            secondaryLabel={null}
+            onSecondary={null}
           />
         )}
       </div>
+
+      <SwitchFlowSheet
+        open={switchOpen}
+        target={reasonTarget}
+        order={order}
+        onConfirm={() => {
+          setSwitchOpen(false)
+          routeFromReason()
+        }}
+        onClose={() => setSwitchOpen(false)}
+      />
     </div>
   )
 }

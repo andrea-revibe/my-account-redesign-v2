@@ -138,9 +138,50 @@ Filter counts reflect the same rules — an in-flight claim counts toward the `i
 - `expectedCompletionFor(claimType, today?)` — sums SLA `expectedHours` across the claim-type's pipeline (refund: 5 steps; warranty: 6 steps), adds the total to `today`, and returns `{ short, long, hours, date }`. `long` is the "Monday, 14 May" form used by the Step 4 headline + warranty Step 6/7 surfaces; `short` mirrors the seeded `claim.repairWindow.expectedComplete` shape ("Mon, 14 May").
 - `actionGateCopy()` — banner copy for the three action gates.
 - Summary-label maps: `REASON_LABELS`, `RETURN_METHOD_LABELS`, `reasonText`, `devicePrepText`, `refundMethodLabel`.
-- `hasActiveClaim`, `isClaimRefunded`.
+- `hasActiveClaim`, `isClaimRefunded`, `canCancelClaim`.
 
 Edit copy or add a new claim state here, not in the components.
+
+### 2.8 Cancel claim
+
+`ClaimCard` and `WarrantyClaimCard` carry a **persistent `Cancel claim`** affordance: a danger-tinted text button in a bordered footer strip that sits *below* the header, **outside** the expand block — so it's visible whether the card is collapsed or expanded. Gated on `canCancelClaim(claim) && onRequestCancelClaim` (the prop is threaded from `App.jsx`).
+
+#### Window — `canCancelClaim(claim)`
+
+`canCancelClaim` in `src/lib/claims.js` is the visibility rule: cancellable across the whole pre-completion window — `claimStatusId ∈ {initiated, pickup, qc}`. Locked once the refund is issued (`refund_issued` / `refund_credited`) or the warranty enters repair (`under_repair` onward). Compensation has no `pickup`, so it resolves to `initiated` / `qc`. The three **takeover** cards (`PickupFailedCard` / `DocsRejectedCard` / `ResetFailedCard`) expose `Cancel claim` regardless — they're already blocked / auto-cancelling states. `InvalidClaimCard` is out of scope (it's already the ship-back surface).
+
+#### Two paths — `cancelNeedsShipBack(claim)`
+
+The *behaviour* of a confirmed cancel forks on whether the device is physically with Revibe:
+
+| Path | When (`cancelNeedsShipBack`) | Outcome |
+|---|---|---|
+| **Clean revert** | `false` — `initiated` device claims (device not yet collected) + **all** compensation (customer keeps the device) | The claim is dropped; the order reverts to its delivered `PastOrderCard` (re-raisable). |
+| **Ship-back** | `true` — device claim at `pickup` / `qc` (unit already collected) | Hands off to the pay-return-shipping surface — the customer covers return shipping to get the device back. |
+
+#### Confirmation sheet — `CancelClaimSheet`
+
+Tapping `Cancel claim` opens `CancelClaimSheet` (`src/components/CancelClaimSheet.jsx`) — a bottom sheet reusing `CancelOrderSheet`'s chrome (scrim, slide-up panel, Escape-to-close, body-scroll lock). Copy is path-aware (reads `cancelNeedsShipBack`):
+
+- **Clean:** "We'll cancel your return — no device pickup will be scheduled / no compensation will be paid. The order goes back to Delivered, nothing was charged." Primary `Cancel claim`.
+- **Ship-back:** "Your device is already with us. To cancel and get it back, you'll cover return shipping ({amount})." Primary **`Continue to payment`** → step 2 (the pay surface). The confusing "no pickup will happen" line is gone.
+
+#### Clean-revert result
+
+Confirm adds the orderId to `App.jsx`'s `cancelledClaims` map; the projection strips the claim (winning over `submittedClaims` and any hand-seeded claim), reverting the order to its delivered `PastOrderCard`. The generalized `UndoSnackbar` surfaces "Claim cancelled" — Undo clears the flag, restoring the claim.
+
+#### Ship-back result — reuse of `InvalidClaimCard`
+
+Confirm overlays `claim.invalidClaim = cancelReturnGate(order)` (`reason: 'cancelled'`) via `App.jsx`'s `shipBackCancels` map — clearing any takeover flag (`resetFailed` etc.) so routing lands on `InvalidClaimCard` rather than the original takeover. That card renders the **same** pay-return-shipping → paid → return-shipment-tracking machinery as an invalid verdict, with copy switched by `reason` (see §3.3) and the secondary action swapped from `Decline` to **`Keep claim`** (`onKeepClaim` → clears the gate, claim resumes). No undo snackbar — `Keep claim` is the back-out. This is the **generic** post-collection-cancel mechanism: any future surface that needs "cancel while the device is already returned" sets the same gate.
+
+#### Journey mode
+
+Cancellation is modelled as real terminal nodes:
+
+- **`claim_cancelled`** (clean) — wired into the `claim_submitted_*` nodes across all four journeys + compensation's `claim_under_review`. `apply()` strips the claim → delivered.
+- **`claim_cancelled_shipback`** (device journeys only — CoM / issue / warranty) — wired into the QC-phase nodes (`claim_qc_started`, `claim_reset_failed`). Sets the `reason: 'cancelled'` gate (clearing takeover flags) and points into the **existing** `claim_return_shipping_paid → return sub-statuses → delivered` chain — near-total reuse. `Keep claim` here calls `journey.back()`.
+
+Confirming the sheet advances whichever node is in `validNext` (also a dev-panel button). Post-collection nodes that aren't wired (pickup/transit, reset-retry) fall back to the in-session `shipBackCancels` overlay, cleared on the next node change so the flow stays repeatable. See [journey_backend_spec.md](../journey_backend_spec.md).
 
 ## 3. Takeover cards
 
@@ -150,7 +191,7 @@ When the claim is blocked on a single customer action, the card flips out of `Cl
 |---|---|
 | Tone (initial) | danger red — the claim is blocked on the customer |
 | Tone (post-commit) | warn amber for re-upload / reschedule (live, awaiting verdict); brand purple for paid-and-shipping (forward motion) |
-| Hero | Eyebrow `Order · #{id} · Claim RET-{ref}` → `Action needed` pill → `Tap to fix` footer when collapsed |
+| Hero | Eyebrow `Order · #{id} · Claim RET-{ref}` → `Action needed` pill → `Tap to fix` CTA button (solid danger, shared `TapToFixCta`) when collapsed |
 | Ops message | Avatar + name + role + timestamp + free-text reason (expanded view) |
 | Action gate | Single primary CTA, danger-red filled |
 | Auto-resolve | `autoCancelAt` (or `autoCloseAt`) — claim auto-cancels/closes if ignored |
@@ -169,7 +210,7 @@ stateDiagram-v2
     submitted --> review: ops accepts → ClaimCard resumes
 ```
 
-**Collapsed (rejected state).** Danger-toned left accent strip; eyebrow as above; `Action needed` pill; tinted hero with `Documents rejected` label, headline `We need a few photos re-shot`, one-line truncated ops quote, countdown strip (`2 days, 14 hours left to re-upload · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (rejected state).** Danger-toned left accent strip; eyebrow as above; `Action needed` pill; tinted hero with `Documents rejected` label, headline `We need a few photos re-shot`, one-line truncated ops quote, countdown strip (`2 days, 14 hours left to re-upload · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (rejected state).** Same hero but the ops message expands into a full attributed block (avatar with `opsName` initial, name + role, rejection timestamp, full free-text message). Below the header:
 
@@ -195,7 +236,7 @@ stateDiagram-v2
     rescheduled --> collected: courier succeeds → ClaimCard resumes
 ```
 
-**Collapsed (failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Pickup failed` label, headline `Pickup didn't go through`, one-line truncated courier quote, countdown strip (`3 days, 18 hours left to reschedule · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Pickup failed` label, headline `Pickup didn't go through`, one-line truncated courier quote, countdown strip (`3 days, 18 hours left to reschedule · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (failed state).** Same hero but the courier message expands into a full attributed block (avatar with `opsName` initial — typically the courier's first name). Below the header:
 
@@ -214,6 +255,8 @@ In production rescheduling is committal once a new AWB is issued (rolling it bac
 
 Trigger: `claim.invalidClaim` is set. The QC team inspected the claimed device and couldn't reproduce the issue (or the device is within spec). The customer must pay return shipping to get the device back. Same takeover shape as the others, but with three internal demo states (`action_needed` → `paid` or `declined`) toggled by the CTAs and a reversal flow.
 
+**`reason` — generic device-ship-back surface.** `claim.invalidClaim.reason` discriminates the trigger: `'invalid'` (the QC verdict above — the default when absent, so all existing mocks/journey nodes are unchanged) vs `'cancelled'` (a customer cancel of a claim whose device is already with Revibe — see §2.8). For `'cancelled'` the card reuses everything (fee card, delivery details, `Pay {amount}`, paid-state return-shipment tracking, the journey return chain) and only switches **copy** — label `Cancelled claim`, phase tag `Cancellation requested`, headline "Pay return shipping to get your device back", a neutral system note instead of the Revibe-Quality ops quote — and swaps the secondary action from `Decline` (invalid-only terminal) to **`Keep claim`** (`onKeepClaim` → resume the original claim, no terminal). Treat `InvalidClaimCard` as the generic "device is at Revibe, pay to get it back" surface, not invalid-specific.
+
 ```mermaid
 stateDiagram-v2
     [*] --> action_needed: QC determines invalid claim
@@ -227,7 +270,7 @@ stateDiagram-v2
 
 None of the transitions persist across re-renders or unmounts.
 
-**Collapsed (action_needed).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Return claim` label, `Inspection complete` right-align phase tag (ShieldX glyph), headline `Claim couldn't be approved`, one-line truncated quote from Revibe Quality, countdown strip (`3 days, 8 hours left to pay return shipping · Claim auto-closes {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (action_needed).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Return claim` label, `Inspection complete` right-align phase tag (ShieldX glyph), headline `Claim couldn't be approved`, one-line truncated quote from Revibe Quality, countdown strip (`3 days, 8 hours left to pay return shipping · Claim auto-closes {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (action_needed).** Same hero but the quality message expands into a full attributed block. Below the header:
 
@@ -241,7 +284,7 @@ None of the transitions persist across re-renders or unmounts.
 - Eyebrow rewrites to `Order · #{id} · Return from Claim RET-{ref}` so lineage stays visible.
 - State pill becomes a brand-toned `Return shipment` (Truck glyph).
 - Hero is the gradient brand-bg / brand-bg2 block from `InProgressCard`, carrying `Delivery by` + the estimated delivery date + an `On track` phase tag, with the same `Delivering to · Home` chip beneath.
-- Expanded body renders a 4-step horizontal dot timeline (Placed → Quality Check → Shipped → Delivered) driven by `claim.invalidClaim.returnShipment.timeline` keyed on the standard `STATUSES` ids. A small brand-tinted heads-up strip names the claim ref and reminds the customer no refund will be issued.
+- Expanded body renders a 4-step horizontal dot timeline (Placed → Quality Check → Shipped → Delivered) driven by `claim.invalidClaim.returnShipment.timeline` keyed on the standard `STATUSES` ids. Once the return shipment is dispatched (`returnShipment.currentStatusId === 'shipped'`) the shared **`ReturnShipmentTracking`** dropdown (`src/components/ReturnShipmentTracking.jsx`) renders beneath it — the same brand-toned `See detailed tracking` panel used by `WarrantyClaimCard`'s ship-back leg: a DHL courier strip (`returnShipment.courier` + `returnShipment.awb` + copy) over the 4-stop outbound `SHIPPING_SUB_STATUSES` sub-timeline. A small brand-tinted heads-up strip names the claim ref and reminds the customer no refund will be issued.
 
 **Declined state.** Tapping `Decline` flips the card to a muted neutral-toned terminal:
 
@@ -266,7 +309,7 @@ stateDiagram-v2
     retry_failed --> [*]: customer ignored → auto-cancel
 ```
 
-**Collapsed (reset_failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Device still locked` right-align label (Lock glyph), headline `We couldn't wipe the device`, one-line truncated quote from Revibe Quality, countdown strip (`2 days, 22 hours left to unlock · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` footer.
+**Collapsed (reset_failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Device still locked` right-align label (Lock glyph), headline `We couldn't wipe the device`, one-line truncated quote from Revibe Quality, countdown strip (`2 days, 22 hours left to unlock · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
 **Expanded (reset_failed state).** Same hero but the Quality message expands into a full attributed block (avatar with `opsName` initial). Below the header:
 
@@ -274,7 +317,7 @@ stateDiagram-v2
 2. **`I've removed this device from my iCloud account` confirmation toggle** — large tap target with a checkbox and required-helper subline. Required before submit.
 3. **`Device passcode` field** — masked numeric input (`type=password`, `inputMode=numeric`), 6-digit cap with progress counter (`0/6` → `6/6` in success-green). Wide tracking + monospace tabular nums so the dots read as a real PIN input. Helper line: "If it's 4 digits, pad with zeros at the end."
 4. **Security note** — danger-tinted strip with ShieldCheck glyph: "Your passcode is encrypted and used only by our technician during the reset. It's deleted once the device is wiped." Reuses the tone of the hero so it reads as part of the action, not an afterthought.
-5. **Footer** — `Cancel claim` (visual stub) + `Submit details`. Submit is gated: shows `Confirm unlink + passcode` in disabled grey until both the toggle is on and the passcode is complete (6 digits), then flips to a solid danger-red primary action with the ShieldCheck glyph.
+5. **Footer** — `Cancel claim` + `Submit details`. Submit is gated: shows `Confirm unlink + passcode` in disabled grey until both the toggle is on and the passcode is complete (6 digits), then flips to a solid danger-red primary action with the ShieldCheck glyph. `Cancel claim` is wired (§2.8): because the device is at Revibe by this point (`qc`), it takes the **ship-back** path — the confirmation sheet hands off to `InvalidClaimCard`'s pay-return-shipping surface (`reason: 'cancelled'`) rather than reverting to delivered.
 
 **Submitted state.** Tapping `Submit details` flips the card in place to a warn-toned variant: amber accent strip, pulsing `Reset in progress` pill, `Details received` phase tag, `Thanks — we'll attempt the reset` headline, body that names the technician and the 24-hour retry window. Expanded shows a `What you sent` summary card (iCloud unlink confirmation row with success check + masked passcode row showing the last two digits — `••••42`) followed by the warn-toned security note and an `Undo · replay the demo` button.
 
@@ -479,7 +522,7 @@ src/
 
 - **Step 7 of `ClaimFlow` doesn't persist.** Submitting a return through the flow generates a `RET-XXXXXXXX` and advances to Step 7, but does not write back to the order. The mock claims on the demo orders are hand-seeded.
 - **`View claim details` and icon-only `Download receipt`** on `ClaimCard` are decorative.
-- **`Cancel claim`** — no in-flight cancellation affordance exists for a submitted return. The buttons inside `DocsRejectedCard` / `PickupFailedCard` are visual stubs.
+- **`Cancel claim`** is wired (§2.8) with two paths. **Clean revert** (pre-pickup device claims + compensation): drops the claim from the in-session projection so the order reverts to delivered (undoable via `UndoSnackbar`). **Ship-back** (device already at Revibe — e.g. `ResetFailedCard` at `qc`): overlays the `reason: 'cancelled'` gate so the order routes to `InvalidClaimCard`'s pay-return-shipping surface, reusing the invalid-verdict machinery + journey return chain. No backend — `cancelledClaims` / `shipBackCancels` are in-session only, cleared on refresh; the pay/paid/return-tracking states are `InvalidClaimCard`'s component-local demo states, and `cancelReturnGate`'s return-shipping amount/dates are hand-written placeholders.
 - **Webhook / polling for state progression.** Production needs a mechanism to move the claim through the 7 states as the warehouse handles the unit; today `claim.claimStatusId` is a static field on the mock data.
 - **DocsRejectedCard.** File picker is a fake-files cycle, countdown label is hand-written, `Resubmit` doesn't persist (warn state is local component state only), no notification + email trigger.
 - **PickupFailedCard.** `Edit` link on the pickup-address card is decorative, new AWB / slot are hand-written rather than generated, `Confirm` doesn't persist.

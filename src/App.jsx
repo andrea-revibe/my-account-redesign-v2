@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Header from './components/Header'
 import GreetRow from './components/GreetRow'
 import OrderFilters from './components/OrderFilters'
@@ -14,12 +14,19 @@ import ResetFailedCard from './components/ResetFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
+import CancelClaimSheet from './components/CancelClaimSheet'
 import UndoSnackbar from './components/UndoSnackbar'
 import JourneyDevPanel from './components/JourneyDevPanel'
 import EddSandboxPanel from './components/EddSandboxPanel'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
-import { hasActiveClaim, isClaimRefunded, isWarrantyDelivered } from './lib/claims'
+import {
+  hasActiveClaim,
+  isClaimRefunded,
+  isWarrantyDelivered,
+  cancelNeedsShipBack,
+  cancelReturnGate,
+} from './lib/claims'
 import { useJourney } from './lib/journey'
 import { useEddSandbox } from './lib/eddSandbox'
 import { JOURNEYS } from './data/journey'
@@ -85,10 +92,24 @@ export default function App() {
   // warranty (or refund) claim flips the order to the right card type
   // immediately and moves between the "In progress" / "Past" sections.
   const [submittedClaims, setSubmittedClaims] = useState({})
-  // Demo-only undo handle — the most recent seeded claim. Snackbar
-  // surfaces after the returns flow closes; Undo removes the entry
-  // from submittedClaims so the order reverts to its delivered card.
-  const [recentSubmit, setRecentSubmit] = useState(null)
+  // In-session set of orderIds whose claim the customer cancelled. The
+  // projection strips the claim for these (winning over submittedClaims and
+  // any hand-seeded claim), so the order reverts to its delivered card.
+  // Cleared on refresh; undoable via the snackbar.
+  const [cancelledClaims, setCancelledClaims] = useState({})
+  // Order whose claim-cancel confirmation sheet is open (null = closed).
+  const [cancelClaimOrderId, setCancelClaimOrderId] = useState(null)
+  // In-session set of orderIds cancelled *after* the device was collected.
+  // The projection overlays the `invalidClaim` ship-back gate (reason
+  // 'cancelled') on these — clearing any takeover flag so the order routes
+  // to InvalidClaimCard's pay-return-shipping surface. Cleared on refresh;
+  // backed out via the card's "Keep claim".
+  const [shipBackCancels, setShipBackCancels] = useState({})
+  // Demo-only undo handle for the most recent claim mutation. Snackbar
+  // surfaces after a submit or a cancel; Undo reverses that one action.
+  // `kind` is 'submit' (drop from submittedClaims) or 'cancel' (drop from
+  // cancelledClaims).
+  const [pendingUndo, setPendingUndo] = useState(null)
   // Auto-expand target driven by Step 7's "Track this return" button.
   // `n` is bumped on each Track click so the matched ClaimCard's key
   // changes → it remounts with defaultExpanded={true} even if the same
@@ -193,7 +214,81 @@ export default function App() {
       return
     }
     setSubmittedClaims((prev) => ({ ...prev, [orderId]: claim }))
-    setRecentSubmit({ orderId, claimType: claim.type })
+    setPendingUndo({
+      kind: 'submit',
+      orderId,
+      message:
+        claim.type === 'warranty'
+          ? 'Warranty claim submitted'
+          : 'Return request submitted',
+    })
+  }
+
+  // Customer taps "Cancel claim" on a claim card (baseline or takeover).
+  // Opens the confirmation sheet. Works in both the multi-order demo and
+  // journey mode; in journey mode the cancel reverts the replayed order to
+  // delivered until the next node advance/reset replays the claim (see the
+  // effect that clears the journey cancel on node change).
+  const handleRequestCancelClaim = (orderId) => {
+    setCancelClaimOrderId(orderId)
+  }
+
+  // Confirmed from the sheet. Two paths, decided by `cancelNeedsShipBack`:
+  //
+  //  • Clean revert (pre-collection device claims + compensation): the order
+  //    drops the claim and falls back to its delivered PastOrderCard. Journey
+  //    mode advances the `claim_cancelled` terminal node (strips the claim via
+  //    apply()); otherwise the in-session `cancelledClaims` flag does it, with
+  //    an undo snackbar (submittedClaims left intact so Undo restores it).
+  //
+  //  • Ship-back (device already with Revibe): hands off to the pay-return-
+  //    shipping surface (InvalidClaimCard, reason 'cancelled'). Journey mode
+  //    advances `claim_cancelled_shipback` (sets the gate, then reuses the
+  //    invalid return chain); otherwise the `shipBackCancels` flag overlays
+  //    the gate. No undo snackbar here — the card's "Keep claim" is the
+  //    back-out.
+  //
+  // On journey takeover surfaces that don't wire the matching node, both
+  // paths fall through to the in-session flag (cleared on the next node
+  // change by the effect below).
+  const handleConfirmCancelClaim = (orderId) => {
+    setCancelClaimOrderId(null)
+    const claim = projectedOrders.find((o) => o.id === orderId)?.claim
+    const needsShipBack = cancelNeedsShipBack(claim)
+    const nodeId = needsShipBack ? 'claim_cancelled_shipback' : 'claim_cancelled'
+    if (
+      journeyMode &&
+      !isSandbox &&
+      journey.validNext().some((n) => n.id === nodeId)
+    ) {
+      journey.advance(nodeId)
+      return
+    }
+    if (needsShipBack) {
+      setShipBackCancels((prev) => ({ ...prev, [orderId]: true }))
+      return
+    }
+    setCancelledClaims((prev) => ({ ...prev, [orderId]: true }))
+    setPendingUndo({ kind: 'cancel', orderId, message: 'Claim cancelled' })
+  }
+
+  // "Keep claim" on the cancel ship-back surface (InvalidClaimCard, reason
+  // 'cancelled') — backs out so the original claim resumes. Journey mode at
+  // the cancel node steps back; otherwise clears the in-session gate.
+  const handleKeepClaim = (orderId) => {
+    if (
+      journeyMode &&
+      !isSandbox &&
+      journey.currentNodeId === 'claim_cancelled_shipback'
+    ) {
+      journey.back()
+      return
+    }
+    setShipBackCancels((prev) => {
+      const next = { ...prev }
+      delete next[orderId]
+      return next
+    })
   }
 
   // Step 7 "Track this return" — close the flow and signal the matched
@@ -204,15 +299,64 @@ export default function App() {
     setAutoOpenClaim((prev) => ({ orderId, n: prev.n + 1 }))
   }
 
-  const projectedOrders = useMemo(
-    () =>
-      journeyMode
-        ? [activeOrderFromJourney]
-        : ORDERS.map((o) =>
-            submittedClaims[o.id] ? { ...o, claim: submittedClaims[o.id] } : o,
-          ),
-    [journeyMode, activeOrderFromJourney, submittedClaims],
-  )
+  const projectedOrders = useMemo(() => {
+    // Overlay the in-session cancel state on a (possibly submitted-claim)
+    // order: a clean cancel strips the claim; a post-collection cancel swaps
+    // in the `invalidClaim` ship-back gate and clears any takeover flag so
+    // routing lands on InvalidClaimCard rather than the original takeover.
+    const applyCancel = (o) => {
+      if (!o.claim) return o
+      if (cancelledClaims[o.id]) return { ...o, claim: undefined }
+      if (shipBackCancels[o.id]) {
+        return {
+          ...o,
+          claim: {
+            ...o.claim,
+            docsRejection: undefined,
+            pickupFailure: undefined,
+            resetFailed: undefined,
+            actionRequired: undefined,
+            invalidClaim: cancelReturnGate(o),
+          },
+        }
+      }
+      return o
+    }
+    if (journeyMode) return [applyCancel(activeOrderFromJourney)]
+    return ORDERS.map((o) =>
+      applyCancel(
+        submittedClaims[o.id] ? { ...o, claim: submittedClaims[o.id] } : o,
+      ),
+    )
+  }, [
+    journeyMode,
+    activeOrderFromJourney,
+    submittedClaims,
+    cancelledClaims,
+    shipBackCancels,
+  ])
+
+  // In journey mode the in-session cancel flags (clean revert + ship-back
+  // fallback) are demo-only overlays used when the current node has no
+  // matching cancel node wired. Advancing/resetting to a different node
+  // replays the claim, so we clear both flags for the journey order whenever
+  // the current node changes — keeps the cancel flow replayable without
+  // leaking across nodes or journeys. (Node-driven cancels don't touch these
+  // flags, so this is a no-op for them.)
+  useEffect(() => {
+    if (!journeyMode) return
+    const id = activeOrderFromJourney?.id
+    if (id == null) return
+    const drop = (prev) => {
+      if (!prev[id]) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    }
+    setCancelledClaims(drop)
+    setShipBackCancels(drop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journey.currentNodeId, journeyId, journeyMode])
 
   // Counts are computed off the date-range-filtered set so the chip badges
   // stay accurate when the user widens / narrows the date window. Journey
@@ -295,17 +439,42 @@ export default function App() {
                 />
                 <div className="px-4 flex flex-col gap-3">
                   {inFlight.map((o) => {
+                    const onRequestCancelClaim = handleRequestCancelClaim
                     if (hasActiveClaim(o) && o.claim?.docsRejection) {
-                      return <DocsRejectedCard key={o.id} order={o} />
+                      return (
+                        <DocsRejectedCard
+                          key={o.id}
+                          order={o}
+                          onRequestCancelClaim={onRequestCancelClaim}
+                        />
+                      )
                     }
                     if (hasActiveClaim(o) && o.claim?.pickupFailure) {
-                      return <PickupFailedCard key={o.id} order={o} />
+                      return (
+                        <PickupFailedCard
+                          key={o.id}
+                          order={o}
+                          onRequestCancelClaim={onRequestCancelClaim}
+                        />
+                      )
                     }
                     if (hasActiveClaim(o) && o.claim?.resetFailed) {
-                      return <ResetFailedCard key={o.id} order={o} />
+                      return (
+                        <ResetFailedCard
+                          key={o.id}
+                          order={o}
+                          onRequestCancelClaim={onRequestCancelClaim}
+                        />
+                      )
                     }
                     if (hasActiveClaim(o) && o.claim?.invalidClaim) {
-                      return <InvalidClaimCard key={o.id} order={o} />
+                      return (
+                        <InvalidClaimCard
+                          key={o.id}
+                          order={o}
+                          onKeepClaim={handleKeepClaim}
+                        />
+                      )
                     }
                     if (hasActiveClaim(o) && o.claim?.type === 'warranty') {
                       return (
@@ -315,6 +484,7 @@ export default function App() {
                           openSignal={
                             autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
                           }
+                          onRequestCancelClaim={onRequestCancelClaim}
                         />
                       )
                     }
@@ -326,6 +496,7 @@ export default function App() {
                           openSignal={
                             autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
                           }
+                          onRequestCancelClaim={onRequestCancelClaim}
                         />
                       )
                     }
@@ -422,22 +593,34 @@ export default function App() {
           onTrackClaim={handleTrackClaim}
         />
       )}
-      {claimFlowOrderId === null && recentSubmit && (
+      {cancelClaimOrderId !== null && (
+        <CancelClaimSheet
+          order={projectedOrders.find((o) => o.id === cancelClaimOrderId)}
+          open
+          onConfirm={() => handleConfirmCancelClaim(cancelClaimOrderId)}
+          onClose={() => setCancelClaimOrderId(null)}
+        />
+      )}
+      {claimFlowOrderId === null && cancelClaimOrderId === null && pendingUndo && (
         <UndoSnackbar
-          message={
-            recentSubmit.claimType === 'warranty'
-              ? 'Warranty claim submitted'
-              : 'Return request submitted'
-          }
+          message={pendingUndo.message}
           onUndo={() => {
-            setSubmittedClaims((prev) => {
-              const next = { ...prev }
-              delete next[recentSubmit.orderId]
-              return next
-            })
-            setRecentSubmit(null)
+            if (pendingUndo.kind === 'cancel') {
+              setCancelledClaims((prev) => {
+                const next = { ...prev }
+                delete next[pendingUndo.orderId]
+                return next
+              })
+            } else {
+              setSubmittedClaims((prev) => {
+                const next = { ...prev }
+                delete next[pendingUndo.orderId]
+                return next
+              })
+            }
+            setPendingUndo(null)
           }}
-          onDismiss={() => setRecentSubmit(null)}
+          onDismiss={() => setPendingUndo(null)}
         />
       )}
       {journeyMode && !isSandbox && (

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { ProductSummary } from './ProductSummary'
+import TapToFixCta from './TapToFixCta'
 
 const PASSCODE_LEN = 6
 
@@ -21,7 +22,11 @@ const PASSCODE_LEN = 6
 // on the device, so QC can't wipe it. Customer removes the device from their
 // iCloud account remotely and shares the device passcode, then the card flips
 // to a warn-tone confirmation while ops attempt the reset.
-export default function ResetFailedCard({ order, defaultExpanded = false }) {
+export default function ResetFailedCard({
+  order,
+  defaultExpanded = false,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [unlinked, setUnlinked] = useState(false)
   const [passcode, setPasscode] = useState('')
@@ -55,7 +60,7 @@ export default function ResetFailedCard({ order, defaultExpanded = false }) {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
+        className="group w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
@@ -110,9 +115,7 @@ export default function ResetFailedCard({ order, defaultExpanded = false }) {
 
         <ProductSummary order={order} />
 
-        {!expanded && (
-          <div className="text-[11px] text-muted text-center pt-0.5">Tap to fix</div>
-        )}
+        {!expanded && <TapToFixCta />}
       </button>
 
       {expanded && (
@@ -134,6 +137,7 @@ export default function ResetFailedCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
+              onClick={() => onRequestCancelClaim?.(order.id)}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
               Cancel claim

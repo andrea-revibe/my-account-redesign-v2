@@ -17,13 +17,11 @@ import {
   Truck,
   Zap,
 } from 'lucide-react'
-import {
-  STATUSES,
-  SHIPPING_SUB_STATUSES,
-  subProgressIndex,
-} from '../lib/statuses'
+import { STATUSES } from '../lib/statuses'
 
 import { ProductSummary } from './ProductSummary'
+import { ReturnShipmentTracking } from './ReturnShipmentTracking'
+import TapToFixCta from './TapToFixCta'
 
 // Routed in App.jsx when `claim.invalidClaim` is set on a claim. Mirrors
 // the DocsRejectedCard / PickupFailedCard pattern: a full danger-tone
@@ -36,7 +34,11 @@ import { ProductSummary } from './ProductSummary'
 //                                       └─ reversal CTA flips back to paid
 //
 // Per CLAUDE.md, this is the third takeover variant — see Card routing.
-export default function InvalidClaimCard({ order, defaultExpanded = false }) {
+export default function InvalidClaimCard({
+  order,
+  defaultExpanded = false,
+  onKeepClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   // Mode is internal demo state, but mirror any matching signal on the
   // order data so a journey-driven advance (paidAt / declinedAt set on
@@ -108,6 +110,18 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
   const claim = order.claim
   const inv = claim.invalidClaim
   const fee = inv.returnShipping
+  // `reason: 'cancelled'` reuses this whole surface for a customer-initiated
+  // cancel whose device is already with Revibe — only the framing differs
+  // (no QC verdict; the customer chose to cancel and just needs the device
+  // sent back). The secondary becomes "Keep claim" (resume) instead of the
+  // invalid path's "Decline" terminal.
+  const isCancel = inv.reason === 'cancelled'
+  const heroLabel = isCancel ? 'Cancelled claim' : 'Return claim'
+  const heroHeadline = isCancel
+    ? 'Pay return shipping to get your device back'
+    : "Claim couldn't be approved"
+  const cancelNote =
+    'You asked to cancel this claim. Your device is at our hub — cover return shipping and we’ll send it straight back.'
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2">
@@ -117,7 +131,7 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
+        className="group w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
@@ -140,18 +154,26 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
         <div className="rounded-[14px] border border-[#f6c5cc] bg-danger-bg p-3.5 flex flex-col gap-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {heroLabel}
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-danger whitespace-nowrap shrink-0">
-              <ShieldX size={11} strokeWidth={2.2} />
-              Inspection complete
+              {isCancel ? (
+                <RotateCcw size={11} strokeWidth={2.2} />
+              ) : (
+                <ShieldX size={11} strokeWidth={2.2} />
+              )}
+              {isCancel ? 'Cancellation requested' : 'Inspection complete'}
             </span>
           </div>
           <div className="text-[18px] font-bold leading-[1.15] tracking-[-0.01em] text-danger">
-            Claim couldn't be approved
+            {heroHeadline}
           </div>
 
-          {expanded ? (
+          {isCancel ? (
+            <div className="rounded-[12px] border bg-white/85 border-white px-3 py-2.5 text-[12px] text-ink leading-snug">
+              {cancelNote}
+            </div>
+          ) : expanded ? (
             <CourierMessage
               name={inv.opsName}
               role={inv.opsRole}
@@ -167,14 +189,12 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
             </div>
           )}
 
-          <CountdownStrip inv={inv} />
+          <CountdownStrip inv={inv} isCancel={isCancel} />
         </div>
 
         <ProductSummary order={order} />
 
-        {!expanded && (
-          <div className="text-[11px] text-muted text-center pt-0.5">Tap to fix</div>
-        )}
+        {!expanded && <TapToFixCta />}
       </button>
 
       {expanded && (
@@ -208,10 +228,10 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => setMode('declined')}
+              onClick={() => (isCancel ? onKeepClaim?.(order.id) : setMode('declined'))}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
-              Decline
+              {isCancel ? 'Keep claim' : 'Decline'}
             </button>
             <button
               type="button"
@@ -224,7 +244,9 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
           </div>
 
           <div className="text-[10.5px] text-center text-muted -mt-0.5">
-            You'll get a confirmation email and SMS once the new shipment is created.
+            {isCancel
+              ? "Keeping the claim leaves it active — nothing changes. You'll get a confirmation once the return shipment is created."
+              : "You'll get a confirmation email and SMS once the new shipment is created."}
           </div>
         </div>
       )}
@@ -307,18 +329,20 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
             <TimelineDots ship={ship} curIdx={curIdx} />
           </div>
 
-          {/* Once the return shipment hits `shipped`, surface the same
-              outbound sub-status drill-down a regular order would carry
-              (arrived in destination country → cleared customs → forwarded
-              to third-party agent → out for delivery). Gated on ship
-              actually being in the shipped state — pre-shipping there's
-              nothing to track yet. */}
-          {ship.currentStatusId === 'shipped' && ship.subStatusId && (
-            <PaidShipBackSubDetail ship={ship} />
+          {/* Once the return shipment is dispatched, surface the shared
+              return-shipment tracking dropdown (same brand chrome + courier
+              strip + outbound sub-status drill-down as WarrantyClaimCard's
+              ship-back leg). Gated on ship being dispatched — pre-shipping
+              there's nothing to track yet. */}
+          {ship.currentStatusId === 'shipped' && (
+            <ReturnShipmentTracking ship={ship} />
           )}
 
           <div className="rounded-[10px] bg-brand-bg/60 border border-brand-bg2 px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
-            <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued — the device is being shipped back as it was inspected.
+            <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued —{' '}
+            {claim.invalidClaim.reason === 'cancelled'
+              ? 'your device is on its way back because you cancelled the claim.'
+              : 'the device is being shipped back as it was inspected.'}
           </div>
 
           {/* Demo only — production would not let the customer rewind a
@@ -552,7 +576,7 @@ function CourierMessage({ name, role, message, timestamp }) {
   )
 }
 
-function CountdownStrip({ inv }) {
+function CountdownStrip({ inv, isCancel = false }) {
   return (
     <div className="flex items-center gap-2 rounded-[10px] bg-white/85 border border-white px-3 py-2 text-[11.5px]">
       <span className="w-6 h-6 rounded-full bg-danger/10 text-danger grid place-items-center shrink-0">
@@ -564,7 +588,8 @@ function CountdownStrip({ inv }) {
           <span className="text-ink-2"> to pay return shipping</span>
         </div>
         <div className="text-[10.5px] text-muted leading-tight mt-0.5">
-          Claim auto-closes {inv.autoCancelAt}
+          {isCancel ? 'Device returns to circulation' : 'Claim auto-closes'}{' '}
+          {inv.autoCancelAt}
         </div>
       </div>
     </div>
@@ -763,86 +788,3 @@ function TimelineDots({ ship, curIdx }) {
   )
 }
 
-// Outbound-style sub-status detail for the post-payment return shipment.
-// Same four milestones as a normal outgoing order (arrived in destination
-// country → cleared customs → forwarded to third-party agent → out for
-// delivery), driven by ship.subStatusId + ship.subTimeline. Neutral chrome
-// since the hero already does the brand-toned attention-grabbing.
-function PaidShipBackSubDetail({ ship }) {
-  const [show, setShow] = useState(false)
-  const cur = subProgressIndex(ship.subStatusId)
-
-  return (
-    <div className="px-1">
-      <button
-        type="button"
-        onClick={() => setShow((v) => !v)}
-        aria-expanded={show}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-[10px] border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-line-2"
-      >
-        <span>{show ? 'Hide detailed tracking' : 'See detailed tracking'}</span>
-        <ChevronDown
-          size={16}
-          strokeWidth={1.75}
-          className={`text-ink-2 transition-transform ${show ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {show && (
-        <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
-          {SHIPPING_SUB_STATUSES.map((s, i) => (
-            <SubStatusItem
-              key={s.id}
-              label={s.label}
-              timestamp={ship.subTimeline?.[s.id]}
-              state={i < cur ? 'done' : i === cur ? 'current' : 'future'}
-              isLast={i === SHIPPING_SUB_STATUSES.length - 1}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function SubStatusItem({ label, timestamp, state, isLast }) {
-  const done = state === 'done'
-  const current = state === 'current'
-  return (
-    <div className="flex gap-3 items-start">
-      <div className="w-[18px] flex flex-col items-center self-stretch">
-        <span
-          className={`w-[14px] h-[14px] rounded-full border-2 grid place-items-center shrink-0 ${
-            done || current
-              ? 'bg-brand border-brand text-white'
-              : 'bg-surface border-line text-muted'
-          } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
-        >
-          {done && <Check size={9} strokeWidth={3} />}
-        </span>
-        {!isLast && (
-          <span
-            className={`flex-1 w-[2px] mt-0.5 ${done ? 'bg-brand' : 'bg-line'}`}
-          />
-        )}
-      </div>
-      <div className={`flex-1 ${isLast ? 'pb-1' : 'pb-3'}`}>
-        <div
-          className={`text-[13px] ${
-            current
-              ? 'text-ink font-bold'
-              : done
-                ? 'text-ink'
-                : 'text-muted'
-          }`}
-        >
-          {label}
-        </div>
-        {timestamp && (
-          <div className="text-[11px] text-muted mt-px tabular-nums">
-            {timestamp}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}

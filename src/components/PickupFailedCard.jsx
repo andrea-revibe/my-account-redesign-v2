@@ -11,13 +11,18 @@ import {
 } from 'lucide-react'
 
 import { ProductSummary } from './ProductSummary'
+import TapToFixCta from './TapToFixCta'
 
 // Routed in App.jsx when `claim.pickupFailure` is set on a claim. Mirrors
 // the DocsRejectedCard pattern: a full danger-tone takeover for a claim
 // that's blocked on a single customer action (here: confirm pickup address
 // so the courier can re-dispatch), then flips to a warn-tone confirmation
 // after the customer taps "Confirm new pickup".
-export default function PickupFailedCard({ order, defaultExpanded = false }) {
+export default function PickupFailedCard({
+  order,
+  defaultExpanded = false,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [confirmed, setConfirmed] = useState(false)
   const [details, setDetails] = useState(order.claim.pickupDetails)
@@ -50,7 +55,7 @@ export default function PickupFailedCard({ order, defaultExpanded = false }) {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
+        className="group w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
@@ -105,9 +110,7 @@ export default function PickupFailedCard({ order, defaultExpanded = false }) {
 
         <ProductSummary order={order} />
 
-        {!expanded && (
-          <div className="text-[11px] text-muted text-center pt-0.5">Tap to fix</div>
-        )}
+        {!expanded && <TapToFixCta />}
       </button>
 
       {expanded && (
@@ -145,6 +148,7 @@ export default function PickupFailedCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
+              onClick={() => onRequestCancelClaim?.(order.id)}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
               Cancel claim

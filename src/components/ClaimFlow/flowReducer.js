@@ -1,48 +1,86 @@
 import { ORDERS } from '../../data/orders'
 import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
 
-export const TOTAL_STEPS = 8
-
-// Warranty submissions skip Step 6 (refund method) — no money changes
-// hands, so the customer-visible step count drops by one. Compensation
-// claims keep the device, so they skip Steps 3 (device prep), 4 (packing)
-// and 5 (pickup) entirely — 5 visible steps (1, 2, 6, 7, 8). NEXT / BACK /
-// GO_TO_STEP step over the skipped screens for each type.
-export function visibleStepCount(claimType) {
-  if (claimType === 'warranty') return TOTAL_STEPS - 1
-  if (claimType === 'compensation') return TOTAL_STEPS - 3
-  return TOTAL_STEPS
+// Each claim type walks its own ordered list of step keys. The reason
+// picker ("Why are you returning it?") is now a shared early step for the
+// three return flows (change of mind / issue / warranty) and acts as the
+// authoritative router — see Step2Reason.routeForReason. Compensation keeps
+// the item, so it skips device prep / packing / pickup and never shows the
+// reason step (missing-parts redirects *into* it). NEXT / BACK / GO_TO_STEP
+// all walk the active type's sequence, so there's no per-step skip logic to
+// keep in sync.
+export const STEP_SEQUENCES = {
+  change_of_mind: [
+    'type',
+    'reason',
+    'deviceprep',
+    'packing',
+    'pickup',
+    'refund',
+    'review',
+    'confirm',
+  ],
+  issue: [
+    'type',
+    'reason',
+    'issuedetails',
+    'deviceprep',
+    'packing',
+    'pickup',
+    'refund',
+    'review',
+    'confirm',
+  ],
+  warranty: [
+    'type',
+    'reason',
+    'issuedetails',
+    'deviceprep',
+    'packing',
+    'pickup',
+    'review',
+    'confirm',
+  ],
+  compensation: ['type', 'compsubtype', 'refund', 'review', 'confirm'],
 }
 
-// Maps a state.step (1..8 internally — 4 = packing, 5 = pickup, 6 =
-// refund method, 7 = review, 8 = confirmation) onto the position the
-// user sees in the progress bar (1..visibleStepCount).
+// Before a claim type is chosen we're on 'type'; fall back to the longest
+// sequence so the progress bar has a sensible denominator on step 1.
+const DEFAULT_SEQUENCE = STEP_SEQUENCES.issue
+
+function sequenceFor(claimType) {
+  return STEP_SEQUENCES[claimType] || DEFAULT_SEQUENCE
+}
+
+export function visibleStepCount(claimType) {
+  return sequenceFor(claimType).length
+}
+
+// Position (1-based) of a step key in its type's sequence — drives the
+// progress bar's "Step X of Y".
 export function visibleStepIndex(step, claimType) {
-  if (claimType === 'warranty') return step >= 6 ? step - 1 : step
-  // Compensation collapses 3/4/5 — only 1, 2, 6, 7, 8 are reachable, so
-  // everything from the refund step on shifts down by three.
-  if (claimType === 'compensation') return step >= 6 ? step - 3 : step
-  return step
+  const i = sequenceFor(claimType).indexOf(step)
+  return i < 0 ? 1 : i + 1
 }
 
 export function initialState({ initialOrderId = null, initialOrder = null } = {}) {
-  // Step 1 (claim type) is always shown empty — the customer picks every
-  // time. Step 4 (pickup details) is pre-seeded from the order's contact
-  // info so the user only needs to edit fields that are out of date.
-  // `initialOrder` (journey mode) takes precedence — its order isn't in
-  // ORDERS, so the lookup would miss without it.
+  // The claim-type step is always shown empty — the customer picks every
+  // time. Pickup details are pre-seeded from the order's contact info so the
+  // user only needs to edit fields that are out of date. `initialOrder`
+  // (journey mode) takes precedence — its order isn't in ORDERS, so the
+  // lookup would miss without it.
   const order =
     initialOrder ??
     (initialOrderId ? ORDERS.find((o) => o.id === initialOrderId) : null)
   // For the OS-ambiguous `Tablet` category, preselect the iPad guide (the
-  // customer can switch to Android in Step 3). Everything else resolves
-  // directly from the category.
+  // customer can switch to Android in the device-prep step). Everything else
+  // resolves directly from the category.
   const resolvedType = deviceTypeForOrder(order)
   const initialDevice = resolvedType === 'tablet' ? 'ipad' : resolvedType
   const initialOs =
     resolvedType === 'tablet' ? 'ios' : deviceOsForOrder(order)
   return {
-    step: 1,
+    step: 'type',
     claimType: null,
     issueScope: null,
     issueSubtypeId: null,
@@ -86,8 +124,9 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     claimRef: null,
     // Soft-validation flag: set by ATTEMPT when Continue is clicked with a
     // required input still missing, and cleared atomically by every
-    // step-changing action (NEXT / BACK / GO_TO_STEP / SUBMIT) so the next
-    // step never paints its errors before the user has tried to advance.
+    // step-changing action (NEXT / BACK / GO_TO_STEP / SUBMIT /
+    // ROUTE_FROM_REASON) so the next step never paints its errors before the
+    // user has tried to advance.
     attempted: false,
   }
 }
@@ -95,9 +134,9 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
 export function flowReducer(state, action) {
   switch (action.type) {
     case 'SET_CLAIM_TYPE': {
-      // The warranty branch reuses Step 2's issue picker, so the
-      // sub-issue is only cleared when leaving evidence-collecting flows
-      // (issue / warranty) for a different claim type (e.g. change_of_mind).
+      // The warranty branch reuses the issue picker, so the sub-issue is only
+      // cleared when leaving evidence-collecting flows (issue / warranty) for
+      // a different claim type (e.g. change_of_mind).
       const usesIssuePicker =
         action.value === 'issue' || action.value === 'warranty'
       return {
@@ -107,6 +146,38 @@ export function flowReducer(state, action) {
         issueSubtypeId: usesIssuePicker ? state.issueSubtypeId : null,
         compensationSubtype:
           action.value === 'compensation' ? state.compensationSubtype : null,
+        attempted: false,
+      }
+    }
+    // Leaving the shared reason step: route to the target track the reason
+    // resolves to (Step2Reason.routeForReason), landing on that flow's first
+    // post-classification step. When routing to issue/warranty we pre-fill
+    // the issue scope from the fault reason (and reset the specific subtype
+    // so the customer still picks it). target may equal the current claim
+    // type — that's the normal "continue" path.
+    case 'ROUTE_FROM_REASON': {
+      const target = action.target
+      const usesIssuePicker = target === 'issue' || target === 'warranty'
+      const dest = usesIssuePicker
+        ? 'issuedetails'
+        : target === 'compensation'
+          ? 'compsubtype'
+          : 'deviceprep'
+      return {
+        ...state,
+        claimType: target,
+        issueScope: usesIssuePicker
+          ? action.scope ?? state.issueScope
+          : null,
+        issueSubtypeId: usesIssuePicker
+          ? action.scope
+            ? null
+            : state.issueSubtypeId
+          : null,
+        compensationSubtype:
+          target === 'compensation' ? state.compensationSubtype : null,
+        step: dest,
+        attempted: false,
       }
     }
     case 'SET_ISSUE_SUBTYPE':
@@ -149,82 +220,77 @@ export function flowReducer(state, action) {
     case 'ATTEMPT':
       return { ...state, attempted: true }
     case 'GO_TO_STEP': {
-      // Edit links from Review must never land the user on Step 6 when
-      // there is no refund-method step in the warranty flow.
-      const target =
-        state.claimType === 'warranty' && action.value === 6
-          ? 5
-          : action.value
+      // Edit links from Review jump to a step key; ignore targets that
+      // aren't part of the active flow's sequence (defensive).
+      const seq = sequenceFor(state.claimType)
+      const target = seq.includes(action.value) ? action.value : state.step
       return { ...state, step: target, attempted: false }
     }
     case 'NEXT': {
-      const next = state.step + 1
-      // Warranty skips Step 6 (refund); compensation skips 3/4/5 (device
-      // prep, packing, pickup) — from Step 2 it jumps straight to refund.
-      if (state.claimType === 'warranty' && next === 6) {
-        return { ...state, step: 7, attempted: false }
-      }
-      if (state.claimType === 'compensation' && next === 3) {
-        return { ...state, step: 6, attempted: false }
-      }
-      return { ...state, step: Math.min(TOTAL_STEPS, next), attempted: false }
+      const seq = sequenceFor(state.claimType)
+      const i = seq.indexOf(state.step)
+      const next = seq[Math.min(seq.length - 1, i + 1)]
+      return { ...state, step: next, attempted: false }
     }
     case 'BACK': {
-      const prev = state.step - 1
-      if (state.claimType === 'warranty' && prev === 6) {
-        return { ...state, step: 5, attempted: false }
-      }
-      if (state.claimType === 'compensation' && prev === 5) {
-        return { ...state, step: 2, attempted: false }
-      }
-      return { ...state, step: Math.max(1, prev), attempted: false }
+      const seq = sequenceFor(state.claimType)
+      const i = seq.indexOf(state.step)
+      const prev = seq[Math.max(0, i - 1)]
+      return { ...state, step: prev, attempted: false }
     }
     case 'SUBMIT':
-      return { ...state, claimRef: action.value, step: TOTAL_STEPS, attempted: false }
+      return { ...state, claimRef: action.value, step: 'confirm', attempted: false }
     default:
       return state
   }
 }
 
 // First unmet requirement for the current step, in the order we want to
-// surface them ("one at a time" — only the topmost missing input lights
-// up). Returns a stable key the step component matches against, or null
-// when the step is complete. This is the gate `ClaimFlow.handlePrimary`
-// reads on a Continue click: a non-null key blocks advancement and flips
-// the step into its attempted/error state instead of graying the button.
-//
-// Note this intentionally diverges from `canAdvance` on the iOS reset
-// path: there `canAdvance` returns true (so the button was never
-// disabled) and the premature-Continue gate lives here as 'resetGuide'.
+// surface them ("one at a time" — only the topmost missing input lights up).
+// Returns a stable key the step component matches against, or null when the
+// step is complete. This is the gate `ClaimFlow.handlePrimary` reads on a
+// Continue click: a non-null key blocks advancement and flips the step into
+// its attempted/error state instead of graying the button.
 export function stepError(state) {
   switch (state.step) {
-    case 1:
+    case 'type':
       return state.claimType ? null : 'claimType'
-    case 2: {
-      const id = state.issueDetails
-      if (state.claimType === 'issue' || state.claimType === 'warranty') {
-        if (!state.issueSubtypeId) return 'subtype'
-        if (id.description.trim().length === 0) return 'description'
-        if (!id.attachmentName) return 'attachment'
-        return null
-      }
-      if (state.claimType === 'compensation') {
-        if (!state.compensationSubtype) return 'subtype'
-        if (id.description.trim().length === 0) return 'description'
-        if (!id.attachmentName) return 'attachment'
-        return null
-      }
+    // Reason is required on all three return flows. A fault / wrong-item
+    // reason is valid here (it has a value) — Step2Reason swaps the CTA to
+    // "Switch to …" and ROUTE_FROM_REASON handles the redirect, so it's
+    // never gated.
+    case 'reason': {
+      if (!state.reason.value) return 'reason'
+      if (
+        state.reason.value === 'other' &&
+        state.reason.otherText.trim().length === 0
+      )
+        return 'reasonOther'
       return null
     }
-    case 3: {
+    case 'issuedetails': {
+      const id = state.issueDetails
+      if (!state.issueSubtypeId) return 'subtype'
+      if (id.description.trim().length === 0) return 'description'
+      if (!id.attachmentName) return 'attachment'
+      return null
+    }
+    case 'compsubtype': {
+      const id = state.issueDetails
+      if (!state.compensationSubtype) return 'subtype'
+      if (id.description.trim().length === 0) return 'description'
+      if (!id.attachmentName) return 'attachment'
+      return null
+    }
+    case 'deviceprep': {
       const dp = state.devicePrep
       if (!dp.resetGuideSeen) return 'resetGuide'
       if (dp.resetConfirmed !== true) return 'resetConfirm'
       return null
     }
-    case 4:
+    case 'packing':
       return state.packingMethod !== null ? null : 'packing'
-    case 5: {
+    case 'pickup': {
       const pd = state.pickupDetails
       if (pd.address.trim().length === 0) return 'address'
       if (pd.email.trim().length === 0) return 'email'
@@ -232,7 +298,7 @@ export function stepError(state) {
       if (state.pickupConfirmed !== true) return 'pickupConfirm'
       return null
     }
-    case 6:
+    case 'refund':
       return state.refundMethod === 'wallet' || state.refundMethod === 'original'
         ? null
         : 'refundMethod'
@@ -241,64 +307,8 @@ export function stepError(state) {
   }
 }
 
-// Per-step validation. Returns true when the user can advance from `state.step`.
+// Per-step validity predicate. Retained as a plain validity check; the button
+// is never disabled (soft validation), so this no longer drives any UI.
 export function canAdvance(state) {
-  switch (state.step) {
-    case 1:
-      return (
-        state.claimType === 'change_of_mind' ||
-        state.claimType === 'issue' ||
-        state.claimType === 'warranty' ||
-        state.claimType === 'compensation'
-      )
-    case 2: {
-      if (state.claimType === 'issue' || state.claimType === 'warranty') {
-        const id = state.issueDetails
-        return Boolean(
-          state.issueSubtypeId &&
-            id.description.trim().length > 0 &&
-            id.attachmentName,
-        )
-      }
-      if (state.claimType === 'compensation') {
-        const id = state.issueDetails
-        return Boolean(
-          state.compensationSubtype &&
-            id.description.trim().length > 0 &&
-            id.attachmentName,
-        )
-      }
-      return true
-    }
-    case 3: {
-      const dp = state.devicePrep
-      // Keep Continue clickable until the guide has been opened and
-      // completed, so a premature click can surface the "open the guide"
-      // gate (ClaimFlow.handlePrimary) rather than silently disabling the
-      // button. Once seen, the confirm checkbox is the gate.
-      if (!dp.resetGuideSeen) return true
-      return dp.resetConfirmed === true
-    }
-    case 4:
-      return state.packingMethod !== null
-    case 5: {
-      const pd = state.pickupDetails
-      return (
-        pd.address.trim().length > 0 &&
-        pd.email.trim().length > 0 &&
-        pd.phone.trim().length > 0 &&
-        state.pickupConfirmed === true
-      )
-    }
-    case 6:
-      return state.refundMethod === 'wallet' || state.refundMethod === 'original'
-    case 7:
-      // Review keeps Submit clickable regardless of the two ack
-      // checkboxes. ClaimFlow.handlePrimary enforces the gate and
-      // flips unchecked cards into their red error state on a
-      // blocked submit.
-      return true
-    default:
-      return false
-  }
+  return stepError(state) === null
 }

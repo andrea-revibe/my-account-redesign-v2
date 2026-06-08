@@ -53,7 +53,7 @@ The head (`initiated → pickup → qc`) is shared with the refund pipeline; the
 
 ### 2.3 WarrantyClaimCard
 
-Lives at `src/components/WarrantyClaimCard.jsx`. Mirrors `ClaimCard`'s chrome (left accent strip, eyebrow, state pill, tinted hero, compact product row, expand-on-tap, history thread, view-details + download footer) but the hero block and post-QC tail diverge.
+Lives at `src/components/WarrantyClaimCard.jsx`. Mirrors `ClaimCard`'s chrome (left accent strip, eyebrow, state pill, tinted hero, compact product row, expand-on-tap, history thread, view-details footer) but the hero block and post-QC tail diverge.
 
 #### 2.3.1 Tone progression
 
@@ -72,11 +72,14 @@ Most states reuse a generic claim hero (eyebrow + headline + ref + updated times
 - **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, "Delivering to · Home" chip, claim-ref + type subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
 - **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Returned on {date}".
 
-#### 2.3.3 Detailed tracking dropdown
+#### 2.3.3 Detailed tracking dropdowns
 
-A brand-toned `See detailed tracking` button (Truck glyph, `border-brand bg-brand-bg/60 text-brand`) surfaces in the expanded view whenever `claim.shipBack?.awb` is set — i.e. as soon as the ship-back AWB has been issued. **Collapsed by default**; the brand styling cues "tap me" without stealing focus from the hero.
+The card carries detailed tracking for **one leg at a time**, mirroring the device's physical journey:
 
-The dropdown reuses the standard outbound `SHIPPING_SUB_STATUSES` from `lib/statuses.js` so a warranty return reads with the **same four milestones as a normal outgoing order**:
+- **Inbound (customer → Revibe), neutral chrome.** `PickupTransitDetail` — a neutral-toned `See detailed tracking` button over the 4-stop inverse-journey `CLAIM_TRANSIT_SUB_STATUSES` (Picked up → … → Arrived at Revibe hub) plus a courier strip reading the order's `courier` / `trackingNumber`. Shown only while the device is still inbound: gated on `claim.transitSubTimeline?.picked_up` **and** `!claim.shipBack?.awb`, so the moment the return shipment exists the inbound dropdown disappears and the return one takes its place.
+- **Return (Revibe → customer), brand chrome.** The shared **`ReturnShipmentTracking`** component (`src/components/ReturnShipmentTracking.jsx`) — a brand-toned `See detailed tracking` button (Truck glyph, `border-brand bg-brand-bg/60 text-brand`, **collapsed by default**, the brand styling cues "tap me") surfaced whenever `claim.shipBack?.awb` is set. This is the **single source of truth** for the return leg, shared verbatim with `InvalidClaimCard`'s paid surface so the two return-shipment cards can't drift.
+
+The return dropdown reuses the standard outbound `SHIPPING_SUB_STATUSES` from `lib/statuses.js` so a warranty return reads with the **same four milestones as a normal outgoing order**:
 
 1. Arrived in destination country
 2. Cleared customs
@@ -88,9 +91,10 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 #### 2.3.4 Expanded view
 
 1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`. Same chrome as `ClaimCard`'s 5-dot strip; tone-aware glow on the current step. Step labels: `Initiated · Pickup · QC · Repair · Ship back · Returned`.
-2. **`See detailed tracking` dropdown** (§2.3.3), collapsed by default.
+2. **`See detailed tracking` dropdown** (§2.3.3) — the inbound or return leg, whichever applies, collapsed by default.
 3. **`HistoryThread`** — same `getHistoryEvents(order, 'claim')` source as `ClaimCard`.
-4. **Two-action footer** — `View claim details` (opens `ClaimDetailsSheet` — warranty-aware, see §2.5) + icon-only `Download receipt` (decorative).
+4. **Footer** — a single full-width `View claim details` button (opens `ClaimDetailsSheet` — warranty-aware, see §2.5). (The decorative icon-only `Download receipt` button was removed.)
+5. **Persistent `Cancel claim` strip** — shown (collapsed or expanded) while `canCancelClaim(claim)` is true (`initiated` / `pickup` / `qc` — i.e. before the device enters repair). At `initiated` the cancel is a clean revert to delivered; once the device is collected (`pickup` / `qc`) `cancelNeedsShipBack` routes it through the **pay-return-shipping** flow (`InvalidClaimCard`, `reason: 'cancelled'`) to get the device back. Shared behaviour — see [claim_tracking.md](./returns/claim_tracking.md) §2.8.
 
 #### 2.3.5 Section placement
 
@@ -98,20 +102,17 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 
 ### 2.4 Intake flow
 
-The warranty intake reuses the existing returns-flow chrome and most of the existing steps. Total visible step count is **7** (not 8) — Step 6 (Refund method) is skipped because no money changes hands. The progress bar reads "Step X of 7"; internally `state.step` still uses 1..8 indexing so Step 4 = packing, Step 7 = review and Step 8 = confirmation stay aligned across all three claim types. Routing lives in `flowReducer.js`:
-
-- `visibleStepCount(claimType)` → 8 for refund flows, 7 for warranty.
-- `visibleStepIndex(step, claimType)` → maps internal 1..8 onto displayed 1..7, subtracting 1 once `step >= 6` when the claim type is warranty.
-- `NEXT` / `BACK` / `GO_TO_STEP` step over `state.step === 6` for warranty so the user never lands on the refund-method screen.
+The warranty intake reuses the existing returns-flow chrome and most of the existing steps. Total visible step count is **8** — it shares the required reason step with the other return flows but skips Refund method (no money changes hands). The reducer drives this from a per-type step-key sequence (`STEP_SEQUENCES.warranty` in `flowReducer.js`): `type → reason → issuedetails → deviceprep → packing → pickup → review → confirm`. `NEXT` / `BACK` / `GO_TO_STEP` walk that list (the refund key simply isn't in it), and `visibleStepCount('warranty')` → 8.
 
 | Step | Behaviour on warranty |
 |---|---|
 | 1 — Claim type | `Use my warranty` row is in-scope. Selecting it dispatches `SET_CLAIM_TYPE: 'warranty'`. Continue is always clickable; tapping it with no type picked surfaces an inline error (flow-wide soft validation — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.1.1). |
-| 2 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch), including the optional **battery check** that surfaces on the `battery` sub-type (capacity % + non-original-part toggle → §7.2 Battery Standards verdict; see [returns/issue.md](./returns/issue.md) §2.2). A filled-in result rides onto the warranty claim as `claim.batteryAssessment`. Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
-| 3 — Device prep | Shared with refund flows — single guided-reset path (see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.4). |
-| 4 — Packing | Shared with refund flows. Radio pick between original Revibe box and sturdy post box with bubble wrap — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.5. |
-| 5 — Pickup details | Shared with refund flows. The Step 5 "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → QC → Under repair → On its way back → Device returned). |
-| 6 — Refund method | **Skipped.** |
+| 2 — Reason | The shared, required "Why are you returning it?" picker. A fault / wrong reason continues into the warranty flow (pre-filling the issue-details scope); a no-fault reason opens `SwitchFlowSheet` and redirects to change of mind; `missing_parts` redirects to compensation. See [returns/change_of_mind.md](./returns/change_of_mind.md) §2.3. |
+| 3 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch), including the optional **battery check** that surfaces on the `battery` sub-type (capacity % + non-original-part toggle → §7.2 Battery Standards verdict; see [returns/issue.md](./returns/issue.md) §2.3). A filled-in result rides onto the warranty claim as `claim.batteryAssessment`. Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
+| 4 — Device prep | Shared with refund flows — single guided-reset path (see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.4). |
+| 5 — Packing | Shared with refund flows. Radio pick between original Revibe box and sturdy post box with bubble wrap — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.5. |
+| 6 — Pickup details | Shared with refund flows. The "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → QC → Under repair → On its way back → Device returned). |
+| — Refund method | **Skipped** — not part of the warranty sequence. |
 | 7 — Review | Refund section is replaced by a **What you'll get back** card: Wrench-iconed "Your repaired device" + "Expected back" date + "No refund — the same unit is returned to you after repair." The Edit-by-section navigation only exposes Fault / Device prep / Packing / Pickup. CTA reads `Submit warranty claim` (still success-toned). Two soft-validated ack cards sit inline (factory-reset + packed-properly) — same `AckCard` contract as the refund branches; see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.8. |
 | 8 — Confirmation | Title swaps to "Your warranty claim is in"; chip reads `Warranty`; second row swaps "Expected refund" (Clock glyph) for **"Expected back"** (Wrench glyph) with the computed return date and a "No refund issued — same device returned after repair" note. Secondary CTA reads "Track this claim". |
 
@@ -223,22 +224,18 @@ Structurally the simplest of the three — it skips three steps — and the only
 
 ### 3.3 Intake flow
 
-Total visible step count is **5** (1, 2, 6, 7, 8); Steps 3/4/5 are skipped by the reducer. The progress bar reads "Step X of 5". Internally `state.step` still uses 1..8 indexing so Step 6 = refund destination, Step 7 = review and Step 8 = confirmation stay aligned across all claim types. Routing lives in `flowReducer.js`:
+Total visible step count is **5**. The reducer drives this from `STEP_SEQUENCES.compensation`: `type → compsubtype → refund → review → confirm` — compensation keeps the item, so device prep / packing / pickup aren't in the sequence, and (unlike the three return flows) there's no shared reason step. `visibleStepCount('compensation')` → 5; `NEXT` / `BACK` walk the sequence and `GO_TO_STEP` edit links from Review target `compsubtype` and `refund`.
 
-- `visibleStepCount('compensation')` → `TOTAL_STEPS - 3` = 5.
-- `visibleStepIndex(step, 'compensation')` → `step >= 6 ? step - 3 : step` (1→1, 2→2, 6→3, 7→4, 8→5).
-- `NEXT` from Step 2 jumps to Step 6 (skips 3/4/5); `BACK` from Step 6 returns to Step 2. `GO_TO_STEP` edit links from Review only target Step 2 and Step 6.
+**Reachable two ways:** directly via the Step-1 `Request compensation` entry, or by redirect — picking **Missing or broken parts** on the shared reason step of any return flow opens `SwitchFlowSheet` and routes here (`ROUTE_FROM_REASON` → `compsubtype`). See [returns/change_of_mind.md](./returns/change_of_mind.md) §2.3.
 
 | Step | Behaviour on compensation |
 |---|---|
 | 1 — Claim type | `Request compensation` dispatches `SET_CLAIM_TYPE: 'compensation'` and highlights (no longer a stub). |
 | 2 — What happened | **`Step2Compensation.jsx`** — a two-option sub-type picker (`shipping_refund` / `charger`, each with a "what we need" evidence hint) + description + attachment. Gates on `compensationSubtype` + a non-empty description + an attachment, one at a time via the flow-wide soft validation (`stepError` order `subtype` → `description` → `attachment`; see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.1.1). Description/attachment reuse `state.issueDetails`; the sub-type is `state.compensationSubtype` (set via `SET_COMPENSATION_SUBTYPE`). |
-| 3 — Device prep | **Skipped.** |
-| 4 — Packing | **Skipped.** |
-| 5 — Pickup | **Skipped.** |
-| 6 — Refund destination | `Step5RefundMethod`'s `CompensationDestination` branch — Wallet vs original payment, **no amount/bonus/restocking** math. Each card shows "Amount confirmed by support after review" in place of a figure. Gates on `refundMethod` (`stepError` key `refundMethod`); Continue stays clickable and reddens both cards on a premature tap (§2.1.1). |
-| 7 — Review | `Step6Review` compensation branch — a **What happened** section (sub-type + description + proof) and a **Refund** section showing the chosen destination + "To be confirmed" / "Confirmed by support after review". No Device prep / Packing / Pickup sections, and **no ack cards** (nothing to reset or pack), so `ClaimFlow.handlePrimary` skips the factory-reset/packing gate for compensation. CTA reads `Submit compensation request`. |
-| 8 — Confirmation | Title swaps to "Your compensation request is in"; chip reads `Compensation`; the middle row shows "Amount confirmed after review · {destination}" (Clock glyph) with a "You keep the device…" note; the Device-preparation row is dropped. Secondary CTA reads "Track this compensation". |
+| — Device prep / Packing / Pickup | **Skipped** — not part of the compensation sequence. |
+| 3 — Refund destination | `Step5RefundMethod`'s `CompensationDestination` branch — Wallet vs original payment, **no amount/bonus/restocking** math. Each card shows "Amount confirmed by support after review" in place of a figure. Gates on `refundMethod` (`stepError` key `refundMethod`); Continue stays clickable and reddens both cards on a premature tap (§2.1.1). |
+| 4 — Review | `Step6Review` compensation branch — a **What happened** section (sub-type + description + proof) and a **Refund** section showing the chosen destination + "To be confirmed" / "Confirmed by support after review". No Device prep / Packing / Pickup sections, and **no ack cards** (nothing to reset or pack), so `ClaimFlow.handlePrimary` skips the factory-reset/packing gate for compensation. CTA reads `Submit compensation request`. |
+| 5 — Confirmation | Title swaps to "Your compensation request is in"; chip reads `Compensation`; the middle row shows "Amount confirmed after review · {destination}" (Clock glyph) with a "You keep the device…" note; the Device-preparation row is dropped. Secondary CTA reads "Track this compensation". |
 
 On submit, `ClaimFlow.buildClaim` builds a compensation-shaped claim (§3.6) and bubbles it via `onSubmitClaim(orderId, claim)`. `App.jsx` projects it over `ORDERS`; the order re-renders as a `ClaimCard` on the compensation pipeline's `initiated` ("Claim submitted") state. The `UndoSnackbar` slides up so reviewers can revert. In-session only — cleared on refresh.
 
@@ -267,6 +264,7 @@ Reuses the refund status **ids** (`initiated` / `qc` / `refund_issued` / `refund
 
 - **Dot timeline** uses `claimStatusesFor(claim)` (4 dots, no Pickup) instead of hard-coding `CLAIM_STATUSES`.
 - **Hero amount** falls back to "To be confirmed" when `claim.expectedRefund` is absent (the in-session submit and the under-review mock carry no figure). A refunded mock that carries `expectedRefund` shows the real amount.
+- **`Cancel claim`** stays cancellable through `qc` ("Under review"), hiding only once `refund_issued`. Because compensation has no device with Revibe, `cancelNeedsShipBack` is always `false` — the cancel is **always a clean revert** to delivered (never the pay-return-shipping path). Shared behaviour — see [claim_tracking.md](./returns/claim_tracking.md) §2.8.
 
 `ClaimDetailsSheet` is compensation-aware: the Summary shows the claim sub-type + description (no Reason / Device-prep / Pickup rows), the refund destination row drops the "10% restocking fee" sub, and the Refund card shows the amount if known else "To be confirmed" with a "you keep the device" note.
 
