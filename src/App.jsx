@@ -144,7 +144,15 @@ export default function App() {
   const handleCancelOrder = ({ method }) => {
     if (!journeyMode || isSandbox) return
     const branch = method === 'store_credit' ? 'wallet' : 'card'
-    const candidates = [`cancel_before_qc_${branch}`, `cancellation_requested_${branch}`]
+    // Late + past-promise variants take precedence: they're only ever in
+    // validNext from the `order_late` / `qc_late` nodes, so listing them
+    // first is harmless on the normal path (only one is ever reachable).
+    const candidates = [
+      `cancel_late_before_qc_${branch}`,
+      `cancellation_late_requested_${branch}`,
+      `cancel_before_qc_${branch}`,
+      `cancellation_requested_${branch}`,
+    ]
     const target = journey.validNext().find((n) => candidates.includes(n.id))
     if (target) journey.advance(target.id)
   }

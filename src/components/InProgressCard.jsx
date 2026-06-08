@@ -14,9 +14,7 @@ import {
 } from 'lucide-react'
 import { STATUSES, statusDescription } from '../lib/statuses'
 import CancelOrderSheet from './CancelOrderSheet'
-
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+import { ProductSummary } from './ProductSummary'
 
 const STATE_LABELS = {
   created: 'Order placed',
@@ -54,14 +52,23 @@ export default function InProgressCard({ order, defaultExpanded = false, onCance
         aria-expanded={expanded}
         className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
-        <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-          Order · #{order.id}
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
+            Order · #{order.id}
+          </div>
+          <span
+            aria-hidden
+            className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
+            style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
+          >
+            <ChevronDown size={12} strokeWidth={1.75} />
+          </span>
         </div>
         <StatePill order={order} />
 
         <ETAHero order={order} desc={desc} />
 
-        <ProductRow order={order} expanded={expanded} />
+        <ProductSummary order={order} />
       </button>
 
       {expanded && (
@@ -125,7 +132,11 @@ function ETAHero({ order, desc }) {
         <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
           Delivery by
         </div>
-        <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-brand text-right">
+        <span
+          className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-right ${
+            order.delayed ? 'text-amber-600' : 'text-brand'
+          }`}
+        >
           <TagIcon size={11} strokeWidth={2} />
           {desc.lead}
         </span>
@@ -145,53 +156,6 @@ function ETAHero({ order, desc }) {
           Home
         </span>
       </div>
-    </div>
-  )
-}
-
-function ProductRow({ order, expanded }) {
-  return (
-    <div className="flex items-center gap-2.5 -mx-1 px-1">
-      <div className="w-8 h-10 rounded-[8px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
-        <img
-          src={order.product.image}
-          alt=""
-          className="max-w-full max-h-full object-contain"
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink truncate">
-          {order.product.name}
-        </div>
-        <div className="text-[11px] text-muted truncate">
-          {order.product.variant}
-        </div>
-        {order.warranty != null && (
-          <div className="flex items-center gap-1 mt-0.5 text-[10.5px] text-muted">
-            <img
-              src={REVIBE_CARE_ICON}
-              alt=""
-              className="w-2.5 h-2.5 object-contain shrink-0"
-            />
-            <span className="truncate">
-              Revibe Care +{order.currency}{' '}
-              {order.warranty.toLocaleString()}
-            </span>
-          </div>
-        )}
-      </div>
-      <div className="text-right shrink-0">
-        <div className="text-[13px] font-semibold text-ink tabular-nums whitespace-nowrap">
-          {order.currency} {order.total.toLocaleString()}
-        </div>
-      </div>
-      <span
-        aria-hidden
-        className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 ml-1 transition-transform duration-200"
-        style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
-      >
-        <ChevronDown size={12} strokeWidth={1.75} />
-      </span>
     </div>
   )
 }

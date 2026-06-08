@@ -65,6 +65,50 @@ export const BASELINE_ORDERS = [
       image: '/iphone-midnight.png',
     },
   },
+  // Late + past-promise order at QC: blew its SLA and is past the delivery
+  // promise the customer saw at checkout. `promiseBreached` flips the cancel
+  // sheet to a full refund (5% fee waived) + a flat AED 100 Wallet bonus on
+  // the store-credit path, with a repurposed (apology) dissuade screen.
+  // `delayed` + `statusBanner` give it the same amber treatment as the
+  // Dynamic EDD sandbox's `qc_late` state.
+  {
+    id: '89720',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    placedAt: '20/05/2026 09:30 AM',
+    placedAtFull: '20 May 2026 · 9:30 AM',
+    estimatedDelivery: 'May 25',
+    estimatedDeliveryLong: 'Monday, 25 May',
+    quantity: 1,
+    subtotal: 939,
+    warranty: 90,
+    total: 1029,
+    currency: 'AED',
+    statusId: 'quality_check',
+    state: 'open',
+    delayed: true,
+    promiseBreached: true,
+    statusBanner: {
+      tone: 'warn',
+      lead: 'Taking longer than usual',
+      body:
+        "Quality check is taking longer than usual. We're working to move your order forward.",
+    },
+    courier: null,
+    trackingNumber: null,
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    timeline: {
+      created: '20 May · 9:30 AM',
+      quality_check: '22 May · 10:15 AM',
+    },
+    product: {
+      name: 'iPhone 13',
+      variant: 'Midnight · 128 GB · Good',
+      image: '/iphone-midnight.png',
+    },
+  },
   {
     id: '89643',
     phone: '+971 50 559 5034',
@@ -334,6 +378,56 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone X',
       variant: 'Silver · 64 GB · Good',
+      image: '/iphone-midnight.png',
+    },
+  },
+  // Late + past-promise cancellation that settled to a Wallet refund: the
+  // refund carries the flat AED 100 bonus (`refund.bonus`), surfaced on the
+  // refund hero and inside RefundDetailsSheet. The companion of 89720 — the
+  // surface a static cancel-sheet stub can't reach (it just closes).
+  {
+    id: '89205',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    placedAt: '14/03/2026 09:30 AM',
+    placedAtFull: '14 Mar 2026 · 9:30 AM',
+    quantity: 1,
+    subtotal: 1099,
+    warranty: 100,
+    total: 1199,
+    currency: 'AED',
+    statusId: 'quality_check',
+    state: 'cancelled',
+    cancellationStatusId: 'refunded',
+    cancellationRef: 'L8tePr',
+    promiseBreached: true,
+    courier: null,
+    trackingNumber: null,
+    customerName: 'Andrea Grossi',
+    timeline: {
+      created: '14 Mar · 9:30 AM',
+      quality_check: '16 Mar · 10:15 AM',
+    },
+    cancellationTimeline: {
+      requested: '19 Mar · 2:40 PM',
+      refund_pending: '19 Mar · 2:41 PM',
+      refunded: '19 Mar · 2:42 PM',
+    },
+    refund: {
+      subtotal: 1199,
+      bonus: 100,
+      amount: 1299,
+      destination: { kind: 'wallet', label: 'Revibe Wallet' },
+      breakdown: [
+        { label: 'iPhone 14', amount: 1099 },
+        { label: 'Revibe Care', amount: 100 },
+      ],
+      fundsAvailable: 'Available now in your wallet',
+    },
+    product: {
+      name: 'iPhone 14',
+      variant: 'Blue · 128 GB · Excellent',
       image: '/iphone-midnight.png',
     },
   },

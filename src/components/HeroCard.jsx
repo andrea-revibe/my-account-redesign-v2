@@ -16,14 +16,12 @@ import {
   statusHeadline,
   statusDescription,
 } from '../lib/statuses'
+import { ProductSummary } from './ProductSummary'
 
 // Hardcoded to a known-good DHL Express shipment so the demo lands on a real
 // tracking page even though the mock orders use placeholder tracking numbers.
 const DHL_TRACKING_URL =
   'https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=3392654392'
-
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
 
 // Hero card pulls the most-active order to the very top of the list with a
 // dark gradient background. Inside-out structure: eyebrow → headline →
@@ -64,44 +62,7 @@ export default function HeroCard({ order }) {
           {desc.body}
         </div>
 
-        <div className="mt-3 flex items-center gap-3 p-3 rounded-[14px] border border-white/[.14] bg-white/[.08] backdrop-blur-[4px]">
-          <div className="w-12 h-12 rounded-[10px] bg-white/[.94] grid place-items-center p-1 shrink-0">
-            <img
-              src={order.product.image}
-              alt=""
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <div className="min-w-0">
-            <div className="font-semibold text-[14px] truncate">
-              {order.product.name}
-            </div>
-            <div className="text-[12px] opacity-75 mt-px truncate">
-              {order.product.variant}
-            </div>
-            {order.warranty != null && (
-              <div className="flex items-center gap-1 mt-px text-[11.5px] opacity-75">
-                <img
-                  src={REVIBE_CARE_ICON}
-                  alt=""
-                  className="w-3.5 h-3.5 object-contain shrink-0"
-                />
-                <span className="truncate">
-                  Revibe Care +{order.currency}{' '}
-                  {order.warranty.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="ml-auto text-right shrink-0">
-            <div className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-70 leading-none">
-              Total
-            </div>
-            <div className="mt-1 font-bold text-[15px] tabular-nums">
-              {order.currency} {order.total.toLocaleString()}
-            </div>
-          </div>
-        </div>
+        <ProductSummary order={order} tone="hero" className="mt-3" />
 
         <div className="mt-4">
           <DotTimeline cur={cur} />

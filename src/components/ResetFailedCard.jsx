@@ -11,8 +11,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+import { ProductSummary } from './ProductSummary'
 
 const PASSCODE_LEN = 6
 
@@ -109,7 +108,7 @@ export default function ResetFailedCard({ order, defaultExpanded = false }) {
           <CountdownStrip rejection={r} />
         </div>
 
-        <ProductRow order={order} />
+        <ProductSummary order={order} />
 
         {!expanded && (
           <div className="text-[11px] text-muted text-center pt-0.5">Tap to fix</div>
@@ -215,7 +214,7 @@ function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle, onUndo 
           </div>
         </div>
 
-        <ProductRow order={order} />
+        <ProductSummary order={order} />
       </button>
 
       {expanded && (
@@ -469,44 +468,4 @@ function maskPasscode(value) {
   if (!value) return ''
   if (value.length <= 2) return '•'.repeat(value.length)
   return '•'.repeat(value.length - 2) + value.slice(-2)
-}
-
-function ProductRow({ order }) {
-  return (
-    <div className="flex items-center gap-2.5 min-w-0">
-      <div className="w-9 h-11 rounded-[8px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
-        <img
-          src={order.product.image}
-          alt=""
-          className="max-w-full max-h-full object-contain"
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink truncate">
-          {order.product.name}
-        </div>
-        <div className="text-[11px] text-muted truncate">{order.product.variant}</div>
-        {order.warranty != null && (
-          <div className="flex items-center gap-1 mt-0.5 text-[10.5px] text-muted">
-            <img
-              src={REVIBE_CARE_ICON}
-              alt=""
-              className="w-2.5 h-2.5 object-contain shrink-0"
-            />
-            <span className="truncate">
-              Revibe Care +{order.currency} {order.warranty.toLocaleString()}
-            </span>
-          </div>
-        )}
-      </div>
-      <div className="text-right shrink-0">
-        <div className="text-[10px] uppercase tracking-[0.08em] font-bold text-muted">
-          Total
-        </div>
-        <div className="text-[13px] font-semibold text-ink tabular-nums whitespace-nowrap">
-          {order.currency} {order.total.toLocaleString()}
-        </div>
-      </div>
-    </div>
-  )
 }

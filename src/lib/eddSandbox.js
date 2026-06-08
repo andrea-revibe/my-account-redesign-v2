@@ -7,7 +7,6 @@ import {
   STAGE_SHIPPED,
   SLA_LATE,
   SLA_ON_TIME,
-  MSG_DELIVERED,
   orderStatus,
 } from './edd'
 
@@ -60,15 +59,15 @@ function fmtIso(d) {
   return `${d.getFullYear()}-${m}-${day}`
 }
 
-// Map (stage, customerMessage.key) → banner tone + lead. Body is the
-// already-resolved customerMessage.body from edd.js.
-function bannerFor(stage, currentSlaStatus, messageKey) {
-  if (messageKey === 'order_on_time') return { tone: 'brand', lead: 'On track' }
-  if (messageKey === 'order_late') return { tone: 'warn', lead: 'Taking longer than usual' }
-  if (messageKey === 'qc_on_time') return { tone: 'brand', lead: 'On track' }
+// Banner tone + lead for the SLA-divergence messages the card system has no
+// equivalent for (late at each stage + the QC "back on track" recovery).
+// Body is the already-resolved customerMessage.body from edd.js. The on-time
+// steady states are NOT handled here — they reuse the card copy via a null
+// banner (see buildOrder), so the sandbox can't drift from the cards.
+function bannerFor(messageKey) {
   if (messageKey === 'qc_back_on_track') return { tone: 'brand', lead: 'Back on track' }
+  if (messageKey === 'order_late') return { tone: 'warn', lead: 'Taking longer than usual' }
   if (messageKey === 'qc_late') return { tone: 'warn', lead: 'Taking longer than usual' }
-  if (messageKey === 'shipped_on_time') return { tone: 'brand', lead: 'Good news' }
   if (messageKey === 'shipped_late') return { tone: 'warn', lead: 'Slight delay' }
   return { tone: 'brand', lead: 'On track' }
 }
@@ -124,11 +123,9 @@ function buildOrder(initialOrder, inputs, status) {
     base.timeline.delivered = `${fmtShort(deliveredDate)} · 3:14 PM`
     base.deliveredOn = fmtIso(deliveredDate)
     base.deliveredOnLong = fmtLong(deliveredDate)
-    base.statusBanner = {
-      tone: 'success',
-      lead: 'All done',
-      body: MSG_DELIVERED,
-    }
+    // Delivered reuses the card copy (STATUS_DESCRIPTIONS.delivered) — leave
+    // the banner unset so statusDescription() resolves it from statuses.js.
+    base.statusBanner = null
     return base
   }
 
@@ -157,15 +154,25 @@ function buildOrder(initialOrder, inputs, status) {
     base.statusId = 'created'
   }
 
-  const banner = bannerFor(
-    status.currentStage,
-    status.currentStageSlaStatus,
-    status.customerMessage.key,
-  )
-  base.statusBanner = {
-    tone: banner.tone,
-    lead: banner.lead,
-    body: status.customerMessage.body,
+  // On-time steady states reuse the card copy in statuses.js
+  // (STATUS_DESCRIPTIONS) — leave the banner unset so statusDescription()
+  // resolves it. Only the SLA-divergence messages, which have no card
+  // equivalent, get a sandbox-owned banner.
+  const SANDBOX_OWNED_KEYS = new Set([
+    'order_late',
+    'qc_late',
+    'shipped_late',
+    'qc_back_on_track',
+  ])
+  if (SANDBOX_OWNED_KEYS.has(status.customerMessage.key)) {
+    const banner = bannerFor(status.customerMessage.key)
+    base.statusBanner = {
+      tone: banner.tone,
+      lead: banner.lead,
+      body: status.customerMessage.body,
+    }
+  } else {
+    base.statusBanner = null
   }
 
   // Mirror `delayed` so any non-banner surface that reads it (e.g. card
