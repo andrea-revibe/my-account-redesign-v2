@@ -1,3 +1,13 @@
+---
+status: live
+verified_against: 9ff7625
+covers:
+  - src/App.jsx
+  - src/lib/claims.js
+  - src/lib/statuses.js
+  - src/components/ClaimFlow/ClaimFlow.jsx
+---
+
 # Cross-cutting diagrams
 
 > The **connective** diagrams — the control flow that spans more than one component or flow and so can't be read off a single file. Read the relevant one *before* planning a change that crosses flows; one diagram read replaces reconstructing the path from `App.jsx` + `lib/claims.js` + the data files. Per-flow diagrams live in their own feature docs ([orders.md](./orders.md), [returns/](./returns/), [warranties_compensations.md](./warranties_compensations.md)); this doc only carries the cross-cutting set. Linked from [`../code_map.md`](../code_map.md).

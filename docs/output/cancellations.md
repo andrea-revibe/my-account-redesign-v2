@@ -1,3 +1,17 @@
+---
+status: live
+verified_against: b35a754
+covers:
+  - src/components/CancelOrderSheet.jsx
+  - src/components/KeepOrderSheet.jsx
+  - src/components/CancellationSubTimeline.jsx
+  - src/components/UndoSnackbar.jsx
+  - src/components/RefundDetailsSheet.jsx
+  - src/components/PastOrderCard.jsx
+  - src/lib/statuses.js
+  - src/data/orders/baseline.js
+---
+
 # Cancellations
 
 > Customer-facing cancellation surface inside My Account. Covers the `Cancel order` bottom sheet (with the take-rate-protection "dissuade" step), the `Keep my order` undo flow on in-flight cancellations, the refund-hero variant of `PastOrderCard` that represents a cancelled order on the list, and the rejected-cancellation chip that survives into later cards. The four-card-routing decision tree lives in [orders.md](./orders.md) §2.

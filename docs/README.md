@@ -77,8 +77,9 @@ The folder is organised by **read-cadence**, not just by type — so the daily w
 
 ### Accuracy without the token bill
 
-- **Freshness markers.** Each `output/*` doc may carry frontmatter `status: live | frozen | archived` + `verified_against: <commit/date>`. An agent then trusts the doc or re-verifies at a glance — no guessing, no full re-read.
-- **Trigger-based verification, not periodic.** The change→doc table below is the discipline: when you touch a feature, re-verify *that one doc's* claims against the code you changed and bump `verified_against`. `npm run codemap` regenerates the derived half on structural change. No scheduled audits.
+- **Freshness markers.** Each `output/*` doc carries frontmatter `status: live | frozen | archived`, `verified_against: <commit>` (the commit it was last aligned to), and `covers: [<source paths>]` (the git pathspecs it documents). An agent then trusts the doc or re-verifies at a glance — no guessing, no full re-read.
+- **`npm run freshness` (report-only, weekly / ad-hoc).** `scripts/freshness.mjs` regenerates `code_map.md`, then for each `live` doc runs `git log <verified_against>..HEAD -- <covers>` and flags the ones whose covered source has changed since they were last verified. Writes `process/freshness-report.md` (gitignored snapshot) + a stdout summary. It never edits docs or bumps markers — it just tells you *which* docs to re-verify this week.
+- **Trigger-based verification, not periodic.** The change→doc table below is the discipline: when you touch a feature, re-verify *that one doc's* claims against the code you changed and bump `verified_against` (to the new HEAD). `npm run freshness` surfaces drift you might have missed; `npm run codemap` regenerates the derived half on structural change. No scheduled audits.
 - **Opt-in confidence pass.** For a real accuracy audit, fan out one verify-agent per `output/*` doc — each gets the doc + its `code_map` rows and returns only a structured "claims that no longer match code" list. Parallel, bounded, conclusions-only. Spend tokens here, and only when asked.
 - **Size discipline.** `output/returns/claim_tracking.md` (~480 lines) is the largest live doc and a likely read-hotspot; flag it for a P1-style split if editing keeps forcing a full load.
 

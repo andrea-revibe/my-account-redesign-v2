@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "codemap": "node scripts/codemap.mjs"
+    "codemap": "node scripts/codemap.mjs",
+    "freshness": "node scripts/freshness.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.14.0",

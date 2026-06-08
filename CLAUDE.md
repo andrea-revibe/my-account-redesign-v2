@@ -53,6 +53,12 @@ One-liners. Expand each in the linked per-feature doc if you need the why.
 - **Reset-failed iCloud unlink.** `ResetFailedCard` takes over (danger tone) when QC hits Activation Lock, until the customer unlinks iCloud + shares their passcode; in-component states `action_needed → submitted` (copy is iOS-only). Submit is component-local — journey mode advances `claim_reset_details_received` via the dev panel, with a one-shot retry loop modelled. `docs/output/returns/claim_tracking.md` §3.4.
 - **Warranty pipeline.** Sibling of the refund pipeline (`claim.type === 'warranty'` → `WarrantyClaimCard`). 6 states with a repair-and-ship-back tail (`under_repair → ship_back → device_returned`) replacing the refund chain — same device returns, no money moves; tone warn → brand → success. State-specific heroes; the `See detailed tracking` dropdown (gated on `claim.shipBack?.awb`) reuses outbound `SHIPPING_SUB_STATUSES`. `docs/output/warranties_compensations.md` §2; operational source `docs/input/return_flow_warranty.md`.
 
+## Subagent discipline
+
+- **Explore sparingly, seed it narrow.** `code_map.md` + targeted reads answer most "where is X". Spawn an `Explore`/`Plan` agent only for genuinely-unknown locations or broad sweeps — and when you do, **paste the relevant `code_map.md` rows into its prompt** (Module index lines, consumers, coupling rows) so it starts from a narrow frontier instead of re-discovering the structure.
+- **Plan agents state blast radius.** Before proposing a multi-file change, look the target up in `code_map.md`'s *Shared-core consumers (blast radius)* + string-contract coupling tables and **list the affected files in the plan**. A `lib/` or `data/` signature change touches every consumer listed there.
+- **Freshness is a command, not a sweep.** `npm run freshness` regenerates `code_map.md` and reports which `docs/output/*` docs have source changes since their `verified_against` marker. Run it weekly / ad-hoc; re-verify only the flagged docs and bump their marker. Don't audit docs that aren't flagged.
+
 ## Conventions
 
 - Default to **no comments**. Only write one when the *why* isn't obvious from the code.

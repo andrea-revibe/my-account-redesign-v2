@@ -1,3 +1,11 @@
+---
+status: live
+verified_against: 0fa71bb
+covers:
+  - src/components/ClaimFlow
+  - src/lib/returns.js
+---
+
 # Returns — Issue & Wrong device
 
 > Customer-facing UI of the faulty-product return branch, launched from `Raise a claim` → `Something's wrong with my device` → `Return for a refund or replacement` on a delivered `PastOrderCard`. Covers Steps 1 (shared), 2 (issue branch), and 3–7 (shared with change-of-mind). The operational state machine (drawio transcription — single repair-supplier path, country-aware AWB creation, LAB sub-flow) is documented separately in [`../../input/return_flow_issue.md`](../../input/return_flow_issue.md). Once submitted, the return appears on the customer's list as a `ClaimCard` — see [claim_tracking.md](./claim_tracking.md).

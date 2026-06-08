@@ -1,3 +1,15 @@
+---
+status: live
+verified_against: fe7f0cd
+covers:
+  - src/lib/journey.js
+  - src/lib/eddSandbox.js
+  - src/data/journey.js
+  - src/data/journeys
+  - src/components/JourneyDevPanel.jsx
+  - src/components/EddSandboxPanel.jsx
+---
+
 # Journey mode
 
 > Alternate demo for the prototype: `?journey=<id>` replaces the eight-card showcase with a single order replayed through one lifecycle, advanced via the floating `JourneyDevPanel`. Two purposes — immersive end-to-end demo of one customer journey, and the seed for a backend-event spec.

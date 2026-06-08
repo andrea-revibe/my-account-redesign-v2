@@ -1,3 +1,19 @@
+---
+status: live
+verified_against: 9ff7625
+covers:
+  - src/components/ClaimCard.jsx
+  - src/components/ClaimActionBanner.jsx
+  - src/components/ClaimDetailsSheet.jsx
+  - src/components/DocsRejectedCard.jsx
+  - src/components/PickupFailedCard.jsx
+  - src/components/ResetFailedCard.jsx
+  - src/components/InvalidClaimCard.jsx
+  - src/lib/claims.js
+  - src/lib/events.js
+  - src/data/orders/claims.js
+---
+
 # Returns — Claim tracking
 
 > Once a return claim is submitted, the customer's view of it lives on a new card type that replaces the delivered `PastOrderCard` for that order. This doc covers `ClaimCard` (the 5-state baseline) and the three takeover cards that supersede it when the claim is blocked on a single customer action: `DocsRejectedCard`, `PickupFailedCard`, `InvalidClaimCard`. Includes the canonical sub-status / action-gate / SLA reference tables.

@@ -1,3 +1,21 @@
+---
+status: live
+verified_against: f8c0796
+covers:
+  - src/App.jsx
+  - src/lib/statuses.js
+  - src/lib/edd.js
+  - src/lib/events.js
+  - src/components/OrderCard.jsx
+  - src/components/InProgressCard.jsx
+  - src/components/PastOrderCard.jsx
+  - src/components/StatusTimeline.jsx
+  - src/components/ShippingSubTimeline.jsx
+  - src/components/HistoryThread.jsx
+  - src/components/OrderFilters.jsx
+  - src/data/orders/baseline.js
+---
+
 # Orders
 
 > Customer-facing surface for browsing past and in-flight orders inside My Account. This doc covers the order list, the four card types and their baseline chrome, the auto-expand rule, the status models, the filters, and the history thread. Cancellation behaviour is in [cancellations.md](./cancellations.md); the returns flow and claim tracking are in [returns/](./returns/).
