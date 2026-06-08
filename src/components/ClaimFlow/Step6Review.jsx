@@ -19,14 +19,7 @@ import { expectedCompletionFor } from '../../lib/claims'
 import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
 import { PACKING_LABELS } from './Step4Packing'
 import { findCompensationSubtype } from './compensationSubtypes'
-
-const REASON_LABELS = {
-  no_fit: "Didn't suit my needs",
-  better_option: 'Found a better option elsewhere',
-  changed_mind: 'Changed my mind',
-  mistake: 'Ordered by mistake',
-  other: 'Other',
-}
+import { REASON_LABELS } from './Step2Reason'
 
 const SCOPE_LABELS = Object.fromEntries(
   ISSUE_SCOPES.map((s) => [s.id, s.label]),
@@ -129,7 +122,7 @@ export default function Step6Review({
         </div>
 
         {isCompensation ? (
-          <Section title="What happened" onEdit={() => goTo(2)}>
+          <Section title="What happened" onEdit={() => goTo('compsubtype')}>
             <CompensationSummary
               issueDetails={state.issueDetails}
               subtypeId={state.compensationSubtype}
@@ -138,7 +131,7 @@ export default function Step6Review({
         ) : isIssue || isWarranty ? (
           <Section
             title={isWarranty ? 'Fault' : 'Issue'}
-            onEdit={() => goTo(2)}
+            onEdit={() => goTo('issuedetails')}
           >
             <IssueSummary
               issueDetails={state.issueDetails}
@@ -147,7 +140,7 @@ export default function Step6Review({
             />
           </Section>
         ) : (
-          <Section title="Reason" onEdit={() => goTo(2)}>
+          <Section title="Reason" onEdit={() => goTo('reason')}>
             <div
               className={`text-[13.5px] ${
                 state.reason.value ? 'text-ink' : 'text-muted italic'
@@ -162,7 +155,7 @@ export default function Step6Review({
         <>
         <Section
           title="Device preparation"
-          onEdit={() => goTo(3)}
+          onEdit={() => goTo('deviceprep')}
           error={resetError}
           scrollOnError={resetError}
         >
@@ -180,7 +173,7 @@ export default function Step6Review({
 
         <Section
           title="Packing"
-          onEdit={() => goTo(4)}
+          onEdit={() => goTo('packing')}
           error={packingError}
           scrollOnError={packingError}
         >
@@ -212,7 +205,7 @@ export default function Step6Review({
           />
         </Section>
 
-        <Section title="Pickup details" onEdit={() => goTo(5)}>
+        <Section title="Pickup details" onEdit={() => goTo('pickup')}>
           <div className="flex flex-col gap-2">
             <PickupRow
               Icon={MapPin}
@@ -262,14 +255,14 @@ export default function Step6Review({
             </div>
           </Section>
         ) : isCompensation ? (
-          <Section title="Refund" onEdit={() => goTo(6)}>
+          <Section title="Refund" onEdit={() => goTo('refund')}>
             <CompensationRefundBody
               refundMethod={state.refundMethod}
               order={order}
             />
           </Section>
         ) : (
-          <Section title="Refund" onEdit={() => goTo(6)}>
+          <Section title="Refund" onEdit={() => goTo('refund')}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[13.5px] text-ink flex items-center gap-1.5">

@@ -28,11 +28,10 @@ The flow's visual chrome is deliberately distinct from the order-card family: wh
 ```mermaid
 flowchart TD
   entry([Tap 'Raise a claim' on delivered PastOrderCard]) --> s1[Step 1 — Claim type]
-  s1 -->|I changed my mind| s2[Step 2 — Reason]
-  s1 -->|Something's wrong with my device → Return for refund/replacement| issue[/Issue branch — see issue.md/]
-  s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
-  s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
-  s2 -->|Continue or Skip| s3[Step 3 — Device prep]
+  s1 -->|Changed mind / Return for refund / Use my warranty| s2[Step 2 — Reason · shared]
+  s1 -->|Request compensation| comp[/Compensation — warranties_compensations.md §3/]
+  s2 -->|Reason routes elsewhere| sheet[/SwitchFlowSheet → issue · warranty · compensation · change of mind/]
+  s2 -->|Reason matches this flow + Continue| s3[Step 3 — Device prep]
   s3 -->|Guided reset completed + confirmed| s4[Step 4 — Packing]
   s4 -->|Original Revibe box OR sturdy post box selected| s5[Step 5 — Pickup details]
   s5 -->|3 fields confirmed + checkbox| s6[Step 6 — Refund method]
@@ -43,13 +42,22 @@ flowchart TD
 
 ### 2.1 Mount & state
 
-`App.jsx` owns `claimFlowOrderId`. The overlay is rendered conditionally (`{claimFlowOrderId !== null && <ClaimFlow ... />}`), so closing it unmounts the reducer state — the brief explicitly forbids session persistence. The reducer (`flowReducer.js`) takes the entry `orderId` as its initialiser argument and always starts at Step 1 with `claimType: null`; the user picks change of mind or issue every time. `orderId` is carried through so the order being returned is unambiguous from the entry point.
+`App.jsx` owns `claimFlowOrderId`. The overlay is rendered conditionally (`{claimFlowOrderId !== null && <ClaimFlow ... />}`), so closing it unmounts the reducer state — the brief explicitly forbids session persistence. The reducer (`flowReducer.js`) takes the entry `orderId` as its initialiser argument and always starts on the `'type'` step with `claimType: null`; the user picks a claim type every time. `orderId` is carried through so the order being returned is unambiguous from the entry point.
+
+**Step model — per-type sequences (not a fixed index).** `state.step` is a **string key**, and each claim type walks its own ordered list of keys in `STEP_SEQUENCES` (`flowReducer.js`). `NEXT` / `BACK` walk that list and `GO_TO_STEP` jumps to a key in it, so there's no per-step skip arithmetic to keep in sync. The reason picker (`'reason'`) is shared by the three return flows; compensation has its own short sequence with no reason step.
+
+| Claim type | Sequence | Visible steps |
+|---|---|---|
+| `change_of_mind` | type → reason → deviceprep → packing → pickup → refund → review → confirm | 8 |
+| `issue` | type → reason → **issuedetails** → deviceprep → packing → pickup → refund → review → confirm | 9 |
+| `warranty` | type → reason → **issuedetails** → deviceprep → packing → pickup → review → confirm | 8 |
+| `compensation` | type → compsubtype → refund → review → confirm | 5 |
 
 ### 2.1.1 Soft validation (flow-wide contract)
 
 **The `Continue` / `Submit` button is never disabled on any step.** Earlier the button hard-grayed via `!canAdvance(state)`; it now stays full-colour and clickable everywhere, and a premature click *teaches* the customer what's missing rather than presenting a dead button. The contract:
 
-- **`stepError(state)`** (in `flowReducer.js`) is the single source of truth: it returns the **first** unmet requirement for the current step as a stable key (e.g. `claimType`, `subtype`, `description`, `attachment`, `resetGuide`, `resetConfirm`, `packing`, `address`, `email`, `phone`, `pickupConfirm`, `refundMethod`), or `null` when the step is complete. The order of the checks **is** the "one at a time" reveal order.
+- **`stepError(state)`** (in `flowReducer.js`) is the single source of truth: it returns the **first** unmet requirement for the current step as a stable key (e.g. `claimType`, `reason`, `reasonOther`, `subtype`, `description`, `attachment`, `resetGuide`, `resetConfirm`, `packing`, `address`, `email`, `phone`, `pickupConfirm`, `refundMethod`), or `null` when the step is complete. The order of the checks **is** the "one at a time" reveal order.
 - **`ClaimFlow.handlePrimary`** calls `stepError(state)` on click. Non-null → it dispatches `ATTEMPT` (which sets `state.attempted: true`) and returns without advancing. Null → it dispatches `NEXT`.
 - **`state.attempted`** is reducer-owned, not component-local. `ATTEMPT` sets it; **every step-changing action (`NEXT` / `BACK` / `GO_TO_STEP` / `SUBMIT`) clears it in the same dispatch.** This atomic reset is what prevents the next step from flashing its own errors for a frame before the user has tried to advance (an earlier `useEffect`-based reset ran one frame too late and produced exactly that flash).
 - **`ClaimFlow`** computes `errorKey = state.attempted ? stepError(state) : null` and passes it as the `error` prop to whichever step is mounted. Each step matches the key against its inputs, turns the offending field's border `border-danger`, renders a shared **`InlineError`** message (`AlertCircle` + danger text, `animate-slideDown`), and `scrollIntoView({ block: 'center' })`s the target where it can sit below the fold (Steps 2, 3, 5).
@@ -67,19 +75,36 @@ Three top-level cards; nothing pre-selected:
 
 The compensation entry now sets `claimType: 'compensation'` (see [warranties_compensations.md](../warranties_compensations.md) §3). Continue stays clickable with nothing picked; clicking dispatches `ATTEMPT` and surfaces an `InlineError` (`Pick an option to continue.`) above the option list (`stepError` key `claimType`) — see §2.1.1.
 
-### 2.3 Step 2 — Reason (change-of-mind branch, optional)
+### 2.3 Step 2 — Reason (shared across change of mind / issue / warranty, **required**)
 
-Five radio options:
+The **"Why are you returning it?"** picker is now a **shared early step for the three return flows** (change of mind, issue, warranty — *not* compensation, which keeps its own first step) and is the **authoritative router** for which track the claim lands on. It is **required** — the old `Skip` is gone. One radio list (`REASONS` in `Step2Reason.jsx`) mixes genuine change-of-mind reasons with four "catch" reasons that signal a problem with the item, with `Other` last:
 
-| `value` | Label |
-|---|---|
-| `no_fit` | Doesn't fit |
-| `better_option` | Found a better option |
-| `changed_mind` | Just changed my mind |
-| `mistake` | Ordered by mistake |
-| `other` | Other |
+| `value` | Label | Routes to |
+|---|---|---|
+| `no_fit` | Didn't suit my needs | change of mind |
+| `expectations` | Didn't meet my expectations | change of mind |
+| `better_option` | Found a better option elsewhere | change of mind |
+| `not_needed` | No longer needed | change of mind |
+| `arrived_late` | Arrived too late | change of mind |
+| `mistake` | Ordered by mistake | change of mind |
+| `changed_mind` | Changed my mind | change of mind |
+| `defective` | Item is defective or doesn't work | issue *(warranty if Revibe Care)* |
+| `wrong_item` | Wrong item was sent | issue *(warranty if Revibe Care)* |
+| `damaged` | Arrived damaged | issue *(warranty if Revibe Care)* |
+| `missing_parts` | Missing or broken parts | compensation |
+| `other` | Other | change of mind |
 
-`Other` reveals a 200-char textarea. The sticky bar renders a `Skip` alongside `Continue`; both advance. The reason is purely informational — eligibility and refund math don't branch on it.
+`Other` reveals a 200-char textarea, **also required** (`stepError` → `reasonOther`). Soft-validation order: `reason` (nothing picked) → `reasonOther` (Other with empty text).
+
+**Routing (`routeForReason(reasonId, claimType, order)` in `Step2Reason.jsx`).** This is the single routing authority:
+
+- `missing_parts` → **compensation**, from any flow (keep the item, get compensated for the part).
+- genuine reasons + `other` → **change of mind**.
+- `defective` / `wrong_item` / `damaged` → if the customer is **already inside** an issue/warranty flow, stay there (only catch the clear cross-track mistakes); if caught **in the change-of-mind flow**, route to the **warranty** flow when the order has Revibe Care (`order.warranty > 0`), otherwise to **issue**.
+
+**Redirect UX — the `SwitchFlowSheet` (`components/ClaimFlow/SwitchFlowSheet.jsx`).** The reason-step CTA is always `Continue`. When the resolved track differs from the current flow, clicking `Continue` opens a slide-up confirm sheet (same chrome as `CancelClaimSheet` — scrim, `animate-slideUp`, Escape/backdrop/X to dismiss, body-scroll lock handled by the flow). The sheet is **authoritative**: its two actions are **"Switch to {track}"** (primary → dispatches `ROUTE_FROM_REASON`) and **"Choose another reason" / X** (dismiss back to the list). There is no "continue anyway" — a faulty / wrong / incomplete item can't proceed down the no-fault change-of-mind track, and a no-fault reason can't sit in an issue/warranty flow. Track-specific copy + a 2–3 line "why this path" list + the `ProductSummary` are rendered per target.
+
+**Scope pre-fill.** When routing into issue/warranty, `ROUTE_FROM_REASON` carries a `scope` from `scopeForReason` (`defective`/`damaged` → `not_working`, `wrong_item` → `wrong_device`) so the issue-details step opens on the matching scope group; the specific sub-type is reset so the customer still picks it. The reason itself is purely informational on the change-of-mind branch — eligibility and refund math don't branch on it.
 
 ### 2.4 Step 3 — Device preparation (shared, gated)
 
@@ -231,7 +256,7 @@ How the customer-facing UI surfaces backend state:
 
 ## 5. UX decisions
 
-**Reason is optional.** Step 2's `Skip` is intentional — the customer's reason for changing their mind is interesting for analytics but isn't gating anything. Forcing a reason adds friction without changing the outcome.
+**Reason is required and routes the claim.** Step 2 used to be optional (with a `Skip`) and change-of-mind-only. It's now required and **shared across the three return flows**, because the reason is the safest place to catch a mis-routed claim: a faulty device sent down the no-fault change-of-mind track means substantial delays for the customer. The picker mixes genuine reasons with four fault/wrong/incomplete "catch" reasons; picking a catch reason (or a no-fault reason inside an issue/warranty flow) opens the authoritative `SwitchFlowSheet` rather than letting the wrong track proceed. The warranty-vs-issue split only fires when catching someone out of the change-of-mind flow — inside an issue/warranty flow a fault reason just continues (we only catch the clear cross-track mistakes). Routing lives in `routeForReason`; the redirect is a popup (not an inline nudge) so it's hard to skim past.
 
 **Restocking fee shown as a red line, not folded into the headline.** The original-payment card's headline is the net amount (`gross − fee`), but the breakdown table renders the `Restocking fee (10%)` row in red so the customer sees explicitly what they're giving up. Earlier drafts hid the fee inside a tooltip — felt cagey.
 
@@ -273,7 +298,7 @@ Step 7's submit builds this object in `ClaimFlow.jsx`'s `buildClaim` helper and 
 | `claim.claimStatusId` | enum | One of the 5 main states (see claim_tracking.md). |
 | `claim.submittedAt` | string | Human-readable submission timestamp. |
 | `claim.units` | integer | Today always `1`. |
-| `claim.reason` | `{ value, otherText }` | `value` is one of the 5 reason keys; `otherText` populated only when `value === 'other'`. |
+| `claim.reason` | `{ value, otherText }` | `value` is one of the genuine change-of-mind reason keys (`no_fit` / `expectations` / `better_option` / `not_needed` / `arrived_late` / `mistake` / `changed_mind` / `other`) — the four catch reasons can't persist here since they redirect to another track; `otherText` populated only when `value === 'other'`. |
 | `claim.devicePrep` | `{ option, os }` | `option` is always `'reset'` from the live flow (`'credentials'` only on seeded mocks); `os` is `'ios'` or `'android'`. |
 | `claim.pickupDetails` | `{ address, email, phone }` | Three contact fields captured at Step 5. |
 | `claim.refundMethod` | `'wallet' | 'original'` | Drives the destination chip on the hero and the `Includes 10% restocking fee` sub-copy in details. |
@@ -288,14 +313,15 @@ src/
 │   └── returns.js                         eligibilityFor, refundBreakdown (defaults to change_of_mind), generateClaimRef
 └── components/
     └── ClaimFlow/
-        ├── ClaimFlow.jsx                  Overlay shell: useReducer, sticky header + progress, step router, sticky action bar
-        ├── flowReducer.js                 State shape, actions (incl. ATTEMPT + state.attempted), stepError(state) first-unmet-input gate, legacy canAdvance(state)
-        ├── ProgressBar.jsx                Segmented progress bar — 7 segments on refund flows, 6 on warranty (driven by visibleStepCount)
+        ├── ClaimFlow.jsx                  Overlay shell: useReducer, sticky header + progress, key-based step router, sticky action bar, SwitchFlowSheet wiring
+        ├── flowReducer.js                 State shape, STEP_SEQUENCES (per-type step-key lists), actions (incl. ATTEMPT + ROUTE_FROM_REASON), stepError(state) first-unmet-input gate, canAdvance(state)
+        ├── ProgressBar.jsx                Segmented progress bar — segment count + "Step X of Y" driven by visibleStepCount/visibleStepIndex over the active sequence
         ├── InlineError.jsx                Shared red AlertCircle + message rendered by every step when its input is missing
         ├── StickyActionBar.jsx            Sticky bottom button bar (Continue / Submit / optional secondary — never disabled)
         ├── StepHeading.jsx                Shared 24px step heading + 13.5px muted subtitle
         ├── Step1ClaimType.jsx             Claim-type options; CoM, issue and warranty advance, compensation still stub
-        ├── Step2Reason.jsx                Change-of-mind branch — optional reason radio + free-text reveal on 'Other'
+        ├── Step2Reason.jsx                Shared reason picker (CoM / issue / warranty) — required radio + free-text on 'Other'; exports routeForReason / scopeForReason / REASON_LABELS / SWITCH_CTA_LABELS
+        ├── SwitchFlowSheet.jsx            Authoritative redirect sheet: "Switch to {track}" vs dismiss; opened from the reason step when the reason routes to another track
         ├── Step3DevicePrep.jsx            Single guided-reset path — tablet OS chooser (ambiguous only) + launcher card + confirm checkbox
         ├── Step4PickupDetails.jsx         Pickup fields + 'Expected by' headline + collapsible detailed-timeline dropdown + confirmation checkbox
         ├── Step5RefundMethod.jsx          Wallet vs original-payment refund cards (skipped for warranty)

@@ -345,13 +345,18 @@ export function warrantyClaimStatusSubline(claim) {
 // country → cleared customs → forwarded to third-party agent → out for
 // delivery). No warranty-specific sub-status export needed.
 
-// Labels duplicated from Step6Review so the ClaimCard summary stays
-// readable without importing from the flow components.
+// Labels duplicated from Step2Reason so the ClaimCard summary stays readable
+// without a lib → component import. Keep in sync with REASONS there. Only the
+// genuine change-of-mind reasons can reach a submitted claim — the faulty /
+// wrong-item reasons redirect into the issue flow and never persist here.
 export const REASON_LABELS = {
   no_fit: "Didn't suit my needs",
+  expectations: "Didn't meet my expectations",
   better_option: 'Found a better option elsewhere',
-  changed_mind: 'Changed my mind',
+  not_needed: 'No longer needed',
+  arrived_late: 'Arrived too late',
   mistake: 'Ordered by mistake',
+  changed_mind: 'Changed my mind',
   other: 'Other',
 }
 

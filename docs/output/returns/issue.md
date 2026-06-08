@@ -21,7 +21,7 @@ The issue branch is the entry point used when something is wrong with the delive
 
 Distinguishing characteristics vs change of mind:
 
-- Step 2 collects required structured evidence (sub-issue from a two-scope picker, free-text description, attachment) instead of an optional reason.
+- A shared, **required** reason step (Step 2, "Why are you returning it?") now precedes issue details — it's the authoritative router (a no-fault reason picked here redirects to the change-of-mind flow via `SwitchFlowSheet`). See [change_of_mind.md](./change_of_mind.md) §2.3. Issue details (Step 3) then collects required structured evidence (sub-issue from a two-scope picker, free-text description, attachment); when the customer arrived from a fault reason the matching scope is pre-filled.
 - No restocking fee on the original-payment path.
 - A flat AED 100 Wallet bonus (`ISSUE_WALLET_BONUS`) is added on the Wallet path — the implicit framing is "we owe you because something went wrong, and we'd like you to stay in the ecosystem".
 - The operational flow has a single repair-supplier route (Original supplier) regardless of country, vs change-of-mind's three-way country split.
@@ -34,16 +34,18 @@ The flow chrome (white surface, segmented progress, sticky action bar, only-fill
 flowchart TD
   entry([Tap 'Raise a claim' on delivered PastOrderCard]) --> s1[Step 1 — Claim type]
   s1 -->|I changed my mind| com[/Change-of-mind branch — see change_of_mind.md/]
-  s1 -->|Something's wrong with my device → Return for refund/replacement| s2[Step 2 — Issue details]
+  s1 -->|Something's wrong with my device → Return for refund/replacement| s2[Step 2 — Reason · shared]
   s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
   s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
-  s2 -->|Scope + sub-issue + description + attachment| s3[Step 3 — Device prep]
-  s3 -->|Guided reset completed + confirmed| s4[Step 4 — Packing]
-  s4 -->|Original Revibe box OR sturdy post box selected| s5[Step 5 — Pickup details]
-  s5 -->|3 fields confirmed + checkbox| s6[Step 6 — Refund method]
-  s6 -->|Wallet +100 AED or Original payment| s7[Step 7 — Review & submit]
-  s7 -->|Both acks ticked → Submit return request| s8[Step 8 — Confirmation]
-  s8 -->|Back to my account| close([Close overlay])
+  s2 -->|No-fault reason → SwitchFlowSheet| com2[/Redirect to change of mind — see change_of_mind.md §2.3/]
+  s2 -->|Fault / wrong reason + Continue| s3[Step 3 — Issue details]
+  s3 -->|Scope + sub-issue + description + attachment| s4[Step 4 — Device prep]
+  s4 -->|Guided reset completed + confirmed| s5[Step 5 — Packing]
+  s5 -->|Original Revibe box OR sturdy post box selected| s6[Step 6 — Pickup details]
+  s6 -->|3 fields confirmed + checkbox| s7[Step 7 — Refund method]
+  s7 -->|Wallet +100 AED or Original payment| s8[Step 8 — Review & submit]
+  s8 -->|Both acks ticked → Submit return request| s9[Step 9 — Confirmation]
+  s9 -->|Back to my account| close([Close overlay])
 ```
 
 ### 2.1 Step 1 — Claim type (shared)
@@ -52,7 +54,11 @@ See [change_of_mind.md](./change_of_mind.md) §2.2. The issue branch is reached 
 
 `Something's wrong with my device` → expands inline accordion → `Return for a refund or replacement` → `claimType: 'issue'`.
 
-### 2.2 Step 2 — Issue details (issue branch, required)
+### 2.2 Step 2 — Reason (shared, required)
+
+The shared "Why are you returning it?" picker — the same step the change-of-mind and warranty flows use, and the authoritative router. A fault / wrong reason (`defective` / `wrong_item` / `damaged`) continues into the issue flow (pre-filling the issue-details scope); a no-fault reason opens `SwitchFlowSheet` and redirects to change of mind; `missing_parts` redirects to compensation. Full table + routing rule + sheet in [change_of_mind.md](./change_of_mind.md) §2.3.
+
+### 2.3 Step 3 — Issue details (issue branch, required)
 
 A required structured-evidence form. `Skip` is hidden; the step gates on `issueSubtypeId` + non-empty description + a stubbed filename, surfaced one at a time via the flow-wide soft validation (`stepError` order: `subtype` → `description` → `attachment`; Continue never grays — see [change_of_mind.md](./change_of_mind.md) §2.1.1).
 
@@ -80,7 +86,7 @@ The per-issue **`What we need`** evidence ask + the **`How to provide valid proo
 
 The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` consumes `issueSubtypeId` (via `findSubtype(id)` in `issueSubtypes.js`) and `issueScope`.
 
-**Optional battery check (battery sub-type only).** When `issueSubtypeId === 'battery'`, a `BatteryHealthCheck` card renders under the selected-sub-type guidance (in both the issue **and** the warranty Step 2 — both reuse `Step2IssueDetails`). It lets the customer self-assess against the §7.2 Battery Standards before committing:
+**Optional battery check (battery sub-type only).** When `issueSubtypeId === 'battery'`, a `BatteryHealthCheck` card renders under the selected-sub-type guidance (in both the issue **and** the warranty issue-details step — both reuse `Step2IssueDetails`). It lets the customer self-assess against the §7.2 Battery Standards before committing:
 
 - A **capacity %** input (the figure from Settings → Battery → Battery Health) and a **non-original part** self-report toggle. Both live in `state.batteryCheck` (`SET_BATTERY_CHECK`); **fully optional** — never gates `canAdvance`, so the customer can skip it and submit proof + description as usual.
 - The card derives the device's guaranteed floor from its condition grade (last segment of `product.variant`): `excellent` 95, `very good` 90, `good` 85, `fair` 85 (no published floor — treated as Good). Time-since-delivery comes from `deliveredOn`.
@@ -90,18 +96,18 @@ The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` c
 
 The filled-in result is carried onto the claim as `claim.batteryAssessment` (`{ capacity, baseline, degradation, nonOriginal, remedy, reason }`) for the issue and warranty shapes — data only; no tracking-card surface reads it yet. Logic + thresholds live in `src/lib/returns.js` (`BATTERY_BASELINE_BY_GRADE`, `conditionGradeOf`, `batteryBaselineFor`, `assessBattery`).
 
-### 2.3 Steps 3 – 5 — Device prep + packing + pickup (shared)
+### 2.4 Steps 4 – 6 — Device prep + packing + pickup (shared)
 
-Identical to the change-of-mind branch. See [change_of_mind.md](./change_of_mind.md) §2.4–2.6 (Step 3 device prep, Step 4 packing radio pick, Step 5 pickup details).
+Identical to the change-of-mind branch (device prep / packing / pickup). See [change_of_mind.md](./change_of_mind.md) §2.4–2.6.
 
-### 2.4 Step 6 — Refund method (shared chrome, issue math)
+### 2.5 Step 7 — Refund method (shared chrome, issue math)
 
-Two stacked refund cards built off `refundBreakdown(order, units, method, 'issue')`. Chrome is identical to the change-of-mind Step 5; only the math and secondary copy diverge.
+Two stacked refund cards built off `refundBreakdown(order, units, method, 'issue')`. Chrome is identical to the change-of-mind refund step; only the math and secondary copy diverge.
 
 - **Wallet card.** Net amount (= `gross + AED 100 bonus`) + an accent-tinted `+AED 100 bonus` chip + tagline `Full refund + bonus · instantly once return is complete`.
 - **Original-payment card.** Full net (no fee), no breakdown table, tagline `Full refund · 5–10 business days once return is complete`. Card label uses `order.paymentMethod.brand` + `last4`. BNPL handling identical to the change-of-mind flow — see [change_of_mind.md](./change_of_mind.md) §2.7 for the `BnplDisclaimerTooltip` treatment.
 
-### 2.5 Step 7 — Review & submit (shared)
+### 2.6 Step 8 — Review & submit (shared)
 
 Sectioned summary. Issue-specific section:
 
@@ -115,7 +121,7 @@ The refund block surfaces the final net + an explanatory line: `Includes AED 100
 
 The sticky bar swaps `Continue` for a success-tone `Submit return request`.
 
-### 2.6 Step 8 — Confirmation (shared)
+### 2.7 Step 9 — Confirmation (shared)
 
 Same as change of mind. See [change_of_mind.md](./change_of_mind.md) §2.8.
 
@@ -136,7 +142,7 @@ Identical to change of mind. See [change_of_mind.md](./change_of_mind.md) §3.1 
 | **Wallet** | `fee = 0`, `bonus = ISSUE_WALLET_BONUS` (flat AED 100), `net = gross + bonus` |
 | **Original payment** | `fee = 0`, `bonus = 0`, `net = gross` |
 
-`bonus` is always present in the return shape (0 when not applicable) so consumers don't need null-guards. Step 6 reads `bonus` to render the `+AED 100 bonus` chip and Step 7 reads it for the `Includes AED 100 bonus` explanatory line.
+`bonus` is always present in the return shape (0 when not applicable) so consumers don't need null-guards. The refund step reads `bonus` to render the `+AED 100 bonus` chip and Review reads it for the `Includes AED 100 bonus` explanatory line.
 
 `ISSUE_WALLET_BONUS` is a constant in `src/lib/returns.js`; the value is currency-agnostic and could grow into a per-order amount sourced from the backend.
 
@@ -176,7 +182,7 @@ How the customer-facing UI surfaces backend state:
 
 **Packing and factory-reset acks moved onto Review as a soft-validated pair.** Earlier drafts had a single trailing packing checkbox on Review that hard-gated Submit; an even earlier version merged packing with a "testing acknowledged" checkbox to fix a negation-tick bug. Both got replaced when Step 4 became a dedicated packing-instructions screen — packing is now its own surface, and the *acknowledgments* (factory-reset + packed-properly) live on Review where they're enforced right before submission. See [change_of_mind.md](./change_of_mind.md) §5 for the rationale on splitting the two acks and using soft validation instead of disabling Submit.
 
-**`category` field was replaced by `issueSubtypeId` + `issueScope`.** The pre-redesign flat `category` field couldn't differentiate "wrong device" from "battery issue" cleanly. Step 7 review now consumes the structured pair via `findSubtype(id)`.
+**`category` field was replaced by `issueSubtypeId` + `issueScope`.** The pre-redesign flat `category` field couldn't differentiate "wrong device" from "battery issue" cleanly. Review now consumes the structured pair via `findSubtype(id)`.
 
 ## 6. Data model
 
@@ -184,7 +190,7 @@ How the customer-facing UI surfaces backend state:
 
 Same as change of mind (see [change_of_mind.md](./change_of_mind.md) §6.1), plus — for the optional battery check on the `battery` sub-type — `order.product.variant` (the condition grade is its last `·`-separated segment) and `order.deliveredOn` (delivery date for the time-window math). Both are read through `conditionGradeOf` / `batteryBaselineFor` / `daysSinceDelivery` in `src/lib/returns.js`.
 
-### 6.2 Claim object written by Step 7 (issue shape)
+### 6.2 Claim object written at submit (issue shape)
 
 The full claim-object reference (including takeover-card extensions) lives in [claim_tracking.md](./claim_tracking.md) §5. Issue-specific fields:
 
@@ -216,7 +222,7 @@ src/components/ClaimFlow/
 
 ## 8. Mocked vs production
 
-- **Step 7 submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
+- **Submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
 - **Attachment slot is fake.** Clicking the drop-zone stubs in a filename. No real file picker, no upload endpoint, no file-type/size validation.
 - **AED 100 bonus is hardcoded** as `ISSUE_WALLET_BONUS` in `src/lib/returns.js`. Production should read from a backend config (per-order or per-category).
 - **Sub-issue guidance copy is hardcoded** in `issueSubtypes.js`. Production should source from a content management system so non-engineers can revise.
@@ -227,8 +233,8 @@ src/components/ClaimFlow/
 ## 9. Open questions
 
 - **Multi-attachment.** The slot today accepts a single fake file. Real evidence often needs photo + video. Likely a small picker carousel with up to N attachments.
-- **Live-chat hand-off from Step 2.** Some sub-issues (e.g. screen unresponsive at boot) would be better handled by support before the customer commits to a return. A `Talk to support` exit ramp on the sub-issue guidance panel is a natural addition.
-- **Wrong device flow.** The `I received the wrong device` scope today flows through the same Steps 3–7 as a normal issue claim. In practice the device prep step is moot (the customer doesn't own the wrong device's iCloud account). Worth gating Step 3 off when `issueScope === 'wrong_device'`.
+- **Live-chat hand-off from issue details.** Some sub-issues (e.g. screen unresponsive at boot) would be better handled by support before the customer commits to a return. A `Talk to support` exit ramp on the sub-issue guidance panel is a natural addition.
+- **Wrong device flow.** The `I received the wrong device` scope today flows through the same device-prep / packing / pickup steps as a normal issue claim. In practice the device prep step is moot (the customer doesn't own the wrong device's iCloud account). Worth gating device prep off when `issueScope === 'wrong_device'`.
 - **Bonus tuning.** AED 100 is a fixed placeholder. Production may want to scale by item price, by historical claim rate, or A/B test against alternative incentives (instant replacement, expedited shipping).
 - **Replacement-vs-refund branching.** Today the flow always lands on a refund. A `Replace` option (ship a working unit, take the broken one back on the same AWB) is a natural addition for issue claims.
 - **Battery check → flow routing.** The check verdict is deliberately generic and never steers the customer between the return (refund) and warranty (replacement) flows, even when the computed remedy points at the other one. A future iteration could nudge (e.g. "your numbers point to a battery replacement — use your warranty instead") or surface `batteryAssessment` on Review / `ClaimDetailsSheet` / the QC ops view so the self-reported figure travels with the claim.

@@ -71,24 +71,25 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
 | `components/ClaimCard.jsx` | 504 | 1 | `ClaimCard`·41 |
 | `components/ClaimDetailsSheet.jsx` | 230 | 2 | `ClaimDetailsSheet`·16 |
-| `components/ClaimFlow/ClaimFlow.jsx` | 369 | 1 | `ClaimFlow`·25 |
-| `components/ClaimFlow/InlineError.jsx` | 16 | 7 | `InlineError`·6 |
+| `components/ClaimFlow/ClaimFlow.jsx` | 405 | 1 | `ClaimFlow`·21 |
+| `components/ClaimFlow/InlineError.jsx` | 16 | 8 | `InlineError`·6 |
 | `components/ClaimFlow/ProgressBar.jsx` | 28 | 1 | `ProgressBar`·3 |
 | `components/ClaimFlow/ResetGuideSheet.jsx` | 888 | 1 | `ResetGuideSheet`·471 |
 | `components/ClaimFlow/Step1ClaimType.jsx` | 225 | 1 | `Step1ClaimType`·33 |
 | `components/ClaimFlow/Step2Compensation.jsx` | 229 | 1 | `Step2Compensation`·22 |
 | `components/ClaimFlow/Step2IssueDetails.jsx` | 612 | 1 | `Step2IssueDetails`·44 |
-| `components/ClaimFlow/Step2Reason.jsx` | 78 | 1 | `Step2Reason`·12 |
+| `components/ClaimFlow/Step2Reason.jsx` | 160 | 3 | `REASONS`·13, `REASON_LABELS`·29, `REDIRECT_REASON_IDS`·35, `SWITCH_CTA_LABELS`·41, `routeForReason`·57, `scopeForReason`·66, `Step2Reason`·72 |
 | `components/ClaimFlow/Step3DevicePrep.jsx` | 478 | 1 | `Step3DevicePrep`·35 |
 | `components/ClaimFlow/Step4Packing.jsx` | 253 | 2 | `PACKING_OPTIONS`·15, `PACKING_LABELS`·36, `Step4Packing`·40 |
 | `components/ClaimFlow/Step4PickupDetails.jsx` | 433 | 1 | `Step4PickupDetails`·53 |
 | `components/ClaimFlow/Step5RefundMethod.jsx` | 269 | 1 | `Step5RefundMethod`·9 |
-| `components/ClaimFlow/Step6Review.jsx` | 599 | 1 | `Step6Review`·35 |
+| `components/ClaimFlow/Step6Review.jsx` | 592 | 1 | `Step6Review`·28 |
 | `components/ClaimFlow/Step7Confirmation.jsx` | 210 | 1 | `Step7Confirmation`·15 |
 | `components/ClaimFlow/StepHeading.jsx` | 16 | 9 | `StepHeading`·1 |
 | `components/ClaimFlow/StickyActionBar.jsx` | 38 | 1 | `StickyActionBar`·1 |
+| `components/ClaimFlow/SwitchFlowSheet.jsx` | 171 | 1 | `SwitchFlowSheet`·69 |
 | `components/ClaimFlow/compensationSubtypes.js` | 30 | 3 | `COMPENSATION_SUBTYPES`·6, `COMPENSATION_SUBTYPE_LABELS`·23, `findCompensationSubtype`·27 |
-| `components/ClaimFlow/flowReducer.js` | 305 | 2 | `TOTAL_STEPS`·4, `visibleStepCount`·11, `visibleStepIndex`·20, `initialState`·28, `flowReducer`·95, `stepError`·199, `canAdvance`·245 |
+| `components/ClaimFlow/flowReducer.js` | 315 | 2 | `STEP_SEQUENCES`·12, `visibleStepCount`·55, `visibleStepIndex`·61, `initialState`·66, `flowReducer`·134, `stepError`·254, `canAdvance`·312 |
 | `components/ClaimFlow/issueSubtypes.js` | 165 | 2 | `PROOF_GUIDE_LABEL`·9, `DEFAULT_PROOF_GUIDE_URL`·12, `ISSUE_SCOPES`·19, `NOT_WORKING_SUBTYPES`·32, `WRONG_DEVICE_SUBTYPES`·129, `findSubtype`·152, `scopeForSubtype`·160 |
 | `components/ClaimFlow/resetGuideAnim.js` | 10 | 2 | `STEP_ANIM_CSS`·3, `stepAnim`·8 |
 | `components/ClaimFlow/resetGuideMocks.jsx` | 1670 | 1 | _(none)_ |
@@ -106,7 +107,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/OrderFilters.jsx` | 151 | 1 | `STATUS_CHIPS`·4, `DATE_RANGES`·11, `OrderFilters`·21 |
 | `components/PastOrderCard.jsx` | 409 | 1 | `PastOrderCard`·29 |
 | `components/PickupFailedCard.jsx` | 428 | 1 | `PickupFailedCard`·21 |
-| `components/ProductSummary.jsx` | 136 | 13 | `REVIBE_CARE_ICON`·1, `ProductSummary`·12 |
+| `components/ProductSummary.jsx` | 136 | 14 | `REVIBE_CARE_ICON`·1, `ProductSummary`·12 |
 | `components/RefundDetailsSheet.jsx` | 165 | 1 | `RefundDetailsSheet`·7 |
 | `components/ResetFailedCard.jsx` | 475 | 1 | `ResetFailedCard`·25 |
 | `components/ReturnShipmentTracking.jsx` | 133 | 2 | `ReturnShipmentTracking`·14, `CourierStrip`·62, `SubStatusItem`·95 |
@@ -129,7 +130,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/orders/claims.js` | 666 | 1 | `CLAIM_ORDERS`·4 |
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
-| `lib/claims.js` | 560 | 10 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `CLAIM_TRANSIT_SUB_STATUSES`·123, `transitSubProgressIndex`·130, `hasActiveClaim`·137, `isClaimRefunded`·145, `canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182, `isWarrantyDelivered`·202, `claimPhaseTag`·212, `claimStatusHeadline`·229, `claimStatusSubline`·234, `WARRANTY_CLAIM_STATUSES`·252, `warrantyClaimToneFor`·300, `warrantyClaimProgressIndex`·308, `warrantyClaimPhaseTag`·312, `warrantyClaimStatusHeadline`·331, `warrantyClaimStatusSubline`·336, `REASON_LABELS`·350, `reasonText`·358, `devicePrepText`·366, `CLAIM_TYPE_LABELS`·373, `claimTypeLabel`·380, `refundMethodLabel`·386, `CLAIM_SLAS`·405, `expectedCompletionFor`·428, `SUB_STATUS_LABELS`·453, `actionGateCopy`·514 |
+| `lib/claims.js` | 565 | 10 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `CLAIM_TRANSIT_SUB_STATUSES`·123, `transitSubProgressIndex`·130, `hasActiveClaim`·137, `isClaimRefunded`·145, `canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182, `isWarrantyDelivered`·202, `claimPhaseTag`·212, `claimStatusHeadline`·229, `claimStatusSubline`·234, `WARRANTY_CLAIM_STATUSES`·252, `warrantyClaimToneFor`·300, `warrantyClaimProgressIndex`·308, `warrantyClaimPhaseTag`·312, `warrantyClaimStatusHeadline`·331, `warrantyClaimStatusSubline`·336, `REASON_LABELS`·352, `reasonText`·363, `devicePrepText`·371, `CLAIM_TYPE_LABELS`·378, `claimTypeLabel`·385, `refundMethodLabel`·391, `CLAIM_SLAS`·410, `expectedCompletionFor`·433, `SUB_STATUS_LABELS`·458, `actionGateCopy`·519 |
 | `lib/devices.js` | 65 | 2 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
 | `lib/edd.js` | 245 | 1 | `MARKETS`·24, `STAGE_ORDER_CREATED`·60, `STAGE_QC`·61, `STAGE_SHIPPED`·62, `SLA_ON_TIME`·64, `SLA_LATE`·65, `MSG_ORDER_LATE`·72, `MSG_QC_BACK_ON_TRACK`·74, `MSG_QC_LATE`·76, `MSG_SHIPPED_LATE`·78, `workdayIntl`·100, `currentStage`·117, `calculateEdd`·125, `buildCustomerMessage`·161, `orderStatus`·185 |
 | `lib/eddSandbox.js` | 231 | 1 | `useEddSandbox`·187 |
@@ -210,6 +211,6 @@ graph LR
   lib_journey_js --> data_journey_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 76 modules, 22242 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 77 modules, 22539 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->
