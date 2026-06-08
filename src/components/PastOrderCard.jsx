@@ -329,6 +329,13 @@ function RefundHero({ order }) {
         <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
         <DestinationChip destination={dest} accent={isWallet} />
       </div>
+      {order.refund.bonus > 0 && (
+        <div className="mt-2 text-[11.5px] text-accent inline-flex items-center gap-1">
+          <Sparkles size={11} strokeWidth={2} />
+          Includes {order.currency} {order.refund.bonus.toLocaleString()} Wallet
+          bonus
+        </div>
+      )}
       {isRefunded && order.refund.fundsAvailable && (
         <div className="mt-2 text-[11.5px] text-success inline-flex items-center gap-1">
           <Sparkles size={11} strokeWidth={2} />

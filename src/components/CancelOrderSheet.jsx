@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, ChevronLeft, Info, ShieldCheck } from 'lucide-react'
+import { X, ChevronLeft, Info, ShieldCheck, Sparkles } from 'lucide-react'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
 
 const REVIBE_CARE_ICON =
@@ -9,6 +9,14 @@ const REVIBE_CARE_ICON =
 // At these stages the order hasn't shipped yet, so the ship-deadline fee
 // waiver still has meaning; shipped/delivered cancellations skip it.
 const DISSUADE_STATUSES = new Set(['created', 'quality_check'])
+
+// Flat Wallet bonus paid when the customer cancels an order that has blown
+// its SLA and is past the initial delivery promise (`order.promiseBreached`).
+// Mirrors the issue-claim ISSUE_WALLET_BONUS: full refund either way, with a
+// store-credit incentive on top. The card processing fee is also waived in
+// this case. Hardcoded here like the 5% fee — production reads both from a
+// per-order backend config.
+const LATE_PROMISE_WALLET_BONUS = 100
 
 export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
   const [step, setStep] = useState('select')
@@ -41,8 +49,13 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
   const subtotal = order.subtotal ?? order.total
   const warranty = order.warranty
   const total = order.total
-  const fee = Math.round(total * 0.05 * 100) / 100
+  // Late + past-promise orders get a full refund (fee waived) plus a flat
+  // Wallet bonus on the store-credit path.
+  const breached = order.promiseBreached === true
+  const fee = breached ? 0 : Math.round(total * 0.05 * 100) / 100
   const refundOriginal = Math.round((total - fee) * 100) / 100
+  const walletBonus = breached ? LATE_PROMISE_WALLET_BONUS : 0
+  const walletTotal = total + walletBonus
   const currency = order.currency
   const cardLabel = formatCardLabel(order.paymentMethod)
 
@@ -79,6 +92,9 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
             refundOriginal={refundOriginal}
             currency={currency}
             cardLabel={cardLabel}
+            breached={breached}
+            walletBonus={walletBonus}
+            walletTotal={walletTotal}
           />
         )}
         {step === 'dissuade' && (
@@ -89,6 +105,8 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
             onContinueToCancel={() => setStep('confirm')}
             fee={fee}
             currency={currency}
+            breached={breached}
+            walletBonus={walletBonus}
           />
         )}
         {step === 'confirm' && (
@@ -112,6 +130,9 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
             refundOriginal={refundOriginal}
             currency={currency}
             cardLabel={cardLabel}
+            breached={breached}
+            walletBonus={walletBonus}
+            walletTotal={walletTotal}
           />
         )}
       </div>
@@ -167,6 +188,9 @@ function SelectStep({
   refundOriginal,
   currency,
   cardLabel,
+  breached,
+  walletBonus,
+  walletTotal,
 }) {
   return (
     <>
@@ -233,8 +257,17 @@ function SelectStep({
               title="Revibe Wallet"
               icon={REVIBE_WALLET_ICON}
               info
-              amountLine={`${currency} ${formatMoney(total)} back to your Revibe Wallet`}
-              detailLine="Full refund · available instantly"
+              amountLine={`${currency} ${formatMoney(breached ? walletTotal : total)} back to your Revibe Wallet`}
+              bonusPill={
+                breached
+                  ? `+${currency} ${formatMoney(walletBonus)} bonus`
+                  : null
+              }
+              detailLine={
+                breached
+                  ? 'Full refund + bonus · available instantly'
+                  : 'Full refund · available instantly'
+              }
               detailHighlight
             />
             <RefundOption
@@ -242,7 +275,11 @@ function SelectStep({
               onSelect={() => setMethod('original')}
               title="Original payment method"
               amountLine={`${currency} ${formatMoney(refundOriginal)} back to ${cardLabel}`}
-              detailLine={`−${currency} ${formatMoney(fee)} (5% processing fee) · 5–10 business days`}
+              detailLine={
+                breached
+                  ? 'No cancellation fee · 5–10 business days'
+                  : `−${currency} ${formatMoney(fee)} (5% processing fee) · 5–10 business days`
+              }
             />
           </div>
         </Section>
@@ -270,18 +307,35 @@ function ConfirmStep({
   refundOriginal,
   currency,
   cardLabel,
+  breached,
+  walletBonus,
+  walletTotal,
 }) {
   const isStoreCredit = method === 'store_credit'
-  const amount = isStoreCredit ? total : refundOriginal
+  const amount = isStoreCredit ? (breached ? walletTotal : total) : refundOriginal
   const destination = isStoreCredit ? 'Revibe Wallet' : cardLabel
   const eta = isStoreCredit
     ? 'Available instantly after cancellation.'
     : 'Refunded to your card in 5–10 business days.'
   const message = isStoreCredit ? (
-    <>
-      <span className="font-semibold">Revibe Wallet credit stays on Revibe.</span>{' '}
-      It won't be paid out to your bank account.
-    </>
+    breached ? (
+      <>
+        <span className="font-semibold">
+          Includes a {currency} {formatMoney(walletBonus)} Wallet bonus
+        </span>{' '}
+        for the delay. Credit stays on Revibe and won't be paid out to your
+        bank account.
+      </>
+    ) : (
+      <>
+        <span className="font-semibold">Revibe Wallet credit stays on Revibe.</span>{' '}
+        It won't be paid out to your bank account.
+      </>
+    )
+  ) : breached ? (
+    <span className="font-semibold">
+      No cancellation fee — you're getting the full amount back.
+    </span>
   ) : (
     <span className="font-semibold">
       You're giving up {currency} {formatMoney(fee)} to the processing fee.
@@ -303,10 +357,16 @@ function ConfirmStep({
           <div className="mt-1 text-[28px] font-bold text-ink tracking-[-0.02em]">
             {currency} {formatMoney(amount)}
           </div>
-          {!isStoreCredit && (
+          {!isStoreCredit && !breached && (
             <div className="mt-1 text-[12px] text-muted">
               Total {currency} {formatMoney(total)} · −{currency}{' '}
               {formatMoney(fee)} fee
+            </div>
+          )}
+          {isStoreCredit && breached && (
+            <div className="mt-1 text-[12px] text-muted">
+              Total {currency} {formatMoney(total)} · +{currency}{' '}
+              {formatMoney(walletBonus)} bonus
             </div>
           )}
           <div className="mt-1 text-[13px] text-ink-2 flex items-center justify-center gap-1.5 flex-wrap">
@@ -356,6 +416,8 @@ function DissuadeStep({
   onContinueToCancel,
   fee,
   currency,
+  breached,
+  walletBonus,
 }) {
   const deliveryDate =
     formatDeliveryDate(order.estimatedDelivery, order.placedAt) ||
@@ -364,6 +426,77 @@ function DissuadeStep({
     order.estimatedDeliveryLong ||
     formatDeliveryDate(order.estimatedDelivery, order.placedAt) ||
     order.estimatedDelivery
+
+  // Breached path: the delivery promise is already missed and the fee is
+  // waived, so the standard "wait for it / fee waiver" pitch is moot. Flip
+  // it into an apology that nudges the customer toward keeping the order or,
+  // failing that, taking Wallet credit (the only path that carries the
+  // bonus).
+  if (breached) {
+    return (
+      <>
+        <SheetHeader
+          title="We missed our delivery estimate"
+          subtitle={`#${order.id}`}
+          onBack={onBack}
+          onClose={onClose}
+        />
+        <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-4">
+          <div className="rounded-[16px] border border-line bg-canvas p-5 text-center">
+            <div className="text-[12.5px] text-ink-2 leading-[1.4]">
+              We didn't get your{' '}
+              <span className="font-semibold text-ink">{order.product.name}</span>{' '}
+              to you by{' '}
+              <span className="font-semibold text-ink">{deliveryDeadlineFull}</span>.
+              We're sorry for the delay.
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 rounded-[12px] border border-success/30 bg-success-bg p-3 text-[12.5px] text-ink leading-[1.45]">
+            <ShieldCheck
+              size={16}
+              strokeWidth={1.75}
+              className="text-success shrink-0 mt-px"
+            />
+            <span>
+              <span className="font-semibold">No cancellation fee.</span> You'll
+              get a full refund whichever way you choose.
+            </span>
+          </div>
+          <div className="flex items-start gap-2.5 rounded-[12px] border border-brand/30 bg-brand-bg p-3 text-[12.5px] text-ink leading-[1.45]">
+            <Info
+              size={16}
+              strokeWidth={1.75}
+              className="text-brand shrink-0 mt-px"
+            />
+            <span>
+              Keep your order or take Revibe Wallet credit and we'll add{' '}
+              <span className="font-semibold">
+                {currency} {formatMoney(walletBonus)}
+              </span>{' '}
+              on top, as an apology.
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-line bg-surface">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full h-[52px] rounded-[12px] inline-flex items-center justify-center gap-1.5 bg-brand text-white border border-brand font-semibold text-[14.5px]"
+          >
+            Keep my order
+          </button>
+          <button
+            type="button"
+            onClick={onContinueToCancel}
+            className="w-full h-[52px] rounded-[12px] inline-flex items-center justify-center bg-surface text-ink border border-line font-semibold text-[14.5px] transition-colors hover:bg-danger-bg hover:text-danger hover:border-danger"
+          >
+            Continue to cancel
+          </button>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <SheetHeader
@@ -467,6 +600,7 @@ function RefundOption({
   icon,
   info,
   amountLine,
+  bonusPill,
   detailLine,
   detailHighlight,
 }) {
@@ -512,6 +646,12 @@ function RefundOption({
           {info && <WalletInfoTooltip stopPropagation />}
         </span>
         <span className="block mt-1 text-[13px] text-ink">{amountLine}</span>
+        {bonusPill && (
+          <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-accent/15 text-accent font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
+            <Sparkles size={10} strokeWidth={2} />
+            {bonusPill}
+          </span>
+        )}
         <span
           className={`block mt-0.5 text-[11.5px] ${
             detailHighlight ? 'text-success font-semibold' : 'text-muted'

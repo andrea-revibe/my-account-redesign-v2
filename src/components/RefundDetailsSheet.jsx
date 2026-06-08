@@ -22,7 +22,7 @@ export default function RefundDetailsSheet({ order, open, onClose }) {
   if (!open) return null
 
   const { currency } = order
-  const { subtotal, fee, amount, breakdown } = order.refund
+  const { subtotal, fee, bonus, amount, breakdown } = order.refund
   const tone = toneFor(order.cancellationStatusId)
 
   return (
@@ -93,6 +93,21 @@ export default function RefundDetailsSheet({ order, open, onClose }) {
                   }
                   value={`− ${currency} ${formatMoney(fee.amount)}`}
                   valueTone="text-danger"
+                />
+              </>
+            )}
+
+            {bonus > 0 && (
+              <>
+                <Divider />
+                <Row
+                  label="Subtotal"
+                  value={`${currency} ${formatMoney(subtotal)}`}
+                />
+                <Row
+                  label="Revibe Wallet bonus"
+                  value={`+ ${currency} ${formatMoney(bonus)}`}
+                  valueTone="text-success"
                 />
               </>
             )}

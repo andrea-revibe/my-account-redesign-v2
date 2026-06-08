@@ -28,7 +28,7 @@ export const CANCELLATION_NODES = [
     label: 'Order placed',
     trigger: 'customer',
     event: 'order.created',
-    next: ['cancel_before_qc_wallet', 'cancel_before_qc_card', 'qc_started'],
+    next: ['cancel_before_qc_wallet', 'cancel_before_qc_card', 'order_late', 'qc_started'],
     apply: (o) => o,
   },
   {
@@ -118,12 +118,129 @@ export const CANCELLATION_NODES = [
       },
     }),
   },
+  // ----- Late + past-promise branch (before QC) -------------------------
+  // The order has blown its SLA at the `created` stage AND is past the
+  // initial delivery promise the customer saw at checkout. `delayed` +
+  // `statusBanner` give InProgressCard the same "Taking longer than usual"
+  // amber treatment the Dynamic EDD sandbox produces for `order_late`.
+  // `promiseBreached` is the single flag the CancelOrderSheet reads to waive
+  // the card processing fee and add the AED 100 Wallet bonus. Production
+  // would derive it from the EDD model (currentStageSlaStatus === late AND
+  // today > initialPromise) rather than stamping it.
+  {
+    id: 'order_late',
+    label: 'Order late — past delivery promise',
+    trigger: 'system',
+    event: 'order.sla.breached',
+    next: ['cancel_late_before_qc_wallet', 'cancel_late_before_qc_card'],
+    apply: (o) => ({
+      ...o,
+      delayed: true,
+      promiseBreached: true,
+      estimatedDelivery: 'May 28',
+      estimatedDeliveryLong: 'Thursday, 28 May',
+      statusBanner: {
+        tone: 'warn',
+        lead: 'Taking longer than usual',
+        body:
+          "Your order is taking a little longer than usual to start. We're working to move your order forward.",
+      },
+    }),
+  },
+  {
+    id: 'cancel_late_before_qc_wallet',
+    label: 'Late cancellation before QC — wallet refund + bonus',
+    trigger: 'customer',
+    event: 'order.cancellation.requested',
+    next: ['refunded_late_before_qc_wallet'],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationStatusId: 'refund_pending',
+      cancellationRef: 'J0urN2',
+      cancellationTimeline: {
+        requested: '28 May · 9:10 AM',
+        refund_pending: '28 May · 9:10 AM',
+      },
+      refund: {
+        subtotal: 1029,
+        bonus: 100,
+        amount: 1129,
+        destination: { kind: 'wallet', label: 'Revibe Wallet' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
+    }),
+  },
+  {
+    id: 'refunded_late_before_qc_wallet',
+    label: 'Wallet refund + bonus credited',
+    trigger: 'system',
+    event: 'order.refund.completed',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refunded',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '28 May · 9:11 AM',
+      },
+      refund: {
+        ...o.refund,
+        fundsAvailable: 'Available now in your wallet',
+      },
+    }),
+  },
+  {
+    id: 'cancel_late_before_qc_card',
+    label: 'Late cancellation before QC — card refund (no fee)',
+    trigger: 'customer',
+    event: 'order.cancellation.requested',
+    next: ['refunded_late_before_qc_card'],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationStatusId: 'refund_pending',
+      cancellationRef: 'J0urN2',
+      cancellationTimeline: {
+        requested: '28 May · 9:10 AM',
+        refund_pending: '28 May · 9:10 AM',
+      },
+      // Promise breached → the 5% processing fee is waived (no `fee` object).
+      refund: {
+        subtotal: 1029,
+        amount: 1029,
+        destination: { kind: 'card', label: 'Visa', last4: '4242' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
+    }),
+  },
+  {
+    id: 'refunded_late_before_qc_card',
+    label: 'Card refund issued (no fee)',
+    trigger: 'system',
+    event: 'order.refund.completed',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refunded',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '31 May · 9:30 AM',
+      },
+    }),
+  },
   {
     id: 'qc_started',
     label: 'Quality check started',
     trigger: 'system',
     event: 'order.quality_check.started',
-    next: ['cancellation_requested_wallet', 'cancellation_requested_card'],
+    next: ['cancellation_requested_wallet', 'cancellation_requested_card', 'qc_late'],
     apply: (o) => ({
       ...o,
       statusId: 'quality_check',
@@ -238,6 +355,142 @@ export const CANCELLATION_NODES = [
       cancellationTimeline: {
         ...o.cancellationTimeline,
         refunded: '24 May · 9:30 AM',
+      },
+    }),
+  },
+  // ----- Late + past-promise branch (at QC) -----------------------------
+  // Same breach, reached at the `quality_check` stage. Because the promise
+  // is already broken, the request is honored straight through (no
+  // accepted/declined fork — there's nothing to push back on); the customer
+  // can still reverse it via `cancellation_kept` while it's `requested`.
+  {
+    id: 'qc_late',
+    label: 'QC late — past delivery promise',
+    trigger: 'system',
+    event: 'order.sla.breached',
+    next: ['cancellation_late_requested_wallet', 'cancellation_late_requested_card'],
+    apply: (o) => ({
+      ...o,
+      delayed: true,
+      promiseBreached: true,
+      estimatedDelivery: 'May 28',
+      estimatedDeliveryLong: 'Thursday, 28 May',
+      statusBanner: {
+        tone: 'warn',
+        lead: 'Taking longer than usual',
+        body:
+          "Quality check is taking longer than usual. We're working to move your order forward.",
+      },
+    }),
+  },
+  {
+    id: 'cancellation_late_requested_wallet',
+    label: 'Late cancellation requested — wallet refund + bonus',
+    trigger: 'customer',
+    event: 'order.cancellation.requested',
+    next: ['cancellation_late_accepted_wallet', 'cancellation_kept'],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationStatusId: 'requested',
+      cancellationRef: 'J0urN3',
+      cancellationTimeline: { requested: '28 May · 11:42 AM' },
+      refund: {
+        subtotal: 1029,
+        bonus: 100,
+        amount: 1129,
+        destination: { kind: 'wallet', label: 'Revibe Wallet' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
+    }),
+  },
+  {
+    id: 'cancellation_late_accepted_wallet',
+    label: 'Cancellation accepted',
+    trigger: 'system',
+    event: 'order.cancellation.accepted',
+    next: ['refunded_late_wallet'],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refund_pending',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refund_pending: '28 May · 1:08 PM',
+      },
+    }),
+  },
+  {
+    id: 'refunded_late_wallet',
+    label: 'Wallet refund + bonus credited',
+    trigger: 'system',
+    event: 'order.refund.completed',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refunded',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '28 May · 1:09 PM',
+      },
+      refund: {
+        ...o.refund,
+        fundsAvailable: 'Available now in your wallet',
+      },
+    }),
+  },
+  {
+    id: 'cancellation_late_requested_card',
+    label: 'Late cancellation requested — card refund (no fee)',
+    trigger: 'customer',
+    event: 'order.cancellation.requested',
+    next: ['cancellation_late_accepted_card', 'cancellation_kept'],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationStatusId: 'requested',
+      cancellationRef: 'J0urN3',
+      cancellationTimeline: { requested: '28 May · 11:42 AM' },
+      refund: {
+        subtotal: 1029,
+        amount: 1029,
+        destination: { kind: 'card', label: 'Visa', last4: '4242' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
+    }),
+  },
+  {
+    id: 'cancellation_late_accepted_card',
+    label: 'Cancellation accepted',
+    trigger: 'system',
+    event: 'order.cancellation.accepted',
+    next: ['refunded_late_card'],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refund_pending',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refund_pending: '28 May · 1:08 PM',
+      },
+    }),
+  },
+  {
+    id: 'refunded_late_card',
+    label: 'Card refund issued (no fee)',
+    trigger: 'system',
+    event: 'order.refund.completed',
+    next: [],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refunded',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '31 May · 9:30 AM',
       },
     }),
   },
