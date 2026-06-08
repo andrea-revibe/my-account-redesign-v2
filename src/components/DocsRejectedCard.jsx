@@ -30,7 +30,11 @@ const FAKE_FILES = [
   { name: 'touch-test.mp4', size: '18 MB', kind: 'video', duration: '0:24' },
 ]
 
-export default function DocsRejectedCard({ order, defaultExpanded = false }) {
+export default function DocsRejectedCard({
+  order,
+  defaultExpanded = false,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [files, setFiles] = useState([])
   const [note, setNote] = useState('')
@@ -193,6 +197,7 @@ export default function DocsRejectedCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
+              onClick={() => onRequestCancelClaim?.(order.id)}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
               Cancel claim

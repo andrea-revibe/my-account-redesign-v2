@@ -17,7 +17,11 @@ import { ProductSummary } from './ProductSummary'
 // that's blocked on a single customer action (here: confirm pickup address
 // so the courier can re-dispatch), then flips to a warn-tone confirmation
 // after the customer taps "Confirm new pickup".
-export default function PickupFailedCard({ order, defaultExpanded = false }) {
+export default function PickupFailedCard({
+  order,
+  defaultExpanded = false,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [confirmed, setConfirmed] = useState(false)
   const [details, setDetails] = useState(order.claim.pickupDetails)
@@ -145,6 +149,7 @@ export default function PickupFailedCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
+              onClick={() => onRequestCancelClaim?.(order.id)}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
               Cancel claim

@@ -131,7 +131,7 @@ export const CLAIM_COMPENSATION_NODES = [
     label: 'Compensation submitted — shipping refund',
     trigger: 'customer',
     event: 'claim.created',
-    next: ['claim_under_review', 'claim_evidence_unclear'],
+    next: ['claim_under_review', 'claim_evidence_unclear', 'claim_cancelled'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -161,7 +161,7 @@ export const CLAIM_COMPENSATION_NODES = [
     label: 'Compensation submitted — faulty charger',
     trigger: 'customer',
     event: 'claim.created',
-    next: ['claim_under_review', 'claim_evidence_unclear'],
+    next: ['claim_under_review', 'claim_evidence_unclear', 'claim_cancelled'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -190,7 +190,7 @@ export const CLAIM_COMPENSATION_NODES = [
     label: 'Under review',
     trigger: 'system',
     event: 'claim.review.started',
-    next: ['claim_refund_issued', 'claim_invalid_confirmed'],
+    next: ['claim_refund_issued', 'claim_invalid_confirmed', 'claim_cancelled'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -236,6 +236,19 @@ export const CLAIM_COMPENSATION_NODES = [
         timeline: { ...o.claim.timeline, refund_credited: '30 May · 2:19 PM' },
       },
     }),
+  },
+  // ----- Customer-cancelled terminal — reachable from both submitted
+  //       nodes and from "under review" (compensation has no shipment
+  //       leg, so it stays cancellable until the refund is issued).
+  //       Strips the claim so the order reverts to its delivered
+  //       PastOrderCard (re-raisable). --------------------------------
+  {
+    id: 'claim_cancelled',
+    label: 'Claim cancelled by customer',
+    trigger: 'customer',
+    event: 'claim.cancelled',
+    next: [],
+    apply: (o) => ({ ...o, claim: undefined }),
   },
   // ----- Unclear-evidence sub-branch. Support can't read the proof and
   //       asks for a reshoot. Reuses the issue flow's `DocsRejectedCard`

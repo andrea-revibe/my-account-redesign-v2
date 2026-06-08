@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import {
   CLAIM_TRANSIT_SUB_STATUSES,
+  canCancelClaim,
   claimStatusesFor,
   claimToneFor,
   claimPhaseTag,
@@ -37,7 +38,12 @@ const TONE = {
   success: { text: 'text-success', bg: 'bg-success', softBg: 'bg-success-bg', softText: 'text-success', border: 'border-[#c6ebd9]',  heroBg: 'bg-gradient-to-br from-success-bg to-[#d4f0e3]' },
 }
 
-export default function ClaimCard({ order, defaultExpanded = false, openSignal = 0 }) {
+export default function ClaimCard({
+  order,
+  defaultExpanded = false,
+  openSignal = 0,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [detailsOpen, setDetailsOpen] = useState(false)
   useEffect(() => {
@@ -119,6 +125,18 @@ export default function ClaimCard({ order, defaultExpanded = false, openSignal =
               <Download size={16} strokeWidth={1.75} />
             </button>
           </div>
+        </div>
+      )}
+
+      {canCancelClaim(claim) && onRequestCancelClaim && (
+        <div className="border-t border-line px-4 py-2">
+          <button
+            type="button"
+            onClick={() => onRequestCancelClaim(order.id)}
+            className="w-full h-[38px] rounded-[10px] text-danger font-semibold text-[12.5px] hover:bg-danger-bg/60 transition"
+          >
+            Cancel claim
+          </button>
         </div>
       )}
 

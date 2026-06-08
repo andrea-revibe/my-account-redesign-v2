@@ -146,6 +146,57 @@ export function isClaimRefunded(order) {
   return Boolean(order?.claim) && order.claim.claimStatusId === 'refund_credited'
 }
 
+// Whether the customer can still cancel a submitted claim — the whole
+// window before anything terminal happens. Cancellable while the claim is
+// `initiated` / `pickup` / `qc`; locked once the refund is issued
+// (`refund_issued` / `refund_credited`) or the warranty enters repair
+// (`under_repair` onward). Compensation has no `pickup`, so this resolves to
+// `initiated` / `qc` for it — unchanged from before. Drives the baseline
+// ClaimCard / WarrantyClaimCard footer affordance; the action-needed
+// takeover cards expose Cancel regardless. Whether the cancel is a clean
+// revert or a pay-return-shipping flow is decided by `cancelNeedsShipBack`.
+const CANCELLABLE_STATUSES = ['initiated', 'pickup', 'qc']
+export function canCancelClaim(claim) {
+  if (!claim) return false
+  return CANCELLABLE_STATUSES.includes(claim.claimStatusId)
+}
+
+// Once a device claim leaves `initiated` the unit is in the courier's hands
+// or already at Revibe, so cancelling can't just revert to delivered — the
+// customer must pay return shipping to get the device back (same surface +
+// machinery as an invalid verdict; see `InvalidClaimCard`). Pre-pickup
+// device claims and all compensation claims (the customer keeps the device)
+// cancel cleanly. This is the single switch every cancel surface reads.
+export function cancelNeedsShipBack(claim) {
+  if (!claim || claim.type === 'compensation') return false
+  return claim.claimStatusId !== 'initiated'
+}
+
+// Builds the `invalidClaim`-shaped ship-back gate for a customer-cancelled
+// claim whose device is already with Revibe. `reason: 'cancelled'` switches
+// only the copy in `InvalidClaimCard`; the fee card, delivery details,
+// paid-state return-shipment tracking, and the journey return chain are all
+// reused verbatim from the invalid-verdict path (every return node spreads
+// `...claim.invalidClaim`, so `reason` survives). Amounts/dates mirror the
+// invalid mock for consistency — hand-written, like the rest of the proto.
+export function cancelReturnGate(order) {
+  const currency = order?.currency || 'AED'
+  return {
+    reason: 'cancelled',
+    requestedAt: '30 May · 4:18 PM',
+    autoCancelAt: '6 Jun · 4:18 PM',
+    timeLeftLabel: '7 days left',
+    returnShipping: { amount: 35, currency },
+    returnShipment: {
+      courier: 'DHL Express',
+      estimatedDelivery: 'Jun 8',
+      estimatedDeliveryLong: 'Monday, 8 June',
+      currentStatusId: 'created',
+      timeline: { created: '31 May · 11:00 AM' },
+    },
+  }
+}
+
 // Warranty equivalent of `isClaimRefunded` — true once the repaired device
 // has been delivered back to the customer (warranty terminal).
 export function isWarrantyDelivered(order) {

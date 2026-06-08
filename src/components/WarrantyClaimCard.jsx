@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import {
   WARRANTY_CLAIM_STATUSES,
+  canCancelClaim,
   warrantyClaimToneFor,
   warrantyClaimProgressIndex,
   warrantyClaimPhaseTag,
@@ -46,7 +47,12 @@ const TONE = {
 // block; the hero carries state-specific context instead (repair window
 // on `under_repair`, return ETA + courier on `ship_back`, delivered date
 // on `device_returned`).
-export default function WarrantyClaimCard({ order, defaultExpanded = false, openSignal = 0 }) {
+export default function WarrantyClaimCard({
+  order,
+  defaultExpanded = false,
+  openSignal = 0,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [detailsOpen, setDetailsOpen] = useState(false)
   useEffect(() => {
@@ -138,6 +144,18 @@ export default function WarrantyClaimCard({ order, defaultExpanded = false, open
               <Download size={16} strokeWidth={1.75} />
             </button>
           </div>
+        </div>
+      )}
+
+      {canCancelClaim(claim) && onRequestCancelClaim && (
+        <div className="border-t border-line px-4 py-2">
+          <button
+            type="button"
+            onClick={() => onRequestCancelClaim(order.id)}
+            className="w-full h-[38px] rounded-[10px] text-danger font-semibold text-[12.5px] hover:bg-danger-bg/60 transition"
+          >
+            Cancel claim
+          </button>
         </div>
       )}
 

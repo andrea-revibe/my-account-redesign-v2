@@ -91,6 +91,7 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 2. **`See detailed tracking` dropdown** (§2.3.3), collapsed by default.
 3. **`HistoryThread`** — same `getHistoryEvents(order, 'claim')` source as `ClaimCard`.
 4. **Two-action footer** — `View claim details` (opens `ClaimDetailsSheet` — warranty-aware, see §2.5) + icon-only `Download receipt` (decorative).
+5. **Persistent `Cancel claim` strip** — shown (collapsed or expanded) while `canCancelClaim(claim)` is true (`initiated` / `pickup` / `qc` — i.e. before the device enters repair). At `initiated` the cancel is a clean revert to delivered; once the device is collected (`pickup` / `qc`) `cancelNeedsShipBack` routes it through the **pay-return-shipping** flow (`InvalidClaimCard`, `reason: 'cancelled'`) to get the device back. Shared behaviour — see [claim_tracking.md](./returns/claim_tracking.md) §2.8.
 
 #### 2.3.5 Section placement
 
@@ -267,6 +268,7 @@ Reuses the refund status **ids** (`initiated` / `qc` / `refund_issued` / `refund
 
 - **Dot timeline** uses `claimStatusesFor(claim)` (4 dots, no Pickup) instead of hard-coding `CLAIM_STATUSES`.
 - **Hero amount** falls back to "To be confirmed" when `claim.expectedRefund` is absent (the in-session submit and the under-review mock carry no figure). A refunded mock that carries `expectedRefund` shows the real amount.
+- **`Cancel claim`** stays cancellable through `qc` ("Under review"), hiding only once `refund_issued`. Because compensation has no device with Revibe, `cancelNeedsShipBack` is always `false` — the cancel is **always a clean revert** to delivered (never the pay-return-shipping path). Shared behaviour — see [claim_tracking.md](./returns/claim_tracking.md) §2.8.
 
 `ClaimDetailsSheet` is compensation-aware: the Summary shows the claim sub-type + description (no Reason / Device-prep / Pickup rows), the refund destination row drops the "10% restocking fee" sub, and the Refund card shows the amount if known else "To be confirmed" with a "you keep the device" note.
 

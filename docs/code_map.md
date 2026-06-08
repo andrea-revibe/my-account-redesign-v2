@@ -15,6 +15,7 @@
 |---|---|---|
 | Order status / banner copy + tone / timeline / `pickActiveOrderId` | `lib/statuses.js` | `output/orders.md` |
 | Claim pipeline states / tone / SLAs / sub-status copy / action-gate copy | `lib/claims.js` | `output/returns/claim_tracking.md` |
+| Cancel claim — window / clean-revert vs ship-back / confirm sheet | `lib/claims.js` (`canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182), `components/CancelClaimSheet.jsx`, `components/InvalidClaimCard.jsx` (`reason: 'cancelled'`), `App.jsx` (`cancelledClaims` / `shipBackCancels`) | `output/returns/claim_tracking.md` §2.8 |
 | Returns eligibility / refund math / fee rate / window / `generateClaimRef` | `lib/returns.js` | `output/returns/change_of_mind.md`, `issue.md` |
 | Returns-flow steps, soft validation, step-skips | `components/ClaimFlow/` + `flowReducer.js` (`stepError`·199) | `output/returns/*.md`, `warranties_compensations.md` |
 | Guided-reset copy / steps / device frames | `components/ClaimFlow/ResetGuideSheet.jsx` + `lib/devices.js` | CLAUDE.md (devices bullet) |
@@ -38,6 +39,7 @@ These are **string contracts**: a value written as a literal in data/flow code, 
 | `claim.claimStatusId` (`initiated`→…→`refund_credited` / warranty tail) | `data/orders.js`, `ClaimFlow` seed (always `initiated`) | `lib/claims.js` (`CLAIM_STATUSES` / `COMPENSATION_` / `WARRANTY_`), `hasActiveClaim`, `isClaimRefunded`, `isWarrantyDelivered` | the right status list in `claims.js` + the `hasActive`/`isRefunded` predicates |
 | `claim.type` (`change_of_mind`/`issue`/`warranty`/`compensation`) | `ClaimFlow`, `data/orders.js` | `App.jsx` routing, `claimStatusesFor`, `flowReducer` step-skips (`visibleStepCount`) | routing in `App.jsx` + step-skip logic in `flowReducer.js` |
 | Takeover flags `claim.docsRejection` / `pickupFailure` / `resetFailed` / `invalidClaim` | `data/orders.js` (hand-seeded only) | `App.jsx` routing **precedence** → takeover cards | the routing precedence list in `App.jsx` (order matters) |
+| `claim.invalidClaim.reason` (`invalid` default / `cancelled`) | `data/journeys/claim*.js`, `lib/claims.js` (`cancelReturnGate`), `App.jsx` (`shipBackCancels` projection) | `components/InvalidClaimCard.jsx` (copy + `Decline`-vs-`Keep claim`) | the `reason` branches in `InvalidClaimCard.jsx` |
 | `category_name` (`iPhone`/`Macbook`/`Samsung phone`/`Tablet`/`Laptop`) | `data/orders.js` product | `lib/devices.js` → `ResetGuideSheet` variant | mapping in `devices.js` + a guide variant in `ResetGuideSheet.jsx` |
 | `claim.transitSubTimeline.picked_up`, `claim.shipBack.awb` | `data/orders.js` | gate the `See detailed tracking` dropdown in `ClaimCard` / `WarrantyClaimCard` | the gating check in the relevant card |
 
@@ -59,13 +61,14 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 
 | Module | LOC | In | Exports (line) |
 |---|--:|--:|---|
-| `App.jsx` | 483 | 1 | `App`·78 |
+| `App.jsx` | 666 | 1 | `App`·85 |
 | `components/BnplDisclaimerTooltip.jsx` | 86 | 6 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
+| `components/CancelClaimSheet.jsx` | 155 | 1 | `CancelClaimSheet`·15 |
 | `components/CancelOrderSheet.jsx` | 711 | 2 | `CancelOrderSheet`·19 |
 | `components/CancellationSubTimeline.jsx` | 94 | 1 | `CancellationSubTimeline`·11 |
 | `components/ChatFab.jsx` | 14 | 1 | `ChatFab`·3 |
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
-| `components/ClaimCard.jsx` | 486 | 1 | `ClaimCard`·40 |
+| `components/ClaimCard.jsx` | 504 | 1 | `ClaimCard`·41 |
 | `components/ClaimDetailsSheet.jsx` | 230 | 2 | `ClaimDetailsSheet`·16 |
 | `components/ClaimFlow/ClaimFlow.jsx` | 369 | 1 | `ClaimFlow`·25 |
 | `components/ClaimFlow/InlineError.jsx` | 16 | 7 | `InlineError`·6 |
@@ -88,34 +91,34 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimFlow/issueSubtypes.js` | 165 | 2 | `PROOF_GUIDE_LABEL`·9, `DEFAULT_PROOF_GUIDE_URL`·12, `ISSUE_SCOPES`·19, `NOT_WORKING_SUBTYPES`·32, `WRONG_DEVICE_SUBTYPES`·129, `findSubtype`·152, `scopeForSubtype`·160 |
 | `components/ClaimFlow/resetGuideAnim.js` | 10 | 2 | `STEP_ANIM_CSS`·3, `stepAnim`·8 |
 | `components/ClaimFlow/resetGuideMocks.jsx` | 1670 | 1 | _(none)_ |
-| `components/DocsRejectedCard.jsx` | 496 | 1 | `DocsRejectedCard`·33 |
+| `components/DocsRejectedCard.jsx` | 501 | 1 | `DocsRejectedCard`·33 |
 | `components/EddSandboxPanel.jsx` | 154 | 1 | `EddSandboxPanel`·9 |
 | `components/GreetRow.jsx` | 39 | 1 | `GreetRow`·3 |
 | `components/Header.jsx` | 50 | 1 | `Header`·6 |
 | `components/HeroCard.jsx` | 298 | 1 | `HeroCard`·29 |
 | `components/HistoryThread.jsx` | 218 | 3 | `HistoryThread`·86 |
 | `components/InProgressCard.jsx` | 291 | 1 | `InProgressCard`·29 |
-| `components/InvalidClaimCard.jsx` | 848 | 1 | `InvalidClaimCard`·39 |
+| `components/InvalidClaimCard.jsx` | 878 | 1 | `InvalidClaimCard`·39 |
 | `components/JourneyDevPanel.jsx` | 162 | 1 | `JourneyDevPanel`·12 |
 | `components/KeepOrderSheet.jsx` | 122 | 1 | `KeepOrderSheet`·9 |
 | `components/OrderCard.jsx` | 449 | 1 | `OrderCard`·36 |
 | `components/OrderFilters.jsx` | 151 | 1 | `STATUS_CHIPS`·4, `DATE_RANGES`·11, `OrderFilters`·21 |
 | `components/PastOrderCard.jsx` | 409 | 1 | `PastOrderCard`·29 |
-| `components/PickupFailedCard.jsx` | 424 | 1 | `PickupFailedCard`·20 |
-| `components/ProductSummary.jsx` | 136 | 12 | `REVIBE_CARE_ICON`·1, `ProductSummary`·12 |
+| `components/PickupFailedCard.jsx` | 429 | 1 | `PickupFailedCard`·20 |
+| `components/ProductSummary.jsx` | 136 | 13 | `REVIBE_CARE_ICON`·1, `ProductSummary`·12 |
 | `components/RefundDetailsSheet.jsx` | 165 | 1 | `RefundDetailsSheet`·7 |
-| `components/ResetFailedCard.jsx` | 471 | 1 | `ResetFailedCard`·24 |
+| `components/ResetFailedCard.jsx` | 476 | 1 | `ResetFailedCard`·24 |
 | `components/ShippingSubTimeline.jsx` | 73 | 1 | `ShippingSubTimeline`·9 |
 | `components/StatusTimeline.jsx` | 62 | 1 | `StatusTimeline`·6 |
 | `components/UndoSnackbar.jsx` | 44 | 1 | `UndoSnackbar`·8 |
 | `components/WalletInfoTooltip.jsx` | 71 | 4 | `REVIBE_WALLET_ICON`·4, `WalletInfoTooltip`·7 |
-| `components/WarrantyClaimCard.jsx` | 641 | 1 | `WarrantyClaimCard`·49 |
+| `components/WarrantyClaimCard.jsx` | 659 | 1 | `WarrantyClaimCard`·50 |
 | `data/journey.js` | 89 | 3 | `INITIAL_ORDER`·28, `JOURNEYS`·30 |
 | `data/journeys/cancellation.js` | 626 | 1 | `CANCELLATION_NODES`·25 |
-| `data/journeys/claimChangeOfMind.js` | 697 | 1 | `CLAIM_COM_NODES`·19 |
-| `data/journeys/claimCompensation.js` | 336 | 1 | `CLAIM_COMPENSATION_NODES`·29 |
-| `data/journeys/claimIssue.js` | 786 | 1 | `CLAIM_ISSUE_NODES`·27 |
-| `data/journeys/claimWarranty.js` | 785 | 1 | `CLAIM_WARRANTY_NODES`·22 |
+| `data/journeys/claimChangeOfMind.js` | 751 | 1 | `CLAIM_COM_NODES`·19 |
+| `data/journeys/claimCompensation.js` | 349 | 1 | `CLAIM_COMPENSATION_NODES`·29 |
+| `data/journeys/claimIssue.js` | 850 | 1 | `CLAIM_ISSUE_NODES`·27 |
+| `data/journeys/claimWarranty.js` | 839 | 1 | `CLAIM_WARRANTY_NODES`·22 |
 | `data/journeys/happyPath.js` | 101 | 1 | `HAPPY_PATH_NODES`·5 |
 | `data/journeys/initialOrder.js` | 37 | 1 | `INITIAL_ORDER`·2 |
 | `data/orders.js` | 20 | 3 | `ORDERS`·14 |
@@ -123,7 +126,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/orders/claims.js` | 661 | 1 | `CLAIM_ORDERS`·4 |
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
-| `lib/claims.js` | 509 | 9 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `CLAIM_TRANSIT_SUB_STATUSES`·123, `transitSubProgressIndex`·130, `hasActiveClaim`·137, `isClaimRefunded`·145, `isWarrantyDelivered`·151, `claimPhaseTag`·161, `claimStatusHeadline`·178, `claimStatusSubline`·183, `WARRANTY_CLAIM_STATUSES`·201, `warrantyClaimToneFor`·249, `warrantyClaimProgressIndex`·257, `warrantyClaimPhaseTag`·261, `warrantyClaimStatusHeadline`·280, `warrantyClaimStatusSubline`·285, `REASON_LABELS`·299, `reasonText`·307, `devicePrepText`·315, `CLAIM_TYPE_LABELS`·322, `claimTypeLabel`·329, `refundMethodLabel`·335, `CLAIM_SLAS`·354, `expectedCompletionFor`·377, `SUB_STATUS_LABELS`·402, `actionGateCopy`·463 |
+| `lib/claims.js` | 560 | 10 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `CLAIM_TRANSIT_SUB_STATUSES`·123, `transitSubProgressIndex`·130, `hasActiveClaim`·137, `isClaimRefunded`·145, `canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182, `isWarrantyDelivered`·202, `claimPhaseTag`·212, `claimStatusHeadline`·229, `claimStatusSubline`·234, `WARRANTY_CLAIM_STATUSES`·252, `warrantyClaimToneFor`·300, `warrantyClaimProgressIndex`·308, `warrantyClaimPhaseTag`·312, `warrantyClaimStatusHeadline`·331, `warrantyClaimStatusSubline`·336, `REASON_LABELS`·350, `reasonText`·358, `devicePrepText`·366, `CLAIM_TYPE_LABELS`·373, `claimTypeLabel`·380, `refundMethodLabel`·386, `CLAIM_SLAS`·405, `expectedCompletionFor`·428, `SUB_STATUS_LABELS`·453, `actionGateCopy`·514 |
 | `lib/devices.js` | 65 | 2 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
 | `lib/edd.js` | 245 | 1 | `MARKETS`·24, `STAGE_ORDER_CREATED`·60, `STAGE_QC`·61, `STAGE_SHIPPED`·62, `SLA_ON_TIME`·64, `SLA_LATE`·65, `MSG_ORDER_LATE`·72, `MSG_QC_BACK_ON_TRACK`·74, `MSG_QC_LATE`·76, `MSG_SHIPPED_LATE`·78, `workdayIntl`·100, `currentStage`·117, `calculateEdd`·125, `buildCustomerMessage`·161, `orderStatus`·185 |
 | `lib/eddSandbox.js` | 231 | 1 | `useEddSandbox`·187 |
@@ -139,8 +142,8 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 
 | Source-of-truth module | Consumers |
 |---|---|
+| `lib/claims.js` | `App.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/WarrantyClaimCard.jsx` |
 | `lib/statuses.js` | `App.jsx`, `components/CancellationSubTimeline.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ShippingSubTimeline.jsx`, `components/StatusTimeline.jsx`, `components/WarrantyClaimCard.jsx` |
-| `lib/claims.js` | `App.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/WarrantyClaimCard.jsx` |
 | `lib/returns.js` | `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx` |
 | `data/journey.js` | `App.jsx`, `lib/eddSandbox.js`, `lib/journey.js` |
 | `data/orders.js` | `App.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/flowReducer.js` |
@@ -204,6 +207,6 @@ graph LR
   lib_journey_js --> data_journey_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 73 modules, 21685 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 74 modules, 22340 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

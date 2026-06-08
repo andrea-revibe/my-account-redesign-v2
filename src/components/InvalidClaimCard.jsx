@@ -36,7 +36,11 @@ import { ProductSummary } from './ProductSummary'
 //                                       └─ reversal CTA flips back to paid
 //
 // Per CLAUDE.md, this is the third takeover variant — see Card routing.
-export default function InvalidClaimCard({ order, defaultExpanded = false }) {
+export default function InvalidClaimCard({
+  order,
+  defaultExpanded = false,
+  onKeepClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   // Mode is internal demo state, but mirror any matching signal on the
   // order data so a journey-driven advance (paidAt / declinedAt set on
@@ -108,6 +112,18 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
   const claim = order.claim
   const inv = claim.invalidClaim
   const fee = inv.returnShipping
+  // `reason: 'cancelled'` reuses this whole surface for a customer-initiated
+  // cancel whose device is already with Revibe — only the framing differs
+  // (no QC verdict; the customer chose to cancel and just needs the device
+  // sent back). The secondary becomes "Keep claim" (resume) instead of the
+  // invalid path's "Decline" terminal.
+  const isCancel = inv.reason === 'cancelled'
+  const heroLabel = isCancel ? 'Cancelled claim' : 'Return claim'
+  const heroHeadline = isCancel
+    ? 'Pay return shipping to get your device back'
+    : "Claim couldn't be approved"
+  const cancelNote =
+    'You asked to cancel this claim. Your device is at our hub — cover return shipping and we’ll send it straight back.'
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2">
@@ -140,18 +156,26 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
         <div className="rounded-[14px] border border-[#f6c5cc] bg-danger-bg p-3.5 flex flex-col gap-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {heroLabel}
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-danger whitespace-nowrap shrink-0">
-              <ShieldX size={11} strokeWidth={2.2} />
-              Inspection complete
+              {isCancel ? (
+                <RotateCcw size={11} strokeWidth={2.2} />
+              ) : (
+                <ShieldX size={11} strokeWidth={2.2} />
+              )}
+              {isCancel ? 'Cancellation requested' : 'Inspection complete'}
             </span>
           </div>
           <div className="text-[18px] font-bold leading-[1.15] tracking-[-0.01em] text-danger">
-            Claim couldn't be approved
+            {heroHeadline}
           </div>
 
-          {expanded ? (
+          {isCancel ? (
+            <div className="rounded-[12px] border bg-white/85 border-white px-3 py-2.5 text-[12px] text-ink leading-snug">
+              {cancelNote}
+            </div>
+          ) : expanded ? (
             <CourierMessage
               name={inv.opsName}
               role={inv.opsRole}
@@ -167,7 +191,7 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
             </div>
           )}
 
-          <CountdownStrip inv={inv} />
+          <CountdownStrip inv={inv} isCancel={isCancel} />
         </div>
 
         <ProductSummary order={order} />
@@ -208,10 +232,10 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => setMode('declined')}
+              onClick={() => (isCancel ? onKeepClaim?.(order.id) : setMode('declined'))}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
-              Decline
+              {isCancel ? 'Keep claim' : 'Decline'}
             </button>
             <button
               type="button"
@@ -224,7 +248,9 @@ export default function InvalidClaimCard({ order, defaultExpanded = false }) {
           </div>
 
           <div className="text-[10.5px] text-center text-muted -mt-0.5">
-            You'll get a confirmation email and SMS once the new shipment is created.
+            {isCancel
+              ? "Keeping the claim leaves it active — nothing changes. You'll get a confirmation once the return shipment is created."
+              : "You'll get a confirmation email and SMS once the new shipment is created."}
           </div>
         </div>
       )}
@@ -318,7 +344,10 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
           )}
 
           <div className="rounded-[10px] bg-brand-bg/60 border border-brand-bg2 px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
-            <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued — the device is being shipped back as it was inspected.
+            <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued —{' '}
+            {claim.invalidClaim.reason === 'cancelled'
+              ? 'your device is on its way back because you cancelled the claim.'
+              : 'the device is being shipped back as it was inspected.'}
           </div>
 
           {/* Demo only — production would not let the customer rewind a
@@ -552,7 +581,7 @@ function CourierMessage({ name, role, message, timestamp }) {
   )
 }
 
-function CountdownStrip({ inv }) {
+function CountdownStrip({ inv, isCancel = false }) {
   return (
     <div className="flex items-center gap-2 rounded-[10px] bg-white/85 border border-white px-3 py-2 text-[11.5px]">
       <span className="w-6 h-6 rounded-full bg-danger/10 text-danger grid place-items-center shrink-0">
@@ -564,7 +593,8 @@ function CountdownStrip({ inv }) {
           <span className="text-ink-2"> to pay return shipping</span>
         </div>
         <div className="text-[10.5px] text-muted leading-tight mt-0.5">
-          Claim auto-closes {inv.autoCancelAt}
+          {isCancel ? 'Device returns to circulation' : 'Claim auto-closes'}{' '}
+          {inv.autoCancelAt}
         </div>
       </div>
     </div>

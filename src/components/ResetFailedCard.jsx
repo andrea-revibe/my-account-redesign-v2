@@ -21,7 +21,11 @@ const PASSCODE_LEN = 6
 // on the device, so QC can't wipe it. Customer removes the device from their
 // iCloud account remotely and shares the device passcode, then the card flips
 // to a warn-tone confirmation while ops attempt the reset.
-export default function ResetFailedCard({ order, defaultExpanded = false }) {
+export default function ResetFailedCard({
+  order,
+  defaultExpanded = false,
+  onRequestCancelClaim,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [unlinked, setUnlinked] = useState(false)
   const [passcode, setPasscode] = useState('')
@@ -134,6 +138,7 @@ export default function ResetFailedCard({ order, defaultExpanded = false }) {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
+              onClick={() => onRequestCancelClaim?.(order.id)}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
               Cancel claim
