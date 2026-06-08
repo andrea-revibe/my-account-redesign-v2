@@ -25,9 +25,7 @@ import ClaimDetailsSheet from './ClaimDetailsSheet'
 import ClaimActionBanner from './ClaimActionBanner'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
-
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+import { ProductSummary } from './ProductSummary'
 
 // Card chrome is the refund-hero family (see PastOrderCard cancelled
 // branch): left accent strip, eyebrow, state pill, tinted hero, compact
@@ -67,10 +65,19 @@ export default function ClaimCard({ order, defaultExpanded = false, openSignal =
         aria-expanded={expanded}
         className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
-        <OrderEyebrow id={order.id} />
+        <div className="flex items-center justify-between gap-2">
+          <OrderEyebrow id={order.id} />
+          <span
+            aria-hidden
+            className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
+            style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
+          >
+            <ChevronDown size={12} strokeWidth={1.75} />
+          </span>
+        </div>
         <StatePill claim={claim} tone={tone} />
         <ClaimHero order={order} claim={claim} tone={tone} />
-        <ProductRow order={order} expanded={expanded} />
+        <ProductSummary order={order} />
       </button>
 
       {expanded && (
@@ -287,48 +294,6 @@ function DestinationChip({ claim, order, accent }) {
     </span>
   )
 }
-
-function ProductRow({ order, expanded }) {
-  return (
-    <div className="flex items-center gap-2.5 -mx-1 px-1">
-      <div className="w-8 h-10 rounded-[8px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
-        <img
-          src={order.product.image}
-          alt=""
-          className="max-w-full max-h-full object-contain"
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink truncate">
-          {order.product.name}
-        </div>
-        <div className="text-[11px] text-muted truncate">
-          {order.product.variant}
-        </div>
-        {order.warranty != null && (
-          <div className="flex items-center gap-1 mt-0.5 text-[10.5px] text-muted">
-            <img
-              src={REVIBE_CARE_ICON}
-              alt=""
-              className="w-2.5 h-2.5 object-contain shrink-0"
-            />
-            <span className="truncate">
-              Revibe Care +{order.currency} {order.warranty.toLocaleString()}
-            </span>
-          </div>
-        )}
-      </div>
-      <span
-        aria-hidden
-        className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 ml-1 transition-transform duration-200"
-        style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
-      >
-        <ChevronDown size={12} strokeWidth={1.75} />
-      </span>
-    </div>
-  )
-}
-
 function ClaimTransitDetail({ claim, order }) {
   const [show, setShow] = useState(false)
   const cur = transitSubProgressIndex(claim.transitSubStatusId)

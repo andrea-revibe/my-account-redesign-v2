@@ -64,6 +64,7 @@ One-liners. Expand each in the linked per-feature doc if you need the why.
 - Default to **no comments**. Only write one when the *why* isn't obvious from the code.
 - Component state stays in the component unless multiple components need it; lift to `App.jsx` and pass down (see filter state).
 - Reuse `WalletInfoTooltip` (exports `REVIBE_WALLET_ICON`) anywhere "Revibe Wallet" is named — don't re-roll the tooltip.
+- Reuse `ProductSummary` (`tone="light" | "hero"`, exports `REVIBE_CARE_ICON`) anywhere a product line-item (thumbnail · name · variant · Revibe Care callout · price breakdown) is shown — don't re-roll the row or re-declare the Care icon. It owns the row but not the expand chevron (the card owns the tap target). Design: `docs/handoff/product-summary/design.md`.
 - New status / sub-status / state? Edit `src/lib/statuses.js` only — timeline, banner, header, chips are data-driven from there.
 - Tailwind: prefer custom tokens (`brand`, `accent`, `success`, `progress`, `chip-*`, `searchBg`, `ink`, `muted`, `line`, `surface`) over arbitrary values. Slash-opacity (`bg-brand/10`) works on every token.
 - "Need a screenshot for verification" → playwright at viewport 430×N, `deviceScaleFactor: 2`, `_snap.mjs` at the repo root.

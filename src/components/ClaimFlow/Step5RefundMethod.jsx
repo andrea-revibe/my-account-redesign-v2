@@ -4,9 +4,7 @@ import InlineError from './InlineError'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
-
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+import { REVIBE_CARE_ICON } from '../ProductSummary'
 
 export default function Step5RefundMethod({ state, dispatch, order, error }) {
   if (!order) return null

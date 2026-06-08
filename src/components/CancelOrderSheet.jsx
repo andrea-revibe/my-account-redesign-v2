@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, ChevronLeft, Info, ShieldCheck, Sparkles } from 'lucide-react'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
-
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+import { REVIBE_CARE_ICON } from './ProductSummary'
 
 // Statuses where the dissuade screen fires on the original-payment path.
 // At these stages the order hasn't shipped yet, so the ship-deadline fee

@@ -68,7 +68,7 @@ flowchart TD
   q6 -->|cancelled past with refund| cancelled[PastOrderCard — Cancelled]
 ```
 
-The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard`) share the same chrome family: left accent strip, `Order · #{id}` eyebrow, state pill, tinted hero block, compact product row. They differ in what the hero leads with and which actions hang off the bottom. The three claim takeover cards (`DocsRejectedCard`, `PickupFailedCard`, `InvalidClaimCard`) replace `ClaimCard`'s surface while the claim is blocked on a single customer action; full spec in [returns/claim_tracking.md](./returns/claim_tracking.md).
+The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard`) share the same chrome family: left accent strip, `Order · #{id}` eyebrow, state pill, tinted hero block, and the shared `ProductSummary` line-item (§3.0). They differ in what the hero leads with and which actions hang off the bottom. The three claim takeover cards (`DocsRejectedCard`, `PickupFailedCard`, `InvalidClaimCard`) replace `ClaimCard`'s surface while the claim is blocked on a single customer action; full spec in [returns/claim_tracking.md](./returns/claim_tracking.md).
 
 | Card | Used for | Hero leads with | Expandable? |
 |---|---|---|---|
@@ -80,6 +80,20 @@ The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimC
 
 ## 3. Order surfaces
 
+### 3.0 ProductSummary — the shared product line-item
+
+Every order/claim card renders the "what you bought + what you paid" row through one shared component, `src/components/ProductSummary.jsx` (design: `docs/handoff/product-summary/design.md`, "Direction C — Elevated Care"). It replaced ten near-identical inline copies and exports the single `REVIBE_CARE_ICON` constant (mirroring `WalletInfoTooltip`'s `REVIBE_WALLET_ICON`); the cancellation/refund breakdown surfaces (`CancelOrderSheet`, `Step5RefundMethod`) import that constant rather than re-declaring it.
+
+API: `<ProductSummary order={order} tone="light" | "hero" />`. The component owns the thumbnail, name, variant, the Revibe Care callout, and the price breakdown — but **not** the expand chevron (the card owns the tap target + chevron).
+
+Layout (with warranty):
+
+- **Top row** — 72×72 thumbnail on a clean tile (white `surface` + `line` border on light cards; `white/.96` no border on hero), product name (16px/700), variant (12.5px/muted), and a right-aligned `Device` eyebrow over the `order.subtotal` price (falls back to `order.total`).
+- **Revibe Care callout** — a dedicated block carrying the **hero gradient** (magenta/violet radial glow + white icon chip holding `REVIBE_CARE_ICON`), the "Revibe Care" title, an "extended warranty" subline, and `+{currency} {warranty}`. This is the brand moment on an otherwise calm light card. On the dark `HeroCard` the gradient can't sit on the gradient, so the callout **inverts to a frosted-white panel** (`white/.12`); the white chip keeps the Care identity.
+- **Total row** — a top divider, `Total paid` label, and the bold `order.total` (19px/800). This makes `subtotal + Revibe Care = total` read with no mental math.
+
+Layout (no warranty, `order.warranty == null`): the Care callout **and** the Total row are both omitted (subtotal === total, so a breakdown would just repeat one number). The row collapses to product + a single right-aligned `Total` eyebrow over the bold total — no empty gap, no leftover divider.
+
 ### 3.1 InProgressCard (`created`, `quality_check`)
 
 **Collapsed:**
@@ -88,7 +102,7 @@ The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimC
 - State pill (`Order placed` for `created`, `Quality check` for `quality_check`) with a `Package` / `ShieldCheck` icon, on its own row beneath the eyebrow. Constant brand-purple tone regardless of `delayed`.
 - A brand-purple gradient hero block (`from-brand-bg to-brand-bg2`) carrying `Delivery by` eyebrow + an `On track` tag (`Zap` icon) on the right; a `text-[26px]` headline using `order.estimatedDeliveryLong || order.estimatedDelivery`; the body sentence from `statusDescription(order).body`; and a `Delivering to [Home]` chip below.
 - When `order.delayed === true` the right-side tag swaps to `Clock` + `Taking longer than expected` and turns **amber** (`text-amber-600`) — the rest of the hero (gradient, ETA headline, state pill) stays brand-purple (see §8 "Delayed in-progress accent"). The body pulls the delay-flavoured copy from `DELAYED_BODY[statusId]`.
-- A compact product row (image / name / variant / `Revibe Care +{currency} {amount}` line / total / chevron). Chevron is decorative; the whole header is one tap target.
+- The shared `ProductSummary` row (§3.0). The decorative expand chevron now sits on the `Order · #{id}` eyebrow line (relocated out of the row); the whole header is one tap target.
 
 **Expanded:**
 
@@ -107,7 +121,7 @@ The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimC
 - Subline with the most relevant timestamp (forward-looking ETA when DHL provides one, otherwise the most recent status timestamp).
 - State chip on the right when relevant. Cancelled orders carry a red "Cancelled" chip.
 - Horizontal four-step dot timeline above the product strip.
-- Product image, name, variant, `Revibe Care +{currency} {amount}` line, uppercase `TOTAL` caption above the bold amount.
+- The shared `ProductSummary` row (§3.0). Chevron lives in the status summary header, not the row.
 
 **Expanded:**
 
@@ -124,7 +138,7 @@ The delivered card is **not expandable** — there is no chevron and no expanded
 - `Order · #{id}` eyebrow.
 - Success-tinted `Delivered` state pill (`PackageCheck` icon).
 - Success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (falls back to the date part of `order.timeline.delivered`); a `Delivered to [Home]` chip below.
-- Compact product row that surfaces image / name / variant / `Revibe Care +{currency} {amount}` line / total. The Revibe Care line and total are deliberately retained on this card (the refunded card omits both, since its hero already carries the money story).
+- The shared `ProductSummary` row (§3.0) — the Revibe Care callout + Total paid are retained on this card (the refunded card omits the money story, which its hero carries). The cancelled refund-hero card keeps its own minimal product-identity row (name + variant only, no money), since the RefundHero already states the refund breakdown.
 - Right-aligned chip-style footer with `Download receipt` + `Raise a claim`, separated by a top dashed border. `Raise a claim` is the entry point to the returns flow — see [returns/change_of_mind.md](./returns/change_of_mind.md) / [returns/issue.md](./returns/issue.md).
 
 A single-row `HistoryThread` (mode `'delivered'`) carrying just the `Order placed` event sits between the product row and the footer buttons, collapsed by default. Delivery is the active hero so it is intentionally absent from the thread.
@@ -251,8 +265,8 @@ The orders array (`src/data/orders.js`) is mock data today. Production will swap
 | `placedAt` | string (formatted) | Order timestamp shown on the summary screen. |
 | `placedAtFull` *(optional)* | string | Pre-formatted long form (e.g. `Monday, 4 May`) — keeps components out of weekday arithmetic. |
 | `quantity` | integer | Number of items in the order. |
-| `subtotal` *(optional)* | number, no currency | Product-only amount. Used by the cancellation sheet's line-item breakdown. Falls back to `total` when absent. |
-| `warranty` *(optional)* | number, no currency | Revibe Care add-on amount. Field name kept as `warranty` for backwards compatibility. Renders as `Revibe Care +{amount}` on product strips and in cancellation/return breakdowns; omitted when absent. |
+| `subtotal` *(optional)* | number, no currency | Product-only amount. Shown as the `Device` price in the `ProductSummary` breakdown (§3.0) and the cancellation sheet's line-item breakdown. Falls back to `total` when absent. |
+| `warranty` *(optional)* | number, no currency | Revibe Care add-on amount. Field name kept as `warranty` for backwards compatibility. Drives the gradient Revibe Care callout in `ProductSummary` (§3.0) and renders as a `Revibe Care +{amount}` line in cancellation/return breakdowns; `null`/absent omits the callout and the Total row. |
 | `total` | number, no currency | Total amount paid. Should equal `subtotal + warranty` when both are present. |
 | `currency` | string | Three-letter currency code (e.g. `"AED"`). |
 | `customerName` | string | Recipient's full name. |

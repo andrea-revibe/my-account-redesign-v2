@@ -19,9 +19,7 @@ import RefundDetailsSheet from './RefundDetailsSheet'
 import KeepOrderSheet from './KeepOrderSheet'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip from './BnplDisclaimerTooltip'
-
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
+import { ProductSummary } from './ProductSummary'
 
 // Compact card for past orders. Delivered keeps its one-row treatment +
 // Download receipt / Raise a claim footer. Cancelled past orders
@@ -46,7 +44,7 @@ function DeliveredOrderCard({ order, onRaiseClaim }) {
         <OrderEyebrow id={order.id} />
         <DeliveredStatePill />
         <DeliveredHero order={order} />
-        <DeliveredProductRow order={order} />
+        <ProductSummary order={order} />
         {history.length > 0 && <HistoryThread events={history} />}
         <div className="flex justify-end gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
           <PastButton icon={Download} label="Download receipt" />
@@ -98,47 +96,6 @@ function DeliveredHero({ order }) {
     </div>
   )
 }
-
-function DeliveredProductRow({ order }) {
-  return (
-    <div className="flex items-center gap-2.5 -mx-1 px-1">
-      <div className="w-8 h-10 rounded-[8px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
-        <img
-          src={order.product.image}
-          alt=""
-          className="max-w-full max-h-full object-contain"
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink truncate">
-          {order.product.name}
-        </div>
-        <div className="text-[11px] text-muted truncate">
-          {order.product.variant}
-        </div>
-        {order.warranty != null && (
-          <div className="flex items-center gap-1 mt-0.5 text-[10.5px] text-muted">
-            <img
-              src={REVIBE_CARE_ICON}
-              alt=""
-              className="w-2.5 h-2.5 object-contain shrink-0"
-            />
-            <span className="truncate">
-              Revibe Care +{order.currency}{' '}
-              {order.warranty.toLocaleString()}
-            </span>
-          </div>
-        )}
-      </div>
-      <div className="text-right shrink-0">
-        <div className="text-[13px] font-semibold text-ink tabular-nums whitespace-nowrap">
-          {order.currency} {order.total.toLocaleString()}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function PastButton({ icon: Icon, label, onClick }) {
   return (
     <button

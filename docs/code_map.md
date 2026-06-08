@@ -24,6 +24,7 @@
 | Card routing (which card renders) | `App.jsx` (routing block ≈ L285–375) | `output/orders.md` §2 |
 | Cancellation sheet / keep-order undo | `CancelOrderSheet.jsx`, `KeepOrderSheet.jsx` | `output/cancellations.md` |
 | Mock orders / field shapes | `data/orders.js` | `output/orders.md` §7 |
+| Product line-item (thumbnail · name · variant · Revibe Care callout · price breakdown), shared across all cards | `components/ProductSummary.jsx` (exports `REVIBE_CARE_ICON`) | `output/orders.md` §3.0 |
 
 ## Coupling the import graph can't see
 
@@ -58,13 +59,13 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 
 | Module | LOC | In | Exports (line) |
 |---|--:|--:|---|
-| `App.jsx` | 475 | 1 | `App`·78 |
+| `App.jsx` | 483 | 1 | `App`·78 |
 | `components/BnplDisclaimerTooltip.jsx` | 86 | 6 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
-| `components/CancelOrderSheet.jsx` | 573 | 2 | `CancelOrderSheet`·13 |
+| `components/CancelOrderSheet.jsx` | 711 | 2 | `CancelOrderSheet`·19 |
 | `components/CancellationSubTimeline.jsx` | 94 | 1 | `CancellationSubTimeline`·11 |
 | `components/ChatFab.jsx` | 14 | 1 | `ChatFab`·3 |
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
-| `components/ClaimCard.jsx` | 521 | 1 | `ClaimCard`·42 |
+| `components/ClaimCard.jsx` | 486 | 1 | `ClaimCard`·40 |
 | `components/ClaimDetailsSheet.jsx` | 230 | 2 | `ClaimDetailsSheet`·16 |
 | `components/ClaimFlow/ClaimFlow.jsx` | 369 | 1 | `ClaimFlow`·25 |
 | `components/ClaimFlow/InlineError.jsx` | 16 | 7 | `InlineError`·6 |
@@ -77,7 +78,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimFlow/Step3DevicePrep.jsx` | 478 | 1 | `Step3DevicePrep`·35 |
 | `components/ClaimFlow/Step4Packing.jsx` | 253 | 2 | `PACKING_OPTIONS`·15, `PACKING_LABELS`·36, `Step4Packing`·40 |
 | `components/ClaimFlow/Step4PickupDetails.jsx` | 433 | 1 | `Step4PickupDetails`·53 |
-| `components/ClaimFlow/Step5RefundMethod.jsx` | 271 | 1 | `Step5RefundMethod`·11 |
+| `components/ClaimFlow/Step5RefundMethod.jsx` | 269 | 1 | `Step5RefundMethod`·9 |
 | `components/ClaimFlow/Step6Review.jsx` | 599 | 1 | `Step6Review`·35 |
 | `components/ClaimFlow/Step7Confirmation.jsx` | 210 | 1 | `Step7Confirmation`·15 |
 | `components/ClaimFlow/StepHeading.jsx` | 16 | 9 | `StepHeading`·1 |
@@ -87,29 +88,30 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimFlow/issueSubtypes.js` | 165 | 2 | `PROOF_GUIDE_LABEL`·9, `DEFAULT_PROOF_GUIDE_URL`·12, `ISSUE_SCOPES`·19, `NOT_WORKING_SUBTYPES`·32, `WRONG_DEVICE_SUBTYPES`·129, `findSubtype`·152, `scopeForSubtype`·160 |
 | `components/ClaimFlow/resetGuideAnim.js` | 10 | 2 | `STEP_ANIM_CSS`·3, `stepAnim`·8 |
 | `components/ClaimFlow/resetGuideMocks.jsx` | 1670 | 1 | _(none)_ |
-| `components/DocsRejectedCard.jsx` | 538 | 1 | `DocsRejectedCard`·34 |
+| `components/DocsRejectedCard.jsx` | 496 | 1 | `DocsRejectedCard`·33 |
 | `components/EddSandboxPanel.jsx` | 154 | 1 | `EddSandboxPanel`·9 |
 | `components/GreetRow.jsx` | 39 | 1 | `GreetRow`·3 |
 | `components/Header.jsx` | 50 | 1 | `Header`·6 |
-| `components/HeroCard.jsx` | 337 | 1 | `HeroCard`·31 |
+| `components/HeroCard.jsx` | 298 | 1 | `HeroCard`·29 |
 | `components/HistoryThread.jsx` | 218 | 3 | `HistoryThread`·86 |
-| `components/InProgressCard.jsx` | 331 | 1 | `InProgressCard`·31 |
-| `components/InvalidClaimCard.jsx` | 890 | 1 | `InvalidClaimCard`·40 |
+| `components/InProgressCard.jsx` | 291 | 1 | `InProgressCard`·29 |
+| `components/InvalidClaimCard.jsx` | 848 | 1 | `InvalidClaimCard`·39 |
 | `components/JourneyDevPanel.jsx` | 162 | 1 | `JourneyDevPanel`·12 |
 | `components/KeepOrderSheet.jsx` | 122 | 1 | `KeepOrderSheet`·9 |
-| `components/OrderCard.jsx` | 485 | 1 | `OrderCard`·38 |
+| `components/OrderCard.jsx` | 449 | 1 | `OrderCard`·36 |
 | `components/OrderFilters.jsx` | 151 | 1 | `STATUS_CHIPS`·4, `DATE_RANGES`·11, `OrderFilters`·21 |
-| `components/PastOrderCard.jsx` | 466 | 1 | `PastOrderCard`·31 |
-| `components/PickupFailedCard.jsx` | 466 | 1 | `PickupFailedCard`·21 |
-| `components/RefundDetailsSheet.jsx` | 150 | 1 | `RefundDetailsSheet`·7 |
-| `components/ResetFailedCard.jsx` | 513 | 1 | `ResetFailedCard`·25 |
+| `components/PastOrderCard.jsx` | 430 | 1 | `PastOrderCard`·29 |
+| `components/PickupFailedCard.jsx` | 424 | 1 | `PickupFailedCard`·20 |
+| `components/ProductSummary.jsx` | 136 | 12 | `REVIBE_CARE_ICON`·1, `ProductSummary`·12 |
+| `components/RefundDetailsSheet.jsx` | 165 | 1 | `RefundDetailsSheet`·7 |
+| `components/ResetFailedCard.jsx` | 471 | 1 | `ResetFailedCard`·24 |
 | `components/ShippingSubTimeline.jsx` | 73 | 1 | `ShippingSubTimeline`·9 |
 | `components/StatusTimeline.jsx` | 62 | 1 | `StatusTimeline`·6 |
 | `components/UndoSnackbar.jsx` | 44 | 1 | `UndoSnackbar`·8 |
 | `components/WalletInfoTooltip.jsx` | 71 | 4 | `REVIBE_WALLET_ICON`·4, `WalletInfoTooltip`·7 |
-| `components/WarrantyClaimCard.jsx` | 676 | 1 | `WarrantyClaimCard`·51 |
+| `components/WarrantyClaimCard.jsx` | 641 | 1 | `WarrantyClaimCard`·49 |
 | `data/journey.js` | 89 | 3 | `INITIAL_ORDER`·28, `JOURNEYS`·30 |
-| `data/journeys/cancellation.js` | 373 | 1 | `CANCELLATION_NODES`·25 |
+| `data/journeys/cancellation.js` | 626 | 1 | `CANCELLATION_NODES`·25 |
 | `data/journeys/claimChangeOfMind.js` | 697 | 1 | `CLAIM_COM_NODES`·19 |
 | `data/journeys/claimCompensation.js` | 336 | 1 | `CLAIM_COMPENSATION_NODES`·29 |
 | `data/journeys/claimIssue.js` | 786 | 1 | `CLAIM_ISSUE_NODES`·27 |
@@ -117,7 +119,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/journeys/happyPath.js` | 101 | 1 | `HAPPY_PATH_NODES`·5 |
 | `data/journeys/initialOrder.js` | 37 | 1 | `INITIAL_ORDER`·2 |
 | `data/orders.js` | 20 | 3 | `ORDERS`·14 |
-| `data/orders/baseline.js` | 341 | 1 | `BASELINE_ORDERS`·3 |
+| `data/orders/baseline.js` | 435 | 1 | `BASELINE_ORDERS`·3 |
 | `data/orders/claims.js` | 661 | 1 | `CLAIM_ORDERS`·4 |
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
@@ -202,6 +204,6 @@ graph LR
   lib_journey_js --> data_journey_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 72 modules, 21453 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 73 modules, 21706 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

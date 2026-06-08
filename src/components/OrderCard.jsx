@@ -22,14 +22,12 @@ import StatusTimeline from './StatusTimeline'
 import ShippingSubTimeline from './ShippingSubTimeline'
 import CancellationSubTimeline from './CancellationSubTimeline'
 import CancelOrderSheet from './CancelOrderSheet'
+import { ProductSummary } from './ProductSummary'
 
 // Hardcoded so the demo lands on a real DHL test shipment regardless of the
 // placeholder tracking numbers in the mock data.
 const DHL_TRACKING_URL =
   'https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=3392654392'
-
-const REVIBE_CARE_ICON =
-  'https://cdn.shopify.com/s/files/1/0695/1737/7855/files/Revibe_logo_RE_CARE_Color_copy.png?v=1719938652'
 
 // Inline-expandable order card. Collapsed view leads with status, an ETA
 // block (for created / quality_check states), the dot timeline, and a
@@ -101,44 +99,10 @@ export default function OrderCard({ order, defaultExpanded = false, onCancelOrde
 
         {showTimeline && <DotBar order={order} />}
 
-        <div className="flex items-center gap-3 pt-3 border-t border-dashed border-line">
-          <div className="w-11 h-14 rounded-[10px] bg-brand-bg border border-line-2 grid place-items-center p-1 shrink-0">
-            <img
-              src={order.product.image}
-              alt={order.product.name}
-              className="max-w-full max-h-full object-contain"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[14px] font-semibold text-ink truncate">
-              {order.product.name}
-            </div>
-            <div className="text-[12px] text-muted mt-0.5 truncate">
-              {order.product.variant}
-            </div>
-            {order.warranty != null && (
-              <div className="flex items-center gap-1 mt-0.5 text-[11.5px] text-muted">
-                <img
-                  src={REVIBE_CARE_ICON}
-                  alt=""
-                  className="w-3.5 h-3.5 object-contain shrink-0"
-                />
-                <span className="truncate">
-                  Revibe Care +{order.currency}{' '}
-                  {order.warranty.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted leading-none">
-              Total
-            </div>
-            <div className="mt-1 text-[14.5px] font-bold text-ink whitespace-nowrap tabular-nums">
-              {order.currency} {order.total.toLocaleString()}
-            </div>
-          </div>
-        </div>
+        <ProductSummary
+          order={order}
+          className="pt-3 border-t border-dashed border-line"
+        />
       </button>
 
       {expanded && (
