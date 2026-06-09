@@ -8,6 +8,9 @@ covers:
   - src/data/journeys
   - src/components/JourneyDevPanel.jsx
   - src/components/EddSandboxPanel.jsx
+  - src/lib/notifications.js
+  - src/data/notifications
+  - src/components/JourneyNotificationPanel.jsx
 ---
 
 # Journey mode
@@ -44,6 +47,16 @@ Live-UI wiring: the card's `Cancel claim` CTA opens `CancelClaimSheet`; on confi
 
 `dynamic_edd` is the first **sandbox** journey — `kind: 'sandbox'`, `nodes: []`. There's no node graph to advance; instead, `useEddSandbox` owns four date inputs (today / order / QC / shipped) + an "actual delivered" toggle + a market selector (UAE / ZA / SA), and synthesises an order shape on every change. `App.jsx` swaps `JourneyDevPanel` for `EddSandboxPanel` (date pickers + a debug strip showing stage / elapsed / SLA verdict / message key / initial promise / EDD). The pure EDD model lives in `src/lib/edd.js` (1:1 port of `brief/edd.py` / `EDD_FINAL.xlsx`). Banner copy is injected via the `order.statusBanner: { tone, lead, body }` field, which fully overrides `statusDescription`'s status-driven defaults when set (the existing `statusMessage` only overrides body). **The sandbox sets `statusBanner` only for the SLA-divergence messages** — `order_late` / `qc_late` / `shipped_late` and the QC `qc_back_on_track` recovery — because those have no card equivalent. The on-time happy path (`order_on_time` / `qc_on_time` / `shipped_on_time`) and `delivered` leave `statusBanner` null, so the card copy in `statuses.js` (`STATUS_DESCRIPTIONS`) renders unchanged — the sandbox reuses the cards rather than duplicating their copy, so the two can't drift. (The on-time `MSG_*` constants were removed from `edd.js`; `buildCustomerMessage` returns `body: null` for those keys, and the debug strip surfaces only the message `key`.)
 
+## Customer notifications
+
+`JourneyNotificationPanel` (stacked above `JourneyDevPanel`, replay journeys only) previews the WhatsApp / Email message the customer receives at the **current node**, looked up by the node's backend `event` name via `notificationFor(event, order)` (returns `null` → panel shows an empty state). Keying by `event` (not node id) means one event reuses the same copy across journeys.
+
+**Content vs logic split.** The copy is pure data in `src/data/notifications/*` — one file per `event.*` domain (`orders.js` for `order.*` incl. cancellation, `shipment.js` for the outbound leg, `claims.js` for `claim.*`), merged by `index.js` into `NOTIFICATIONS`. Each entry is `{ whatsapp, email: { subject, body, screenshot } }` — plain strings with `{tokens}` (e.g. `{trackingNumber}`, `{deliveredOnLong}`) that `interpolate` in `src/lib/notifications.js` fills from the live order. `lib/notifications.js` holds only the lookup + interpolation — no copy. To add a notification, add an entry to the matching domain file (no code changes); to add a domain, add a sibling file and spread it in `index.js`. `claims.js` is currently a scaffold (one filled example + a commented event index).
+
+**Email screenshots.** The Email preview is tappable → opens the real email render full-size in a portal lightbox. The path is `email.screenshot`, organised by domain under `public/emails/{orders,shipment,claims}/` (mirroring the content files; see `public/emails/README.md`). The lightbox shows a "coming soon" placeholder naming the exact path when the image isn't present, so paths can be wired ahead of the assets.
+
+The channel toggle is a preview (both channels are "sent"); selection lives in the component so it persists across advances. **Coverage today:** the full happy-path chain (`order.created`, `order.quality_check.started`, `shipment.arrived_destination`, `shipment.out_for_delivery`, `shipment.delivered`) plus a growing set of claim-domain events in `claims.js` (`claim.created`, `claim.pickup.failed`, …). Every event without an entry — incl. intermediate logistics sub-statuses, deliberately silent — falls through to the empty state until copy is authored. This is the seed of the backend notification spec.
+
 ## Adding a new journey
 
 1. **Sketch the nodes on paper first.** For each: `id`, `label`, `trigger` (`customer` or `system`), `event` (backend event name), and the exact field deltas `apply(order)` applies. The node *is* the spec — do this before writing code.
@@ -59,7 +72,7 @@ Live-UI wiring: the card's `Cancel claim` CTA opens `CancelClaimSheet`; on confi
 - **Hybrid architecture.** `JOURNEYS` is an array of top-level journeys (picker chip per journey in the panel). Branching lives *inside* a journey via the `next: [...]` field, not by adding a new top-level journey for every variant.
 - **Refund-method branching pattern.** When a customer-triggered node forks on refund method, use sibling nodes (`*_wallet`, `*_card`) that converge later in the chain. Branch suffix maps to the sheet's refund-method value in `App.jsx` (`store_credit → wallet`, `original → card`).
 - **Permissive panel (current default).** The dev panel renders Next buttons for `customer`-triggered nodes too, styled outlined with a `via UI` chip — flags that the real surface is the canonical path. Switch to strict (filter `trigger === 'customer'`) once 3+ customer-triggered nodes exist across journeys.
-- **Path-based replay.** `useJourney` tracks `path: string[]` rather than a single cursor. Required for branched journeys — applying nodes 0..i in array order would silently misapply deltas as soon as the array contains nodes from unreachable branches.
+- **Path-based replay.** `useJourney` tracks `path: string[]` rather than a single cursor. Required for branched journeys — applying nodes 0..i in array order would silently misapply deltas as soon as the array contains nodes from unreachable branches. **Trap:** for the same reason, always resolve the current node by `nodes.find(n => n.id === currentNodeId)`, never `nodes[currentIndex]` (= `nodes[path.length - 1]`) — sub-branch nodes are appended at the end of the array, so the index lookup points at an unrelated node. The notification panel + dev-panel current-state label both depend on this; `validNext()` already uses `currentNodeId`.
 - **`kind: 'sandbox'` for free-input journeys.** When a journey is parameter-driven (not event-driven), set `kind: 'sandbox'`, leave `nodes: []`, and pair it with a dedicated hook + panel. `App.jsx` calls *both* `useJourney` and the sandbox hook unconditionally (hook rules) and picks one based on `journey.kind`. The sandbox order shape feeds the existing card-routing tree unchanged — no new branches in the rendering pipeline.
 
 ## Source files
@@ -69,6 +82,10 @@ Live-UI wiring: the card's `Cancel claim` CTA opens `CancelClaimSheet`; on confi
 - `src/lib/edd.js` — pure EDD model (markets, `workdayIntl`, `calculateEdd`, `orderStatus`, message constants). Port of `brief/edd.py`.
 - `src/lib/eddSandbox.js` — `useEddSandbox(journey)` hook (date/market inputs → synthesised order with `statusBanner` override).
 - `src/components/JourneyDevPanel.jsx` — replay panel (Next buttons + journey picker).
+- `src/data/notifications/*` — notification copy, split per `event.*` domain (`orders` / `shipment` / `claims`) + `index.js` barrel exporting the merged `NOTIFICATIONS`. Pure data, `{token}` placeholders.
+- `src/lib/notifications.js` — `notificationFor(event, order)` + `interpolate`: resolves an event to its message and fills tokens. Logic only (no copy).
+- `src/components/JourneyNotificationPanel.jsx` — customer-notification preview (channel toggle + tappable Email → screenshot lightbox), stacked above the dev panel in replay mode.
+- `public/emails/{orders,shipment,claims}/` — real email screenshots, mirroring the content domains (`README.md` indexes the wired files).
 - `src/components/EddSandboxPanel.jsx` — sandbox panel (date inputs + debug strip + journey picker).
 - `src/App.jsx` — `journeyMode` + `?journey=<id>` URL param; `handleCancelOrder` / `handleSubmitClaim` (customer-triggered advances; no-op in sandbox).
 - `src/lib/statuses.js` — `statusDescription` honours `order.statusBanner` as a full override when set (used by the sandbox for late / back-on-track only; on-time + delivered fall through to `STATUS_DESCRIPTIONS`).

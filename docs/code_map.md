@@ -62,7 +62,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 
 | Module | LOC | In | Exports (line) |
 |---|--:|--:|---|
-| `App.jsx` | 666 | 1 | `App`·85 |
+| `App.jsx` | 673 | 1 | `App`·86 |
 | `components/BnplDisclaimerTooltip.jsx` | 86 | 6 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
 | `components/CancelClaimSheet.jsx` | 155 | 1 | `CancelClaimSheet`·15 |
 | `components/CancelOrderSheet.jsx` | 711 | 2 | `CancelOrderSheet`·19 |
@@ -102,6 +102,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/InProgressCard.jsx` | 291 | 1 | `InProgressCard`·29 |
 | `components/InvalidClaimCard.jsx` | 791 | 1 | `InvalidClaimCard`·37 |
 | `components/JourneyDevPanel.jsx` | 162 | 1 | `JourneyDevPanel`·12 |
+| `components/JourneyNotificationPanel.jsx` | 171 | 1 | `JourneyNotificationPanel`·20 |
 | `components/KeepOrderSheet.jsx` | 122 | 1 | `KeepOrderSheet`·9 |
 | `components/OrderCard.jsx` | 449 | 1 | `OrderCard`·36 |
 | `components/OrderFilters.jsx` | 151 | 1 | `STATUS_CHIPS`·4, `DATE_RANGES`·11, `OrderFilters`·21 |
@@ -122,9 +123,13 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/journeys/claimChangeOfMind.js` | 751 | 1 | `CLAIM_COM_NODES`·19 |
 | `data/journeys/claimCompensation.js` | 349 | 1 | `CLAIM_COMPENSATION_NODES`·29 |
 | `data/journeys/claimIssue.js` | 850 | 1 | `CLAIM_ISSUE_NODES`·27 |
-| `data/journeys/claimWarranty.js` | 840 | 1 | `CLAIM_WARRANTY_NODES`·22 |
+| `data/journeys/claimWarranty.js` | 905 | 1 | `CLAIM_WARRANTY_NODES`·22 |
 | `data/journeys/happyPath.js` | 101 | 1 | `HAPPY_PATH_NODES`·5 |
 | `data/journeys/initialOrder.js` | 37 | 1 | `INITIAL_ORDER`·2 |
+| `data/notifications/claims.js` | 48 | 1 | `CLAIM_NOTIFICATIONS`·9 |
+| `data/notifications/index.js` | 16 | 1 | `NOTIFICATIONS`·11 |
+| `data/notifications/orders.js` | 45 | 1 | `ORDER_NOTIFICATIONS`·9 |
+| `data/notifications/shipment.js` | 40 | 1 | `SHIPMENT_NOTIFICATIONS`·9 |
 | `data/orders.js` | 20 | 3 | `ORDERS`·14 |
 | `data/orders/baseline.js` | 435 | 1 | `BASELINE_ORDERS`·3 |
 | `data/orders/claims.js` | 666 | 1 | `CLAIM_ORDERS`·4 |
@@ -136,6 +141,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `lib/eddSandbox.js` | 231 | 1 | `useEddSandbox`·187 |
 | `lib/events.js` | 152 | 3 | `getHistoryEvents`·119 |
 | `lib/journey.js` | 91 | 1 | `useJourney`·17 |
+| `lib/notifications.js` | 33 | 1 | `NOTIFICATIONS`·12, `notificationFor`·21 |
 | `lib/returns.js` | 267 | 5 | `RETURN_WINDOW_DAYS`·4, `RESTOCKING_FEE_RATE`·5, `ISSUE_WALLET_BONUS`·9, `addDays`·36, `startOfDay`·40, `eligibilityFor`·46, `groupOrdersByEligibility`·71, `refundBreakdown`·89, `formatMoney`·135, `formatLongDate`·140, `formatShortDate`·149, `generateClaimRef`·158, `BATTERY_BASELINE_BY_GRADE`·166, `conditionGradeOf`·175, `batteryBaselineFor`·182, `daysSinceDelivery`·193, `assessBattery`·210 |
 | `lib/statuses.js` | 338 | 10 | `STATUSES`·4, `CANCELLATION_STATUSES`·31, `SHIPPING_SUB_STATUSES`·55, `ORDER_STATES`·80, `progressIndex`·94, `subProgressIndex`·99, `cancellationProgressIndex`·104, `cancellationStepsFor`·115, `statusDescription`·125, `pickActiveOrderId`·253, `statusHeadline`·266, `statusSubline`·285, `statusIconFor`·314 |
 | `main.jsx` | 11 | 0 | _(none)_ |
@@ -160,6 +166,10 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 | `data/journeys/claimWarranty.js` | `data/journey.js` |
 | `data/journeys/happyPath.js` | `data/journey.js` |
 | `data/journeys/initialOrder.js` | `data/journey.js` |
+| `data/notifications/claims.js` | `data/notifications/index.js` |
+| `data/notifications/index.js` | `lib/notifications.js` |
+| `data/notifications/orders.js` | `data/notifications/index.js` |
+| `data/notifications/shipment.js` | `data/notifications/index.js` |
 | `data/orders/baseline.js` | `data/orders.js` |
 | `data/orders/claims.js` | `data/orders.js` |
 | `data/orders/compensation.js` | `data/orders.js` |
@@ -167,6 +177,7 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 | `lib/edd.js` | `lib/eddSandbox.js` |
 | `lib/eddSandbox.js` | `App.jsx` |
 | `lib/journey.js` | `App.jsx` |
+| `lib/notifications.js` | `components/JourneyNotificationPanel.jsx` |
 
 ### Source-of-truth spine
 
@@ -182,6 +193,10 @@ graph LR
   data_journeys_claimWarranty_js["data/journeys/claimWarranty.js"]
   data_journeys_happyPath_js["data/journeys/happyPath.js"]
   data_journeys_initialOrder_js["data/journeys/initialOrder.js"]
+  data_notifications_claims_js["data/notifications/claims.js"]
+  data_notifications_index_js["data/notifications/index.js"]
+  data_notifications_orders_js["data/notifications/orders.js"]
+  data_notifications_shipment_js["data/notifications/shipment.js"]
   data_orders_js["data/orders.js"]
   data_orders_baseline_js["data/orders/baseline.js"]
   data_orders_claims_js["data/orders/claims.js"]
@@ -193,6 +208,7 @@ graph LR
   lib_eddSandbox_js["lib/eddSandbox.js"]
   lib_events_js["lib/events.js"]
   lib_journey_js["lib/journey.js"]
+  lib_notifications_js["lib/notifications.js"]
   lib_returns_js["lib/returns.js"]
   lib_statuses_js["lib/statuses.js"]
   data_journey_js --> data_journeys_initialOrder_js
@@ -202,6 +218,9 @@ graph LR
   data_journey_js --> data_journeys_claimWarranty_js
   data_journey_js --> data_journeys_claimIssue_js
   data_journey_js --> data_journeys_claimCompensation_js
+  data_notifications_index_js --> data_notifications_orders_js
+  data_notifications_index_js --> data_notifications_shipment_js
+  data_notifications_index_js --> data_notifications_claims_js
   data_orders_js --> data_orders_baseline_js
   data_orders_js --> data_orders_claims_js
   data_orders_js --> data_orders_warranty_js
@@ -209,8 +228,9 @@ graph LR
   lib_eddSandbox_js --> data_journey_js
   lib_eddSandbox_js --> lib_edd_js
   lib_journey_js --> data_journey_js
+  lib_notifications_js --> data_notifications_index_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 77 modules, 22535 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 83 modules, 22960 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

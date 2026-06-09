@@ -17,6 +17,7 @@ import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import CancelClaimSheet from './components/CancelClaimSheet'
 import UndoSnackbar from './components/UndoSnackbar'
 import JourneyDevPanel from './components/JourneyDevPanel'
+import JourneyNotificationPanel from './components/JourneyNotificationPanel'
 import EddSandboxPanel from './components/EddSandboxPanel'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
@@ -624,18 +625,26 @@ export default function App() {
         />
       )}
       {journeyMode && !isSandbox && (
-        <JourneyDevPanel
-          nodes={journey.nodes}
-          currentNodeId={journey.currentNodeId}
-          currentIndex={journey.currentIndex}
-          validNext={journey.validNext}
-          advance={journey.advance}
-          back={journey.back}
-          reset={journey.reset}
-          journeys={journey.journeys}
-          activeJourneyId={journey.journey.id}
-          onSelectJourney={selectJourney}
-        />
+        <div className="fixed bottom-4 right-4 z-50 w-[360px] flex flex-col gap-3">
+          <JourneyNotificationPanel
+            event={
+              journey.nodes.find((n) => n.id === journey.currentNodeId)?.event
+            }
+            order={journey.order}
+          />
+          <JourneyDevPanel
+            nodes={journey.nodes}
+            currentNodeId={journey.currentNodeId}
+            currentIndex={journey.currentIndex}
+            validNext={journey.validNext}
+            advance={journey.advance}
+            back={journey.back}
+            reset={journey.reset}
+            journeys={journey.journeys}
+            activeJourneyId={journey.journey.id}
+            onSelectJourney={selectJourney}
+          />
+        </div>
       )}
       {journeyMode && isSandbox && (
         <EddSandboxPanel

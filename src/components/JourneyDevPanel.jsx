@@ -21,14 +21,17 @@ export default function JourneyDevPanel({
   activeJourneyId,
   onSelectJourney,
 }) {
-  const current = nodes[currentIndex] ?? nodes.find((n) => n.id === currentNodeId)
+  // Resolve by id, not array index: on branched journeys the current node
+  // (last on the visited path) isn't at array position `currentIndex`, so
+  // `nodes[currentIndex]` would point at an unrelated node.
+  const current = nodes.find((n) => n.id === currentNodeId) ?? nodes[currentIndex]
   const nexts = validNext()
   const isComplete = nexts.length === 0
   const stepNumber = currentIndex + 1
   const atStart = currentIndex === 0
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[360px] bg-surface border border-line rounded-2xl shadow-lg p-4">
+    <div className="w-full bg-surface border border-line rounded-2xl shadow-lg p-4">
       {journeys && journeys.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5 mb-3 -mt-0.5">
           {journeys.map((j) => {

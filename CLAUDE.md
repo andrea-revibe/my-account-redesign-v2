@@ -57,7 +57,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 - **Detailed claim tracking.** Inside `ClaimCard` expanded: `ClaimActionBanner` gate, Initiated scheduled-pickup strip, opt-in `See detailed tracking` dropdown (gated on `claim.transitSubTimeline.picked_up`). `claim_tracking.md` §2.2–2.3.
 - **Reset-failed iCloud unlink.** `ResetFailedCard` takes over (danger) on Activation Lock until iCloud unlink + passcode; states `action_needed → submitted`, iOS-only copy. `claim_tracking.md` §3.4.
 - **History thread.** On layered cards, past events render as compact chips under the hero; tap expands one inline. Derived in `lib/events.js`. `orders.md` §6.
-- **Journey mode.** Opt-in demo (`?journey=<id>`) replaying one order via `JourneyDevPanel`; multi-journey + branching in the `JOURNEYS` array / `node.next`. `journey_backend_spec.md`.
+- **Journey mode.** Opt-in demo (`?journey=<id>`) replaying one order via `JourneyDevPanel`; multi-journey + branching in the `JOURNEYS` array / `node.next`. Replay panels also stack a `JourneyNotificationPanel` (WhatsApp/Email preview); copy is event-keyed data in `data/notifications/*` (logic in `lib/notifications.js`). `journey_backend_spec.md`.
 - **Sandbox journeys.** Parameter-driven journey variant (`kind: 'sandbox'`, `nodes: []`) with `useEddSandbox` / `EddSandboxPanel`; injects `order.statusBanner` only for SLA-divergence messages. `journey_backend_spec.md`.
 
 ## Subagent discipline
