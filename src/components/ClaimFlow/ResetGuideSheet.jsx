@@ -10,10 +10,6 @@ import {
   ChevronLeft,
   ChevronDown,
   HelpCircle,
-  Package,
-  Watch,
-  Camera,
-  Hash,
   ShieldCheck,
   RotateCcw,
 } from 'lucide-react'
@@ -51,7 +47,6 @@ import {
   MacWelcome,
   MacICloudRemove,
   MacAccountRemove,
-  SimCard,
 } from './resetGuideMocks'
 
 // Guided reset — a focused, one-step-per-screen walkthrough launched from the
@@ -60,11 +55,9 @@ import {
 // else (the phase machine, the shell, the progress + trouble chrome) is
 // shared. The customer picks a route on the intro screen (reset from the
 // device, or remove it remotely), walks each step grounded in a mock OS
-// screen, then lands on a "ready to ship" finish with an optional
-// final-touches checklist. Pressing Done fires onDone so the step can unlock
-// its confirm checkbox. Instructional only — never gates the flow directly;
-// the step's confirm checkbox does. Final-touches ticks persist in
-// devicePrep.resetGuideChecks via checks / onToggle.
+// screen, then lands on a centered "ready to ship" finish. Pressing Done fires
+// onDone so the step can unlock its confirm checkbox. Instructional only —
+// never gates the flow directly; the step's confirm checkbox does.
 //
 // iOS = Activation Lock (one Apple account). Android = Samsung One UI, where
 // two separate locks must clear: Google's Factory Reset Protection (FRP) and
@@ -357,41 +350,6 @@ const REMOTE_STEPS = {
   ],
 }
 
-const FINAL_CHECKS = {
-  iphone: [
-    { id: 'gf_sim', Icon: SimCard, label: 'Remove SIM / delete eSIM' },
-    { id: 'gf_watch', Icon: Watch, label: 'Unpair Apple Watch' },
-    { id: 'gf_imei', Icon: Camera, label: 'Photo the IMEI for warranty' },
-    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
-  ],
-  ipad: [
-    { id: 'gf_sim', Icon: SimCard, label: 'Remove SIM / delete eSIM (cellular)' },
-    { id: 'gf_pencil', Icon: Watch, label: 'Unpair Apple Pencil & accessories' },
-    { id: 'gf_serial', Icon: Camera, label: 'Photo the serial for warranty' },
-    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
-  ],
-  mac: [
-    { id: 'gf_bt', Icon: Watch, label: 'Unpair Bluetooth mouse & keyboard' },
-    { id: 'gf_charger', Icon: Package, label: 'Include the charger & cable' },
-    { id: 'gf_serial', Icon: Camera, label: 'Photo the serial for warranty' },
-    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
-  ],
-  android: [
-    { id: 'gf_sim', Icon: SimCard, label: 'Remove SIM / delete eSIM' },
-    { id: 'gf_sd', Icon: Package, label: 'Remove the microSD card' },
-    { id: 'gf_galaxy', Icon: Watch, label: 'Unpair Galaxy Watch / Buds' },
-    { id: 'gf_imei', Icon: Camera, label: 'Photo the IMEI for warranty' },
-    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
-  ],
-  android_tablet: [
-    { id: 'gf_sim', Icon: SimCard, label: 'Remove SIM / delete eSIM (cellular)' },
-    { id: 'gf_sd', Icon: Package, label: 'Remove the microSD card' },
-    { id: 'gf_spen', Icon: Watch, label: 'Pack the S Pen & accessories' },
-    { id: 'gf_serial', Icon: Camera, label: 'Photo the serial for warranty' },
-    { id: 'gf_order', Icon: Hash, label: 'Order number in the box' },
-  ],
-}
-
 const COPY = {
   iphone: {
     fallbackTitle: 'Reset your iPhone',
@@ -403,8 +361,7 @@ const COPY = {
     no: 'No — it’s broken or won’t turn on',
     noSub: 'We’ll erase it remotely instead',
     doneTitle: 'Your iPhone is ready to ship',
-    doneSub:
-      'It’s erased and unlinked. Before you box it up, a few quick optional checks:',
+    doneSub: 'It’s erased and unlinked from your account.',
   },
   ipad: {
     fallbackTitle: 'Reset your iPad',
@@ -416,8 +373,7 @@ const COPY = {
     no: 'No — it’s broken or won’t turn on',
     noSub: 'We’ll erase it remotely instead',
     doneTitle: 'Your iPad is ready to ship',
-    doneSub:
-      'It’s erased and unlinked. Before you box it up, a few quick optional checks:',
+    doneSub: 'It’s erased and unlinked from your account.',
   },
   mac: {
     fallbackTitle: 'Reset your MacBook',
@@ -429,8 +385,7 @@ const COPY = {
     no: 'No — it’s broken or won’t start up',
     noSub: 'We’ll unlink it remotely instead',
     doneTitle: 'Your MacBook is ready to ship',
-    doneSub:
-      'It’s erased and unlinked. Before you box it up, a few quick optional checks:',
+    doneSub: 'It’s erased and unlinked from your account.',
   },
   android: {
     fallbackTitle: 'Reset your Samsung phone',
@@ -442,8 +397,7 @@ const COPY = {
     no: 'No — it’s broken or won’t turn on',
     noSub: 'We’ll erase it remotely instead',
     doneTitle: 'Your phone is ready to ship',
-    doneSub:
-      'It’s erased and unlinked from your Google and Samsung accounts. Before you box it up, a few quick optional checks:',
+    doneSub: 'It’s erased and unlinked from your Google and Samsung accounts.',
   },
   android_tablet: {
     fallbackTitle: 'Reset your Samsung tablet',
@@ -455,8 +409,7 @@ const COPY = {
     no: 'No — it’s broken or won’t turn on',
     noSub: 'We’ll erase it remotely instead',
     doneTitle: 'Your tablet is ready to ship',
-    doneSub:
-      'It’s erased and unlinked from your Google and Samsung accounts. Before you box it up, a few quick optional checks:',
+    doneSub: 'It’s erased and unlinked from your Google and Samsung accounts.',
   },
 }
 
@@ -470,8 +423,6 @@ const DEVICE_LABEL = {
 
 export default function ResetGuideSheet({
   device = 'iphone',
-  checks,
-  onToggle,
   onDone,
   onClose,
 }) {
@@ -502,7 +453,6 @@ export default function ResetGuideSheet({
 
   const deviceSteps = DEVICE_STEPS[device] || DEVICE_STEPS.iphone
   const remoteSteps = REMOTE_STEPS[device] || REMOTE_STEPS.iphone
-  const finalChecks = FINAL_CHECKS[device] || FINAL_CHECKS.iphone
   const steps = route === 'remote' ? remoteSteps : deviceSteps
 
   // A step is a carousel when its Mock exposes a `.screens` array (see
@@ -545,7 +495,7 @@ export default function ResetGuideSheet({
 
   const headerTitle =
     phase === 'done'
-      ? 'Almost there'
+      ? ''
       : route === 'remote'
         ? 'Remote reset'
         : route === 'device'
@@ -703,62 +653,18 @@ export default function ResetGuideSheet({
             })()}
 
           {phase === 'done' && (
-            <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center animate-fadeIn">
+            <div className="min-h-full px-5 py-8 flex flex-col items-center justify-center text-center animate-fadeIn">
               <div className="relative w-16 h-16">
                 <div className="absolute inset-0 rounded-full bg-success-bg" />
                 <div className="absolute inset-0 grid place-items-center text-success">
                   <CheckCircle2 size={40} strokeWidth={1.9} />
                 </div>
               </div>
-              <h2 className="mt-3 text-[21px] font-bold text-ink leading-tight">
+              <h2 className="mt-4 text-[21px] font-bold text-ink leading-tight">
                 {c.doneTitle}
               </h2>
               <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">
                 {c.doneSub}
-              </p>
-              <div className="mt-4 w-full rounded-[16px] border border-line overflow-hidden">
-                {finalChecks.map((f, idx) => {
-                  const ItemIcon = f.Icon
-                  const checked = !!checks[f.id]
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => onToggle(f.id, !checked)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-3 text-left ${
-                        idx > 0 ? 'border-t border-line-2' : ''
-                      }`}
-                    >
-                      <span
-                        className={`w-[22px] h-[22px] rounded-[7px] border-2 grid place-items-center shrink-0 transition-colors ${
-                          checked
-                            ? 'bg-success border-success'
-                            : 'border-line bg-surface'
-                        }`}
-                      >
-                        {checked && (
-                          <Check size={13} strokeWidth={3} className="text-white" />
-                        )}
-                      </span>
-                      <ItemIcon
-                        size={16}
-                        strokeWidth={1.9}
-                        className="text-muted shrink-0"
-                      />
-                      <span
-                        className={`flex-1 text-[13px] ${
-                          checked
-                            ? 'text-muted line-through decoration-line'
-                            : 'text-ink-2'
-                        }`}
-                      >
-                        {f.label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="mt-3 text-[11.5px] text-muted leading-snug">
-                These are optional — tap Done whenever you’re ready.
               </p>
             </div>
           )}

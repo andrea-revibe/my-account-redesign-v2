@@ -108,8 +108,12 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       os: initialOs,
       device: initialDevice,
       resetConfirmed: false,
-      resetGuideChecks: {},
       resetGuideSeen: false,
+      // Change-of-mind escape hatch: a device that was never set up has no
+      // account linked and nothing to erase, so the customer can attest to
+      // that instead of running the guided reset. Only offered / honored on
+      // the change_of_mind flow (see stepError + Step3DevicePrep).
+      neverSetUp: false,
     },
     pickupDetails: {
       address: order?.address || '',
@@ -176,6 +180,13 @@ export function flowReducer(state, action) {
           : null,
         compensationSubtype:
           target === 'compensation' ? state.compensationSubtype : null,
+        // The never-set-up skip is a change_of_mind-only affordance; clear it
+        // when routing elsewhere so a back-nav can't carry it into a flow that
+        // never offers it.
+        devicePrep:
+          target === 'change_of_mind'
+            ? state.devicePrep
+            : { ...state.devicePrep, neverSetUp: false },
         step: dest,
         attempted: false,
       }
@@ -284,6 +295,9 @@ export function stepError(state) {
     }
     case 'deviceprep': {
       const dp = state.devicePrep
+      // Change-of-mind only: attesting the device was never set up satisfies
+      // the step in place of the guided reset.
+      if (state.claimType === 'change_of_mind' && dp.neverSetUp) return null
       if (!dp.resetGuideSeen) return 'resetGuide'
       if (dp.resetConfirmed !== true) return 'resetConfirm'
       return null

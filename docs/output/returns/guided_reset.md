@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: fa180b5
+verified_against: c6d79ae
 covers:
   - src/lib/devices.js
   - src/components/ClaimFlow/Step3DevicePrep.jsx
@@ -46,7 +46,7 @@ Unknown categories, or orders with only `deviceOs`, fall back to `iphone`/`ios` 
 
 ## 2. The five guide variants
 
-`device` keys five parallel guide definitions in `ResetGuideSheet.jsx`. Each variant has its own on-device steps (`DEVICE_STEPS`), remote steps (`REMOTE_STEPS`), pre-ship checklist (`FINAL_CHECKS`), copy (`COPY`), short label (`DEVICE_LABEL`), and frame:
+`device` keys five parallel guide definitions in `ResetGuideSheet.jsx`. Each variant has its own on-device steps (`DEVICE_STEPS`), remote steps (`REMOTE_STEPS`), copy (`COPY`), short label (`DEVICE_LABEL`), and frame:
 
 | `device` | Frame (`resetGuideMocks.jsx`) | On-device steps | Account system unlocked |
 |---|---|---|---|
@@ -65,7 +65,7 @@ Unknown categories, or orders with only `deviceOs`, fall back to `iphone`/`ios` 
 1. **`intro`** — `COPY[device]` asks *"can you still unlock and use this device?"* → **Yes** picks the on-device route, **No** picks the **remote** route (`route === 'remote'` swaps `DEVICE_STEPS` → `REMOTE_STEPS`). This is what covers broken/locked devices without a separate option.
 2. **Steps** — one screen per step with a device mockup (`Mock`), a `lead` (what to do) and a `why` (why it matters). Some steps are **carousels**: their `Mock` exposes a `.screens` array and the footer walks screen-by-screen before advancing the step. Slide transitions come from `resetGuideAnim.js` (`STEP_ANIM_CSS` / `stepAnim`).
 3. **Trouble** — most steps carry `trouble: { label, body, escalate? }`. When `escalate` is set, the trouble panel offers a jump to the remote route (the standard "forgot password / device broken" off-ramp).
-4. **Final checks** — `FINAL_CHECKS[device]` is an optional pre-ship checklist (SIM, accessories, IMEI/serial photo, order number in box). Toggles persist via `resetGuideChecks` on the reducer (`SET_DEVICE_PREP`). Closing with `onDone` sets `resetGuideSeen`.
+4. **Done** — a centered success state: green check coin + `doneTitle` ("Your {device} is ready to ship") + `doneSub` ("It's erased and unlinked…"). The header title is blank on this phase (just the close ✕). Tapping `Done` fires `onDone`, which sets `resetGuideSeen`. (There is no pre-ship checklist — the optional `FINAL_CHECKS` list, its `resetGuideChecks` persistence, and the "Almost there" header were removed.)
 
 ## 3. OS-ambiguous `Tablet` → the chooser
 
@@ -79,11 +79,23 @@ This is the **only** manual device input in the whole flow.
 
 ## 4. The Step 3 surface — `Step3DevicePrep.jsx`
 
-Layout, top to bottom: a warn **`Callout`** (unlock before refund), the **`TabletPicker`** (ambiguous only), the **`HeroLauncher`**, a **`SafetyNote`** (your iCloud/Google backup stays safe — the screen's emotional crux), a remote-path hint line, and the **`ConfirmGate`**.
+Layout, top to bottom: a warn **`Callout`** (unlock before refund), the **`TabletPicker`** (ambiguous only), the **`HeroLauncher`**, the **`ResetOffRamps`** disclosure, a **`SafetyNote`** (your iCloud/Google backup stays safe — the screen's emotional crux), and the **`ConfirmGate`**.
 
-- **`HeroLauncher`** has three tones: `default` (brand purple, meta chips `~10 min` · `{stepCount} simple steps`, where `stepCount` is 4 for Android else 3), `done` (green, "Guided reset completed", tap to re-run), and `error` (red + `animate-shakeX`).
-- **`ConfirmGate`** — the checkbox is **locked until `resetGuideSeen`** (guide opened and finished via `Done`). The card border/fill tracks locked → error → checked → default.
+- **`HeroLauncher`** has three tones: `default` (brand purple, meta chips `~10 min` · `{stepCount} simple steps`, where `stepCount` is 4 for Android else 3), `done` (green, "Guided reset completed", tap to re-run), and `error` (red + `animate-shakeX`). It also dims (`opacity-55 grayscale`) when the never-set-up skip is checked.
+- **`ResetOffRamps`** — a single collapsed-by-default **"Can't run the guided reset?"** disclosure (bordered button row, `HelpCircle` + chevron) that folds away the two off-ramps from the normal on-device reset, replacing what used to be two always-on text blocks (see §5). Expanding reveals, in order:
+  1. **"Never set up this device?"** — change-of-mind only (§5): an attestation checkbox that skips the reset.
+  2. **"Broken, or can't unlock it?"** — informational (all flows): points the customer into the guide's remote route (the route itself is picked inside the guide intro, not here).
+- **`ConfirmGate`** — the checkbox is **locked until `resetGuideSeen`** (guide opened and finished via `Done`). The card border/fill tracks locked → error → checked → default. The old always-on "Run the guide and tap Done" hint under it is gone — it now appears **only** in the red error state. Hidden entirely when the never-set-up skip is checked (§5).
 - **Soft validation** (the flow-wide model — Continue is never disabled): `stepError` returns `'resetGuide'` first (guide not yet completed → launcher goes red + shakes) then `'resetConfirm'` (guide done but box unticked → gate goes red, scrolls into view). The error flag is reducer-owned and cleared by every step-changing action.
+
+## 5. The never-set-up skip (change_of_mind only)
+
+A device that was never set up has no account linked and nothing to erase, so the guided reset is moot. The customer can attest to that instead of running it — but **only on the change-of-mind flow** (`state.claimType === 'change_of_mind'`). On issue / warranty the device is presumed used, so the `ResetOffRamps` disclosure shows only the informational remote-route row.
+
+- **State** — `devicePrep.neverSetUp` (boolean). Set true when the attestation checkbox inside `ResetOffRamps` is ticked. `ROUTE_FROM_REASON` clears it back to `false` whenever the resolved track isn't `change_of_mind`, so a back-nav out of change-of-mind can't carry a skip the UI never offered.
+- **Gate** — `stepError`'s `deviceprep` case short-circuits to `null` (step satisfied) at the top when `claimType === 'change_of_mind' && dp.neverSetUp`, before the `resetGuide` / `resetConfirm` checks. No new error key: if the box is left unticked the normal reset error still applies, since reset stays the default expectation.
+- **UI when checked** — the `HeroLauncher` dims, and the `SafetyNote` + reset `ConfirmGate` are hidden (the attestation is now the gate). The disclosure stays force-expanded so the ticked attestation is visible. Unticking restores the reset path.
+- **Downstream** — `neverSetUp` rides into the seeded claim (`devicePrep` is spread in `ClaimFlow.jsx`). It's checked **before** the `option === 'reset'` branch in `devicePrepText` (`lib/claims.js`, → "Not set up — no reset needed"), `Step6Review` (summary + ack card), and `Step7Confirmation`.
 
 ## Mocked vs production
 

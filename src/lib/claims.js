@@ -369,6 +369,7 @@ export function reasonText(claim) {
 }
 
 export function devicePrepText(claim) {
+  if (claim?.devicePrep?.neverSetUp) return 'Not set up — no reset needed'
   if (claim?.devicePrep?.option === 'reset') return 'Factory reset confirmed'
   if (claim?.devicePrep?.option === 'credentials')
     return 'Unlinked + passcode shared'

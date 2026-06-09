@@ -33,8 +33,9 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
       : isBnpl(order)
         ? `Returns to your ${order.paymentMethod.brand} account in 5–10 business days once return is complete.`
         : 'Returns to your card in 5–10 business days once return is complete.'
-  const devicePrepLine =
-    state.devicePrep.option === 'reset'
+  const devicePrepLine = state.devicePrep.neverSetUp
+    ? 'You indicated the device was never set up, so no reset was needed.'
+    : state.devicePrep.option === 'reset'
       ? 'You confirmed the device is factory reset.'
       : 'Thanks for unlinking the device and sharing your passcode.'
 

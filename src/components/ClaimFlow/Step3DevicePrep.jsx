@@ -10,6 +10,8 @@ import {
   RotateCcw,
   ArrowRight,
   Lock,
+  ChevronDown,
+  HelpCircle,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
@@ -68,6 +70,17 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const confirmed = dp.resetConfirmed
   const confirmLocked = !guideSeen
 
+  // Change-of-mind escape hatch: a device that was never set up has no
+  // account linked and nothing to erase. The customer can attest to that
+  // instead of running the guided reset — when they do, the reset becomes
+  // optional (launcher dims, the reset confirm gate is replaced by the
+  // attestation). Only offered on the change_of_mind flow.
+  const offerNeverSetUp = state.claimType === 'change_of_mind'
+  const neverSetUp = dp.neverSetUp
+  const [skipOpen, setSkipOpen] = useState(false)
+  const setNeverSetUp = (value) =>
+    dispatch({ type: 'SET_DEVICE_PREP', value: { neverSetUp: value } })
+
   // Premature Continue before completing the guide — escalates the guide
   // launcher + gate message into a red error state.
   const showGuideError = error === 'resetGuide'
@@ -102,35 +115,24 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
           guideSeen={guideSeen}
           showError={showGuideError}
           stepCount={stepCount}
+          dimmed={neverSetUp}
           onOpen={() => setGuideOpen(true)}
         />
 
-        <SafetyNote os={os} />
+        <ResetOffRamps
+          os={os}
+          open={skipOpen}
+          onToggle={() => setSkipOpen((v) => !v)}
+          offerNeverSetUp={offerNeverSetUp}
+          neverSetUp={neverSetUp}
+          onCheck={setNeverSetUp}
+        />
 
-        <div className="flex items-start gap-2 px-1 text-[11.5px] text-muted leading-[1.45]">
-          <WifiOff size={13} strokeWidth={2} className="text-muted shrink-0 mt-0.5" />
-          <span>
-            Can't unlock or power on the device? The guide has a remote path —
-            you'll erase it from{' '}
-            {os === 'ios' ? 'iCloud' : 'your Google account'} instead.
-          </span>
-        </div>
+        {!neverSetUp && <SafetyNote os={os} />}
 
         {guideOpen && (
           <ResetGuideSheet
             device={device}
-            checks={dp.resetGuideChecks || {}}
-            onToggle={(id, checked) =>
-              dispatch({
-                type: 'SET_DEVICE_PREP',
-                value: {
-                  resetGuideChecks: {
-                    ...(dp.resetGuideChecks || {}),
-                    [id]: checked,
-                  },
-                },
-              })
-            }
             onDone={() => {
               dispatch({
                 type: 'SET_DEVICE_PREP',
@@ -142,19 +144,21 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
           />
         )}
 
-        <ConfirmGate
-          ref={confirmRef}
-          confirmed={confirmed}
-          setConfirmed={(checked) =>
-            dispatch({
-              type: 'SET_DEVICE_PREP',
-              value: { resetConfirmed: checked },
-            })
-          }
-          locked={confirmLocked}
-          confirmError={confirmError}
-          showGuideError={showGuideError}
-        />
+        {!neverSetUp && (
+          <ConfirmGate
+            ref={confirmRef}
+            confirmed={confirmed}
+            setConfirmed={(checked) =>
+              dispatch({
+                type: 'SET_DEVICE_PREP',
+                value: { resetConfirmed: checked },
+              })
+            }
+            locked={confirmLocked}
+            confirmError={confirmError}
+            showGuideError={showGuideError}
+          />
+        )}
 
         <div className="mt-1 text-[11.5px] text-muted leading-[1.45]">
           If you leave this flow, you'll need to start over — your inputs
@@ -236,7 +240,7 @@ function Callout() {
 // The one prominent action on the step: an elevated hero launcher with a
 // gradient icon coin, decorative ring texture, and meta chips. Turns green
 // once completed, red (and shakes) if Continue is pressed before it's run.
-function HeroLauncher({ guideSeen, showError, stepCount = 3, onOpen }) {
+function HeroLauncher({ guideSeen, showError, stepCount = 3, dimmed = false, onOpen }) {
   const tone = showError ? 'error' : guideSeen ? 'done' : 'default'
   const surface =
     tone === 'error'
@@ -272,7 +276,7 @@ function HeroLauncher({ guideSeen, showError, stepCount = 3, onOpen }) {
       onClick={onOpen}
       className={`relative w-full overflow-hidden rounded-[18px] border-[1.5px] px-4 py-4 text-left transition-all ${
         showError ? 'animate-shakeX' : ''
-      }`}
+      } ${dimmed ? 'opacity-55 grayscale-[0.35]' : ''}`}
       style={surface}
     >
       {/* decorative concentric rings, brand-tinted texture */}
@@ -379,6 +383,92 @@ function SafetyNote({ os }) {
   )
 }
 
+// Single quiet "Can't run the guided reset?" disclosure that folds away the
+// two off-ramps from the normal on-device reset, replacing two always-on text
+// blocks with one collapsed link:
+//   • Remote erase — broken / locked / won't power on (all flows). Purely
+//     informational: the route is actually picked inside the guide's intro.
+//   • Never set up (change_of_mind only) — an attestation checkbox that skips
+//     the reset; ticking it dims the launcher and replaces the reset confirm
+//     gate with this attestation (see Step3DevicePrep render).
+// Stays force-expanded while the skip is checked so the attestation is visible.
+function ResetOffRamps({ os, open, onToggle, offerNeverSetUp, neverSetUp, onCheck }) {
+  const expanded = open || neverSetUp
+  return (
+    <div className="pt-0.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex w-full items-center gap-2 rounded-[12px] border px-3.5 py-3 text-[13px] font-semibold transition-colors ${
+          expanded
+            ? 'border-brand/40 bg-brand-bg/30 text-ink'
+            : 'border-line bg-surface text-ink hover:border-brand/40'
+        }`}
+      >
+        <HelpCircle size={16} strokeWidth={2.2} className="shrink-0 text-brand" />
+        <span>Can't run the guided reset?</span>
+        <ChevronDown
+          size={16}
+          strokeWidth={2.2}
+          className={`ml-auto shrink-0 text-muted transition-transform ${
+            expanded ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="mt-2 flex flex-col gap-2 animate-slideDown">
+          {offerNeverSetUp && (
+            <label
+              className={`flex items-start gap-2.5 rounded-[12px] border px-3 py-2.5 cursor-pointer transition-colors ${
+                neverSetUp
+                  ? 'border-brand/40 bg-brand-bg/40'
+                  : 'border-line bg-surface hover:border-brand/40'
+              }`}
+            >
+              <span className="relative mt-px shrink-0">
+                <input
+                  type="checkbox"
+                  checked={neverSetUp}
+                  onChange={(e) => onCheck(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <span
+                  className={`w-[20px] h-[20px] rounded-[6px] border-2 grid place-items-center transition-colors ${
+                    neverSetUp ? 'bg-brand border-brand' : 'border-line bg-surface'
+                  }`}
+                >
+                  {neverSetUp && (
+                    <Check size={13} strokeWidth={3} className="text-white" />
+                  )}
+                </span>
+              </span>
+              <span className="text-[12px] text-ink-2 leading-[1.45]">
+                <span className="font-semibold text-ink">
+                  Never set up this device?
+                </span>{' '}
+                No account is linked, so there's nothing to erase — skip the
+                guided reset.
+              </span>
+            </label>
+          )}
+
+          <div className="flex items-start gap-2.5 rounded-[12px] border border-line bg-line-2/40 px-3 py-2.5">
+            <WifiOff size={14} strokeWidth={2} className="shrink-0 mt-0.5 text-muted" />
+            <p className="text-[12px] text-ink-2 leading-[1.45]">
+              <span className="font-semibold text-ink">
+                Broken, or can't unlock it?
+              </span>{' '}
+              Start the guide and choose “No” — you'll erase it remotely from{' '}
+              {os === 'ios' ? 'iCloud' : 'your Google account'} instead.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // The confirm gate, restyled as a bordered card whose border / fill track
 // locked → error → checked → default. The clear final action of the step.
 function ConfirmGate({
@@ -443,31 +533,12 @@ function ConfirmGate({
           Confirm you've completed the reset before continuing.
         </InlineError>
       )}
-      {locked && (
-        <p
-          className={`mt-1.5 ml-1 flex items-start gap-1.5 text-[11.5px] leading-snug ${
-            showGuideError
-              ? 'font-medium text-danger animate-slideDown'
-              : 'text-muted'
-          }`}
-        >
-          {showGuideError && (
-            <AlertTriangle
-              size={13}
-              strokeWidth={2.2}
-              className="shrink-0 mt-px"
-            />
-          )}
+      {locked && showGuideError && (
+        <p className="mt-1.5 ml-1 flex items-start gap-1.5 text-[11.5px] leading-snug font-medium text-danger animate-slideDown">
+          <AlertTriangle size={13} strokeWidth={2.2} className="shrink-0 mt-px" />
           <span>
             Run the guide above and tap{' '}
-            <span
-              className={
-                showGuideError ? 'font-semibold' : 'font-semibold text-ink-2'
-              }
-            >
-              Done
-            </span>{' '}
-            to confirm.
+            <span className="font-semibold">Done</span> to confirm.
           </span>
         </p>
       )}
