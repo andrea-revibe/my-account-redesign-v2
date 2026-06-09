@@ -625,7 +625,7 @@ export default function App() {
         />
       )}
       {journeyMode && !isSandbox && (
-        <div className="fixed bottom-4 right-4 z-50 w-[360px] flex flex-col gap-3">
+        <div className="fixed bottom-4 right-4 z-50 w-[400px] flex flex-col gap-3">
           <JourneyNotificationPanel
             event={
               journey.nodes.find((n) => n.id === journey.currentNodeId)?.event

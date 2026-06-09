@@ -838,7 +838,9 @@ export const CLAIM_ISSUE_NODES = [
     id: 'claim_reset_retry_resubmitted',
     label: 'Updated unlock details received',
     trigger: 'customer',
-    event: 'claim.reset.retry_resubmitted',
+    // Same customer comm as the first submission — both fire
+    // claim.reset.details_received (attempt distinguishes them).
+    event: 'claim.reset.details_received',
     next: ['claim_refund_issued', 'claim_invalid_confirmed'],
     apply: (o) => ({
       ...o,

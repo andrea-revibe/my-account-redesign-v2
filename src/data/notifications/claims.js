@@ -60,6 +60,103 @@ export const CLAIM_NOTIFICATIONS = {
     },
   },
 
+  'claim.cancelled': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
+  'claim.pickup.rescheduled': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
+  'claim.documents.rejected': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
+  'claim.documents.resubmitted': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
+  'claim.transit.picked_up': {
+    whatsapp:
+      "Your device is on its way to us! 📦 We will notify you as soon as it arrives at our warehouse.",
+    email: {
+      subject: 'Your device is on its way to us! 📦',
+      body: "We will notify you as soon as it arrives at our warehouse.",
+      screenshot: '/emails/claims/in-transit.png',
+    },
+  },
+
+  'claim.qc.started': {
+    whatsapp:
+      "We are checking your device! 🔬 We have received your device and our quality control team is now inspecting it. We will update you as soon as the review is complete!",
+    email: {
+      subject: 'We are checking your device! 🔬',
+      body: "We have received your device and our quality control team is now inspecting it. We will update you as soon as the review is complete!",
+      screenshot: '/emails/claims/under-qc.png',
+    },
+  },
+
+  'claim.reset.failed': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
+  'claim.reset.details_received': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
+  'claim.reset.retry_failed': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
   'claim.inspection.invalid_confirmed': {
     whatsapp:
       "Update on your claim 😔 We will get in touch to understand if you would like us to arrange a new pickup.",
@@ -70,27 +167,84 @@ export const CLAIM_NOTIFICATIONS = {
     },
   },
 
+  'claim.repair.started': { // this is for warranties after its marked as a valid claim 
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
 
+  'claim.declined': {
+    status: 'missing',
+    whatsapp:
+      "missing ‼️",
+    email: {
+      subject: 'missing ‼️',
+      body: "",
+      screenshot: '',
+    },
+  },
+
+  'claim.return_shipping.paid': {
+    whatsapp:
+      "Your device will be shipped back! 📦",
+    email: {
+      subject: 'Your device will be shipped back! 📦',
+      body: "Your device will be shipped back to you shortly 📦 You will receive a tracking update once it is on its way!",
+      screenshot: '',
+    },
+  },
+
+  'claim.refund.issued': {
+    whatsapp:
+      "Your claim has been approved and your refund is being processed! 💸 You will receive your money back to your preferred payment method shortly.",
+    email: {
+      subject: "Your refund is being processed! 💸",
+      body: "Your claim has been approved and your refund is being processed! 💸 You will receive your money back to your preferred payment method shortly.",
+      screenshot: '/emails/claims/refund-issued.png',
+    },
+  },
+
+  'claim.refund.completed': { // no distinction between revibe wallet and original payment method (last sentence is not needed for revibe wallet)
+    whatsapp:
+      "Your claim has been approved and your refund is being processed! 💸 You will receive your money back to your preferred payment method shortly.",
+    email: {
+      subject: "Refunded! 💰",
+      body: "Good news! We have refunded your order to your preferred payment method 💰 Please note that it might take up to 7 days to reflect in your account.",
+      screenshot: '/emails/claims/refund-issued.png',
+    },
+  },
+
+  // missing step where AWB is created from Revibe and ship_back_under_collection notifications are sent to customers 
+
+  // missing step where AWB has first pcikup event and shipped_back notifications are sent to customers
+
+  'claim.return_shipment.delivered': {
+    whatsapp:
+      "Great news! Your device has been successfully delivered back to you ✅ We hope everything was handled to your satisfaction. Feel free to reach out if you need anything!",
+    email: {
+      subject: "Your device has been delivered! ✅",
+      body: "Great news! Your device has been successfully delivered back to you ✅ We hope everything was handled to your satisfaction. Feel free to reach out if you need anything!",
+      screenshot: '/emails/claims/shipped-back-delivered.png',
+    },
+  },
 
   // --- Scaffold — add entries as flows are built --------------------------
   // Intake / evidence:
-  //   'claim.documents.rejected'      'claim.documents.resubmitted'
   //   'claim.evidence.unclear'        'claim.evidence.resubmitted'
   // Pickup + inbound transit (device → Revibe):
-  //   'claim.pickup.rescheduled'
-  //   'claim.transit.picked_up'       'claim.transit.in_transit'
+  //   'claim.transit.in_transit'
   //   'claim.transit.arrived_origin_hub'   'claim.transit.arrived_revibe_hub'
-  // Reset (Activation Lock):
-  //   'claim.reset.failed'            'claim.reset.details_received'
-  //   'claim.reset.retry_failed'      'claim.reset.retry_resubmitted'
   // Inspection / review outcome:
-  //   'claim.qc.started'              'claim.review.started'
+  //   'claim.review.started'
   //   'claim.review.invalid_confirmed'   
   // Resolution — refund / repair / return:
-  //   'claim.refund.issued'           'claim.refund.completed'
-  //   'claim.repair.started'          'claim.device.returned'
-  //   'claim.cancelled'               'claim.declined'
-  //   'claim.return_shipping.paid'    'claim.ship_back.created'
+  //   'claim.device.returned'
+  //   'claim.ship_back.created'
   //   'claim.return_shipment.*'  /  'claim.ship_back.*'  (out_for_delivery, delivered, …)
   //
   // Template:

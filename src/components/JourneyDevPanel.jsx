@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
+import { journeyNotificationCoverage } from '../lib/notifications'
 
 // Fixed bottom-right dev tool — only rendered in journey mode. Sits outside
 // the mobile frame on wide viewports; overlaps the frame on narrow ones
@@ -25,6 +26,7 @@ export default function JourneyDevPanel({
   // (last on the visited path) isn't at array position `currentIndex`, so
   // `nodes[currentIndex]` would point at an unrelated node.
   const current = nodes.find((n) => n.id === currentNodeId) ?? nodes[currentIndex]
+  const coverage = journeyNotificationCoverage(nodes)
   const nexts = validNext()
   const isComplete = nexts.length === 0
   const stepNumber = currentIndex + 1
@@ -53,6 +55,8 @@ export default function JourneyDevPanel({
           })}
         </div>
       )}
+
+      <CoverageSummary counts={coverage} />
 
       <div className="flex items-center gap-2 mb-3">
         <DotStrip count={stepNumber} />
@@ -142,6 +146,31 @@ function DotStrip({ count }) {
     <div className="flex items-center gap-1">
       {Array.from({ length: dots }).map((_, i) => (
         <span key={i} className="w-1.5 h-1.5 rounded-full bg-brand" />
+      ))}
+    </div>
+  )
+}
+
+// Journey-wide notification coverage — distinct events bucketed by status.
+// Zero-count buckets are omitted; the whole strip hides if nothing's tagged.
+const COVERAGE_META = [
+  ['live', 'live', 'bg-success'],
+  ['new', 'new', 'bg-brand'],
+  ['changed', 'changed', 'bg-accent'],
+  ['missing', 'missing', 'bg-red-500'],
+  ['silent', 'silent', 'bg-muted/40'],
+]
+function CoverageSummary({ counts }) {
+  const shown = COVERAGE_META.filter(([key]) => counts[key] > 0)
+  if (!shown.length) return null
+  return (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mb-3 text-[11px] text-muted">
+      <span className="text-[10px] font-bold uppercase tracking-[0.08em]">Comms</span>
+      {shown.map(([key, label, dot]) => (
+        <span key={key} className="inline-flex items-center gap-1">
+          <span className={'w-1.5 h-1.5 rounded-full ' + dot} />
+          {counts[key]} {label}
+        </span>
       ))}
     </div>
   )

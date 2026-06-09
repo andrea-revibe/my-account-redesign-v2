@@ -17,10 +17,20 @@ const NOTIF_ANIM_CSS = `
 @keyframes notifIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 `
 
+// Coverage badge styling, keyed by the status from notificationFor.
+const STATUS_BADGE = {
+  live: { label: 'Live', cls: 'bg-success/10 text-success' },
+  new: { label: 'New', cls: 'bg-brand/10 text-brand' },
+  changed: { label: 'Changed', cls: 'bg-accent/10 text-accent' },
+  missing: { label: 'Missing', cls: 'bg-red-50 text-red-600' },
+  silent: { label: 'Silent', cls: 'bg-line-2 text-muted' },
+}
+
 export default function JourneyNotificationPanel({ event, order }) {
   const [channel, setChannel] = useState('whatsapp')
   const [lightbox, setLightbox] = useState(false)
   const notif = notificationFor(event, order)
+  const hasCopy = notif.whatsapp || notif.email
 
   return (
     <div className="w-full bg-surface border border-line rounded-2xl shadow-lg p-4">
@@ -30,6 +40,7 @@ export default function JourneyNotificationPanel({ event, order }) {
         <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
           <Bell size={12} strokeWidth={2.5} />
           Customer receives
+          <StatusBadge status={notif.status} />
         </div>
         <div className="flex items-center gap-1">
           <ChannelPill
@@ -51,10 +62,16 @@ export default function JourneyNotificationPanel({ event, order }) {
         key={event}
         style={{ animation: 'notifIn 0.3s cubic-bezier(0.32,0.72,0,1)' }}
       >
-        {!notif ? (
-          <div className="rounded-xl bg-line-2/60 text-muted text-[12px] px-3 py-4 text-center">
-            No notification sent at this step.
-          </div>
+        {!hasCopy ? (
+          notif.status === 'missing' ? (
+            <div className="rounded-xl bg-red-50 text-red-600 text-[12px] px-3 py-4 text-center">
+              No comm here yet — gap to fill.
+            </div>
+          ) : (
+            <div className="rounded-xl bg-line-2/60 text-muted text-[12px] px-3 py-4 text-center">
+              No notification sent at this step.
+            </div>
+          )
         ) : channel === 'whatsapp' ? (
           <div className="rounded-xl rounded-tl-sm bg-green-50 px-3 py-2.5">
             <div className="flex items-center gap-1 mb-1">
@@ -154,17 +171,34 @@ function EmailLightbox({ src, subject, onClose }) {
   )
 }
 
+function StatusBadge({ status }) {
+  const badge = STATUS_BADGE[status] ?? STATUS_BADGE.silent
+  return (
+    <span
+      className={
+        'inline-flex items-center px-1.5 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-[0.06em] ' +
+        badge.cls
+      }
+    >
+      {badge.label}
+    </span>
+  )
+}
+
+// Icon-only toggle — the active channel is filled, so the label is redundant
+// in the row; it survives as aria-label/title for hover + a11y.
 function ChannelPill({ label, icon: Icon, active, onClick }) {
   return (
     <button
       onClick={onClick}
+      aria-label={label}
+      title={label}
       className={
-        'inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10.5px] font-semibold transition ' +
+        'inline-flex items-center justify-center w-7 h-7 rounded-full transition ' +
         (active ? 'bg-brand text-white' : 'bg-brand/10 text-brand hover:bg-brand/15')
       }
     >
-      <Icon size={11} strokeWidth={2.5} />
-      {label}
+      <Icon size={13} strokeWidth={2.5} />
     </button>
   )
 }
