@@ -52,11 +52,7 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
           <CheckCircle2 size={32} strokeWidth={1.75} className="text-success" />
         </div>
         <h1 className="m-0 text-[24px] leading-[1.15] font-bold text-ink tracking-[-0.01em]">
-          {isWarranty
-            ? 'Your warranty claim is in'
-            : isCompensation
-              ? 'Your compensation request is in'
-              : 'Your return request is in'}
+          Your request has been submitted
         </h1>
         <div className="mt-3 inline-flex items-center rounded-full bg-brand-bg text-brand font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px]">
           {claimTypeLabel(state.claimType)}

@@ -141,7 +141,6 @@ export default function Step4PickupDetails({ state, dispatch, error }) {
 
         <ConfirmationCheckbox
           checked={state.pickupConfirmed}
-          isWarranty={isWarranty}
           error={error === 'pickupConfirm'}
           confirmRef={error === 'pickupConfirm' ? errorRef : null}
           onChange={(value) =>
@@ -279,7 +278,7 @@ function ProcessRow({ step, isFirst, isLast }) {
   )
 }
 
-function ConfirmationCheckbox({ checked, isWarranty, error, confirmRef, onChange }) {
+function ConfirmationCheckbox({ checked, error, confirmRef, onChange }) {
   return (
     <label
       ref={confirmRef}
@@ -315,11 +314,6 @@ function ConfirmationCheckbox({ checked, isWarranty, error, confirmRef, onChange
       <span className="flex-1 min-w-0">
         <span className="block text-[13.5px] font-semibold text-ink leading-[1.35]">
           I confirm the pickup details above and understand the estimated timeline.
-        </span>
-        <span className="block mt-1 text-[11.5px] text-muted leading-[1.4]">
-          {isWarranty
-            ? 'Each step has its own SLA — most warranty repairs complete in ~2 weeks, longer if parts are scarce.'
-            : 'Each step has its own SLA — most returns complete in 5–7 business days, longer if expert inspection is needed.'}
         </span>
         {error && (
           <InlineError className="mt-2">
