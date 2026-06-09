@@ -425,10 +425,17 @@ export default function ResetGuideSheet({
   device = 'iphone',
   onDone,
   onClose,
+  // When set (e.g. 'remote'), the sheet skips the intro fork and opens
+  // straight onto that route's first step — used by ResetFailedCard, where
+  // QC already established the device is locked and at Revibe, so only the
+  // remote path applies. `skipDone` then closes via onDone on the last step
+  // instead of showing the "ready to ship" screen (the device is already here).
+  initialRoute = null,
+  skipDone = false,
 }) {
   const c = COPY[device] || COPY.iphone
-  const [phase, setPhase] = useState('intro')
-  const [route, setRoute] = useState(null)
+  const [phase, setPhase] = useState(initialRoute ? 'steps' : 'intro')
+  const [route, setRoute] = useState(initialRoute ?? null)
   const [i, setI] = useState(0)
   const [dir, setDir] = useState(1)
   // Index within a carousel step (steps whose Mock carries a `.screens`
@@ -476,6 +483,7 @@ export default function ResetGuideSheet({
     }
     setDir(1)
     if (i < steps.length - 1) setI(i + 1)
+    else if (skipDone) onDone()
     else setPhase('done')
   }
   const back = () => {
@@ -485,6 +493,7 @@ export default function ResetGuideSheet({
     }
     setDir(-1)
     if (i > 0) setI(i - 1)
+    else if (initialRoute) onClose()
     else setPhase('intro')
   }
   const escalate = () => {

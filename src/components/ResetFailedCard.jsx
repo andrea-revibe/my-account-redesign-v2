@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   ChevronDown,
   Clock,
-  ExternalLink,
   KeyRound,
   Lock,
   RotateCcw,
@@ -13,6 +13,8 @@ import {
 
 import { ProductSummary } from './ProductSummary'
 import TapToFixCta from './TapToFixCta'
+import ResetGuideSheet from './ClaimFlow/ResetGuideSheet'
+import { deviceTypeForOrder } from '../lib/devices'
 
 const PASSCODE_LEN = 6
 
@@ -28,6 +30,8 @@ export default function ResetFailedCard({
   onRequestCancelClaim,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [guideDone, setGuideDone] = useState(false)
   const [unlinked, setUnlinked] = useState(false)
   const [passcode, setPasscode] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -50,6 +54,10 @@ export default function ResetFailedCard({
 
   const claim = order.claim
   const r = claim.resetFailed
+  // The guided reset opens straight onto its remote route (device locked +
+  // already at Revibe). Device-typed from the order so the right walkthrough
+  // shows; falls back to the iPhone guide for the iOS mock here.
+  const device = deviceTypeForOrder(order)
   const canSubmit = unlinked && passcode.length === PASSCODE_LEN
 
   return (
@@ -123,11 +131,28 @@ export default function ResetFailedCard({
           className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3.5 animate-slideDown"
           onClick={(e) => e.stopPropagation()}
         >
-          <UnlinkInstructions />
+          <RemoteResetLauncher
+            done={guideDone}
+            onOpen={() => setGuideOpen(true)}
+          />
+
+          {guideOpen && (
+            <ResetGuideSheet
+              device={device}
+              initialRoute="remote"
+              skipDone
+              onDone={() => {
+                setGuideDone(true)
+                setGuideOpen(false)
+              }}
+              onClose={() => setGuideOpen(false)}
+            />
+          )}
 
           <AckToggle
             checked={unlinked}
-            onChange={() => setUnlinked((v) => !v)}
+            locked={!guideDone}
+            onChange={() => guideDone && setUnlinked((v) => !v)}
           />
 
           <PasscodeField value={passcode} onChange={setPasscode} />
@@ -287,74 +312,66 @@ function CountdownStrip({ rejection }) {
   )
 }
 
-const UNLINK_STEPS = [
-  {
-    title: 'Go to iCloud.com on any browser',
-    body: 'Sign in with the Apple ID linked to this device.',
-  },
-  {
-    title: 'Open Find My, then choose All Devices',
-    body: 'Pick the device you sent us from the list.',
-  },
-  {
-    title: 'Tap Erase This Device, then Remove from Account',
-    body: 'This switches Activation Lock off so we can wipe it.',
-  },
-]
-
-function UnlinkInstructions() {
+// Launches the guided reset straight onto its remote route — the customer no
+// longer has the device (it's at Revibe), so the only way to clear Activation
+// Lock is to unlink it remotely. Finishing the guide flips to a done state and
+// unlocks the confirm checkbox below. Brand-toned so it reads as the action,
+// distinct from the danger-toned blocked hero above.
+function RemoteResetLauncher({ done, onOpen }) {
   return (
-    <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
-      <div className="px-3.5 py-2.5 flex items-center justify-between gap-2 bg-line-2/30 border-b border-line">
-        <div className="flex items-center gap-2">
-          <Lock size={13} strokeWidth={2} className="text-muted" />
-          <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink">
-            Remove device from your iCloud
-          </span>
-        </div>
-        <a
-          href="https://www.icloud.com/find"
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="text-[11px] font-semibold text-brand inline-flex items-center gap-1 hover:underline"
-        >
-          Open iCloud
-          <ExternalLink size={11} strokeWidth={2} />
-        </a>
-      </div>
-      <ol className="px-3.5 py-3 flex flex-col gap-2.5">
-        {UNLINK_STEPS.map((step, i) => (
-          <li key={i} className="flex gap-2.5 items-start">
-            <span className="w-5 h-5 rounded-full bg-brand text-white text-[10.5px] font-bold grid place-items-center shrink-0 mt-0.5">
-              {i + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-[12.5px] font-semibold text-ink leading-snug">
-                {step.title}
-              </div>
-              <div className="text-[11.5px] text-muted leading-snug mt-0.5">
-                {step.body}
-              </div>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`w-full rounded-[14px] border-2 px-4 py-3.5 flex items-center gap-3 text-left transition-colors ${
+        done
+          ? 'border-success/40 bg-success/5 hover:bg-success/10'
+          : 'border-brand bg-brand-bg/50 hover:bg-brand-bg/70'
+      }`}
+    >
+      <span
+        className={`w-10 h-10 rounded-full grid place-items-center shrink-0 text-white ${
+          done ? 'bg-success' : 'bg-brand'
+        }`}
+      >
+        {done ? (
+          <CheckCircle2 size={20} strokeWidth={2} />
+        ) : (
+          <Lock size={18} strokeWidth={2.2} />
+        )}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[14px] font-semibold text-ink leading-snug">
+          {done ? 'Guided reset completed' : 'Run the guided remote reset'}
+        </span>
+        <span className="block text-[11.5px] text-muted leading-snug mt-0.5">
+          {done
+            ? 'Tap to run it again'
+            : 'We’ll walk you through unlinking the device remotely'}
+        </span>
+      </span>
+      <ArrowRight
+        size={18}
+        strokeWidth={2.2}
+        className={`shrink-0 ${done ? 'text-success' : 'text-brand'}`}
+      />
+    </button>
   )
 }
 
-function AckToggle({ checked, onChange }) {
+function AckToggle({ checked, locked, onChange }) {
   return (
     <button
       type="button"
       onClick={onChange}
       role="checkbox"
       aria-checked={checked}
+      aria-disabled={locked}
       className={`w-full rounded-[12px] border px-3.5 py-3 flex items-start gap-2.5 text-left transition ${
-        checked
-          ? 'bg-success/5 border-success/40'
-          : 'bg-surface border-line hover:bg-line-2/40'
+        locked
+          ? 'bg-line-2/30 border-line opacity-55 cursor-not-allowed'
+          : checked
+            ? 'bg-success/5 border-success/40'
+            : 'bg-surface border-line hover:bg-line-2/40'
       }`}
     >
       <span
@@ -372,7 +389,9 @@ function AckToggle({ checked, onChange }) {
           I’ve removed this device from my iCloud account
         </div>
         <div className="text-[11.5px] text-muted leading-snug mt-0.5">
-          Required so our technician can complete the wipe.
+          {locked
+            ? 'Run the guided reset above first.'
+            : 'Required so our technician can complete the wipe.'}
         </div>
       </div>
     </button>
