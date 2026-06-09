@@ -134,7 +134,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
               <div className="flex items-baseline justify-between">
                 <span className="text-[13px] text-ink-2">
                   {claim.claimStatusId === 'device_returned'
-                    ? 'Returned on'
+                    ? 'Delivered on'
                     : 'Expected back by'}
                 </span>
                 <span className="text-[14px] font-semibold text-ink">

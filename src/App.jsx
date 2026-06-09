@@ -25,6 +25,7 @@ import {
   hasActiveClaim,
   isClaimRefunded,
   isWarrantyDelivered,
+  isReturnDelivered,
   cancelNeedsShipBack,
   cancelReturnGate,
 } from './lib/claims'
@@ -56,6 +57,10 @@ function isInFlightCancellation(order) {
 // A delivered order with an active claim is "open" again — the customer is
 // tracking a return-in-progress. Refunded claims drop back to past.
 function isOpen(order) {
+  // A delivered return (invalid / wrong-device verdict shipped back) is done,
+  // even though the claim's own statusId never reaches a refund terminal —
+  // drop it to Past, mirroring a delivered warranty.
+  if (isReturnDelivered(order)) return false
   if (hasActiveClaim(order)) return true
   return (
     (order.state !== 'cancelled' && order.statusId !== 'delivered') ||
@@ -63,15 +68,22 @@ function isOpen(order) {
   )
 }
 
+// Delivered view = a delivered order that isn't cancelled and has no claim
+// still in flight. A delivered return counts here too (its device is back),
+// matching how a delivered warranty surfaces.
+function isDeliveredPast(order) {
+  if (isReturnDelivered(order)) return true
+  return (
+    order.statusId === 'delivered' &&
+    order.state !== 'cancelled' &&
+    !hasActiveClaim(order)
+  )
+}
+
 function matchesStatus(order, status) {
   if (status === 'all') return true
   if (status === 'cancelled') return order.state === 'cancelled'
-  if (status === 'delivered')
-    return (
-      order.statusId === 'delivered' &&
-      order.state !== 'cancelled' &&
-      !hasActiveClaim(order)
-    )
+  if (status === 'delivered') return isDeliveredPast(order)
   if (status === 'in_progress') return isOpen(order)
   return true
 }
@@ -373,12 +385,7 @@ export default function App() {
     () => ({
       all: dateFiltered.length,
       in_progress: dateFiltered.filter(isOpen).length,
-      delivered: dateFiltered.filter(
-        (o) =>
-          o.statusId === 'delivered' &&
-          o.state !== 'cancelled' &&
-          !hasActiveClaim(o),
-      ).length,
+      delivered: dateFiltered.filter(isDeliveredPast).length,
       cancelled: dateFiltered.filter((o) => o.state === 'cancelled').length,
     }),
     [dateFiltered],
@@ -537,6 +544,15 @@ export default function App() {
                 <SectionLabel title="Past orders" count={past.length} />
                 <div className="px-4 flex flex-col gap-3">
                   {past.map((o) => {
+                    if (isReturnDelivered(o)) {
+                      return (
+                        <InvalidClaimCard
+                          key={o.id}
+                          order={o}
+                          onKeepClaim={handleKeepClaim}
+                        />
+                      )
+                    }
                     if (isWarrantyDelivered(o)) {
                       return (
                         <WarrantyClaimCard

@@ -189,7 +189,11 @@ export const CLAIM_NOTIFICATIONS = {
     },
   },
 
-  'claim.return_shipping.paid': {
+  // Return shipment created — the device is on its way back to the customer.
+  // Keyed on the unified `claim.ship_back.created` event so the one comm covers
+  // every return leg: warranty repair-return, and the invalid / cancel paid
+  // return (issue · warranty · change-of-mind journeys all emit it).
+  'claim.ship_back.created': {
     whatsapp:
       "Your device will be shipped back! 📦",
     email: {
@@ -219,11 +223,14 @@ export const CLAIM_NOTIFICATIONS = {
     },
   },
 
-  // missing step where AWB is created from Revibe and ship_back_under_collection notifications are sent to customers 
+  // The four return-transit milestones (claim.ship_back.arrived_destination /
+  // cleared_customs / forwarded_to_agent / out_for_delivery) are intentionally
+  // silent — logistics steps with no customer comm, same as the outbound order.
 
-  // missing step where AWB has first pcikup event and shipped_back notifications are sent to customers
-
-  'claim.return_shipment.delivered': {
+  // Device delivered back to the customer — return-leg terminal. Keyed on the
+  // unified `claim.device.returned` event, so it fires for both the warranty
+  // repair-return and the invalid / cancel paid return.
+  'claim.device.returned': {
     whatsapp:
       "Great news! Your device has been successfully delivered back to you ✅ We hope everything was handled to your satisfaction. Feel free to reach out if you need anything!",
     email: {
@@ -241,11 +248,11 @@ export const CLAIM_NOTIFICATIONS = {
   //   'claim.transit.arrived_origin_hub'   'claim.transit.arrived_revibe_hub'
   // Inspection / review outcome:
   //   'claim.review.started'
-  //   'claim.review.invalid_confirmed'   
-  // Resolution — refund / repair / return:
-  //   'claim.device.returned'
-  //   'claim.ship_back.created'
-  //   'claim.return_shipment.*'  /  'claim.ship_back.*'  (out_for_delivery, delivered, …)
+  //   'claim.review.invalid_confirmed'
+  // Return leg (device → customer) is unified on the `claim.ship_back.*`
+  // family + `claim.device.returned` terminal — one comm covers warranty
+  // repair-return and the invalid / cancel paid return across every journey.
+  // The four ship_back transit milestones stay silent (logistics).
   //
   // Template:
   // 'claim.documents.rejected': {

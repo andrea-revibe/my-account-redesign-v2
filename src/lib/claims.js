@@ -115,6 +115,29 @@ export function claimProgressIndex(claimStatusId) {
   return CLAIM_STATUSES.findIndex((s) => s.id === claimStatusId)
 }
 
+// Progress chain for a claim whose device ships *back* to the customer
+// instead of being refunded — an invalid / wrong-device verdict (or a
+// post-collection cancel). Keeps the refund chain's head (initiated →
+// pickup → qc) and swaps the refund tail (refund_issued / refund_credited)
+// for the return shipment's Shipped → Delivered, so it reads with the same
+// tail as a warranty ship-back. Used by InvalidClaimCard's paid surface.
+export const RETURN_CLAIM_STATUSES = [
+  CLAIM_STATUSES[0], // initiated
+  CLAIM_STATUSES[1], // pickup
+  CLAIM_STATUSES[2], // qc
+  { id: 'shipped', label: 'Shipped', short: 'Shipped', headline: 'On its way back', icon: Truck },
+  { id: 'delivered', label: 'Delivered', short: 'Delivered', headline: 'Delivered', icon: CheckCircle2 },
+]
+
+// Current step in RETURN_CLAIM_STATUSES, driven by the return shipment's
+// order-style status id. The device cleared the claim's head (initiated →
+// pickup → qc) before any return leg exists, so the only live steps are the
+// shipped leg (created / quality_check / shipped all sit on it) and the
+// delivered terminal.
+export function returnClaimProgressIndex(returnShipment) {
+  return returnShipment?.currentStatusId === 'delivered' ? 4 : 3
+}
+
 // Courier sub-steps for the device's return journey, surfaced inside the
 // `See detailed tracking` dropdown once `claim.transitSubTimeline.picked_up`
 // is set (i.e. the courier has scanned the device). Inverse of the outbound
@@ -207,6 +230,15 @@ export function isWarrantyDelivered(order) {
   )
 }
 
+// Terminal for an invalid / wrong-device verdict (or a post-collection
+// cancel): the un-refunded device has been shipped back and delivered to the
+// customer. The claim's own `claimStatusId` stays at `qc` (no refund leg), so
+// this reads the return shipment instead. Drives the same "drop to Past +
+// success tone" treatment as `isWarrantyDelivered`.
+export function isReturnDelivered(order) {
+  return order?.claim?.invalidClaim?.returnShipment?.currentStatusId === 'delivered'
+}
+
 // Right-side phase tag in the hero, mirroring the InProgressCard `Zap / On
 // track` and PastOrderCard `Hourglass / Receipt / Check` patterns.
 export function claimPhaseTag(claimStatusId) {
@@ -281,15 +313,15 @@ export const WARRANTY_CLAIM_STATUSES = [
   {
     id: 'ship_back',
     label: 'On the way back',
-    short: 'Ship back',
+    short: 'Shipped',
     headline: 'On its way back',
     icon: PackageCheck,
   },
   {
     id: 'device_returned',
-    label: 'Device returned',
-    short: 'Returned',
-    headline: 'Device returned',
+    label: 'Delivered',
+    short: 'Delivered',
+    headline: 'Delivered',
     icon: CheckCircle2,
   },
 ]

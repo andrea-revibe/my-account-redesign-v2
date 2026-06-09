@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   ChevronDown,
-  Check,
   Home,
   Wrench,
   CalendarClock,
@@ -25,6 +24,7 @@ import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import HistoryThread from './HistoryThread'
 import { ProductSummary } from './ProductSummary'
+import ClaimProgressDots from './ClaimProgressDots'
 import {
   ReturnShipmentTracking,
   CourierStrip,
@@ -102,7 +102,12 @@ export default function WarrantyClaimCard({
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Warranty progress
             </div>
-            <WarrantyProgressDots claim={claim} tone={tone} />
+            <ClaimProgressDots
+              steps={WARRANTY_CLAIM_STATUSES}
+              curIdx={warrantyClaimProgressIndex(claim.claimStatusId)}
+              stamps={claim.timeline}
+              tone={tone}
+            />
           </div>
 
           {/* Pickup-leg (inbound, customer → Revibe) detailed tracking —
@@ -322,7 +327,7 @@ function ReturnedStrip({ shipBack, toneText }) {
         className={`${toneText} shrink-0 mt-px`}
       />
       <span className="font-semibold leading-[1.3]">
-        Returned on {shipBack.deliveredOnLong || shipBack.deliveredOn}
+        Delivered on {shipBack.deliveredOnLong || shipBack.deliveredOn}
       </span>
     </div>
   )
@@ -414,84 +419,3 @@ function PickupTransitDetail({ claim, order }) {
   )
 }
 
-function WarrantyProgressDots({ claim, tone }) {
-  const t = TONE[tone]
-  const steps = WARRANTY_CLAIM_STATUSES
-  const curIdx = warrantyClaimProgressIndex(claim.claimStatusId)
-
-  return (
-    <ol className="flex items-start justify-between gap-0.5">
-      {steps.map((s, i) => {
-        const reached = i <= curIdx
-        const isCurrent = i === curIdx
-        const ts = reached ? claim.timeline?.[s.id] : null
-        let date = ''
-        let time = ''
-        if (ts) {
-          const parts = String(ts).split(' · ')
-          date = parts[0] || ''
-          time = parts[1] || ''
-        }
-        const glow = isCurrent
-          ? tone === 'success'
-            ? 'shadow-[0_0_0_4px_rgb(216,239,225)]'
-            : tone === 'brand'
-              ? 'shadow-[0_0_0_4px_rgb(243,237,251)]'
-              : 'shadow-[0_0_0_4px_rgb(255,242,221)]'
-          : ''
-        return (
-          <li
-            key={s.id}
-            className="flex-1 flex flex-col items-center text-center relative min-w-0"
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-[2px] ${
-                  reached ? t.bg : 'bg-line'
-                }`}
-              />
-            )}
-            <span
-              className={`relative z-10 grid place-items-center w-[18px] h-[18px] rounded-full border-2 ${
-                reached
-                  ? `${t.bg} border-transparent text-white`
-                  : 'bg-surface border-line text-muted'
-              } ${glow}`}
-            >
-              {i < curIdx && <Check size={10} strokeWidth={3} />}
-            </span>
-            <span
-              className={`mt-1.5 text-[9.5px] leading-[1.2] px-0.5 ${
-                isCurrent
-                  ? `${t.text} font-bold`
-                  : reached
-                    ? 'text-ink font-medium'
-                    : 'text-muted font-medium'
-              }`}
-            >
-              {s.short}
-            </span>
-            <span
-              className={`mt-1 text-[9px] leading-[1.25] tabular-nums min-h-[22px] ${
-                reached ? 'text-ink-2' : 'text-muted/50'
-              }`}
-            >
-              {date && (
-                <>
-                  {date}
-                  {time && (
-                    <>
-                      <br />
-                      {time}
-                    </>
-                  )}
-                </>
-              )}
-            </span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}

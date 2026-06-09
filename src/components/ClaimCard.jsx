@@ -27,6 +27,7 @@ import ClaimActionBanner from './ClaimActionBanner'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
+import ClaimProgressDots from './ClaimProgressDots'
 
 // Card chrome is the refund-hero family (see PastOrderCard cancelled
 // branch): left accent strip, eyebrow, state pill, tinted hero, compact
@@ -60,6 +61,7 @@ export default function ClaimCard({
   const claim = order.claim
   const tone = claimToneFor(claim.claimStatusId)
   const t = TONE[tone]
+  const steps = claimStatusesFor(claim)
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
@@ -96,7 +98,12 @@ export default function ClaimCard({
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Claim progress
             </div>
-            <ClaimProgressDots claim={claim} tone={tone} />
+            <ClaimProgressDots
+              steps={steps}
+              curIdx={steps.findIndex((s) => s.id === claim.claimStatusId)}
+              stamps={claim.timeline}
+              tone={tone}
+            />
           </div>
 
           {Boolean(claim.transitSubTimeline?.picked_up) && (
@@ -425,79 +432,5 @@ function TransitSubItem({ label, timestamp, state, isLast }) {
   )
 }
 
-function ClaimProgressDots({ claim, tone }) {
-  const t = TONE[tone]
-  const steps = claimStatusesFor(claim)
-  const curIdx = steps.findIndex((s) => s.id === claim.claimStatusId)
-
-  return (
-    <ol className="flex items-start justify-between gap-0.5">
-      {steps.map((s, i) => {
-        const reached = i <= curIdx
-        const isCurrent = i === curIdx
-        const ts = reached ? claim.timeline?.[s.id] : null
-        let date = ''
-        let time = ''
-        if (ts) {
-          const parts = String(ts).split(' · ')
-          date = parts[0] || ''
-          time = parts[1] || ''
-        }
-        return (
-          <li
-            key={s.id}
-            className="flex-1 flex flex-col items-center text-center relative min-w-0"
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-[2px] ${
-                  reached ? t.bg : 'bg-line'
-                }`}
-              />
-            )}
-            <span
-              className={`relative z-10 grid place-items-center w-[18px] h-[18px] rounded-full border-2 ${
-                reached
-                  ? `${t.bg} border-transparent text-white`
-                  : 'bg-surface border-line text-muted'
-              } ${isCurrent ? 'shadow-[0_0_0_4px_rgb(255,242,221)]' : ''}`}
-            >
-              {i < curIdx && <Check size={10} strokeWidth={3} />}
-            </span>
-            <span
-              className={`mt-1.5 text-[9.5px] leading-[1.2] px-0.5 ${
-                isCurrent
-                  ? `${t.text} font-bold`
-                  : reached
-                    ? 'text-ink font-medium'
-                    : 'text-muted font-medium'
-              }`}
-            >
-              {s.short}
-            </span>
-            <span
-              className={`mt-1 text-[9px] leading-[1.25] tabular-nums min-h-[22px] ${
-                reached ? 'text-ink-2' : 'text-muted/50'
-              }`}
-            >
-              {date && (
-                <>
-                  {date}
-                  {time && (
-                    <>
-                      <br />
-                      {time}
-                    </>
-                  )}
-                </>
-              )}
-            </span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
 
 

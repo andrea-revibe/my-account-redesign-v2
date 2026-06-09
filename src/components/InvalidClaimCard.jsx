@@ -9,17 +9,20 @@ import {
   CreditCard,
   Home,
   MapPin,
-  Package,
   RotateCcw,
   Settings2,
-  ShieldCheck,
   ShieldX,
   Truck,
   Zap,
 } from 'lucide-react'
-import { STATUSES } from '../lib/statuses'
+import {
+  RETURN_CLAIM_STATUSES,
+  returnClaimProgressIndex,
+  claimTypeLabel,
+} from '../lib/claims'
 
 import { ProductSummary } from './ProductSummary'
+import ClaimProgressDots from './ClaimProgressDots'
 import { ReturnShipmentTracking } from './ReturnShipmentTracking'
 import TapToFixCta from './TapToFixCta'
 
@@ -262,11 +265,29 @@ export default function InvalidClaimCard({
 function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
   const claim = order.claim
   const ship = claim.invalidClaim.returnShipment
-  const curIdx = STATUSES.findIndex((s) => s.id === ship.currentStatusId)
+  // Merge the claim's own head (initiated → pickup → qc, collected for QC
+  // before the verdict) with the return shipment's Shipped → Delivered tail,
+  // so the dot strip keeps the full claim context instead of reading as a
+  // fresh order — and matches the warranty ship-back card's tail.
+  const stamps = {
+    initiated: claim.timeline?.initiated,
+    pickup: claim.timeline?.pickup,
+    qc: claim.timeline?.qc,
+    shipped: ship.timeline?.shipped,
+    delivered: ship.timeline?.delivered,
+  }
+  // Once the device is delivered the leg is complete — flip the whole card to
+  // success (green), mirroring the warranty `device_returned` card, and swap
+  // the future-tense ETA hero for a "Delivered on …" hero.
+  const delivered = ship.currentStatusId === 'delivered'
+  const tone = delivered ? 'success' : 'brand'
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative animate-fadeIn">
-      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 bg-brand" />
+      <span
+        aria-hidden
+        className={`absolute left-0 top-0 bottom-0 w-1 ${delivered ? 'bg-success' : 'bg-brand'}`}
+      />
 
       <button
         type="button"
@@ -287,35 +308,88 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
           </span>
         </div>
 
-        <span className="self-start inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] bg-brand-bg text-brand h-6 px-2.5 text-[10.5px]">
-          <Truck size={11} strokeWidth={2} />
-          Return shipment
-        </span>
+        {delivered ? (
+          <span className="self-start inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] bg-success-bg text-success h-6 px-2.5 text-[10.5px]">
+            <Check size={11} strokeWidth={2.4} />
+            Delivered
+          </span>
+        ) : (
+          <span className="self-start inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] bg-brand-bg text-brand h-6 px-2.5 text-[10.5px]">
+            <Truck size={11} strokeWidth={2} />
+            Return shipment
+          </span>
+        )}
 
-        <div className="rounded-[14px] border p-3.5 bg-gradient-to-br from-brand-bg to-brand-bg2 border-brand-bg2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
-              Delivery by
+        {delivered ? (
+          <div className="rounded-[14px] border p-3.5 bg-gradient-to-br from-success-bg to-[#d4f0e3] border-[#c6ebd9]">
+            <div className="flex items-start justify-between gap-2">
+              <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+                Back with you
+              </div>
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-success text-right">
+                <Check size={11} strokeWidth={2.4} />
+                Complete
+              </span>
             </div>
-            <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-brand text-right">
-              <Zap size={11} strokeWidth={2} />
-              On track
-            </span>
+            <div className="mt-1 text-[26px] font-bold leading-[1.05] tracking-[-0.01em] text-success">
+              Delivered
+            </div>
+            <div className="mt-2.5 flex items-start gap-1.5 text-[12px] text-ink-2">
+              <CheckCircle2
+                size={13}
+                strokeWidth={2}
+                className="text-success shrink-0 mt-px"
+              />
+              <span className="font-semibold leading-[1.3]">
+                Delivered on{' '}
+                {ship.deliveredOnLong ||
+                  ship.deliveredOn ||
+                  (ship.timeline?.delivered || '').split(' · ')[0] ||
+                  ship.estimatedDeliveryLong ||
+                  ship.estimatedDelivery}
+              </span>
+            </div>
+            <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
+              <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
+              <span className="text-muted/60">·</span>
+              <span className="font-semibold uppercase tracking-[0.08em] text-[10.5px]">
+                Claim · {claimTypeLabel(claim)}
+              </span>
+            </div>
           </div>
-          <div className="mt-1 text-[26px] font-bold leading-[1.05] tracking-[-0.01em] text-brand">
-            {ship.estimatedDeliveryLong || ship.estimatedDelivery}
+        ) : (
+          <div className="rounded-[14px] border p-3.5 bg-gradient-to-br from-brand-bg to-brand-bg2 border-brand-bg2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
+                Back with you by
+              </div>
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-brand text-right">
+                <Zap size={11} strokeWidth={2} />
+                On track
+              </span>
+            </div>
+            <div className="mt-1 text-[26px] font-bold leading-[1.05] tracking-[-0.01em] text-brand">
+              {ship.estimatedDeliveryLong || ship.estimatedDelivery}
+            </div>
+            <div className="mt-1.5 text-[12px] leading-[1.45] text-ink-2">
+              Your device is on its way back — we'll track it like any other delivery.
+            </div>
+            <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
+              <span>Delivering to</span>
+              <span className="inline-flex items-center rounded-full border bg-surface text-ink border-line font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5">
+                <Home size={12} strokeWidth={2} />
+                Home
+              </span>
+            </div>
+            <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
+              <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
+              <span className="text-muted/60">·</span>
+              <span className="font-semibold uppercase tracking-[0.08em] text-[10.5px]">
+                Claim · {claimTypeLabel(claim)}
+              </span>
+            </div>
           </div>
-          <div className="mt-1.5 text-[12px] leading-[1.45] text-ink-2">
-            Your device is on its way back — we'll track it like any other order.
-          </div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
-            <span>Delivering to</span>
-            <span className="inline-flex items-center rounded-full border bg-surface text-ink border-line font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5">
-              <Home size={12} strokeWidth={2} />
-              Home
-            </span>
-          </div>
-        </div>
+        )}
 
         <ProductSummary order={order} />
       </button>
@@ -326,7 +400,12 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Return shipment timeline
             </div>
-            <TimelineDots ship={ship} curIdx={curIdx} />
+            <ClaimProgressDots
+              steps={RETURN_CLAIM_STATUSES}
+              curIdx={returnClaimProgressIndex(ship)}
+              stamps={stamps}
+              tone={tone}
+            />
           </div>
 
           {/* Once the return shipment is dispatched, surface the shared
@@ -716,75 +795,4 @@ function EditableField({ label, value, onChange, multiline = false, type = 'text
   )
 }
 
-// Mirrors InProgressCard's TimelineDots but reads from the
-// `invalidClaim.returnShipment` block instead of the order-level fields,
-// since the post-pay shipment is a separate leg tracked under the claim.
-function TimelineDots({ ship, curIdx }) {
-  return (
-    <div className="flex items-start justify-between gap-1">
-      {STATUSES.map((s, i) => {
-        const done = i < curIdx
-        const current = i === curIdx
-        const reached = done || current
-        const ts = ship.timeline?.[s.id]
-        let date = ''
-        let time = ''
-        if (ts) {
-          const parts = String(ts).split(' · ')
-          date = parts[0] || ''
-          time = parts[1] || ''
-        }
-        return (
-          <div key={s.id} className="flex-1 flex flex-col items-center relative">
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-[2px] ${
-                  reached ? 'bg-brand' : 'bg-line'
-                }`}
-              />
-            )}
-            <span
-              className={`relative z-10 grid place-items-center w-[18px] h-[18px] rounded-full border-2 ${
-                reached
-                  ? 'bg-brand border-brand text-white'
-                  : 'bg-surface border-line text-muted'
-              } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
-            >
-              {done && <Check size={10} strokeWidth={3} />}
-            </span>
-            <span
-              className={`mt-1.5 text-[10.5px] text-center leading-[1.2] ${
-                current
-                  ? 'text-ink font-bold'
-                  : reached
-                    ? 'text-ink font-medium'
-                    : 'text-muted font-medium'
-              }`}
-            >
-              {s.short}
-            </span>
-            <span
-              className={`mt-1 text-[9.5px] text-center leading-[1.25] tabular-nums min-h-[22px] ${
-                reached ? 'text-ink-2' : 'text-muted/50'
-              }`}
-            >
-              {date && (
-                <>
-                  {date}
-                  {time && (
-                    <>
-                      <br />
-                      {time}
-                    </>
-                  )}
-                </>
-              )}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 

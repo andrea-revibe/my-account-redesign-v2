@@ -648,7 +648,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_return_shipping_paid',
     label: 'Customer paid return shipping',
     trigger: 'customer',
-    event: 'claim.return_shipping.paid',
+    event: 'claim.ship_back.created',
     apply: (o) => ({
       ...o,
       claim: {
@@ -680,7 +680,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_arrived_destination',
     label: 'Return — arrived in destination country',
     trigger: 'system',
-    event: 'claim.return_shipment.arrived_destination',
+    event: 'claim.ship_back.arrived_destination',
     apply: (o) => ({
       ...o,
       claim: {
@@ -703,7 +703,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_cleared_customs',
     label: 'Return — cleared customs',
     trigger: 'system',
-    event: 'claim.return_shipment.cleared_customs',
+    event: 'claim.ship_back.cleared_customs',
     apply: (o) => ({
       ...o,
       claim: {
@@ -726,7 +726,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_forwarded_to_agent',
     label: 'Return — forwarded to third-party agent',
     trigger: 'system',
-    event: 'claim.return_shipment.forwarded_to_agent',
+    event: 'claim.ship_back.forwarded_to_agent',
     apply: (o) => ({
       ...o,
       claim: {
@@ -749,7 +749,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_out_for_delivery',
     label: 'Return — out for delivery',
     trigger: 'system',
-    event: 'claim.return_shipment.out_for_delivery',
+    event: 'claim.ship_back.out_for_delivery',
     apply: (o) => ({
       ...o,
       claim: {
@@ -772,7 +772,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_delivered',
     label: 'Unrepaired device delivered to customer',
     trigger: 'system',
-    event: 'claim.return_shipment.delivered',
+    event: 'claim.device.returned',
     next: [],
     apply: (o) => ({
       ...o,
