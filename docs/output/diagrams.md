@@ -25,8 +25,8 @@ These are hand-maintained — there's no generator. When routing precedence, a c
 ```mermaid
 flowchart TD
   start(["order in filtered list"]) --> isOpen{"isOpen(order)?"}
-  isOpen -- "hasActiveClaim · OR not-cancelled & not-delivered · OR in-flight cancellation" --> IP[["In progress section"]]
-  isOpen -- "else" --> PAST[["Past orders section"]]
+  isOpen -- "NOT isReturnDelivered AND (hasActiveClaim · OR not-cancelled & not-delivered · OR in-flight cancellation)" --> IP[["In progress section"]]
+  isOpen -- "else (incl. isReturnDelivered)" --> PAST[["Past orders section"]]
 
   IP --> ip1{"claim.docsRejection?"}
   ip1 -- yes --> DocsRejectedCard
@@ -46,7 +46,9 @@ flowchart TD
   ip8 -- yes --> InProgressCard
   ip8 -- no --> OrderCard
 
-  PAST --> p1{"isWarrantyDelivered?"}
+  PAST --> p0{"isReturnDelivered?"}
+  p0 -- yes --> ICP["InvalidClaimCard (delivered → green)"]
+  p0 -- no --> p1{"isWarrantyDelivered?"}
   p1 -- yes --> WCP["WarrantyClaimCard"]
   p1 -- no --> p2{"isClaimRefunded?"}
   p2 -- yes --> CCP["ClaimCard"]

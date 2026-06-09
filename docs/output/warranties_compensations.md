@@ -70,7 +70,7 @@ Most states reuse a generic claim hero (eyebrow + headline + ref + updated times
 - **`initiated`** — `ScheduledPickupStrip` (CalendarClock + scheduled date/slot, MapPin + pickup address). Same shape as `ClaimCard`'s initiated strip.
 - **`under_repair`** — `RepairWindowStrip`: Wrench-iconed "Estimated repair complete" date + optional one-line note ("Charging-port assembly swap — typically wraps up within 7–10 days").
 - **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, "Delivering to · Home" chip, claim-ref + type subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
-- **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Returned on {date}".
+- **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Delivered on {date}" (headline + state pill read "Delivered").
 
 #### 2.3.3 Detailed tracking dropdowns
 
@@ -90,7 +90,7 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 
 #### 2.3.4 Expanded view
 
-1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`. Same chrome as `ClaimCard`'s 5-dot strip; tone-aware glow on the current step. Step labels: `Initiated · Pickup · QC · Repair · Ship back · Returned`.
+1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`, rendered by the shared **`ClaimProgressDots`** component (`src/components/ClaimProgressDots.jsx`, also used by `ClaimCard` and `InvalidClaimCard`); tone-aware glow on the current step. Step labels: `Initiated · Pickup · QC · Repair · Shipped · Delivered` — the `Shipped · Delivered` tail matches `InvalidClaimCard`'s return-shipment card verbatim (the `ship_back`/`device_returned` `short` labels were relabelled from `Ship back`/`Returned`).
 2. **`See detailed tracking` dropdown** (§2.3.3) — the inbound or return leg, whichever applies, collapsed by default.
 3. **`HistoryThread`** — same `getHistoryEvents(order, 'claim')` source as `ClaimCard`.
 4. **Footer** — a single full-width `View claim details` button (opens `ClaimDetailsSheet` — warranty-aware, see §2.5). (The decorative icon-only `Download receipt` button was removed.)

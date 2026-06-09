@@ -16,6 +16,10 @@
 //      delivered (no refund, unrepaired unit ships back to the customer).
 //      Declined → terminal "Claim closed, no refund."
 //
+// Intake carries proof (Step 2 attachment), so submit → proof accepted
+// (pending-collection notification) → pickup, with a docs-rejected detour
+// that re-merges into the proof-accepted beat. Change-of-mind skips this.
+//
 // No refund-method fork: warranty intake skips Step 5, so the claim has no
 // `refundMethod` / `expectedRefund` fields. Cf. `CLAIM_COM_NODES` which
 // branches on refund method at submit.
@@ -121,12 +125,7 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Warranty claim submitted',
     trigger: 'customer',
     event: 'claim.created',
-    next: [
-      'claim_picked_up',
-      'claim_pickup_failed',
-      'claim_docs_rejected',
-      'claim_cancelled',
-    ],
+    next: ['claim_proof_accepted', 'claim_docs_rejected', 'claim_cancelled'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -168,6 +167,19 @@ export const CLAIM_WARRANTY_NODES = [
         },
       },
     }),
+  },
+  // ----- Proof accepted. Background proof review passed — the customer
+  //       hears "courier will be in touch" (the same pending-collection
+  //       message change-of-mind gets at claim.created, one beat later).
+  //       Notification beat only; no card-state change. The docs-resubmitted
+  //       re-merge also routes through here. ------------------------------
+  {
+    id: 'claim_proof_accepted',
+    label: 'Proof accepted',
+    trigger: 'system',
+    event: 'claim.documents.accepted',
+    next: ['claim_picked_up', 'claim_pickup_failed', 'claim_cancelled'],
+    apply: (o) => o,
   },
   // ----- Happy pickup → transit → QC → repair → ship-back → returned ---
   {
@@ -495,9 +507,10 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Evidence resubmitted',
     trigger: 'customer',
     event: 'claim.documents.resubmitted',
-    // Re-merges into the pickup outcome fork — customer can still hit a
-    // failed pickup downstream of a resubmitted-evidence chapter.
-    next: ['claim_picked_up', 'claim_pickup_failed'],
+    // Re-merges into the proof-accepted beat — the resubmitted proof clears,
+    // so the customer gets the same "proof accepted → courier coming" beat as
+    // the happy path before the pickup outcome fork.
+    next: ['claim_proof_accepted'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -635,7 +648,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_return_shipping_paid',
     label: 'Customer paid return shipping',
     trigger: 'customer',
-    event: 'claim.return_shipping.paid',
+    event: 'claim.ship_back.created',
     apply: (o) => ({
       ...o,
       claim: {
@@ -667,7 +680,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_arrived_destination',
     label: 'Return — arrived in destination country',
     trigger: 'system',
-    event: 'claim.return_shipment.arrived_destination',
+    event: 'claim.ship_back.arrived_destination',
     apply: (o) => ({
       ...o,
       claim: {
@@ -690,7 +703,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_cleared_customs',
     label: 'Return — cleared customs',
     trigger: 'system',
-    event: 'claim.return_shipment.cleared_customs',
+    event: 'claim.ship_back.cleared_customs',
     apply: (o) => ({
       ...o,
       claim: {
@@ -713,7 +726,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_forwarded_to_agent',
     label: 'Return — forwarded to third-party agent',
     trigger: 'system',
-    event: 'claim.return_shipment.forwarded_to_agent',
+    event: 'claim.ship_back.forwarded_to_agent',
     apply: (o) => ({
       ...o,
       claim: {
@@ -736,7 +749,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_out_for_delivery',
     label: 'Return — out for delivery',
     trigger: 'system',
-    event: 'claim.return_shipment.out_for_delivery',
+    event: 'claim.ship_back.out_for_delivery',
     apply: (o) => ({
       ...o,
       claim: {
@@ -759,7 +772,7 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_invalid_return_delivered',
     label: 'Unrepaired device delivered to customer',
     trigger: 'system',
-    event: 'claim.return_shipment.delivered',
+    event: 'claim.device.returned',
     next: [],
     apply: (o) => ({
       ...o,
@@ -885,7 +898,9 @@ export const CLAIM_WARRANTY_NODES = [
     id: 'claim_reset_retry_resubmitted',
     label: 'Updated unlock details received',
     trigger: 'customer',
-    event: 'claim.reset.retry_resubmitted',
+    // Same customer comm as the first submission — both fire
+    // claim.reset.details_received (attempt distinguishes them).
+    event: 'claim.reset.details_received',
     next: ['claim_under_repair', 'claim_invalid_confirmed'],
     apply: (o) => ({
       ...o,
