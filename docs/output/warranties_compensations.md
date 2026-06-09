@@ -164,7 +164,7 @@ flowchart TD
   q7 -->|yes| past[ClaimCard — Past orders]
 ```
 
-The takeover cards currently fire only on refund-type mocks; a warranty claim that triggers a takeover (e.g. docs-rejected at intake — `n6` on the operational diagram) would route to the takeover ahead of `WarrantyClaimCard`. The precedence is in place but the takeover copy was written for refund-flow context and may need a warranty variant — see §2.9.
+A warranty claim that triggers a takeover routes to it ahead of `WarrantyClaimCard`. The `claim_warranty` journey now exercises this directly: it forks into `claim_docs_rejected` at intake (docs-rejected — `n6` on the operational diagram → `DocsRejectedCard`), in addition to the pickup-failed and reset-failed forks it already had. The takeover copy is still the shared refund-flow copy ("Return claim") — see §2.9.
 
 ### 2.7 Data model — warranty-specific fields
 
@@ -193,7 +193,7 @@ No `refundMethod` / `expectedRefund` fields are needed — the warranty branch h
 ### 2.9 Open questions
 
 - **Warranty-specific Step 2.** Today the warranty branch reuses the Issue scope picker (battery / screen / wrong device / etc.). Production may want a warranty-specific intake block (proof of warranty / serial / purchase date) — particularly if extended-warranty vs manufacturer's-warranty distinction needs to route differently downstream.
-- **Takeover copy on warranty claims.** `DocsRejectedCard` and `PickupFailedCard` would route ahead of `WarrantyClaimCard` if the corresponding fields are set, but the ops/quality message copy was written for refund-flow context. May need a warranty variant.
+- **Takeover copy on warranty claims.** `DocsRejectedCard` (now wired into the `claim_warranty` journey), `PickupFailedCard`, and `ResetFailedCard` route ahead of `WarrantyClaimCard` when their fields are set, but all three render the shared "Return claim" eyebrow + refund-flow ops copy. Consistent across takeovers by choice today; a warranty variant ("Warranty claim", warranty-flavoured ops message) is deferred.
 - **Auto-expand for active warranty claims.** Same question as `ClaimCard` ([returns/claim_tracking.md §9](./returns/claim_tracking.md)). Worth revisiting now that customers can routinely have an active warranty claim.
 - **Repair-window source.** Today `claim.repairWindow.expectedComplete` is either hand-written (mocks) or computed from `expectedCompletionFor('warranty')` (in-session submit). Production needs either a per-supplier SLA-driven estimate or a seller-input field at intake.
 - **Single warranty branch or sub-branched intake?** Warranty coverage varies (manufacturer's warranty / Revibe Care add-on / extended warranty). The current intake collapses to one branch; production may want to split at Step 2 with the source determined backend-side.

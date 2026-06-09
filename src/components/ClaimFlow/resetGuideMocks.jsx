@@ -1610,28 +1610,6 @@ function MacAccountRemove() {
   )
 }
 
-// lucide has no SIM-card glyph — inline one matching the design's path.
-function SimCard({ size = 16, strokeWidth = 1.9, className = '' }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M5 3h9l5 5v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
-      <rect x="8" y="13" width="8" height="5" rx="1" />
-    </svg>
-  )
-}
-
-
 export {
   MiniPhone,
   SettingsSignOut,
@@ -1665,5 +1643,4 @@ export {
   MacWelcome,
   MacICloudRemove,
   MacAccountRemove,
-  SimCard,
 }

@@ -52,18 +52,26 @@ export default function Step6Review({
       : REASON_LABELS[state.reason.value]
 
   const isUnlinkPath = state.devicePrep.option === 'credentials'
-  const devicePrep = isUnlinkPath
-    ? 'Unlinked + passcode shared'
-    : 'Factory reset confirmed'
-  const devicePrepAck = isUnlinkPath
+  const isNeverSetUp = state.devicePrep.neverSetUp
+  const devicePrep = isNeverSetUp
+    ? 'Not set up — no reset needed'
+    : isUnlinkPath
+      ? 'Unlinked + passcode shared'
+      : 'Factory reset confirmed'
+  const devicePrepAck = isNeverSetUp
     ? {
-        title: "I've unlinked the device and shared my passcode.",
-        subtitle: 'Required so our technician can complete the wipe.',
+        title: 'This device was never set up.',
+        subtitle: 'No account is linked, so no reset is needed before pickup.',
       }
-    : {
-        title: 'I have factory reset my device.',
-        subtitle: 'Required before pickup. Unreset devices may delay your refund.',
-      }
+    : isUnlinkPath
+      ? {
+          title: "I've unlinked the device and shared my passcode.",
+          subtitle: 'Required so our technician can complete the wipe.',
+        }
+      : {
+          title: 'I have factory reset my device.',
+          subtitle: 'Required before pickup. Unreset devices may delay your refund.',
+        }
 
   const refundMethodLabel = isWarranty
     ? null
