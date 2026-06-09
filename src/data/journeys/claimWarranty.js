@@ -121,7 +121,12 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Warranty claim submitted',
     trigger: 'customer',
     event: 'claim.created',
-    next: ['claim_picked_up', 'claim_pickup_failed', 'claim_cancelled'],
+    next: [
+      'claim_picked_up',
+      'claim_pickup_failed',
+      'claim_docs_rejected',
+      'claim_cancelled',
+    ],
     apply: (o) => ({
       ...o,
       claim: {
@@ -443,6 +448,66 @@ export const CLAIM_WARRANTY_NODES = [
             currentStatusId: 'created',
             timeline: { created: '31 May · 11:00 AM' },
           },
+        },
+      },
+    }),
+  },
+  // ----- Docs-rejected sub-branch (mirrors the issue journey). Warranty
+  //       intake also attaches evidence (issueDetails.attachmentName), so
+  //       Quality can reject it pre-pickup. Setting `claim.docsRejection`
+  //       routes the order to DocsRejectedCard ahead of WarrantyClaimCard;
+  //       resubmission clears the takeover, sets `proofResubmission`, and
+  //       re-merges into the pickup outcome fork. -----------------------
+  {
+    id: 'claim_docs_rejected',
+    label: 'Documents rejected by Quality',
+    trigger: 'system',
+    event: 'claim.documents.rejected',
+    next: ['claim_docs_resubmitted'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: 'awaiting_documents',
+        actionRequired: {
+          kind: 'awaiting_documents',
+          deadline: '29 May · 11:18 AM',
+          deadlineLabel: '2 days, 14 hours left',
+        },
+        docsRejection: {
+          rejectedAt: '26 May · 11:18 AM',
+          autoCancelAt: '29 May · 11:18 AM',
+          timeLeftLabel: '2 days, 14 hours left',
+          opsName: 'Marwa',
+          opsRole: 'Revibe Quality',
+          opsMessage:
+            "Hi Andrea — thanks for the report. The Battery Health screenshot you sent is cropped and the capacity percentage isn't visible. Could you reshoot the full Settings → Battery → Battery Health screen, including the percentage line near the top? A short clip showing the drain over a few minutes would help too.",
+          previous: [
+            { name: 'IMG_0710.jpg', size: '2.4 MB', kind: 'image', tag: 'Cropped' },
+            { name: 'IMG_0711.jpg', size: '2.1 MB', kind: 'image', tag: 'Blurry' },
+          ],
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_docs_resubmitted',
+    label: 'Evidence resubmitted',
+    trigger: 'customer',
+    event: 'claim.documents.resubmitted',
+    // Re-merges into the pickup outcome fork — customer can still hit a
+    // failed pickup downstream of a resubmitted-evidence chapter.
+    next: ['claim_picked_up', 'claim_pickup_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        subStatusId: undefined,
+        actionRequired: undefined,
+        docsRejection: undefined,
+        proofResubmission: {
+          at: '27 May · 10:42 AM',
+          fileCount: 3,
         },
       },
     }),
