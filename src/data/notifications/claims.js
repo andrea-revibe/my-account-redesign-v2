@@ -6,17 +6,49 @@
 //
 // As this grows it can be split further (e.g. claims/transit.js,
 // claims/resolution.js) and merged in index.js — same barrel pattern.
+
+// "Pending collection" — courier-pickup-is-coming message. Shared by two
+// beats so they stay word-for-word identical to the one screenshot:
+//   • change-of-mind at `claim.created` (no proof to review → straight to
+//     pickup), via the `no_proof` variant below; and
+//   • issue/warranty at `claim.documents.accepted` (after the background
+//     proof review passes — see the proof-accepted node in those journeys).
+const PENDING_COLLECTION = {
+  whatsapp:
+    "We received your claim! 🎉 Our courier will be in touch soon to arrange the pickup of your device — please have it ready!",
+  email: {
+    subject: 'We received your claim! 👍',
+    body: 'We have received your claim! 🎉 Our courier will be in touch soon to arrange the pickup of your device. Please have it ready!',
+    screenshot: '/emails/claims/pending-collection.png',
+  },
+}
+
 export const CLAIM_NOTIFICATIONS = {
   // --- Example (filled) ---------------------------------------------------
+  // `claim.created` is the one event whose copy diverges by claim type: claims
+  // that carry proof (issue/warranty/compensation) go into a background review,
+  // so the customer hears "we're reviewing it"; change-of-mind has nothing to
+  // review and jumps straight to courier pickup. The resolver picks a variant
+  // via `claimRequiresProof` — see lib/notifications.js.
   'claim.created': {
-    whatsapp:
-      "We've received your claim for your Revibe order 📝 Our team is reviewing it and we'll be in touch with the next steps shortly.",
-    email: {
-      subject: 'We’ve received your claim',
-      body: "Thanks for letting us know. We've received your claim and our team is reviewing it. We'll email you with the next steps — including how to return your device if needed — very soon.",
-      screenshot: '/emails/claims/claim-created.png',
+    variants: {
+      proof: {
+        whatsapp:
+          "We received your claim! 👍 We have received your claim and our team is reviewing it 🔍 We will get back to you if needed!",
+        email: {
+          subject: 'We received your claim! 👍',
+          body: 'We have received your claim and our team is reviewing it 🔍 We will get back to you if needed!',
+          screenshot: '/emails/claims/form-received.png',
+        },
+      },
+      no_proof: PENDING_COLLECTION,
     },
   },
+
+  // Proof review passed (issue/warranty only — change-of-mind has no proof,
+  // compensation has no pickup). Same pending-collection message as the
+  // change-of-mind `claim.created`, fired one beat later once proof clears.
+  'claim.documents.accepted': PENDING_COLLECTION,
 
   'claim.pickup.failed': {
     whatsapp:
@@ -27,6 +59,18 @@ export const CLAIM_NOTIFICATIONS = {
       screenshot: '/emails/claims/collection-failed.png',
     },
   },
+
+  'claim.inspection.invalid_confirmed': {
+    whatsapp:
+      "Update on your claim 😔 We will get in touch to understand if you would like us to arrange a new pickup.",
+    email: {
+      subject: 'Update on your claim 😔',
+      body: "After carefully reviewing your claim, our team has determined that unfortunately it does not meet our policy criteria 😔 Someone from our team will be in touch soon to explain the reasons and provide next steps.",
+      screenshot: '/emails/claims/invalid-claim.png',
+    },
+  },
+
+
 
   // --- Scaffold — add entries as flows are built --------------------------
   // Intake / evidence:
@@ -41,7 +85,7 @@ export const CLAIM_NOTIFICATIONS = {
   //   'claim.reset.retry_failed'      'claim.reset.retry_resubmitted'
   // Inspection / review outcome:
   //   'claim.qc.started'              'claim.review.started'
-  //   'claim.review.invalid_confirmed'     'claim.inspection.invalid_confirmed'
+  //   'claim.review.invalid_confirmed'   
   // Resolution — refund / repair / return:
   //   'claim.refund.issued'           'claim.refund.completed'
   //   'claim.repair.started'          'claim.device.returned'

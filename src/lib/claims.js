@@ -389,6 +389,15 @@ export function claimTypeLabel(typeOrClaim) {
   return CLAIM_TYPE_LABELS[type] || 'Claim'
 }
 
+// Every claim type submits proof (issue/warranty/compensation require an
+// attachment in ClaimFlow Step 2) except change-of-mind, which has nothing to
+// review. Drives the divergent `claim.created` intake notification.
+export function claimRequiresProof(typeOrClaim) {
+  const type =
+    typeof typeOrClaim === 'string' ? typeOrClaim : typeOrClaim?.type
+  return type !== 'change_of_mind'
+}
+
 export function refundMethodLabel(claim, order) {
   if (claim?.refundMethod === 'wallet') return 'Revibe Wallet'
   if (claim?.refundMethod === 'original') {

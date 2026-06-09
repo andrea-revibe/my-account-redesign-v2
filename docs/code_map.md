@@ -62,7 +62,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 
 | Module | LOC | In | Exports (line) |
 |---|--:|--:|---|
-| `App.jsx` | 673 | 1 | `App`·86 |
+| `App.jsx` | 675 | 1 | `App`·86 |
 | `components/BnplDisclaimerTooltip.jsx` | 86 | 6 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
 | `components/CancelClaimSheet.jsx` | 155 | 1 | `CancelClaimSheet`·15 |
 | `components/CancelOrderSheet.jsx` | 711 | 2 | `CancelOrderSheet`·19 |
@@ -101,7 +101,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/HistoryThread.jsx` | 218 | 3 | `HistoryThread`·86 |
 | `components/InProgressCard.jsx` | 291 | 1 | `InProgressCard`·29 |
 | `components/InvalidClaimCard.jsx` | 791 | 1 | `InvalidClaimCard`·37 |
-| `components/JourneyDevPanel.jsx` | 162 | 1 | `JourneyDevPanel`·12 |
+| `components/JourneyDevPanel.jsx` | 165 | 1 | `JourneyDevPanel`·12 |
 | `components/JourneyNotificationPanel.jsx` | 171 | 1 | `JourneyNotificationPanel`·20 |
 | `components/KeepOrderSheet.jsx` | 122 | 1 | `KeepOrderSheet`·9 |
 | `components/OrderCard.jsx` | 449 | 1 | `OrderCard`·36 |
@@ -122,11 +122,11 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/journeys/cancellation.js` | 626 | 1 | `CANCELLATION_NODES`·25 |
 | `data/journeys/claimChangeOfMind.js` | 751 | 1 | `CLAIM_COM_NODES`·19 |
 | `data/journeys/claimCompensation.js` | 349 | 1 | `CLAIM_COMPENSATION_NODES`·29 |
-| `data/journeys/claimIssue.js` | 850 | 1 | `CLAIM_ISSUE_NODES`·27 |
-| `data/journeys/claimWarranty.js` | 905 | 1 | `CLAIM_WARRANTY_NODES`·22 |
+| `data/journeys/claimIssue.js` | 858 | 1 | `CLAIM_ISSUE_NODES`·31 |
+| `data/journeys/claimWarranty.js` | 918 | 1 | `CLAIM_WARRANTY_NODES`·26 |
 | `data/journeys/happyPath.js` | 101 | 1 | `HAPPY_PATH_NODES`·5 |
 | `data/journeys/initialOrder.js` | 37 | 1 | `INITIAL_ORDER`·2 |
-| `data/notifications/claims.js` | 48 | 1 | `CLAIM_NOTIFICATIONS`·9 |
+| `data/notifications/claims.js` | 102 | 1 | `CLAIM_NOTIFICATIONS`·26 |
 | `data/notifications/index.js` | 16 | 1 | `NOTIFICATIONS`·11 |
 | `data/notifications/orders.js` | 45 | 1 | `ORDER_NOTIFICATIONS`·9 |
 | `data/notifications/shipment.js` | 40 | 1 | `SHIPMENT_NOTIFICATIONS`·9 |
@@ -135,13 +135,13 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/orders/claims.js` | 666 | 1 | `CLAIM_ORDERS`·4 |
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
-| `lib/claims.js` | 566 | 10 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `CLAIM_TRANSIT_SUB_STATUSES`·123, `transitSubProgressIndex`·130, `hasActiveClaim`·137, `isClaimRefunded`·145, `canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182, `isWarrantyDelivered`·202, `claimPhaseTag`·212, `claimStatusHeadline`·229, `claimStatusSubline`·234, `WARRANTY_CLAIM_STATUSES`·252, `warrantyClaimToneFor`·300, `warrantyClaimProgressIndex`·308, `warrantyClaimPhaseTag`·312, `warrantyClaimStatusHeadline`·331, `warrantyClaimStatusSubline`·336, `REASON_LABELS`·352, `reasonText`·363, `devicePrepText`·371, `CLAIM_TYPE_LABELS`·379, `claimTypeLabel`·386, `refundMethodLabel`·392, `CLAIM_SLAS`·411, `expectedCompletionFor`·434, `SUB_STATUS_LABELS`·459, `actionGateCopy`·520 |
+| `lib/claims.js` | 575 | 11 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `CLAIM_TRANSIT_SUB_STATUSES`·123, `transitSubProgressIndex`·130, `hasActiveClaim`·137, `isClaimRefunded`·145, `canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182, `isWarrantyDelivered`·202, `claimPhaseTag`·212, `claimStatusHeadline`·229, `claimStatusSubline`·234, `WARRANTY_CLAIM_STATUSES`·252, `warrantyClaimToneFor`·300, `warrantyClaimProgressIndex`·308, `warrantyClaimPhaseTag`·312, `warrantyClaimStatusHeadline`·331, `warrantyClaimStatusSubline`·336, `REASON_LABELS`·352, `reasonText`·363, `devicePrepText`·371, `CLAIM_TYPE_LABELS`·379, `claimTypeLabel`·386, `claimRequiresProof`·395, `refundMethodLabel`·401, `CLAIM_SLAS`·420, `expectedCompletionFor`·443, `SUB_STATUS_LABELS`·468, `actionGateCopy`·529 |
 | `lib/devices.js` | 65 | 3 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
 | `lib/edd.js` | 245 | 1 | `MARKETS`·24, `STAGE_ORDER_CREATED`·60, `STAGE_QC`·61, `STAGE_SHIPPED`·62, `SLA_ON_TIME`·64, `SLA_LATE`·65, `MSG_ORDER_LATE`·72, `MSG_QC_BACK_ON_TRACK`·74, `MSG_QC_LATE`·76, `MSG_SHIPPED_LATE`·78, `workdayIntl`·100, `currentStage`·117, `calculateEdd`·125, `buildCustomerMessage`·161, `orderStatus`·185 |
 | `lib/eddSandbox.js` | 231 | 1 | `useEddSandbox`·187 |
 | `lib/events.js` | 152 | 3 | `getHistoryEvents`·119 |
 | `lib/journey.js` | 91 | 1 | `useJourney`·17 |
-| `lib/notifications.js` | 33 | 1 | `NOTIFICATIONS`·12, `notificationFor`·21 |
+| `lib/notifications.js` | 41 | 1 | `NOTIFICATIONS`·13, `notificationFor`·22 |
 | `lib/returns.js` | 267 | 5 | `RETURN_WINDOW_DAYS`·4, `RESTOCKING_FEE_RATE`·5, `ISSUE_WALLET_BONUS`·9, `addDays`·36, `startOfDay`·40, `eligibilityFor`·46, `groupOrdersByEligibility`·71, `refundBreakdown`·89, `formatMoney`·135, `formatLongDate`·140, `formatShortDate`·149, `generateClaimRef`·158, `BATTERY_BASELINE_BY_GRADE`·166, `conditionGradeOf`·175, `batteryBaselineFor`·182, `daysSinceDelivery`·193, `assessBattery`·210 |
 | `lib/statuses.js` | 338 | 10 | `STATUSES`·4, `CANCELLATION_STATUSES`·31, `SHIPPING_SUB_STATUSES`·55, `ORDER_STATES`·80, `progressIndex`·94, `subProgressIndex`·99, `cancellationProgressIndex`·104, `cancellationStepsFor`·115, `statusDescription`·125, `pickActiveOrderId`·253, `statusHeadline`·266, `statusSubline`·285, `statusIconFor`·314 |
 | `main.jsx` | 11 | 0 | _(none)_ |
@@ -152,7 +152,7 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 
 | Source-of-truth module | Consumers |
 |---|---|
-| `lib/claims.js` | `App.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/WarrantyClaimCard.jsx` |
+| `lib/claims.js` | `App.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/WarrantyClaimCard.jsx`, `lib/notifications.js` |
 | `lib/statuses.js` | `App.jsx`, `components/CancellationSubTimeline.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ReturnShipmentTracking.jsx`, `components/ShippingSubTimeline.jsx`, `components/StatusTimeline.jsx` |
 | `lib/returns.js` | `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx` |
 | `data/journey.js` | `App.jsx`, `lib/eddSandbox.js`, `lib/journey.js` |
@@ -229,8 +229,9 @@ graph LR
   lib_eddSandbox_js --> lib_edd_js
   lib_journey_js --> data_journey_js
   lib_notifications_js --> data_notifications_index_js
+  lib_notifications_js --> lib_claims_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 83 modules, 22960 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 83 modules, 23057 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

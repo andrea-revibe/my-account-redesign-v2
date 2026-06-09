@@ -8,6 +8,7 @@
 // for that event (the panel then shows an empty state). Keying by `event` (not
 // node id) means one event reuses the same copy across journeys.
 import { NOTIFICATIONS } from '../data/notifications'
+import { claimRequiresProof } from './claims'
 
 export { NOTIFICATIONS }
 
@@ -19,7 +20,14 @@ function interpolate(str, order) {
 }
 
 export function notificationFor(event, order) {
-  const entry = NOTIFICATIONS[event]
+  const raw = NOTIFICATIONS[event]
+  if (!raw) return null
+  // A few events (today only `claim.created`) carry per-claim-type variants:
+  // proof claims go into review, change-of-mind jumps to pickup. All other
+  // events resolve straight to their single copy.
+  const entry = raw.variants
+    ? raw.variants[claimRequiresProof(order?.claim) ? 'proof' : 'no_proof']
+    : raw
   if (!entry) return null
   return {
     whatsapp: interpolate(entry.whatsapp, order),
