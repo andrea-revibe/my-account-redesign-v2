@@ -88,7 +88,7 @@ API: `<ProductSummary order={order} tone="light" | "hero" />`. The component own
 
 Layout (with warranty):
 
-- **Top row** — 72×72 thumbnail on a clean tile (white `surface` + `line` border on light cards; `white/.96` no border on hero), product name (16px/700), variant (12.5px/muted), and a right-aligned `Device` eyebrow over the `order.subtotal` price (falls back to `order.total`).
+- **Top row** — 98×98 thumbnail, image fill-zoomed inside an `overflow-hidden` tile to kill the dead margin (Direction C §6 follow-up). A `CUTOUT_ART` flag in `ProductSummary.jsx` switches two image realities from one code path: with transparent cut-out art (current — `order.product.image` is `/iphone-cutout.png`) the device floats on a brand-tint media well (`brand-bg`→`brand-bg2` radial; faint `white/.10` wash on hero) at `scale(1.04)`; with the legacy white-bg placeholder it's a clean `surface` + `line` tile (`white/.96` no border on hero) at `scale(1.3)`. Then product name (16px/700), variant (12.5px/muted), and a right-aligned `Device` eyebrow over the `order.subtotal` price (falls back to `order.total`).
 - **Revibe Care callout** — a dedicated block carrying the **hero gradient** (magenta/violet radial glow + white icon chip holding `REVIBE_CARE_ICON`), the "Revibe Care" title, an "extended warranty" subline, and `+{currency} {warranty}`. This is the brand moment on an otherwise calm light card. On the dark `HeroCard` the gradient can't sit on the gradient, so the callout **inverts to a frosted-white panel** (`white/.12`); the white chip keeps the Care identity.
 - **Total row** — a top divider, `Total paid` label, and the bold `order.total` (19px/800). This makes `subtotal + Revibe Care = total` read with no mental math.
 

@@ -31,6 +31,6 @@ export const INITIAL_ORDER = {
     name: 'iPhone 13',
     variant: 'Midnight · 128 GB · Good',
     category_name: 'iPhone',
-    image: '/iphone-midnight.png',
+    image: '/iphone-cutout.png',
   },
 }

@@ -29,7 +29,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone 12',
       variant: 'Blue · 128 GB · Excellent',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -62,7 +62,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone 11',
       variant: 'White · 64 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   // Late + past-promise order at QC: blew its SLA and is past the delivery
@@ -106,7 +106,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone 13',
       variant: 'Midnight · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -143,7 +143,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone 7',
       variant: 'Black · 32 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -178,7 +178,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone 13',
       variant: 'Midnight · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -214,7 +214,7 @@ export const BASELINE_ORDERS = [
       name: 'iPad Pro 11″',
       variant: 'Space Gray · 256 GB · Excellent',
       category_name: 'Tablet',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -250,7 +250,7 @@ export const BASELINE_ORDERS = [
       name: 'MacBook Air 13″',
       variant: 'Midnight · M3 · 512 GB · Excellent',
       category_name: 'Macbook',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -291,7 +291,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone SE',
       variant: 'Red · 64 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -334,7 +334,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone 8',
       variant: 'Space Gray · 64 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   {
@@ -378,7 +378,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone X',
       variant: 'Silver · 64 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
   // Late + past-promise cancellation that settled to a Wallet refund: the
@@ -428,7 +428,7 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone 14',
       variant: 'Blue · 128 GB · Excellent',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
   },
 ]

@@ -62,7 +62,7 @@ export const JOURNEYS = [
         name: 'Samsung Galaxy S21',
         variant: 'Phantom Black · 128 GB · Good',
         category_name: 'Samsung phone',
-        image: '/iphone-midnight.png',
+        image: '/iphone-cutout.png',
       },
     },
     nodes: CLAIM_COM_NODES,
