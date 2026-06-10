@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 0fa71bb
+verified_against: 8333006
 covers:
   - src/components/WarrantyClaimCard.jsx
   - src/components/ClaimFlow/Step2Compensation.jsx
@@ -69,7 +69,7 @@ Most states reuse a generic claim hero (eyebrow + headline + ref + updated times
 
 - **`initiated`** — `ScheduledPickupStrip` (CalendarClock + scheduled date/slot, MapPin + pickup address). Same shape as `ClaimCard`'s initiated strip.
 - **`under_repair`** — `RepairWindowStrip`: Wrench-iconed "Estimated repair complete" date + optional one-line note ("Charging-port assembly swap — typically wraps up within 7–10 days").
-- **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, "Delivering to · Home" chip, claim-ref + type subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
+- **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, a `DeliveryAddressPill` ("Delivering to" + the order's actual address, falling back to "Home" only when `order.address` is unset), claim-ref + type subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
 - **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Delivered on {date}" (headline + state pill read "Delivered").
 
 #### 2.3.3 Detailed tracking dropdowns
@@ -90,7 +90,7 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 
 #### 2.3.4 Expanded view
 
-1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`, rendered by the shared **`ClaimProgressDots`** component (`src/components/ClaimProgressDots.jsx`, also used by `ClaimCard` and `InvalidClaimCard`); tone-aware glow on the current step. Step labels: `Initiated · Pickup · QC · Repair · Shipped · Delivered` — the `Shipped · Delivered` tail matches `InvalidClaimCard`'s return-shipment card verbatim (the `ship_back`/`device_returned` `short` labels were relabelled from `Ship back`/`Returned`).
+1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`, rendered by the shared **`ClaimProgressDots`** component (`src/components/ClaimProgressDots.jsx`, also used by `ClaimCard` and `InvalidClaimCard`); tone-aware glow on the current step. Step labels: `Initiated · Pickup · Quality Check · Repair · Shipped · Delivered` — the `Shipped · Delivered` tail matches `InvalidClaimCard`'s return-shipment card verbatim (the `ship_back`/`device_returned` `short` labels were relabelled from `Ship back`/`Returned`).
 2. **`See detailed tracking` dropdown** (§2.3.3) — the inbound or return leg, whichever applies, collapsed by default.
 3. **`HistoryThread`** — same `getHistoryEvents(order, 'claim')` source as `ClaimCard`.
 4. **Footer** — a single full-width `View claim details` button (opens `ClaimDetailsSheet` — warranty-aware, see §2.5). (The decorative icon-only `Download receipt` button was removed.)
@@ -111,7 +111,7 @@ The warranty intake reuses the existing returns-flow chrome and most of the exis
 | 3 — Issue details | **Reuses `Step2IssueDetails`** (same two-scope picker + description + attachment as the Issue branch), including the optional **battery check** that surfaces on the `battery` sub-type (capacity % + non-original-part toggle → §7.2 Battery Standards verdict; see [returns/issue.md](./returns/issue.md) §2.3). A filled-in result rides onto the warranty claim as `claim.batteryAssessment`. Production may swap this for a warranty-specific intake (proof of warranty / serial / purchase date) — see §2.9. |
 | 4 — Device prep | Shared with refund flows — single guided-reset path (see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.4). |
 | 5 — Packing | Shared with refund flows. Radio pick between original Revibe box and sturdy post box with bubble wrap — see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.5. |
-| 6 — Pickup details | Shared with refund flows. The "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → QC → Under repair → On its way back → Device returned). |
+| 6 — Pickup details | Shared with refund flows. The "Expected by" headline (see [returns/claim_tracking.md](./returns/claim_tracking.md) §4) reads the warranty pipeline so the date is computed off `WARRANTY_CLAIM_STATUSES` + warranty-tail SLAs, and the detailed-timeline dropdown shows 6 steps (Initiated → Pickup → Quality Check → Under repair → On its way back → Device returned). |
 | — Refund method | **Skipped** — not part of the warranty sequence. |
 | 7 — Review | Refund section is replaced by a **What you'll get back** card: Wrench-iconed "Your repaired device" + "Expected back" date + "No refund — the same unit is returned to you after repair." The Edit-by-section navigation only exposes Fault / Device prep / Packing / Pickup. CTA reads `Submit warranty claim` (still success-toned). Two soft-validated ack cards sit inline (factory-reset + packed-properly) — same `AckCard` contract as the refund branches; see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.8. |
 | 8 — Confirmation | Title swaps to "Your warranty claim is in"; chip reads `Warranty`; second row swaps "Expected refund" (Clock glyph) for **"Expected back"** (Wrench glyph) with the computed return date and a "No refund issued — same device returned after repair" note. Secondary CTA reads "Track this claim". |

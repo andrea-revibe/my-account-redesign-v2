@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: c2ca086
+verified_against: 8333006
 covers:
   - src/lib/journey.js
   - src/lib/eddSandbox.js

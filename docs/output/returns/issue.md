@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 0fa71bb
+verified_against: 8333006
 covers:
   - src/components/ClaimFlow
   - src/lib/returns.js
@@ -90,7 +90,7 @@ The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` c
 
 - A **capacity %** input (the figure from Settings → Battery → Battery Health) and a **non-original part** self-report toggle. Both live in `state.batteryCheck` (`SET_BATTERY_CHECK`); **fully optional** — never gates `canAdvance`, so the customer can skip it and submit proof + description as usual.
 - The card derives the device's guaranteed floor from its condition grade (last segment of `product.variant`): `excellent` 95, `very good` 90, `good` 85, `fair` 85 (no published floor — treated as Good). Time-since-delivery comes from `deliveredOn`.
-- A live, **generic** verdict (no flow-switching nudge) computed by `assessBattery(...)` in `src/lib/returns.js`, evaluated most-favourable-first: non-original part → **full refund**; > 3% degradation within 10 days → **full refund**; > 10% within 6 months **or** > 20% within 12 months → **free battery replacement**; otherwise **normal wear, not a covered defect** (still submittable). Each remedy names its delivery window (10 days / 6 months / 12 months) so the **time component is visible**, and every verdict carries an "estimate only — QC confirms after inspection" caveat.
+- A live, **generic** verdict (no flow-switching nudge) computed by `assessBattery(...)` in `src/lib/returns.js`, evaluated most-favourable-first: non-original part → **full refund**; > 3% degradation within 10 days → **full refund**; > 10% within 6 months **or** > 20% within 12 months → **free battery replacement**; otherwise **normal wear, not a covered defect** (still submittable). Each remedy names its delivery window (10 days / 6 months / 12 months) so the **time component is visible**, and every verdict carries an "estimate only — final eligibility is confirmed by quality check after inspection" caveat.
 - The **time component is part of the math, not just the copy**: each tier requires both the degradation threshold *and* its window, checked against `deliveredOn` vs today (`daysSinceDelivery` + month math in `assessBattery`). The card surfaces this directly — it shows how many days ago the device was delivered next to the guaranteed floor.
 - A collapsible **"What counts as a battery defect?"** disclosure (`BatteryThresholds`) lists all three §7.2 thresholds (window + degradation + remedy) plus the normal-wear / non-original-part rules, so a customer who just wants to understand normal battery usage can read the policy without entering anything.
 
@@ -113,7 +113,7 @@ Sectioned summary. Issue-specific section:
 
 - **Issue** — category label (resolved via `findSubtype(id)` against `issueSubtypes.js`) + description + attachment chip.
 
-Shared sections: Device prep (shows `Factory reset confirmed` — the single guided-reset path; `Credentials provided` survives only for seeded credentials mocks), Packing summary (with the chosen method label), Pickup, Refund.
+Shared sections: Device prep (shows `Factory reset confirmed` — the single guided-reset path; `Unlinked + passcode shared` survives only for seeded credentials mocks), Packing summary (with the chosen method label), Pickup, Refund.
 
 Two soft-validated ack cards sit inside the Review surface — **☑︎ I have factory reset my device** directly under Device preparation, **☑︎ I have packed the device properly** directly under the Packing summary. Submit stays clickable; clicking with either unchecked flips the topmost unchecked card into a danger-toned error state and blocks submission. Same `AckCard` chrome as the change-of-mind branch — see [change_of_mind.md](./change_of_mind.md) §2.8 for the full soft-validation contract.
 
@@ -197,7 +197,9 @@ The full claim-object reference (including takeover-card extensions) lives in [c
 | Field | Type | Notes |
 |---|---|---|
 | `claim.type` | `'issue'` | Constant for this branch. |
-| `claim.issueDetails` | `{ category, description, attachmentName }` | `category` is one of `battery` / `software` / `physical` / `screen` / `charger` / `overheating` / `camera` (resolved via `issueSubtypes.js`); `description` is the customer's free-text; `attachmentName` is a stub filename today. |
+| `claim.issueDetails` | `{ description, attachmentName }` | `description` is the customer's free-text; `attachmentName` is a stub filename today. The sub-issue id and scope are **separate** top-level fields (below), not nested here. |
+| `claim.issueSubtypeId` | string | One of the sub-issue ids (`battery` / `software` / `physical` / `screen` / `charger` / `overheating` / `camera` / `wrong_item` / …), resolved via `findSubtype(id)` in `issueSubtypes.js`. |
+| `claim.issueScope` | `'not_working' | 'wrong_device'` | The two-scope picker value; pre-filled from the fault reason via `scopeForReason`. |
 | `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Written **only** when the `battery` sub-type's optional check was filled in (a capacity entered or the non-original toggle ticked). `remedy` is `'refund'` / `'replacement'` / `'none'` / `null`; `reason` is `'non_original'` / `'refund_10d'` / `'replacement_6m'` / `'replacement_12m'` / `'normal_wear'` / `null`. Computed by `assessBattery(...)` in `src/lib/returns.js`. Data only — no tracking-card / `ClaimDetailsSheet` surface reads it yet. |
 | `claim.expectedRefund.bonus` | number | `ISSUE_WALLET_BONUS` (`100`) when `refundMethod === 'wallet'`; `0` otherwise. |
 

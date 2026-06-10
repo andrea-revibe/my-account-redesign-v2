@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: f8c0796
+verified_against: 8333006
 covers:
   - src/App.jsx
   - src/lib/statuses.js
@@ -47,28 +47,40 @@ This prototype is intentionally narrow: only the orders list and the expand/coll
 
 ## 2. Card routing
 
-`App.jsx` picks the card to render per order in a specific precedence order. The first three branches are claim takeovers (see [returns/claim_tracking.md](./returns/claim_tracking.md)); the rest fall through to the order surfaces documented in §3.
+`App.jsx` routes in **two stages**: `isOpen(order)` partitions orders into the *In progress* and *Past* sections, then a precedence ladder inside each section picks the card. The first four in-progress branches are claim takeovers (see [returns/claim_tracking.md](./returns/claim_tracking.md)); the rest fall through to the order surfaces documented in §3. (Canonical copy of this tree, kept in lock-step with `App.jsx`: [diagrams.md](./diagrams.md#card-routing).)
 
 ```mermaid
 flowchart TD
-  start([order]) --> q1{claim.docsRejection?}
+  start([order]) --> open{isOpen?}
+  open -->|In progress| q1{claim.docsRejection?}
   q1 -->|yes| docs[DocsRejectedCard]
   q1 -->|no| q2{claim.pickupFailure?}
   q2 -->|yes| pickup[PickupFailedCard]
-  q2 -->|no| q3{claim.invalidClaim?}
-  q3 -->|yes| invalid[InvalidClaimCard]
-  q3 -->|no| q4{hasActiveClaim?}
-  q4 -->|yes| claim[ClaimCard — In progress]
-  q4 -->|no| q5{isClaimRefunded?}
-  q5 -->|yes| claimPast[ClaimCard — Past orders]
-  q5 -->|no| q6{statusId / state}
-  q6 -->|created / quality_check, non-cancelled| inprog[InProgressCard]
-  q6 -->|shipped, or cancelled in-flight| order[OrderCard]
-  q6 -->|delivered, no claim| delivered[PastOrderCard — Delivered]
-  q6 -->|cancelled past with refund| cancelled[PastOrderCard — Cancelled]
+  q2 -->|no| q3{claim.resetFailed?}
+  q3 -->|yes| reset[ResetFailedCard]
+  q3 -->|no| q4{claim.invalidClaim?}
+  q4 -->|yes| invalid[InvalidClaimCard]
+  q4 -->|no| q5{type == 'warranty' &amp; active?}
+  q5 -->|yes| warr[WarrantyClaimCard]
+  q5 -->|no| q6{hasActiveClaim?}
+  q6 -->|yes| claim[ClaimCard]
+  q6 -->|no| q7{in-flight cancellation?}
+  q7 -->|yes| keep[PastOrderCard — onKeep]
+  q7 -->|no| q8{created / quality_check?}
+  q8 -->|yes| inprog[InProgressCard]
+  q8 -->|no| order[OrderCard]
+  open -->|Past| p1{isReturnDelivered?}
+  p1 -->|yes| invP[InvalidClaimCard — delivered]
+  p1 -->|no| p2{isWarrantyDelivered?}
+  p2 -->|yes| warrP[WarrantyClaimCard]
+  p2 -->|no| p3{isClaimRefunded?}
+  p3 -->|yes| claimP[ClaimCard]
+  p3 -->|no| p4{cancelled &amp; initiator == 'revibe'?}
+  p4 -->|yes| revibe[RevibeCancellationCard]
+  p4 -->|no| past[PastOrderCard]
 ```
 
-The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard`) share the same chrome family: left accent strip, `Order · #{id}` eyebrow, state pill, tinted hero block, and the shared `ProductSummary` line-item (§3.0). They differ in what the hero leads with and which actions hang off the bottom. The three claim takeover cards (`DocsRejectedCard`, `PickupFailedCard`, `InvalidClaimCard`) replace `ClaimCard`'s surface while the claim is blocked on a single customer action; full spec in [returns/claim_tracking.md](./returns/claim_tracking.md).
+The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard`) share the same chrome family: left accent strip, `Order · #{id}` eyebrow, state pill, tinted hero block, and the shared `ProductSummary` line-item (§3.0). They differ in what the hero leads with and which actions hang off the bottom. The four claim takeover cards (`DocsRejectedCard`, `PickupFailedCard`, `ResetFailedCard`, `InvalidClaimCard`) replace `ClaimCard`'s surface while the claim is blocked on a single customer action; `WarrantyClaimCard` is a sibling card for warranty claims and `RevibeCancellationCard` covers Revibe-initiated cancellations in the Past section. Full specs in [returns/claim_tracking.md](./returns/claim_tracking.md) and [cancellations.md](./cancellations.md).
 
 | Card | Used for | Hero leads with | Expandable? |
 |---|---|---|---|
@@ -154,7 +166,8 @@ A single-row `HistoryThread` (mode `'delivered'`) carrying just the `Order place
 ### 3.4 Other surfaces
 
 - **`PastOrderCard` — cancelled past:** documented in [cancellations.md](./cancellations.md) (refund-hero card variants).
-- **`ClaimCard` + takeover cards:** documented in [returns/claim_tracking.md](./returns/claim_tracking.md).
+- **`RevibeCancellationCard` — Revibe-initiated cancellation:** the Past-section card for orders cancelled by Revibe (`state === 'cancelled' && cancellationInitiator === 'revibe'`); documented in [cancellations.md](./cancellations.md).
+- **`ClaimCard` + takeover cards (incl. `ResetFailedCard`) + `WarrantyClaimCard`:** documented in [returns/claim_tracking.md](./returns/claim_tracking.md) and [warranties_compensations.md](./warranties_compensations.md).
 - **HeroCard:** the active in-flight order (currently the out-for-delivery one) has two stacked rows of full-width buttons beneath the headline — `Track package` (filled white, brand text — the only filled CTA in the app), `Get help` (ghost), `Cancel order` + `Raise a claim` (ghost). `Cancel order` toggles a small dark tooltip — *"You cannot cancel the order at this stage"* — the cancellation rule is prototype-only.
 
 ## 4. State models
@@ -208,6 +221,8 @@ There is intentionally no `delivered` sub-status. When the parcel is delivered, 
 | `cancelled` — in flight (`state === 'cancelled'` + non-terminal `statusId`) | `OrderCard` | Never | "Cancelled" + status banner | danger | n/a | `Get help` |
 | `cancelled` — past order | `PastOrderCard` (cancelled branch) | Never | `Refund of` / `Refunded` + amount | warn / brand / success per phase | "Requested" / "Processing" / "Complete" | `View refund details` + icon-only `Download receipt` |
 
+A past cancelled order whose `cancellationInitiator === 'revibe'` routes instead to `RevibeCancellationCard` (Revibe-initiated cancellation, ahead of the customer `PastOrderCard` fallback) — see [cancellations.md](./cancellations.md).
+
 ### 4.5 Status banner tone resolution
 
 `statusDescription(order)` resolves in this order:
@@ -248,7 +263,7 @@ Once the customer taps a card, their state sticks across filter changes (state l
 
 ## 6. History thread
 
-On layered cards — `ClaimCard`, cancelled `PastOrderCard` in `refund_pending` / `refunded`, and the `DeliveredOrderCard` — past events render as compact chips under the active hero; tapping a chip expands its detail inline (one open at a time). Derived in `src/lib/events.js` from `timeline` / `cancellationTimeline` / `cancellationRejection`.
+On layered cards — `ClaimCard`, cancelled `PastOrderCard` in `refund_pending` / `refunded`, and the delivered variant of `PastOrderCard` — past events render as compact chips under the active hero; tapping a chip expands its detail inline (one open at a time). Derived in `src/lib/events.js` from `timeline` / `cancellationTimeline` / `cancellationRejection`.
 
 The active event lives in the hero and is excluded from the thread. Chip click handlers `stopPropagation` because the card header is one big tap target.
 
@@ -276,6 +291,9 @@ The orders array (`src/data/orders.js`) is mock data today. Production will swap
 | `subtotal` *(optional)* | number, no currency | Product-only amount. Shown as the `Device` price in the `ProductSummary` breakdown (§3.0) and the cancellation sheet's line-item breakdown. Falls back to `total` when absent. |
 | `warranty` *(optional)* | number, no currency | Revibe Care add-on amount. Field name kept as `warranty` for backwards compatibility. Drives the gradient Revibe Care callout in `ProductSummary` (§3.0) and renders as a `Revibe Care +{amount}` line in cancellation/return breakdowns; `null`/absent omits the callout and the Total row. |
 | `total` | number, no currency | Total amount paid. Should equal `subtotal + warranty` when both are present. |
+| `unitPrice` *(optional)* | number, no currency | Per-unit device price used by the returns flow's `refundBreakdown` (`gross = unitPrice * units`). Falls back to `subtotal`, then `total`. |
+| `paymentMethod` *(optional)* | `{ type: 'card', brand, last4 }` or `{ type: 'bnpl', provider, brand }` | Payment instrument. Drives the original-payment card label on the cancellation sheet + returns refund step; BNPL collapses the label to the provider brand and adds `BnplDisclaimerTooltip`. Falls back to a generic `Card •• 0000`. |
+| `deviceOs` *(optional, `'ios' | 'android'`)* | string | Guided-reset OS fallback used only when `product.category_name` is absent; defaults to `'ios'`. See [returns/guided_reset.md](./returns/guided_reset.md). |
 | `currency` | string | Three-letter currency code (e.g. `"AED"`). |
 | `customerName` | string | Recipient's full name. |
 | `country` *(optional, default `'AE'`)* | string | Two-letter country code. Today no UI branches on it; kept for future country-aware behaviour (e.g. the ZA/SA repair-partner returns track in `returns/change_of_mind.md`). |
@@ -317,8 +335,9 @@ Today an order has one product. The `product` object carries:
 | Field | Type | Notes |
 |---|---|---|
 | `name` | string | Display name. |
-| `variant` | string | Variant string (e.g. `"Black / 32 GB / Good"`). |
+| `variant` | string | Variant string (e.g. `"Black / 32 GB / Good"`). The last `·`/`/`-separated segment is the condition grade read by the returns battery check (`conditionGradeOf`). |
 | `image` | string | Path to the product image asset. |
+| `category_name` *(optional)* | string | Product category (e.g. `'Tablet'`, `'Macbook'`, `'Samsung phone'`). Canonical driver of the guided-reset variant via `deviceTypeForOrder` / `deviceOsForOrder`. See [returns/guided_reset.md](./returns/guided_reset.md). |
 
 Multi-item orders are out of scope for the prototype (see §11).
 
@@ -362,10 +381,13 @@ src/
     ├── GreetRow.jsx              Greeting row + Revibe Wallet pill
     ├── StoreCreditsCard.jsx      Wallet balance card (decorative)
     ├── OrderFilters.jsx          Search field + range dropdown + chip row (controlled)
+    ├── ProductSummary.jsx        Shared product line-item (thumbnail · name · variant · Revibe Care callout · price breakdown); exports REVIBE_CARE_ICON (§3.0)
+    ├── DeliveryAddressPill.jsx   Shared "Delivering to / Delivered to" address row used by four heroes (§3.0.1)
     ├── InProgressCard.jsx        Expandable card for non-cancelled created/quality_check
     ├── OrderCard.jsx             Expandable card for shipped + in-flight cancellations mid-fulfilment
     ├── HeroCard.jsx              Active order's hero variant of OrderCard
     ├── PastOrderCard.jsx         Branches on `order.state` into delivered (no expand) and cancelled-past variants
+    ├── RevibeCancellationCard.jsx Past-section card for Revibe-initiated cancellations (detailed in cancellations.md)
     ├── StatusTimeline.jsx        Horizontal 4-step timeline
     ├── ShippingSubTimeline.jsx   Vertical sub-status timeline
     ├── CancellationSubTimeline.jsx Vertical sub-timeline retained for in-flight cancellations
