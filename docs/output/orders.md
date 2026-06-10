@@ -96,13 +96,19 @@ Layout (no warranty, `order.warranty == null`): the Care callout **and** the Tot
 
 `ProductSummary` is used on **every** card that carries an order, including the cancelled refund-hero card (§3.4 / [cancellations.md](./cancellations.md)). There it sits below the `RefundHero`: the hero states the **refund** amount + destination, while `ProductSummary` states the device + Revibe Care + **Total paid** (the original price) — distinct numbers (they differ by any cancellation fee), so the two read as paid-vs-refunded rather than a repeat.
 
+### 3.0.1 DeliveryAddressPill — the shared "Delivering to / Delivered to" address row
+
+The hero's destination line is one shared component, `src/components/DeliveryAddressPill.jsx` (props `{ label, address }`), used by four heroes: `InProgressCard` (`Delivering to`), `PastOrderCard` (`Delivered to`), `WarrantyClaimCard`'s ship-back, and `InvalidClaimCard`'s paid return (both `Delivering to`). It replaced the old static `[🏠 Home]` chip with the real `order.address`.
+
+The component owns the whole block (label + pill + reveal). The label and a `rounded-full` pill stay pinned on one line; the pill shows a `MapPin` icon + the **first comma-separated segment** of the address (`address.split(',')[0]`, e.g. `Ontario Tower`) + a `ChevronDown`. Tapping the pill reveals the **full address** on a muted line directly below the row (chevron rotates) — the label never reflows. When the address has no second segment (`full === short`) the chevron and reveal are suppressed and the pill is inert. Falls back to `Home` when `address` is absent.
+
 ### 3.1 InProgressCard (`created`, `quality_check`)
 
 **Collapsed:**
 
 - Small `Order · #{id}` eyebrow at the very top.
 - State pill (`Order placed` for `created`, `Quality check` for `quality_check`) with a `Package` / `ShieldCheck` icon, on its own row beneath the eyebrow. Constant brand-purple tone regardless of `delayed`.
-- A brand-purple gradient hero block (`from-brand-bg to-brand-bg2`) carrying `Delivery by` eyebrow + an `On track` tag (`Zap` icon) on the right; a `text-[26px]` headline using `order.estimatedDeliveryLong || order.estimatedDelivery`; the body sentence from `statusDescription(order).body`; and a `Delivering to [Home]` chip below.
+- A brand-purple gradient hero block (`from-brand-bg to-brand-bg2`) carrying `Delivery by` eyebrow + an `On track` tag (`Zap` icon) on the right; a `text-[26px]` headline using `order.estimatedDeliveryLong || order.estimatedDelivery`; the body sentence from `statusDescription(order).body`; and a `Delivering to [📍 …]` address pill below (shared `DeliveryAddressPill`, §3.0.1).
 - When `order.delayed === true` the right-side tag swaps to `Clock` + `Taking longer than expected` and turns **amber** (`text-amber-600`) — the rest of the hero (gradient, ETA headline, state pill) stays brand-purple (see §8 "Delayed in-progress accent"). The body pulls the delay-flavoured copy from `DELAYED_BODY[statusId]`.
 - The shared `ProductSummary` row (§3.0). The decorative expand chevron now sits on the `Order · #{id}` eyebrow line (relocated out of the row); the whole header is one tap target.
 
@@ -139,7 +145,7 @@ The delivered card is **not expandable** — there is no chevron and no expanded
 - `w-1` left success-green strip.
 - `Order · #{id}` eyebrow.
 - Success-tinted `Delivered` state pill (`PackageCheck` icon).
-- Success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (falls back to the date part of `order.timeline.delivered`); a `Delivered to [Home]` chip below.
+- Success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (falls back to the date part of `order.timeline.delivered`); a `Delivered to [📍 …]` address pill below (shared `DeliveryAddressPill`, §3.0.1).
 - The shared `ProductSummary` row (§3.0). The cancelled refund-hero card (§3.4) also uses `ProductSummary` — the `RefundHero` carries the refund amount, the row carries the device + Revibe Care + Total paid.
 - Right-aligned chip-style footer with `Download receipt` + `Raise a claim`, separated by a top dashed border. `Raise a claim` is the entry point to the returns flow — see [returns/change_of_mind.md](./returns/change_of_mind.md) / [returns/issue.md](./returns/issue.md).
 

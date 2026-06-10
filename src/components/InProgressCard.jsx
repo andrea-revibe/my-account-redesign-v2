@@ -9,12 +9,12 @@ import {
   ShieldCheck,
   Package,
   Zap,
-  Home,
   Clock,
 } from 'lucide-react'
 import { STATUSES, statusDescription } from '../lib/statuses'
 import CancelOrderSheet from './CancelOrderSheet'
 import { ProductSummary } from './ProductSummary'
+import DeliveryAddressPill from './DeliveryAddressPill'
 
 const STATE_LABELS = {
   created: 'Order placed',
@@ -149,13 +149,7 @@ function ETAHero({ order, desc }) {
           {desc.body}
         </div>
       )}
-      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
-        <span>Delivering to</span>
-        <span className="inline-flex items-center rounded-full border bg-surface text-ink border-line font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5">
-          <Home size={12} strokeWidth={2} />
-          Home
-        </span>
-      </div>
+      <DeliveryAddressPill label="Delivering to" address={order.address} />
     </div>
   )
 }

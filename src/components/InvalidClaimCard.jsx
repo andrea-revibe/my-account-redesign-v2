@@ -7,7 +7,6 @@ import {
   ClipboardList,
   Clock,
   CreditCard,
-  Home,
   MapPin,
   RotateCcw,
   Settings2,
@@ -25,6 +24,7 @@ import { ProductSummary } from './ProductSummary'
 import ClaimProgressDots from './ClaimProgressDots'
 import { ReturnShipmentTracking } from './ReturnShipmentTracking'
 import TapToFixCta from './TapToFixCta'
+import DeliveryAddressPill from './DeliveryAddressPill'
 
 // Routed in App.jsx when `claim.invalidClaim` is set on a claim. Mirrors
 // the DocsRejectedCard / PickupFailedCard pattern: a full danger-tone
@@ -374,13 +374,7 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
             <div className="mt-1.5 text-[12px] leading-[1.45] text-ink-2">
               Your device is on its way back — we'll track it like any other delivery.
             </div>
-            <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
-              <span>Delivering to</span>
-              <span className="inline-flex items-center rounded-full border bg-surface text-ink border-line font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5">
-                <Home size={12} strokeWidth={2} />
-                Home
-              </span>
-            </div>
+            <DeliveryAddressPill label="Delivering to" address={order.address} />
             <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
               <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
               <span className="text-muted/60">·</span>
