@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, RotateCcw, PackageX } from 'lucide-react'
 import { journeyNotificationCoverage } from '../lib/notifications'
+import CountryPicker from './CountryPicker'
 
 // Fixed bottom-right dev tool — only rendered in journey mode. Sits outside
 // the mobile frame on wide viewports; overlaps the frame on narrow ones
@@ -22,6 +23,8 @@ export default function JourneyDevPanel({
   journeys,
   activeJourneyId,
   onSelectJourney,
+  activeCountry,
+  onSelectCountry,
 }) {
   // Resolve by id, not array index: on branched journeys the current node
   // (last on the visited path) isn't at array position `currentIndex`, so
@@ -59,6 +62,13 @@ export default function JourneyDevPanel({
             )
           })}
         </div>
+      )}
+
+      {onSelectCountry && (
+        <CountryPicker
+          activeCountry={activeCountry}
+          onSelectCountry={onSelectCountry}
+        />
       )}
 
       <CoverageSummary counts={coverage} />

@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 9ff7625
+verified_against: 8333006
 covers:
   - src/components/ClaimCard.jsx
   - src/components/ClaimActionBanner.jsx
@@ -102,7 +102,7 @@ This piggybacks the existing `warn` / `brand` / `success` tokens — no new colo
 
 `ClaimDetailsSheet` (`src/components/ClaimDetailsSheet.jsx`) is a bottom sheet mirroring `RefundDetailsSheet`'s chrome (`bg-black/45` scrim, slide-up panel, `Escape` to close, body-scroll lock). Two cards:
 
-- **Summary** — read-only set of choices captured during the returns flow: reason (mapped via `REASON_LABELS`; falls back to the free-text `otherText` when the user picked `Other`), units (e.g. `1 of 1`), device preparation (masked to `Factory reset confirmed` / `Credentials provided` — never plain credentials), pickup details broken out as three rows (`Pickup address`, `Pickup email`, `Pickup phone`), refund destination (wallet icon or card chip + `Includes 10% restocking fee` sub-copy when method is `original`), and `Submitted` timestamp.
+- **Summary** — read-only set of choices captured during the returns flow: reason (mapped via `REASON_LABELS`; falls back to the free-text `otherText` when the user picked `Other`), units (e.g. `1 of 1`), device preparation (masked to `Factory reset confirmed` / `Unlinked + passcode shared` — never plain credentials), pickup details broken out as three rows (`Pickup address`, `Pickup email`, `Pickup phone`), refund destination (wallet icon or card chip + `Includes 10% restocking fee` sub-copy when method is `original`), and `Submitted` timestamp.
 - **Refund** — `Expected refund` (or `Refunded` once terminal) row with the net amount in `text-[18px]` tabular-nums. Original-payment refunds also show a small `Gross … · Restocking fee − …` line so the math is visible.
 
 The summary content used to live inline inside the expanded card; it was pulled into the sheet so the expanded body stays focused on progress and the underlying order context, with the full breakdown one tap away.
@@ -285,8 +285,8 @@ None of the transitions persist across re-renders or unmounts.
 
 - Eyebrow rewrites to `Order · #{id} · Return from Claim RET-{ref}` so lineage stays visible.
 - State pill: brand-toned `Return shipment` (Truck glyph) in transit; success-toned `Delivered` (Check glyph) once delivered.
-- Hero (in transit): gradient brand-bg / brand-bg2 block carrying `Back with you by` + the estimated delivery date + an `On track` phase tag, the `Delivering to · Home` chip, and a `{claimRef} · Claim · {type}` subline. **At delivered** the future-tense ETA hero is replaced by a green hero — `Delivered` headline, `Complete` phase tag (Check), and a `Delivered on {date}` strip (`returnShipment.deliveredOnLong || deliveredOn`, falling back to the date part of `timeline.delivered`) — mirroring warranty's `device_returned` hero.
-- Expanded body renders the **5-step claim-progress dot timeline** `Initiated · Pickup · QC · Shipped · Delivered` via the shared **`ClaimProgressDots`** component (`src/components/ClaimProgressDots.jsx`) over the shared `RETURN_CLAIM_STATUSES` list — the claim's own head (`initiated`/`pickup`/`qc` from `claim.timeline`) with the refund tail (`refund_issued`/`refund_credited`) swapped for the return shipment's `shipped`/`delivered` (from `returnShipment.timeline`); current step from `returnClaimProgressIndex(returnShipment)`. This keeps the claim context instead of reading as a fresh order, and shares its `Shipped · Delivered` tail verbatim with the warranty card. While `currentStatusId === 'shipped'` the shared **`ReturnShipmentTracking`** dropdown (`src/components/ReturnShipmentTracking.jsx`) renders beneath it — a DHL courier strip (`returnShipment.courier` + `returnShipment.awb` + copy) over the 4-stop outbound `SHIPPING_SUB_STATUSES` sub-timeline. A small brand-tinted heads-up strip names the claim ref and reminds the customer no refund will be issued.
+- Hero (in transit): gradient brand-bg / brand-bg2 block carrying `Back with you by` + the estimated delivery date + an `On track` phase tag, a `DeliveryAddressPill` (`Delivering to` + the order's actual address; `Home` only when `order.address` is unset), and a `{claimRef} · Claim · {type}` subline. **At delivered** the future-tense ETA hero is replaced by a green hero — `Delivered` headline, `Complete` phase tag (Check), and a `Delivered on {date}` strip (`returnShipment.deliveredOnLong || deliveredOn`, then the date part of `timeline.delivered`, then `estimatedDeliveryLong || estimatedDelivery`) — mirroring warranty's `device_returned` hero.
+- Expanded body renders the **5-step claim-progress dot timeline** `Initiated · Pickup · Quality Check · Shipped · Delivered` via the shared **`Timeline`** component (`src/components/Timeline.jsx`, horizontal) over the shared `RETURN_CLAIM_STATUSES` list — the claim's own head (`initiated`/`pickup`/`qc` from `claim.timeline`) with the refund tail (`refund_issued`/`refund_credited`) swapped for the return shipment's `shipped`/`delivered` (from `returnShipment.timeline`); current step from `returnClaimProgressIndex(returnShipment)`. This keeps the claim context instead of reading as a fresh order, and shares its `Shipped · Delivered` tail verbatim with the warranty card. While `currentStatusId === 'shipped'` the shared **`ReturnShipmentTracking`** dropdown (`src/components/ReturnShipmentTracking.jsx`) renders beneath it — a DHL courier strip (`returnShipment.courier` + `returnShipment.awb` + copy) over the 4-stop outbound `SHIPPING_SUB_STATUSES` sub-timeline. A small brand-tinted heads-up strip names the claim ref and reminds the customer no refund will be issued.
 - **Section placement:** once delivered, the claim drops to **Past orders** and counts toward the `delivered` filter (see §2.5), parity with a delivered warranty.
 
 **Declined state.** Tapping `Decline` flips the card to a muted neutral-toned terminal:
@@ -370,8 +370,8 @@ Registry only — no current `ClaimCard` surface renders these inline. Kept as t
 
 | `subStatusId` | Headline | Subline | Tone |
 |---|---|---|---|
-| `awaiting_documents` | More info needed | "Revibe Quality asked for a clearer photo / longer video." | warn |
-| `collection_failed` | Pickup didn't go through | "We couldn't collect on {date}." | warn |
+| `awaiting_documents` | More info needed | "Revibe Quality asked for a clearer photo or longer video." | warn |
+| `collection_failed` | Pickup didn't go through | "We couldn't collect on the scheduled date." | warn |
 | `reset_failed` | Device still linked to iCloud | "We couldn't wipe the device — Activation Lock is still on." | warn |
 | `under_revision` | Reviewing seller's response | "Our team is double-checking the seller's notes." | brand |
 | `expert_revision` | Expert inspection | "Sent to our lab for a closer look. This step takes longer than usual." | brand |
@@ -379,7 +379,7 @@ Registry only — no current `ClaimCard` surface renders these inline. Kept as t
 | `awaiting_payment` | Payment needed to return device | "Cover return shipping to get your device back." | warn |
 | `ship_back_pending` | Preparing to send your device back | "Arranging a courier — should be on the way in a day or two." | brand |
 | `ship_back_in_transit` | Your device is on the way back | "Tracking will appear here once the courier scans it in." | brand |
-| `ship_back_delivered` | Device returned | "Delivered on {date}." | success |
+| `ship_back_delivered` | Device returned | "Delivered." | success |
 
 All copy is customer-facing — internal (IS) labels never appear in the UI.
 
@@ -389,7 +389,7 @@ Four gates total. Each fires a promoted banner above the dot strip (inline) or r
 
 | Gate (`kind`) | Surface | Banner headline | Body | Deadline | Primary CTA | Secondary |
 |---|---|---|---|---|---|---|
-| `awaiting_documents` | Inline `ClaimActionBanner` | Action needed — documents requested | "{opsName} from Revibe Quality has asked for a clearer photo / longer video." | "Reply by {deadline} or the claim will close automatically." | Reply with documents | Close claim |
+| `awaiting_documents` | Inline `ClaimActionBanner` | Action needed — documents requested | "Revibe Quality has asked for a clearer photo or longer video before we can pick up your device." | "Reply by {deadline} or the claim will close automatically." | Reply with documents | Close claim |
 | `collection_failed` | Inline banner (dormant) **or** `PickupFailedCard` takeover | Action needed — pickup didn't go through | "Our courier couldn't pick up your device on {failedAt}." | "Confirm by {deadline} or the claim will close automatically." | Schedule new pickup | Cancel claim |
 | `reset_failed` | Inline banner (dormant) **or** `ResetFailedCard` takeover | Action needed — device still linked to iCloud | "Activation Lock is still on, so we can't wipe the device. Remove it from your iCloud account and share your passcode so we can complete the reset." | "Submit by {deadline} or the claim will close automatically." | Unlock device | Cancel claim |
 | `awaiting_payment` | Inline banner (dormant) **or** `InvalidClaimCard` takeover | Action needed — return shipping payment | "Your claim couldn't be approved after inspection. Cover the return shipping fee to get your device sent back." | "Pay by {deadline} or your device will not be returned." | Pay return shipping | Discuss with support |
@@ -432,9 +432,11 @@ Optional object populated on a delivered order to drive `ClaimCard` and its take
 | `claim.submittedAt` | string | Human-readable timestamp for the `Submitted` row in `ClaimDetailsSheet`. |
 | `claim.units` | integer | Today the returns flow always submits `1`. Kept as an integer for multi-unit future. |
 | `claim.reason` *(change-of-mind only)* | `{ value, otherText }` | `value` is one of the keys of `REASON_LABELS`; `otherText` populated only when `value === 'other'`. |
-| `claim.issueDetails` *(issue only)* | `{ category, description, attachmentName }` | `category` is the sub-issue id; `description` is the customer's free-text; `attachmentName` is a stub filename today. |
+| `claim.issueDetails` *(issue / warranty)* | `{ description, attachmentName }` | `description` is the customer's free-text; `attachmentName` is a stub filename today. (Sub-issue id and scope are **separate** top-level fields, below.) |
+| `claim.issueScope` *(issue / warranty)* | `'not_working' | 'wrong_device'` | The two-scope picker value, pre-filled from the fault reason via `scopeForReason`. |
+| `claim.issueSubtypeId` *(issue / warranty)* | string | The sub-issue id (e.g. `battery`, `physical`, `wrong_item`); resolves against `issueSubtypes.js`. |
 | `claim.batteryAssessment` *(issue / warranty, optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | The optional Step-2 battery self-check result (§7.2 Battery Standards), set only when the `battery` sub-type's check was filled in. `remedy` ∈ `refund` / `replacement` / `none` / `null`; `reason` ∈ `non_original` / `refund_10d` / `replacement_6m` / `replacement_12m` / `normal_wear` / `null`. Computed by `assessBattery()` in `src/lib/returns.js`. Captured but not yet rendered by any card / sheet. See [issue.md](./issue.md) §2.2 + §6.2. |
-| `claim.devicePrep` | `{ option, os }` | `option` is `'reset'` or `'credentials'` and `os` is `'ios'` or `'android'`. Surfaced as masked `Factory reset confirmed` / `Credentials provided`; raw credentials intentionally not persisted. |
+| `claim.devicePrep` | `{ option, os }` | `option` is `'reset'` or `'credentials'` and `os` is `'ios'` or `'android'`. Surfaced as masked `Factory reset confirmed` / `Unlinked + passcode shared`; raw credentials intentionally not persisted. |
 | `claim.pickupDetails` | `{ address, email, phone }` | Three contact fields captured at Step 4. Customer-submitted; the values flow through unchanged into the Initiated-state hero strip and the details sheet. |
 | `claim.scheduledPickup` *(optional)* | `{ courier, date, slot }` | Revibe-assigned pickup window. `date` is human-readable (`'Tomorrow, 20 May'`, `'Friday, 15 May'`); `slot` is a time range (`'10 AM – 12 PM'`); `courier` is the carrier name. Surfaced in the Initiated-state hero strip together with `pickupDetails.address`. Kept on the claim past `initiated` for the details sheet to reference, but the hero strip only renders while `claimStatusId === 'initiated'`. |
 | `claim.refundMethod` | `'wallet' | 'original'` | Drives the destination chip and the `Includes 10% restocking fee` sub-copy when `original`. |
@@ -480,10 +482,10 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 | `resetFailed.attempt` | ResetFailedCard | Optional integer marking which retry round this is. `1` (or undefined) on the initial gate; `2` on the journey-mode retry takeover. Lets the card switch to retry-specific copy if needed in future iterations. |
 | `invalidClaim.returnShipping.{amount, currency}` | InvalidClaimCard | Carried on the fee card + primary CTA label. |
 | `invalidClaim.returnShipment.{currentStatusId, timeline}` | InvalidClaimCard (paid state) | `currentStatusId` is one of the `STATUSES` ids (`created` / `quality_check` / `shipped` / `delivered`). Drives `returnClaimProgressIndex` for the 5-step claim dot timeline (`shipped` from `timeline.shipped`, `delivered` from `timeline.delivered`; the head reads `claim.timeline`). `currentStatusId === 'delivered'` also flips the card to its green delivered surface + drops it to Past (`isReturnDelivered`). |
-| `invalidClaim.returnShipment.{deliveredOn, deliveredOnLong}` | InvalidClaimCard (delivered state) | Optional long/short delivered date for the green `Delivered on {date}` hero strip; falls back to the date part of `timeline.delivered`. |
+| `invalidClaim.returnShipment.{deliveredOn, deliveredOnLong}` | InvalidClaimCard (delivered state) | Optional long/short delivered date for the green `Delivered on {date}` hero strip; falls back to the date part of `timeline.delivered`, then `estimatedDeliveryLong || estimatedDelivery`. |
 | `invalidClaim.returnShipment.{estimatedDelivery, estimatedDeliveryLong}` | InvalidClaimCard (paid state) | Populates the brand-tone ETA hero. |
 
-`order.country` *(optional, default `'AE'`)* sits at the top level of the order, not inside `claim`. Today no UI branches on it; kept on claim-carrying orders for future country-aware behaviour (the ZA/SA repair-partner track on change of mind, etc.).
+`order.country` *(optional, default `'AE'`)* sits at the top level of the order, not inside `claim`. It now drives the **country split**: `countryConfig(order).detailedTracking` (from `lib/countries.js`) gates the claim inbound-pickup and return-leg `See detailed tracking` dropdowns — hidden for `SA` / `Others`, shown for `AE` / `ZA`. Full model + the recipe for adding further country differences: `docs/output/country_split.md`.
 
 ## 6. UX decisions
 
@@ -493,7 +495,7 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 
 **Consolidating 7 → 5 states.** The earlier pipeline split submission (`claim_created` + `pending_collection`) and transit (`under_collection` + `in_transit`) into pairs that were operationally distinct but functionally identical from the customer's vantage point — they were both "waiting for the courier" or "device with the courier". Collapsing those pairs into `initiated` and `pickup` halved the visual noise on the dot strip and let the Initiated-state hero own the schedule/address surface end-to-end. Splitting the terminal `refunded` into `refund_issued` + `refund_credited` was the inverse move: payout-triggered and money-credited mean different things to a customer (especially when refund destination is a card, where the gateway window is real), so promoting both into the main strip made that gap visible.
 
-**`InvalidClaimCard` paid-state keeps the claim chain, in `InProgressCard` chrome.** Once the customer has paid for the return shipment, the leg reads as a forward shipment (brand ETA hero, `Delivering to · Home`) — the chrome family they recognise for fresh orders — but the **progress dots keep the full claim chain** (`Initiated · Pickup · QC · Shipped · Delivered`) rather than a fresh 4-step order timeline, so the customer sees this is still their claim and the tail matches the warranty ship-back card. The eyebrow (`Order · #{id} · Return from Claim RET-{ref}`) preserves the link back to the originating claim. At delivered the card flips to a green terminal and drops to Past — the same treatment as a delivered warranty.
+**`InvalidClaimCard` paid-state keeps the claim chain, in `InProgressCard` chrome.** Once the customer has paid for the return shipment, the leg reads as a forward shipment (brand ETA hero, `Delivering to` + the actual address) — the chrome family they recognise for fresh orders — but the **progress dots keep the full claim chain** (`Initiated · Pickup · Quality Check · Shipped · Delivered`) rather than a fresh 4-step order timeline, so the customer sees this is still their claim and the tail matches the warranty ship-back card. The eyebrow (`Order · #{id} · Return from Claim RET-{ref}`) preserves the link back to the originating claim. At delivered the card flips to a green terminal and drops to Past — the same treatment as a delivered warranty.
 
 **`See detailed tracking` dropdown gated on courier scan.** The 5-state dot strip says the device is in the courier's hands but not where it is on that leg. Mirroring `HeroCard`'s outbound dropdown (light palette, 4 sub-stops, courier strip) reuses a pattern customers already recognise from the fulfilment side. The dropdown is gated on `claim.transitSubTimeline?.picked_up` being set — i.e. it only appears once the courier has actually scanned the device. Before pickup the Initiated-state hero strip carries the scheduled-pickup info; after pickup the dropdown takes over as the courier-journey surface, and surfacing an empty dropdown pre-scan would read worse than not surfacing one at all.
 
@@ -519,7 +521,7 @@ src/
 │   │                                     hasActiveClaim, isClaimRefunded
 │   └── events.js                         getHistoryEvents(order, 'claim') — builds the HistoryThread events
 └── components/
-    ├── ClaimCard.jsx                     7-state baseline expandable card; hosts the ClaimTransitDetail dropdown helper
+    ├── ClaimCard.jsx                     5-state baseline expandable card; hosts the ClaimTransitDetail dropdown helper
     ├── ClaimActionBanner.jsx             Inline warn banner above the dot strip when `claim.actionRequired` is set
     ├── ClaimDetailsSheet.jsx             Bottom sheet opened by ClaimCard's `View claim details` — Summary + Refund cards
     ├── DocsRejectedCard.jsx              Takeover: customer must re-upload faulty-product evidence
@@ -536,12 +538,12 @@ src/
 - **Step 7 of `ClaimFlow` doesn't persist.** Submitting a return through the flow generates a `RET-XXXXXXXX` and advances to Step 7, but does not write back to the order. The mock claims on the demo orders are hand-seeded.
 - **`View claim details` and icon-only `Download receipt`** on `ClaimCard` are decorative.
 - **`Cancel claim`** is wired (§2.8) with two paths. **Clean revert** (pre-pickup device claims + compensation): drops the claim from the in-session projection so the order reverts to delivered (undoable via `UndoSnackbar`). **Ship-back** (device already at Revibe — e.g. `ResetFailedCard` at `qc`): overlays the `reason: 'cancelled'` gate so the order routes to `InvalidClaimCard`'s pay-return-shipping surface, reusing the invalid-verdict machinery + journey return chain. No backend — `cancelledClaims` / `shipBackCancels` are in-session only, cleared on refresh; the pay/paid/return-tracking states are `InvalidClaimCard`'s component-local demo states, and `cancelReturnGate`'s return-shipping amount/dates are hand-written placeholders.
-- **Webhook / polling for state progression.** Production needs a mechanism to move the claim through the 7 states as the warehouse handles the unit; today `claim.claimStatusId` is a static field on the mock data.
+- **Webhook / polling for state progression.** Production needs a mechanism to move the claim through the 5 states as the warehouse handles the unit; today `claim.claimStatusId` is a static field on the mock data.
 - **DocsRejectedCard.** File picker is a fake-files cycle, countdown label is hand-written, `Resubmit` doesn't persist (warn state is local component state only), no notification + email trigger.
 - **PickupFailedCard.** `Edit` link on the pickup-address card is decorative, new AWB / slot are hand-written rather than generated, `Confirm` doesn't persist.
 - **ResetFailedCard.** Submit is local component state only — the guide-completed flag, unlink confirmation, and passcode are never transmitted, never persisted, and the warn-toned "received" view is a visual stub. The unlink walkthrough reuses the device-typed `ResetGuideSheet` remote route (§3.4.1), but the card chrome (confirm toggle + summary) is still iOS-worded — see the Android-branch open question. Auto-cancel countdown is hand-written. Production must encrypt the passcode in transit + at rest, scope visibility to the named technician, and delete it on a short timer once the wipe succeeds.
 - **SLA placeholders.** `CLAIM_SLAS` values are hand-guessed; ops to revise.
-- **`order.country` is unused.** No UI branches on it; future country-aware behaviour will need it.
+- **`order.country` drives the country split (partial).** It now gates the inbound-pickup + return-leg detailed-tracking dropdowns via `countryConfig` (`SA`/`Others` → hidden). Other country-aware behaviour (repair-partner routing, country-varying SLAs) is still future work. See `docs/output/country_split.md`.
 
 ## 9. Open questions
 
@@ -551,6 +553,6 @@ src/
 - **Telemetry hooks.** Production should fire events when (i) an action gate banner / takeover is shown, (ii) an action gate CTA is tapped.
 - **Auto-expand for active claims.** Extend `pickActiveOrderId` to consider `claimProgressIndex` if research shows customers want their active claim opened on land.
 - **Filter chip for claims.** No new filter chip was added for claims — they count toward `in_progress` while active, `delivered` when refunded. Revisit when more than one or two claim cards routinely show at once.
-- **Country-aware transit SLAs.** `in_transit` SLA likely differs domestic vs international. Deferred for the prototype.
+- **Country-aware transit SLAs.** `in_transit` SLA likely differs domestic vs international. Deferred for the prototype — a future capability on the country split (`docs/output/country_split.md` §8), driven by the same `order.country` the detailed-tracking gating already uses.
 - **`ResetFailedCard` Android branch.** The unlink walkthrough now reuses the device-typed `ResetGuideSheet` remote route (§3.4.1), so the Android remote path (Google + Samsung account removal) already renders if the guide opens for an Android device. What's still iOS-only is the surrounding card chrome — the `I've removed this device from my iCloud account` toggle and the `iCloud unlink` row in the `What you sent` summary. Generalise that copy (and resolve `deviceTypeForOrder` ahead of an Android mock) when an Android claim mock exists.
 - **Real auto-cancel + auto-retry behaviour after a failed `ResetFailedCard` submit.** Journey mode models a one-shot retry then a happy re-merge into QC. Production likely needs (a) a real second-attempt countdown with auto-cancel + return-shipment on a second failure, mirroring the invalid-paid branch; (b) a way for QC to flag a third-party-locked device (carrier lock, MDM enrollment) that the customer can't unlink. Deferred until ops surfaces the failure-rate data.

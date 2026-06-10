@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Check, ChevronDown, Copy, Truck } from 'lucide-react'
+import { ChevronDown, Copy, Truck } from 'lucide-react'
 import { SHIPPING_SUB_STATUSES, subProgressIndex } from '../lib/statuses'
+import Timeline from './Timeline'
 
 // Shared "return shipment" detailed-tracking dropdown — the single source
 // of truth for the Revibe → customer leg, used by both return-shipment
@@ -41,15 +42,15 @@ export function ReturnShipmentTracking({ ship }) {
           {(ship?.courier || ship?.awb) && (
             <CourierStrip courier={ship.courier} awb={ship.awb} />
           )}
-          {SHIPPING_SUB_STATUSES.map((s, i) => (
-            <SubStatusItem
-              key={s.id}
-              label={s.label}
-              timestamp={ship?.subTimeline?.[s.id]}
-              state={i < cur ? 'done' : i === cur ? 'current' : 'future'}
-              isLast={i === SHIPPING_SUB_STATUSES.length - 1}
-            />
-          ))}
+          <Timeline
+            orientation="vertical"
+            dense
+            tone="brand"
+            steps={SHIPPING_SUB_STATUSES}
+            currentIndex={cur}
+            stamps={ship?.subTimeline || {}}
+          />
+          <div className="pb-1" />
         </div>
       )}
     </div>
@@ -86,47 +87,6 @@ export function CourierStrip({ courier, awb }) {
       >
         <Copy size={14} strokeWidth={1.75} />
       </button>
-    </div>
-  )
-}
-
-// One milestone row in a shipment sub-timeline (vertical connector + dot).
-// Shared by the return-shipment dropdown and the inbound-pickup dropdown.
-export function SubStatusItem({ label, timestamp, state, isLast }) {
-  const done = state === 'done'
-  const current = state === 'current'
-  return (
-    <div className="flex gap-3 items-start">
-      <div className="w-[18px] flex flex-col items-center self-stretch">
-        <span
-          className={`w-[14px] h-[14px] rounded-full border-2 grid place-items-center shrink-0 ${
-            done || current
-              ? 'bg-brand border-brand text-white'
-              : 'bg-surface border-line text-muted'
-          } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
-        >
-          {done && <Check size={9} strokeWidth={3} />}
-        </span>
-        {!isLast && (
-          <span
-            className={`flex-1 w-[2px] mt-0.5 ${done ? 'bg-brand' : 'bg-line'}`}
-          />
-        )}
-      </div>
-      <div className={`flex-1 ${isLast ? 'pb-1' : 'pb-3'}`}>
-        <div
-          className={`text-[13px] ${
-            current ? 'text-ink font-bold' : done ? 'text-ink' : 'text-muted'
-          }`}
-        >
-          {label}
-        </div>
-        {timestamp && (
-          <div className="text-[11px] text-muted mt-px tabular-nums">
-            {timestamp}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

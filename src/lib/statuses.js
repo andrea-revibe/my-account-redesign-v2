@@ -23,6 +23,7 @@ import {
   Wallet,
   CircleDollarSign,
 } from 'lucide-react'
+import { countryConfig } from './countries'
 
 // Sub-statuses that apply only while `state === 'cancelled'`. The `requested`
 // step only fires on the quality_check path — at QC the supplier still needs
@@ -182,7 +183,17 @@ function lastTimelineEntry(map) {
 }
 
 function descriptionKey(order) {
-  if (order.statusId === 'shipped' && order.subStatusId) {
+  // Markets without detailed tracking (SA / Others) surface no granular
+  // shipping milestones anywhere — including the banner. Collapse any
+  // shipping sub-status to the single `shipped` message so the customs /
+  // destination-country copy never shows. The journeys also skip the
+  // sub-status nodes for these markets (country_split.md §6), so this is the
+  // belt-and-suspenders that also covers data-driven (non-journey) orders.
+  if (
+    order.statusId === 'shipped' &&
+    order.subStatusId &&
+    countryConfig(order).detailedTracking
+  ) {
     return `shipped:${order.subStatusId}`
   }
   return order.statusId
@@ -206,7 +217,7 @@ const STATUS_DESCRIPTIONS = {
   shipped: {
     tone: 'brand',
     lead: 'On track',
-    body: 'Your package is on its way to the destination country.',
+    body: 'Your order has shipped and is on its way to you.',
   },
   'shipped:arrived_destination': {
     tone: 'brand',

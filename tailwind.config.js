@@ -109,6 +109,18 @@ export default {
           '0%, 38%, 100%': { transform: 'translateX(0)' },
           '44%': { transform: 'translateX(3px)' },
         },
+        // Unified <Timeline> current-step pulse: the existing 4px glow ring
+        // (var --tl-glow = the tone's -bg token, set per dot) breathes 3px↔7px;
+        // the ¾ "in-transit" connector breathes opacity in phase. Both applied
+        // via motion-safe: so prefers-reduced-motion falls back to the static ring.
+        timelinePulse: {
+          '0%, 100%': { boxShadow: '0 0 0 3px var(--tl-glow)' },
+          '50%': { boxShadow: '0 0 0 7px var(--tl-glow)' },
+        },
+        timelineConnPulse: {
+          '0%, 100%': { opacity: '0.8' },
+          '50%': { opacity: '1' },
+        },
       },
       animation: {
         slideDown: 'slideDown 0.3s ease',
@@ -119,6 +131,8 @@ export default {
         ctaGlow: 'ctaGlow 3.8s ease-in-out infinite',
         ctaShine: 'ctaShine 3.8s ease-in-out infinite',
         ctaNudge: 'ctaNudge 3.8s ease-in-out infinite',
+        timelinePulse: 'timelinePulse 2.4s ease-in-out infinite',
+        timelineConnPulse: 'timelineConnPulse 2.4s ease-in-out infinite',
       },
     },
   },

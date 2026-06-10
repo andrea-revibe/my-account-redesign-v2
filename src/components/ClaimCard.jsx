@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   ChevronDown,
-  Check,
   Copy,
   Download,
   Wallet,
@@ -27,7 +26,8 @@ import ClaimActionBanner from './ClaimActionBanner'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
-import ClaimProgressDots from './ClaimProgressDots'
+import Timeline from './Timeline'
+import { countryConfig } from '../lib/countries'
 
 // Card chrome is the refund-hero family (see PastOrderCard cancelled
 // branch): left accent strip, eyebrow, state pill, tinted hero, compact
@@ -98,17 +98,19 @@ export default function ClaimCard({
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Claim progress
             </div>
-            <ClaimProgressDots
+            <Timeline
+              orientation="horizontal"
               steps={steps}
-              curIdx={steps.findIndex((s) => s.id === claim.claimStatusId)}
+              currentIndex={steps.findIndex((s) => s.id === claim.claimStatusId)}
               stamps={claim.timeline}
               tone={tone}
             />
           </div>
 
-          {Boolean(claim.transitSubTimeline?.picked_up) && (
-            <ClaimTransitDetail claim={claim} order={order} />
-          )}
+          {Boolean(claim.transitSubTimeline?.picked_up) &&
+            countryConfig(order).detailedTracking && (
+              <ClaimTransitDetail claim={claim} order={order} />
+            )}
 
           {(() => {
             const history = getHistoryEvents(order, 'claim')
@@ -343,17 +345,15 @@ function ClaimTransitDetail({ claim, order }) {
           {(order.courier || order.trackingNumber) && (
             <TransitCourierStrip order={order} />
           )}
-          {CLAIM_TRANSIT_SUB_STATUSES.map((s, i) => (
-            <TransitSubItem
-              key={s.id}
-              label={s.label}
-              timestamp={claim.transitSubTimeline?.[s.id]}
-              state={
-                i < cur ? 'done' : i === cur ? 'current' : 'future'
-              }
-              isLast={i === CLAIM_TRANSIT_SUB_STATUSES.length - 1}
-            />
-          ))}
+          <Timeline
+            orientation="vertical"
+            dense
+            tone="brand"
+            steps={CLAIM_TRANSIT_SUB_STATUSES}
+            currentIndex={cur}
+            stamps={claim.transitSubTimeline || {}}
+          />
+          <div className="pb-1" />
         </div>
       )}
     </div>
@@ -390,47 +390,5 @@ function TransitCourierStrip({ order }) {
     </div>
   )
 }
-
-function TransitSubItem({ label, timestamp, state, isLast }) {
-  const done = state === 'done'
-  const current = state === 'current'
-  return (
-    <div className="flex gap-3 items-start">
-      <div className="w-[18px] flex flex-col items-center self-stretch">
-        <span
-          className={`w-[14px] h-[14px] rounded-full border-2 grid place-items-center shrink-0 ${
-            done || current
-              ? 'bg-brand border-brand text-white'
-              : 'bg-surface border-line text-muted'
-          } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
-        >
-          {done && <Check size={9} strokeWidth={3} />}
-        </span>
-        {!isLast && (
-          <span
-            className={`flex-1 w-[2px] mt-0.5 ${done ? 'bg-brand' : 'bg-line'}`}
-          />
-        )}
-      </div>
-      <div className={`flex-1 ${isLast ? 'pb-1' : 'pb-3'}`}>
-        <div
-          className={`text-[13px] ${
-            current
-              ? 'text-ink font-bold'
-              : done
-                ? 'text-ink'
-                : 'text-muted'
-          }`}
-        >
-          {label}
-        </div>
-        {timestamp && (
-          <div className="text-[11px] text-muted mt-px tabular-nums">{timestamp}</div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 
 

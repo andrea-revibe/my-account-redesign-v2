@@ -23,13 +23,13 @@ import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import HistoryThread from './HistoryThread'
 import { ProductSummary } from './ProductSummary'
-import ClaimProgressDots from './ClaimProgressDots'
+import Timeline from './Timeline'
 import DeliveryAddressPill from './DeliveryAddressPill'
 import {
   ReturnShipmentTracking,
   CourierStrip,
-  SubStatusItem,
 } from './ReturnShipmentTracking'
+import { countryConfig } from '../lib/countries'
 
 // Tone palette mirrors ClaimCard's so the two card types feel like
 // siblings. Warranty tones: warn while the device is leaving the customer
@@ -102,9 +102,10 @@ export default function WarrantyClaimCard({
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Warranty progress
             </div>
-            <ClaimProgressDots
+            <Timeline
+              orientation="horizontal"
               steps={WARRANTY_CLAIM_STATUSES}
-              curIdx={warrantyClaimProgressIndex(claim.claimStatusId)}
+              currentIndex={warrantyClaimProgressIndex(claim.claimStatusId)}
               stamps={claim.timeline}
               tone={tone}
             />
@@ -115,16 +116,19 @@ export default function WarrantyClaimCard({
               while the device is still inbound: once the return shipment
               exists (`shipBack.awb`) the inbound leg disappears so the
               return shipment is the only detailed tracking on the surface. */}
-          {Boolean(claim.transitSubTimeline?.picked_up) && !claim.shipBack?.awb && (
-            <PickupTransitDetail claim={claim} order={order} />
-          )}
+          {Boolean(claim.transitSubTimeline?.picked_up) &&
+            !claim.shipBack?.awb &&
+            countryConfig(order).detailedTracking && (
+              <PickupTransitDetail claim={claim} order={order} />
+            )}
 
           {/* Return-shipment (Revibe → customer) detailed tracking,
               shared with InvalidClaimCard's paid surface. Surfaces once
               the AWB has been created. */}
-          {Boolean(claim.shipBack?.awb) && (
-            <ReturnShipmentTracking ship={claim.shipBack} />
-          )}
+          {Boolean(claim.shipBack?.awb) &&
+            countryConfig(order).detailedTracking && (
+              <ReturnShipmentTracking ship={claim.shipBack} />
+            )}
 
           {(() => {
             const history = getHistoryEvents(order, 'claim')
@@ -398,15 +402,15 @@ function PickupTransitDetail({ claim, order }) {
           {(order.courier || order.trackingNumber) && (
             <CourierStrip courier={order.courier} awb={order.trackingNumber} />
           )}
-          {CLAIM_TRANSIT_SUB_STATUSES.map((s, i) => (
-            <SubStatusItem
-              key={s.id}
-              label={s.label}
-              timestamp={claim.transitSubTimeline?.[s.id]}
-              state={i < cur ? 'done' : i === cur ? 'current' : 'future'}
-              isLast={i === CLAIM_TRANSIT_SUB_STATUSES.length - 1}
-            />
-          ))}
+          <Timeline
+            orientation="vertical"
+            dense
+            tone="brand"
+            steps={CLAIM_TRANSIT_SUB_STATUSES}
+            currentIndex={cur}
+            stamps={claim.transitSubTimeline || {}}
+          />
+          <div className="pb-1" />
         </div>
       )}
     </div>

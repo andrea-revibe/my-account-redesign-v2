@@ -32,6 +32,7 @@ import {
 } from './lib/claims'
 import { useJourney } from './lib/journey'
 import { useEddSandbox } from './lib/eddSandbox'
+import { COUNTRY_CODES, DEFAULT_COUNTRY } from './lib/countries'
 import { JOURNEYS } from './data/journey'
 
 const RANGE_DAYS = { '30d': 30, '3m': 90, '1y': 365, all: Infinity }
@@ -146,12 +147,41 @@ export default function App() {
   const [journeyId, setJourneyId] = useState(() =>
     resolveJourneyId(initialJourneyParam),
   )
-  const journey = useJourney(journeyId)
+  // Country split — orthogonal to the journey. Sourced from ?country=<code>,
+  // defaulting to AE; injected into the replayed order's `country` below so
+  // the cards' capability flags (lib/countries.js) flip without touching the
+  // journey graph. Flipped live via the dev panel's CountryPicker.
+  const initialCountryParam =
+    typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('country')
+  const [activeCountry, setActiveCountry] = useState(() =>
+    initialCountryParam && COUNTRY_CODES.includes(initialCountryParam)
+      ? initialCountryParam
+      : DEFAULT_COUNTRY,
+  )
+  const selectCountry = (code) => {
+    setActiveCountry(code)
+    const url = new URL(window.location.href)
+    url.searchParams.set('country', code)
+    window.history.replaceState({}, '', url)
+  }
+  const journey = useJourney(journeyId, activeCountry)
   // Sandbox state lives outside the replay hook — both hooks are called
   // unconditionally (hook rules), then `active` is the one we actually use.
   const sandbox = useEddSandbox(journey.journey)
   const isSandbox = journey.kind === 'sandbox'
-  const activeOrderFromJourney = isSandbox ? sandbox.order : journey.order
+  // Inject the selected country last so it wins over anything the journey
+  // nodes set (they never set `country`), keeping INITIAL_ORDER country-free.
+  // Memoized so the spread doesn't mint a new object every render (which
+  // would defeat the downstream useMemo that depends on it).
+  const activeOrderFromJourney = useMemo(
+    () => ({
+      ...(isSandbox ? sandbox.order : journey.order),
+      country: activeCountry,
+    }),
+    [isSandbox, sandbox.order, journey.order, activeCountry],
+  )
   const toggleJourneyMode = () => {
     setJourneyMode((prev) => {
       const next = !prev
@@ -666,6 +696,8 @@ export default function App() {
             journeys={journey.journeys}
             activeJourneyId={journey.journey.id}
             onSelectJourney={selectJourney}
+            activeCountry={activeCountry}
+            onSelectCountry={selectCountry}
           />
         </div>
       )}
@@ -679,6 +711,8 @@ export default function App() {
           journeys={sandbox.journeys}
           activeJourneyId={journey.journey.id}
           onSelectJourney={selectJourney}
+          activeCountry={activeCountry}
+          onSelectCountry={selectCountry}
         />
       )}
     </div>

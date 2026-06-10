@@ -3,7 +3,6 @@ import {
   Truck,
   Headphones,
   ChevronDown,
-  Check,
   Copy,
   X,
   AlertTriangle,
@@ -17,6 +16,8 @@ import {
   statusDescription,
 } from '../lib/statuses'
 import { ProductSummary } from './ProductSummary'
+import Timeline from './Timeline'
+import { countryConfig } from '../lib/countries'
 
 // Hardcoded to a known-good DHL Express shipment so the demo lands on a real
 // tracking page even though the mock orders use placeholder tracking numbers.
@@ -65,10 +66,16 @@ export default function HeroCard({ order }) {
         <ProductSummary order={order} tone="hero" className="mt-3" />
 
         <div className="mt-4">
-          <DotTimeline cur={cur} />
+          <Timeline
+            orientation="horizontal"
+            onDark
+            steps={STATUSES}
+            currentIndex={cur}
+            complete={order.statusId === 'delivered'}
+          />
         </div>
 
-        {isShipped && (
+        {isShipped && countryConfig(order).detailedTracking && (
           <>
             <button
               onClick={() => setShowDetail((v) => !v)}
@@ -87,21 +94,15 @@ export default function HeroCard({ order }) {
                 {(order.courier || order.trackingNumber) && (
                   <CourierStrip order={order} />
                 )}
-                {SHIPPING_SUB_STATUSES.map((s, i) => (
-                  <SubItem
-                    key={s.id}
-                    label={s.label}
-                    timestamp={order.subTimeline?.[s.id]}
-                    state={
-                      i < subCur
-                        ? 'done'
-                        : i === subCur
-                          ? 'current'
-                          : 'future'
-                    }
-                    isLast={i === SHIPPING_SUB_STATUSES.length - 1}
-                  />
-                ))}
+                <Timeline
+                  orientation="vertical"
+                  dense
+                  onDark
+                  steps={SHIPPING_SUB_STATUSES}
+                  currentIndex={subCur}
+                  stamps={order.subTimeline || {}}
+                />
+                <div className="pb-1" />
               </div>
             )}
           </>
@@ -177,91 +178,6 @@ function CancelOrderButton() {
         <X size={16} strokeWidth={1.75} />
         Cancel order
       </button>
-    </div>
-  )
-}
-
-function DotTimeline({ cur }) {
-  return (
-    <div className="flex items-start justify-between gap-1">
-      {STATUSES.map((s, i) => {
-        const done = i < cur
-        const current = i === cur
-        return (
-          <div
-            key={s.id}
-            className="flex-1 flex flex-col items-center relative"
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-[2px] ${
-                  done || current ? 'bg-white' : 'bg-white/[.22]'
-                }`}
-              />
-            )}
-            <span
-              className={`relative z-10 grid place-items-center w-[18px] h-[18px] rounded-full border-2 text-brand ${
-                done || current
-                  ? 'bg-white border-white'
-                  : 'bg-transparent border-white/40'
-              } ${current ? 'shadow-[0_0_0_4px_rgba(255,255,255,0.18)]' : ''}`}
-            >
-              {done && <Check size={10} strokeWidth={3} />}
-            </span>
-            <span
-              className={`mt-1.5 text-[10.5px] text-center leading-[1.2] ${
-                current
-                  ? 'text-white font-bold'
-                  : done
-                    ? 'text-white font-medium'
-                    : 'text-white/65 font-medium'
-              }`}
-            >
-              {s.short}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function SubItem({ label, timestamp, state, isLast }) {
-  const done = state === 'done'
-  const current = state === 'current'
-  return (
-    <div className="flex gap-3 items-start">
-      <div className="w-[18px] flex flex-col items-center self-stretch">
-        <span
-          className={`w-[14px] h-[14px] rounded-full border-2 grid place-items-center text-brand shrink-0 ${
-            done || current ? 'bg-white border-white' : 'bg-transparent border-white/40'
-          } ${current ? 'shadow-[0_0_0_4px_rgba(255,255,255,0.18)]' : ''}`}
-        >
-          {done && <Check size={9} strokeWidth={3} />}
-        </span>
-        {!isLast && (
-          <span
-            className={`flex-1 w-[2px] mt-0.5 ${done ? 'bg-white' : 'bg-white/[.22]'}`}
-          />
-        )}
-      </div>
-      <div className={`flex-1 ${isLast ? 'pb-1' : 'pb-3'}`}>
-        <div
-          className={`text-[13px] ${
-            current
-              ? 'text-white font-bold'
-              : done
-                ? 'text-white'
-                : 'text-white/75'
-          }`}
-        >
-          {label}
-        </div>
-        {timestamp && (
-          <div className="text-[11px] text-white/55 mt-px">{timestamp}</div>
-        )}
-      </div>
     </div>
   )
 }

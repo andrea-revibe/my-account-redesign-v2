@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: c6d79ae
+verified_against: 8333006
 covers:
   - src/components/ClaimFlow
   - src/lib/returns.js
@@ -33,6 +33,7 @@ flowchart TD
   s2 -->|Reason routes elsewhere| sheet[/SwitchFlowSheet → issue · warranty · compensation · change of mind/]
   s2 -->|Reason matches this flow + Continue| s3[Step 3 — Device prep]
   s3 -->|Guided reset completed + confirmed| s4[Step 4 — Packing]
+  s3 -->|"Never set up this device" attestation · CoM only| s4
   s4 -->|Original Revibe box OR sturdy post box selected| s5[Step 5 — Pickup details]
   s5 -->|3 fields confirmed + checkbox| s6[Step 6 — Refund method]
   s6 -->|Wallet or Original payment| s7[Step 7 — Review & submit]
@@ -125,7 +126,7 @@ The launcher's tone tracks state: brand-gradient default → success-gradient `d
 
 **Confirm gate (both platforms).** The confirm checkbox (*"I confirm I've completed the guided reset — this device is unlinked and erased."*) is rendered as a **bordered card** whose border + fill track its state (locked → confirm-error → checked → default). It's locked until the customer has been through the guide — opened it **and** tapped `Done` (`devicePrep.resetGuideSeen`); while locked the checkbox shows a `Lock` glyph and the card sits muted. It's one slice of the flow-wide soft validation (§2.1.1): `stepError` returns `resetGuide` while the guide is unseen, so a premature `Continue` dispatches `ATTEMPT` and paints the hero launcher card red (`border-danger`, danger coin, `animate-shakeX`) with the message *"Run the guide above and tap Done to confirm."* under the gate (AlertTriangle + `animate-slideDown`) instead of advancing. Once the guide is completed the red state clears, the checkbox unlocks, and the gate falls to `resetConfirm` (confirm checkbox unticked → danger card border + `InlineError` *"Confirm you've completed the reset before continuing."*).
 
-The reducer stores `devicePrep: { option, os, device, resetConfirmed, resetGuideSeen, neverSetUp }`, where `os` and `device` are initialised from `deviceOsForOrder(order)` / `deviceTypeForOrder(order)` (category-driven, see above — the ambiguous `Tablet` category preselects `device: 'ipad'`) and `option` is pinned to `'reset'` (the only remaining path) so the downstream Review / Confirmation summaries and `devicePrepText` keep rendering the reset branch. `neverSetUp` is the change-of-mind-only skip (see [guided_reset.md](guided_reset.md) §5); the previously-stored `resetGuideChecks` was removed alongside the guide's done-screen checklist. The old credentials path (a `'credentials'` option with an unlink toggle + 6-digit passcode) was removed; `accountUnlinked` / `passcode` are gone from flow state. A couple of seeded mock claims in `orders.js` still carry `option: 'credentials'`, so the dead `'credentials'` branches in `Step6Review` / `Step7Confirmation` / `devicePrepText` (masking to `Credentials provided`) are retained for them.
+The reducer stores `devicePrep: { option, os, device, resetConfirmed, resetGuideSeen, neverSetUp }`, where `os` and `device` are initialised from `deviceOsForOrder(order)` / `deviceTypeForOrder(order)` (category-driven, see above — the ambiguous `Tablet` category preselects `device: 'ipad'`) and `option` is pinned to `'reset'` (the only remaining path) so the downstream Review / Confirmation summaries and `devicePrepText` keep rendering the reset branch. `neverSetUp` is the change-of-mind-only skip (see [guided_reset.md](guided_reset.md) §5); the previously-stored `resetGuideChecks` was removed alongside the guide's done-screen checklist. The old credentials path (a `'credentials'` option with an unlink toggle + 6-digit passcode) was removed; `accountUnlinked` / `passcode` are gone from flow state. A couple of seeded mock claims in `orders.js` still carry `option: 'credentials'`, so the dead `'credentials'` branches in `Step6Review` / `Step7Confirmation` / `devicePrepText` (masking to `Unlinked + passcode shared`) are retained for them.
 
 ### 2.5 Step 4 — Packing (shared)
 
@@ -171,7 +172,7 @@ The order of sections in Review is deliberate — each ack checkbox sits directl
 
 1. **Item** (read-only).
 2. **Reason** (change-of-mind) / **Issue** (issue / warranty) — Edit → Step 2.
-3. **Device preparation** — Edit → Step 3. Shows `Factory reset confirmed` (the default live path), or `Not set up — no reset needed` when the never-set-up skip was taken (§2.4); `Credentials provided` survives only for the seeded credentials mocks.
+3. **Device preparation** — Edit → Step 3. Shows `Factory reset confirmed` (the default live path), or `Not set up — no reset needed` when the never-set-up skip was taken (§2.4); `Unlinked + passcode shared` survives only for the seeded credentials mocks.
 4. **☑︎ I have factory reset my device** — soft-validated ack card; see below.
 5. **Packing** — Edit → Step 4. Shows the chosen method label (`Original Revibe box` / `Sturdy post box`).
 6. **☑︎ I have packed the device properly** — soft-validated ack card.
@@ -323,6 +324,7 @@ src/
         ├── Step2Reason.jsx                Shared reason picker (CoM / issue / warranty) — required radio + free-text on 'Other'; exports routeForReason / scopeForReason / REASON_LABELS / SWITCH_CTA_LABELS
         ├── SwitchFlowSheet.jsx            Authoritative redirect sheet: "Switch to {track}" vs dismiss; opened from the reason step when the reason routes to another track
         ├── Step3DevicePrep.jsx            Single guided-reset path — tablet OS chooser (ambiguous only) + launcher card + confirm checkbox
+        ├── Step4Packing.jsx               Packing-demo video + original-box vs post-box radio cards + collapsible tips; exports PACKING_LABELS (filename predates the inserted Packing step, so it's one ahead of its visual step number — likewise Step4–7 below)
         ├── Step4PickupDetails.jsx         Pickup fields + 'Expected by' headline + collapsible detailed-timeline dropdown + confirmation checkbox
         ├── Step5RefundMethod.jsx          Wallet vs original-payment refund cards (skipped for warranty)
         ├── Step6Review.jsx                Read-only item block + sectioned summary with per-section Edit links (warranty hides Refund, shows 'What you'll get back')

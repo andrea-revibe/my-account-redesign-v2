@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: c2ca086
+verified_against: 8333006
 covers:
   - src/App.jsx
   - src/lib/claims.js
@@ -18,7 +18,7 @@ These are hand-maintained — there's no generator. When routing precedence, a c
 
 ## Card routing
 
-**Read before:** touching the routing precedence in `App.jsx`, adding a card variant, or adding a takeover flag. **Source:** `src/App.jsx` — `isOpen` L50–56, in-progress ladder L289–350, past ladder L359–389.
+**Read before:** touching the routing precedence in `App.jsx`, adding a card variant, or adding a takeover flag. **Source:** `src/App.jsx` — `isOpen` L60, in-progress ladder L452–531, past ladder L548–586.
 
 `App.jsx` routes in **two stages**, not one flat precedence list. First `isOpen(order)` partitions the filtered orders into the *In progress* and *Past* sections; then a precedence ladder inside each section picks the card. In journey mode the list is a single replayed order (`projectedOrders = [activeOrderFromJourney]`) routed through the *same* ladder. Each takeover branch in code is guarded by `hasActiveClaim(o) && o.claim?.X` — a takeover claim is always active, so what matters is the ladder order.
 
@@ -52,16 +52,18 @@ flowchart TD
   p1 -- yes --> WCP["WarrantyClaimCard"]
   p1 -- no --> p2{"isClaimRefunded?"}
   p2 -- yes --> CCP["ClaimCard"]
-  p2 -- no --> POC["PastOrderCard (onRaiseClaim)"]
+  p2 -- no --> p3{"cancelled &amp; cancellationInitiator == 'revibe'?"}
+  p3 -- yes --> RCC["RevibeCancellationCard"]
+  p3 -- no --> POC["PastOrderCard (onRaiseClaim)"]
 ```
 
-The first four in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline. Full prose tree: [orders.md](./orders.md) §2.
+The first four in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline. (The `invalidClaim` branch is also reached via the post-collection cancel projection — see [returns/claim_tracking.md](./returns/claim_tracking.md) §2.8.) In the past ladder, a Revibe-initiated cancellation (`cancellationInitiator === 'revibe'`) routes to `RevibeCancellationCard` ahead of the customer `PastOrderCard` fallback. Full prose tree: [orders.md](./orders.md) §2.
 
 ---
 
 ## Claim lifecycle
 
-**Read before:** changing a claim pipeline, adding a claim state, or wiring a new takeover. **Source:** `src/lib/claims.js` — `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `WARRANTY_CLAIM_STATUSES`·201, terminal predicates `hasActiveClaim`·137 / `isClaimRefunded`·145 / `isWarrantyDelivered`·151. Takeover seeded states: `src/data/orders/claims.js`.
+**Read before:** changing a claim pipeline, adding a claim state, or wiring a new takeover. **Source:** `src/lib/claims.js` — `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `WARRANTY_CLAIM_STATUSES`·284, terminal predicates `hasActiveClaim`·160 / `isClaimRefunded`·168 / `isWarrantyDelivered`·225. Takeover seeded states: `src/data/orders/claims.js`.
 
 All four pipelines on one canvas, tone-classed **warn → brand → success** (matching the card tone helpers), with the four takeover detours annotated by trigger flag + the claim state they're seeded at.
 
@@ -101,7 +103,7 @@ Notes:
 
 ## Returns data-flow
 
-**Read before:** changing how a submitted claim reaches a card, the undo, or the track-to-expand behaviour. **Source:** `src/App.jsx` — `handleSubmitClaim`·171, projection·199–207, `UndoSnackbar` wiring·417, `handleTrackClaim`·193; `src/components/ClaimFlow/ClaimFlow.jsx` (`onSubmitClaim`).
+**Read before:** changing how a submitted claim reaches a card, the undo, or the track-to-expand behaviour. **Source:** `src/App.jsx` — `handleSubmitClaim`·214, projection·316, `UndoSnackbar` wiring·629, `handleTrackClaim`·310; `src/components/ClaimFlow/ClaimFlow.jsx` (`onSubmitClaim`).
 
 The coupling here is a **runtime projection**, not an import: the seeded claim is stitched onto the order at render time. This is the path most likely to confuse, because no import edge connects `ClaimFlow` to the card that ends up rendering.
 
@@ -110,7 +112,7 @@ flowchart TD
   A["ClaimFlow overlay — user completes steps"] -->|"handlePrimary → onSubmitClaim(orderId, claim); seed always claimStatusId:'initiated'"| B{"journeyMode?"}
   B -- "yes (replay)" --> J["journey.advance('claim_submitted_*') — no submittedClaims write"]
   B -- "no" --> C["App.setSubmittedClaims({...prev, [orderId]: claim}) + setRecentSubmit"]
-  C --> D["projectedOrders = ORDERS.map(o => submittedClaims[o.id] ? {...o, claim} : o)  (App.jsx ~L204)"]
+  C --> D["projectedOrders = ORDERS.map(o => submittedClaims[o.id] ? {...o, claim} : o)  (App.jsx ~L316)"]
   D --> E["isOpen(o) re-partitions → order enters In-progress section"]
   E --> F["Card-routing ladder → ClaimCard / WarrantyClaimCard (or a takeover card if the claim carries a takeover flag)"]
   C --> G["UndoSnackbar (8s) — Undo deletes submittedClaims[orderId] → order reverts to PastOrderCard"]

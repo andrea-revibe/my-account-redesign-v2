@@ -21,8 +21,9 @@ import {
 } from '../lib/claims'
 
 import { ProductSummary } from './ProductSummary'
-import ClaimProgressDots from './ClaimProgressDots'
+import Timeline from './Timeline'
 import { ReturnShipmentTracking } from './ReturnShipmentTracking'
+import { countryConfig } from '../lib/countries'
 import TapToFixCta from './TapToFixCta'
 import DeliveryAddressPill from './DeliveryAddressPill'
 
@@ -394,9 +395,10 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Return shipment timeline
             </div>
-            <ClaimProgressDots
+            <Timeline
+              orientation="horizontal"
               steps={RETURN_CLAIM_STATUSES}
-              curIdx={returnClaimProgressIndex(ship)}
+              currentIndex={returnClaimProgressIndex(ship)}
               stamps={stamps}
               tone={tone}
             />
@@ -407,9 +409,10 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
               strip + outbound sub-status drill-down as WarrantyClaimCard's
               ship-back leg). Gated on ship being dispatched — pre-shipping
               there's nothing to track yet. */}
-          {ship.currentStatusId === 'shipped' && (
-            <ReturnShipmentTracking ship={ship} />
-          )}
+          {ship.currentStatusId === 'shipped' &&
+            countryConfig(order).detailedTracking && (
+              <ReturnShipmentTracking ship={ship} />
+            )}
 
           <div className="rounded-[10px] bg-brand-bg/60 border border-brand-bg2 px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
             <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued —{' '}
