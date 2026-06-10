@@ -4,7 +4,7 @@ verified_against: 8333006
 covers:
   - src/components/CancelOrderSheet.jsx
   - src/components/KeepOrderSheet.jsx
-  - src/components/CancellationSubTimeline.jsx
+  - src/components/Timeline.jsx
   - src/components/UndoSnackbar.jsx
   - src/components/RefundDetailsSheet.jsx
   - src/components/PastOrderCard.jsx
@@ -114,7 +114,7 @@ Below the hero sits the shared `ProductSummary` row ([orders.md](./orders.md) §
 
 Followed by a single-action footer: a full-width `View refund details` button. Tapping it opens the `RefundDetailsSheet` bottom sheet, which is the canonical surface for the line-item breakdown (product + Revibe Care line items → subtotal → fee (card refunds only) → total refund). Always collapsed by default; no auto-expand.
 
-The full `OrderCard` chrome (status banner, sub-timeline, courier banner, order summary) is no longer rendered for cancelled past orders. `CancellationSubTimeline` is retained for in-flight orders that are mid-fulfilment with `state === 'cancelled'`.
+The full `OrderCard` chrome (status banner, sub-timeline, courier banner, order summary) is no longer rendered for cancelled past orders. The in-flight cancellation sub-timeline (mid-fulfilment, `state === 'cancelled'` on `OrderCard`) is rendered by the shared `Timeline` (vertical) with a per-step `toneForStep` = danger chain → success `refunded` terminal; the past/refunded card's horizontal cancellation strip uses the same `Timeline` (`complete` once refunded). See `docs/handoff/timeline/design.md`.
 
 ### 3.1 Phase tone progression
 
@@ -244,7 +244,7 @@ src/
 │   ├── PastOrderCard.jsx             Branches on order.state — cancelled-past variant is the refund-hero card; exports DestinationChip
 │   ├── RevibeCancellationCard.jsx    Revibe-initiated cancelled card (§11) — apology + re-buy offer + no-fee refund strip
 │   ├── RefundDetailsSheet.jsx        Bottom sheet for the past cancelled card's `View refund details` action
-│   ├── CancellationSubTimeline.jsx   Vertical sub-timeline retained for in-flight cancellations on OrderCard
+│   ├── Timeline.jsx                  Unified timeline (in-flight cancellation sub-timeline + past refund strip)
 │   ├── HistoryThread.jsx             Drives the Cancel rejected chip on layered cards
 │   └── WalletInfoTooltip.jsx         Shared anywhere "Revibe Wallet" is named
 └── lib/

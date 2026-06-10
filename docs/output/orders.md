@@ -9,8 +9,7 @@ covers:
   - src/components/OrderCard.jsx
   - src/components/InProgressCard.jsx
   - src/components/PastOrderCard.jsx
-  - src/components/StatusTimeline.jsx
-  - src/components/ShippingSubTimeline.jsx
+  - src/components/Timeline.jsx
   - src/components/HistoryThread.jsx
   - src/components/OrderFilters.jsx
   - src/data/orders/baseline.js
@@ -357,7 +356,7 @@ These decisions came out of phase-2 review and inform later phases; future contr
 
 **Delivered chip overrides `state: 'close'`.** Delivered orders carry `state: 'close'` in the data, but customers see a green "Delivered" pill instead of the orange "Close" pill. The override lives in `OrderCard`'s `SummaryHeader` so the data shape stays unchanged.
 
-**Filled brand-purple horizontal timeline for reached stages.** Reached stages and the connectors between them are filled with brand purple, not grey. The current step's label is bold so it remains identifiable without changing the dot treatment. Future stages stay outlined and grey.
+**Unified `Timeline` dot treatment.** Completed stages are filled brand dots with a white check and a 100% brand connector; the current stage is a hollow brand ring (pulsing glow) whose outgoing connector fills ¾ ("in transit"); future stages stay grey-outlined with a grey connector. The current label is the tone colour + bold. Reaching the final stage renders it completed (filled check, no pulse). The same component/treatment is used across the collapsed cards, the hero (white `onDark` palette), and the expanded full timeline — see `docs/handoff/timeline/design.md`.
 
 **Forward-looking subline when ETA is available.** DHL provides an estimated delivery date sometimes, not always. When present, the collapsed-card subline reads "Delivery by [date]" — a customer-facing, future-tense answer to "when is it coming". When absent it falls back to "Updated [timestamp]".
 
@@ -388,9 +387,7 @@ src/
     ├── HeroCard.jsx              Active order's hero variant of OrderCard
     ├── PastOrderCard.jsx         Branches on `order.state` into delivered (no expand) and cancelled-past variants
     ├── RevibeCancellationCard.jsx Past-section card for Revibe-initiated cancellations (detailed in cancellations.md)
-    ├── StatusTimeline.jsx        Horizontal 4-step timeline
-    ├── ShippingSubTimeline.jsx   Vertical sub-status timeline
-    ├── CancellationSubTimeline.jsx Vertical sub-timeline retained for in-flight cancellations
+    ├── Timeline.jsx              Unified timeline — every dot strip (horizontal/vertical · 4 tones · onDark/dense/complete/frozen)
     ├── HistoryThread.jsx         Compact chip thread for past events on layered cards
     ├── WalletInfoTooltip.jsx     Shared anywhere "Revibe Wallet" is named (also exports REVIBE_WALLET_ICON)
     └── ChatFab.jsx               Floating chat-with-support button

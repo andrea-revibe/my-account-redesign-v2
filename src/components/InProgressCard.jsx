@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ChevronDown,
-  Check,
   Edit2,
   Phone,
   X,
@@ -11,10 +10,11 @@ import {
   Zap,
   Clock,
 } from 'lucide-react'
-import { STATUSES, statusDescription } from '../lib/statuses'
+import { STATUSES, progressIndex, statusDescription } from '../lib/statuses'
 import CancelOrderSheet from './CancelOrderSheet'
 import { ProductSummary } from './ProductSummary'
 import DeliveryAddressPill from './DeliveryAddressPill'
+import Timeline from './Timeline'
 
 const STATE_LABELS = {
   created: 'Order placed',
@@ -77,7 +77,13 @@ export default function InProgressCard({ order, defaultExpanded = false, onCance
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Timeline
             </div>
-            <TimelineDots order={order} />
+            <Timeline
+              orientation="horizontal"
+              tone="brand"
+              steps={STATUSES}
+              currentIndex={progressIndex(order.statusId)}
+              stamps={order.timeline || {}}
+            />
           </div>
 
           <DetailsCollapse order={order} detailsRef={detailsRef} />
@@ -150,79 +156,6 @@ function ETAHero({ order, desc }) {
         </div>
       )}
       <DeliveryAddressPill label="Delivering to" address={order.address} />
-    </div>
-  )
-}
-
-function TimelineDots({ order }) {
-  const curIdx = STATUSES.findIndex((s) => s.id === order.statusId)
-  return (
-    <div className="flex items-start justify-between gap-1">
-      {STATUSES.map((s, i) => {
-        const done = i < curIdx
-        const current = i === curIdx
-        const reached = done || current
-        const ts = order.timeline?.[s.id]
-        let date = ''
-        let time = ''
-        if (ts) {
-          const parts = String(ts).split(' · ')
-          date = parts[0] || ''
-          time = parts[1] || ''
-        }
-        return (
-          <div
-            key={s.id}
-            className="flex-1 flex flex-col items-center relative"
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-[2px] ${
-                  reached ? 'bg-brand' : 'bg-line'
-                }`}
-              />
-            )}
-            <span
-              className={`relative z-10 grid place-items-center w-[18px] h-[18px] rounded-full border-2 ${
-                reached
-                  ? 'bg-brand border-brand text-white'
-                  : 'bg-surface border-line text-muted'
-              } ${current ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
-            >
-              {done && <Check size={10} strokeWidth={3} />}
-            </span>
-            <span
-              className={`mt-1.5 text-[10.5px] text-center leading-[1.2] ${
-                current
-                  ? 'text-ink font-bold'
-                  : reached
-                    ? 'text-ink font-medium'
-                    : 'text-muted font-medium'
-              }`}
-            >
-              {s.short}
-            </span>
-            <span
-              className={`mt-1 text-[9.5px] text-center leading-[1.25] tabular-nums min-h-[22px] ${
-                reached ? 'text-ink-2' : 'text-muted/50'
-              }`}
-            >
-              {date && (
-                <>
-                  {date}
-                  {time && (
-                    <>
-                      <br />
-                      {time}
-                    </>
-                  )}
-                </>
-              )}
-            </span>
-          </div>
-        )
-      })}
     </div>
   )
 }

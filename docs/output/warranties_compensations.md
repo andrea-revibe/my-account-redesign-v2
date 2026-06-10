@@ -90,7 +90,7 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 
 #### 2.3.4 Expanded view
 
-1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`, rendered by the shared **`ClaimProgressDots`** component (`src/components/ClaimProgressDots.jsx`, also used by `ClaimCard` and `InvalidClaimCard`); tone-aware glow on the current step. Step labels: `Initiated · Pickup · Quality Check · Repair · Shipped · Delivered` — the `Shipped · Delivered` tail matches `InvalidClaimCard`'s return-shipment card verbatim (the `ship_back`/`device_returned` `short` labels were relabelled from `Ship back`/`Returned`).
+1. **6-step horizontal dot timeline** using `WARRANTY_CLAIM_STATUSES`, rendered by the shared **`Timeline`** component (`src/components/Timeline.jsx`, horizontal — the single timeline used everywhere); tone-aware pulsing ring on the current step. Step labels: `Initiated · Pickup · Quality Check · Repair · Shipped · Delivered` — the `Shipped · Delivered` tail matches `InvalidClaimCard`'s return-shipment card verbatim (the `ship_back`/`device_returned` `short` labels were relabelled from `Ship back`/`Returned`).
 2. **`See detailed tracking` dropdown** (§2.3.3) — the inbound or return leg, whichever applies, collapsed by default.
 3. **`HistoryThread`** — same `getHistoryEvents(order, 'claim')` source as `ClaimCard`.
 4. **Footer** — a single full-width `View claim details` button (opens `ClaimDetailsSheet` — warranty-aware, see §2.5). (The decorative icon-only `Download receipt` button was removed.)

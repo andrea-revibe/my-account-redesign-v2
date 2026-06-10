@@ -13,6 +13,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { cancellationStepsFor } from '../lib/statuses'
+import Timeline from './Timeline'
 import { getHistoryEvents } from '../lib/events'
 import RefundDetailsSheet from './RefundDetailsSheet'
 import KeepOrderSheet from './KeepOrderSheet'
@@ -164,7 +165,16 @@ function CancelledOrderCard({ order, onKeep }) {
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2">
               Cancellation progress
             </div>
-            <RefundProgressDots order={order} />
+            <Timeline
+              orientation="horizontal"
+              tone={toneFor(order.cancellationStatusId)}
+              steps={cancellationStepsFor(order)}
+              currentIndex={cancellationStepsFor(order).findIndex(
+                (s) => s.id === order.cancellationStatusId,
+              )}
+              complete={order.cancellationStatusId === 'refunded'}
+              stamps={order.cancellationTimeline || {}}
+            />
           </div>
 
           {(() => {
@@ -337,66 +347,6 @@ export function DestinationChip({ destination, accent }) {
         />
       )}
     </span>
-  )
-}
-function RefundProgressDots({ order }) {
-  const steps = cancellationStepsFor(order)
-  const curIdx = steps.findIndex((s) => s.id === order.cancellationStatusId)
-  const tone = toneFor(order.cancellationStatusId)
-  const t = TONE[tone]
-
-  return (
-    <ol className="flex items-start justify-between gap-1">
-      {steps.map((s, i) => {
-        const reached = i <= curIdx
-        const isCurrent = i === curIdx
-        const ts = reached ? order.cancellationTimeline?.[s.id] : null
-        return (
-          <li
-            key={s.id}
-            className="flex-1 flex flex-col items-center text-center relative"
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-3 right-1/2 w-full h-0.5 ${
-                  reached ? t.bg : 'bg-line/70'
-                }`}
-              />
-            )}
-            <span
-              className={`relative z-10 grid place-items-center w-6 h-6 rounded-full ${
-                reached
-                  ? `${t.bg} text-white`
-                  : 'bg-white border border-line text-line'
-              }`}
-            >
-              {reached ? (
-                <Check size={14} strokeWidth={3} />
-              ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-line" />
-              )}
-            </span>
-            <span
-              className={`mt-2 text-[11px] leading-tight ${
-                isCurrent
-                  ? `${t.text} font-bold`
-                  : reached
-                    ? 'text-ink'
-                    : 'text-muted'
-              }`}
-            >
-              {s.shortLabel}
-            </span>
-            {ts && (
-              <span className="mt-1 text-[10.5px] leading-tight text-muted tabular-nums">
-                {ts}
-              </span>
-            )}
-          </li>
-        )
-      })}
-    </ol>
   )
 }
 

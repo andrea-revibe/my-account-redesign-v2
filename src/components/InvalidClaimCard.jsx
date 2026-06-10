@@ -21,7 +21,7 @@ import {
 } from '../lib/claims'
 
 import { ProductSummary } from './ProductSummary'
-import ClaimProgressDots from './ClaimProgressDots'
+import Timeline from './Timeline'
 import { ReturnShipmentTracking } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
 import TapToFixCta from './TapToFixCta'
@@ -395,9 +395,10 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted mb-2.5">
               Return shipment timeline
             </div>
-            <ClaimProgressDots
+            <Timeline
+              orientation="horizontal"
               steps={RETURN_CLAIM_STATUSES}
-              curIdx={returnClaimProgressIndex(ship)}
+              currentIndex={returnClaimProgressIndex(ship)}
               stamps={stamps}
               tone={tone}
             />

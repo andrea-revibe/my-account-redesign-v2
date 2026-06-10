@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ChevronDown,
-  Check,
   Edit2,
   Phone,
   X,
@@ -12,15 +11,17 @@ import {
 } from 'lucide-react'
 import {
   STATUSES,
+  SHIPPING_SUB_STATUSES,
   progressIndex,
+  subProgressIndex,
+  cancellationStepsFor,
+  cancellationProgressIndex,
   statusHeadline,
   statusSubline,
   statusDescription,
   statusIconFor,
 } from '../lib/statuses'
-import StatusTimeline from './StatusTimeline'
-import ShippingSubTimeline from './ShippingSubTimeline'
-import CancellationSubTimeline from './CancellationSubTimeline'
+import Timeline from './Timeline'
 import CancelOrderSheet from './CancelOrderSheet'
 import { ProductSummary } from './ProductSummary'
 import { countryConfig } from '../lib/countries'
@@ -63,9 +64,12 @@ export default function OrderCard({ order, defaultExpanded = false, onCancelOrde
       <h4 className="m-0 mb-3 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted">
         Full timeline
       </h4>
-      <StatusTimeline
-        currentStatusId={order.statusId}
-        timeline={formatTimeline(order.timeline)}
+      <Timeline
+        orientation="horizontal"
+        tone="brand"
+        steps={STATUSES}
+        currentIndex={progressIndex(order.statusId)}
+        stamps={formatTimeline(order.timeline)}
       />
     </div>
   )
@@ -98,7 +102,24 @@ export default function OrderCard({ order, defaultExpanded = false, onCancelOrde
           </div>
         )}
 
-        {showTimeline && <DotBar order={order} />}
+        {showTimeline && (
+          <div className="mt-1">
+            <Timeline
+              orientation="horizontal"
+              tone={
+                isCancelled
+                  ? 'danger'
+                  : order.statusId === 'delivered'
+                    ? 'success'
+                    : 'brand'
+              }
+              steps={STATUSES}
+              currentIndex={progressIndex(order.statusId)}
+              complete={!isCancelled && order.statusId === 'delivered'}
+              frozen={isCancelled}
+            />
+          </div>
+        )}
 
         <ProductSummary
           order={order}
@@ -110,16 +131,49 @@ export default function OrderCard({ order, defaultExpanded = false, onCancelOrde
         <div className="px-4 py-4 flex flex-col gap-3.5 border-t border-line bg-canvas animate-slideDown">
           {!showEta && <StatusBannerInline desc={desc} />}
 
-          {isCancelled && <CancellationSubTimeline order={order} />}
+          {isCancelled &&
+            (() => {
+              // Cancellation keeps a per-step tone: a danger chain with a
+              // success `refunded` terminal (matches statusDescription's
+              // banner resolution). The `pending` / `just now` stamps mirror
+              // the prior CancellationSubTimeline copy.
+              const steps = cancellationStepsFor(order)
+              const cur = cancellationProgressIndex(order.cancellationStatusId)
+              const tl = order.cancellationTimeline || {}
+              const stamps = {}
+              steps.forEach((s, i) => {
+                stamps[s.id] =
+                  i <= cur ? tl[s.id] || (i === cur ? 'just now' : '') : 'pending'
+              })
+              return (
+                <div className="rounded-[14px] border border-line bg-surface p-3.5">
+                  <h4 className="m-0 mb-3 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted">
+                    Cancellation progress
+                  </h4>
+                  <Timeline
+                    orientation="vertical"
+                    steps={steps}
+                    currentIndex={cur}
+                    stamps={stamps}
+                    toneForStep={(i) =>
+                      steps[i].id === 'refunded' && i <= cur ? 'success' : 'danger'
+                    }
+                  />
+                </div>
+              )
+            })()}
 
           {isShipped && countryConfig(order).detailedTracking && (
             <div className="rounded-[14px] border border-line bg-surface p-3.5">
               <h4 className="m-0 mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted">
                 Shipping progress
               </h4>
-              <ShippingSubTimeline
-                subStatusId={order.subStatusId}
-                subTimeline={order.subTimeline}
+              <Timeline
+                orientation="vertical"
+                tone="brand"
+                steps={SHIPPING_SUB_STATUSES}
+                currentIndex={subProgressIndex(order.subStatusId)}
+                stamps={order.subTimeline || {}}
               />
             </div>
           )}
@@ -228,80 +282,6 @@ function SummaryHeader({ order, expanded }) {
       >
         <ChevronDown size={14} strokeWidth={1.75} />
       </span>
-    </div>
-  )
-}
-
-// Compact dot timeline used inside the collapsed card header. Mirrors the
-// hero-card variant but in the light palette — see HeroCard's DotTimeline
-// for the dark counterpart.
-function DotBar({ order }) {
-  const cur = progressIndex(order.statusId)
-  const cancelled = order.state === 'cancelled'
-  const delivered = order.statusId === 'delivered'
-  return (
-    <div className="flex items-start justify-between gap-1 mt-1">
-      {STATUSES.map((s, i) => {
-        const done = i < cur
-        const current = i === cur
-        // On cancelled the timeline is frozen — the cancel point is marked
-        // with an ✕ instead of treated as "current and progressing".
-        const reached = cancelled ? done : done || current
-        const cancelPoint = cancelled && current
-        const tone = cancelled ? 'danger' : delivered ? 'success' : 'brand'
-        const showHalo = current && !cancelled
-        return (
-          <div
-            key={s.id}
-            className="flex-1 flex flex-col items-center relative"
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-[2px] ${
-                  reached || cancelPoint
-                    ? tone === 'danger'
-                      ? 'bg-danger'
-                      : tone === 'success'
-                        ? 'bg-success'
-                        : 'bg-brand'
-                    : 'bg-line'
-                }`}
-              />
-            )}
-            <span
-              className={`relative z-10 grid place-items-center w-[18px] h-[18px] rounded-full border-2 ${
-                reached || cancelPoint
-                  ? tone === 'danger'
-                    ? 'bg-danger border-danger text-white'
-                    : tone === 'success'
-                      ? 'bg-success border-success text-white'
-                      : 'bg-brand border-brand text-white'
-                  : 'bg-surface border-line text-muted'
-              } ${showHalo ? 'shadow-[0_0_0_4px_rgb(243,237,251)]' : ''}`}
-            >
-              {cancelPoint ? (
-                <X size={10} strokeWidth={3} />
-              ) : done ? (
-                <Check size={10} strokeWidth={3} />
-              ) : null}
-            </span>
-            <span
-              className={`mt-1.5 text-[10.5px] text-center leading-[1.2] font-medium ${
-                cancelPoint
-                  ? 'text-danger font-bold'
-                  : current
-                    ? 'text-ink font-bold'
-                    : reached
-                      ? 'text-ink'
-                      : 'text-muted'
-              }`}
-            >
-              {s.short}
-            </span>
-          </div>
-        )
-      })}
     </div>
   )
 }
