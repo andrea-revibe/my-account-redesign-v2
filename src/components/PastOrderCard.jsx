@@ -306,7 +306,7 @@ function RefundHero({ order }) {
   )
 }
 
-function DestinationChip({ destination, accent }) {
+export function DestinationChip({ destination, accent }) {
   const isWallet = destination.kind === 'wallet'
   const isBnpl = destination.kind === 'bnpl'
   const Icon = isWallet ? Wallet : CreditCard
