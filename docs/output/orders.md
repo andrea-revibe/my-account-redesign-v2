@@ -229,7 +229,7 @@ A past cancelled order whose `cancellationInitiator === 'revibe'` routes instead
 
 1. `state === 'cancelled'` → red "Refund in progress"
 2. `delayed === true` → orange "Taking longer than expected". On `OrderCard` (shipped) the full warn-amber banner applies; on `InProgressCard` (created/QC) the hero body still uses the delay copy but only the `Clock` tag accent turns amber — the hero gradient/headline/pill stay brand-purple (see §8)
-3. otherwise → `STATUS_DESCRIPTIONS[statusId]` (or `shipped:{subStatusId}`)
+3. otherwise → `STATUS_DESCRIPTIONS[statusId]` (or `shipped:{subStatusId}` — **but only when `countryConfig(order).detailedTracking` is true**; `SA`/`Others` collapse to the single `shipped` message so no destination-country / customs copy shows, see `country_split.md` §4)
 4. `statusMessage` overrides body only
 
 ## 5. Filters & auto-expand

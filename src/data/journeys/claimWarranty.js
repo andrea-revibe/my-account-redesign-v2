@@ -36,6 +36,13 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Quality check started',
     trigger: 'system',
     event: 'order.quality_check.started',
+    // Outbound country fork: detailed-tracking markets (AE/ZA) walk the four
+    // shipping sub-statuses; SA/Others collapse to a single `shipped_simple`
+    // step. country_split.md §6.
+    next: [
+      { id: 'shipped_arrived_destination', countries: ['AE', 'ZA'] },
+      { id: 'shipped_simple', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       statusId: 'quality_check',
@@ -119,6 +126,25 @@ export const CLAIM_WARRANTY_NODES = [
       deliveredOnLong: 'Monday, 25 May',
     }),
   },
+  // Outbound country fork — SA/Others collapse the four shipping sub-statuses
+  // into one "Shipped" step (no detailed tracking; banner copy collapses in
+  // lib/statuses.js). AE/ZA walk the granular chain. country_split.md §6.
+  {
+    id: 'shipped_simple',
+    label: 'Shipped',
+    trigger: 'system',
+    event: 'shipment.shipped',
+    next: ['delivered'],
+    apply: (o) => ({
+      ...o,
+      statusId: 'shipped',
+      subStatusId: null,
+      courier: 'DHL Express',
+      trackingNumber: '25193399',
+      trackingUrl: 'https://www.dhl.com/track',
+      timeline: { ...o.timeline, shipped: '23 May · 11:02 AM' },
+    }),
+  },
   // ----- Warranty claim submitted (customer-triggered via ClaimFlow) ----
   {
     id: 'claim_submitted_warranty',
@@ -187,6 +213,13 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Picked up by courier',
     trigger: 'system',
     event: 'claim.transit.picked_up',
+    // Inbound-leg country fork — picked_up already seeds the functional pickup
+    // state, so SA/Others skip the three granular transit sub-statuses straight
+    // to QC (no detailed tracking). AE/ZA walk them. country_split.md §6.
+    next: [
+      { id: 'claim_transit_arrived_origin_hub', countries: ['AE', 'ZA'] },
+      { id: 'claim_qc_started', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       claim: {
@@ -298,6 +331,14 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Ship-back AWB created',
     trigger: 'system',
     event: 'claim.ship_back.created',
+    // Ship-back country fork — the AWB-created node already set the repaired
+    // unit's shipment in motion, so SA/Others skip the four granular ship-back
+    // sub-statuses straight to device_returned (no detailed tracking). AE/ZA
+    // walk them. country_split.md §6.
+    next: [
+      { id: 'claim_ship_back_arrived_destination', countries: ['AE', 'ZA'] },
+      { id: 'claim_device_returned', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       claim: {
@@ -568,7 +609,12 @@ export const CLAIM_WARRANTY_NODES = [
     // claim_picked_up node — reschedule itself advances claimStatusId to
     // 'pickup' and seeds the picked_up scan so the detailed-tracking
     // dropdown is visible immediately after the customer confirms.
-    next: ['claim_transit_arrived_origin_hub'],
+    // Inbound-leg country fork (same as claim_picked_up) — SA/Others collapse
+    // straight to QC; AE/ZA re-enter the granular transit chain. §6.
+    next: [
+      { id: 'claim_transit_arrived_origin_hub', countries: ['AE', 'ZA'] },
+      { id: 'claim_qc_started', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       claim: {
@@ -649,6 +695,13 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Customer paid return shipping',
     trigger: 'customer',
     event: 'claim.ship_back.created',
+    // Return-leg country fork — paying already set the shipment to `shipped`,
+    // so SA/Others skip the four granular return sub-statuses straight to
+    // delivered (no detailed tracking). AE/ZA walk them. country_split.md §6.
+    next: [
+      { id: 'claim_invalid_return_arrived_destination', countries: ['AE', 'ZA'] },
+      { id: 'claim_invalid_return_delivered', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       claim: {

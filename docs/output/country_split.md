@@ -75,8 +75,11 @@ export function countryConfig(country) { /* code string OR order → config, saf
 | Claim inbound pickup (customer → Revibe) | `ClaimCard.jsx` — `…picked_up && countryConfig(order).detailedTracking` |
 | Warranty inbound pickup | `WarrantyClaimCard.jsx` — `…picked_up && !shipBack.awb && countryConfig(order).detailedTracking` |
 | Return leg (Revibe → customer) | `WarrantyClaimCard.jsx` (`shipBack`) + `InvalidClaimCard.jsx` (`invalidClaim.returnShipment`) — both wrap `<ReturnShipmentTracking>` in the guard |
+| Status-banner copy (shipped sub-status) | `statuses.js` — `descriptionKey()` collapses `shipped:<sub>` → the single `shipped` message when `!detailedTracking`, so the destination-country / customs sentence never shows |
 
 `OrderCard`'s "Shipping progress" block is the **only always-on** sub-timeline (not behind a dropdown); the rest are `See detailed tracking` toggles. Off → the milestone view is removed but the top-level courier "Track" card / claim-progress dots / status remain. `ReturnShipmentTracking.jsx` stays **country-agnostic** (pure presentational); gating happens at its two call sites, where `order` is in scope. **Matrix:** AE ✓, ZA ✓, SA ✗, Others ✗.
+
+The same flag also collapses the **journey shipment sequence** to a single "Shipped" step for these markets (so the sequence and the card agree — no granular steps in either) — that's the §6 worked example below. The banner collapse here is the belt-and-suspenders that additionally covers data-driven (non-journey) orders, since for journey replays `SA`/`Others` never set a shipping `subStatusId` in the first place.
 
 ## 5. Recipe — add a CARD-design country difference
 
@@ -95,19 +98,32 @@ Use this when a market has a *different sequence of steps*. The mechanism is **p
 
 **How it works.** A `next` entry is either a plain id string (applies to all countries) or an object `{ id, countries: [...] }` (applies only when the active country is listed). `validNext` filters edges by `order.country`; untagged edges always pass, so every existing journey is unchanged.
 
-**Worked example — AE expert-revision before a claim is marked invalid** (the canonical case; the `expertReview` flag in §2 is reserved for it):
+**Worked example — shipment legs collapse to a single step for SA/Others** (the live case; first real use of the tags). The four detailed-tracking markets walk the granular logistics milestones; `SA`/`Others` see one step per leg, agreeing with their hidden card tracking (§4). Two patterns, picked by whether the leg's entry node already carries the end-state:
 
-```js
-// in claim_qc_started.next — AE routes through an extra review step;
-// every other market goes straight to the invalid verdict.
-next: [
-  { id: 'claim_expert_review',     countries: ['AE'] },
-  { id: 'claim_invalid_confirmed', countries: ['ZA', 'SA', 'Others'] },
-  'claim_refund_issued',   // valid-claim path — all countries (untagged)
-]
-// then add the AE-only node, converging back onto the shared chain:
-// claim_expert_review → next: ['claim_invalid_confirmed', 'claim_refund_issued']
-```
+- **New collapsed node** (outbound, where skipping straight to `delivered` would never set `statusId: 'shipped'`). Fork the branch-point edge and add one node:
+  ```js
+  // qc_started.next — AE/ZA walk arrived_destination → … → out_for_delivery;
+  // SA/Others get the single shipped_simple step instead.
+  next: [
+    { id: 'shipped_arrived_destination', countries: ['AE', 'ZA'] },
+    { id: 'shipped_simple',              countries: ['SA', 'Others'] },
+  ]
+  // shipped_simple → next: ['delivered'] · statusId 'shipped', subStatusId null,
+  // event 'shipment.shipped'. Appended at the array end (so default-next
+  // routing isn't disturbed). In the cancellation journey the outbound leg is
+  // entered from cancellation_declined + cancellation_kept, so both fork.
+  ```
+- **Edge-skip to the leg exit** (return leg / warranty ship-back / inbound pickup, where the entry node *already* set the needed functional state — `currentStatusId: 'shipped'`, the `picked_up` flag, etc.). No new node — the fork just jumps past the granular sub-statuses:
+  ```js
+  // claim_return_shipping_paid.next (paying already set the shipment 'shipped'):
+  next: [
+    { id: 'claim_invalid_return_arrived_destination', countries: ['AE', 'ZA'] },
+    { id: 'claim_invalid_return_delivered',           countries: ['SA', 'Others'] },
+  ]
+  ```
+  Same shape for warranty ship-back (`claim_ship_back_created` → `claim_device_returned`) and the inbound pickup leg (`claim_picked_up` → `claim_qc_started`). For inbound, fork **both** `claim_picked_up` *and* the rescheduled re-entry `claim_pickup_rescheduled` so the pickup-failed branch collapses too and nothing points into the middle of the skipped run.
+
+The skipped nodes stay in each journey's array — they're simply unreached for `SA`/`Others`, reachable for `AE`/`ZA`. (The `expertReview` flag in §2 is still reserved for a future AE-only expert-revision step — same mechanism, not yet built.)
 
 **Steps:**
 1. Add the country-only node(s) to the journey's `data/journeys/*` file (id, label, `trigger`, `event`, `apply`), same as any node (see `journey_backend_spec.md` "Adding a new journey").
@@ -125,11 +141,11 @@ next: [
 - **Country picker is a demo control**, journey-mode only; production reads `order.country` from the order. The showcase mocks are all `AE`.
 - **`?country=` is in-session** — flipping it re-derives the cards immediately but persists nothing.
 - **EDD sandbox shows two market controls** right now (the Country chips + the EDD `Market` dropdown) — different axes (capabilities vs timing), not yet unified. See §8.
-- **`expertReview` and the journey-flow path are scaffolded, not built** — the flag exists and `validNext` supports the tags, but no journey uses them yet (deferred until the AE expert-revision step is designed).
+- **The journey-flow path is live; `expertReview` is still scaffolded.** The per-edge country tags are now used in earnest by the shipment-step collapse (§6) across all six journeys. The `expertReview` flag itself is still unread — reserved for the future AE expert-revision step (same mechanism, not yet built).
 
 ## 8. Open questions
 
-- **"Tracking unavailable" copy.** When `detailedTracking` is off we currently render nothing. Decide whether SA/Others should instead get a short "detailed tracking isn't available in your region" note, or stay silent. (Deferred to the "perfect the difference" pass.)
+- **~~"Tracking unavailable" copy.~~ Resolved.** Rather than a "tracking isn't available in your region" note, `SA`/`Others` get a single collapsed "Shipped" step + a country-neutral banner (§4, §6) — the difference reads as *less granular surfacing*, not *missing* tracking. The `shipment.shipped` comm copy is owner-authored (it resolves to `silent` until then).
 - **Unify country with the EDD market.** The Dynamic-EDD sandbox keeps its own `MARKETS` (`UAE/ZA/SA`, no "Others") for timing math. The `eddMarket` bridge field is in place; decide whether the CountryPicker should drive the sandbox market (one control) or stay independent.
 - **Country switch mid-journey** can desync a branched path once §6 forks exist (see §6 caveat). Decide whether to auto-reset the journey on country change or leave it to the operator.
 - **Per-country EDD/SLA timing in cards.** Transit SLAs likely differ by market (see `claim_tracking.md` §9 "Country-aware transit SLAs"); that's a future capability-flag/`edd.js` integration, not yet wired.

@@ -514,7 +514,13 @@ export const CANCELLATION_NODES = [
     label: 'Cancellation declined',
     trigger: 'system',
     event: 'order.cancellation.declined',
-    next: ['shipped_arrived_destination'],
+    // Outbound country fork (shared shipping chain): AE/ZA walk the granular
+    // sub-statuses; SA/Others collapse to a single `shipped_simple` step.
+    // country_split.md §6.
+    next: [
+      { id: 'shipped_arrived_destination', countries: ['AE', 'ZA'] },
+      { id: 'shipped_simple', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       state: 'open',
@@ -544,7 +550,10 @@ export const CANCELLATION_NODES = [
     // `reverted` timestamp + `cancellationReversal` marker survive so the
     // event shows as a history chip once the order is delivered — parallel
     // to how the declined branch keeps its rejection trace.
-    next: ['shipped_arrived_destination'],
+    next: [
+      { id: 'shipped_arrived_destination', countries: ['AE', 'ZA'] },
+      { id: 'shipped_simple', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       state: 'open',
@@ -635,6 +644,26 @@ export const CANCELLATION_NODES = [
       timeline: { ...o.timeline, delivered: '25 May · 3:14 PM' },
       deliveredOn: '2026-05-25',
       deliveredOnLong: 'Monday, 25 May',
+    }),
+  },
+  // Outbound country fork — SA/Others collapse the four shipping sub-statuses
+  // into one "Shipped" step (no detailed tracking; banner copy collapses in
+  // lib/statuses.js). AE/ZA walk the granular chain. Reached from both the
+  // declined and kept cancellation branches. country_split.md §6.
+  {
+    id: 'shipped_simple',
+    label: 'Shipped',
+    trigger: 'system',
+    event: 'shipment.shipped',
+    next: ['delivered'],
+    apply: (o) => ({
+      ...o,
+      statusId: 'shipped',
+      subStatusId: null,
+      courier: 'DHL Express',
+      trackingNumber: '25193399',
+      trackingUrl: 'https://www.dhl.com/track',
+      timeline: { ...o.timeline, shipped: '23 May · 11:02 AM' },
     }),
   },
   // ----- Revibe-initiated cancellation (Revibe cancels, customer never asked) -

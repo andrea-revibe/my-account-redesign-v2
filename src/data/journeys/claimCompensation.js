@@ -39,6 +39,13 @@ export const CLAIM_COMPENSATION_NODES = [
     label: 'Quality check started',
     trigger: 'system',
     event: 'order.quality_check.started',
+    // Outbound country fork: detailed-tracking markets (AE/ZA) walk the four
+    // shipping sub-statuses; SA/Others collapse to a single `shipped_simple`
+    // step. country_split.md §6.
+    next: [
+      { id: 'shipped_arrived_destination', countries: ['AE', 'ZA'] },
+      { id: 'shipped_simple', countries: ['SA', 'Others'] },
+    ],
     apply: (o) => ({
       ...o,
       statusId: 'quality_check',
@@ -120,6 +127,25 @@ export const CLAIM_COMPENSATION_NODES = [
       timeline: { ...o.timeline, delivered: '25 May · 3:14 PM' },
       deliveredOn: '2026-05-25',
       deliveredOnLong: 'Monday, 25 May',
+    }),
+  },
+  // Outbound country fork — SA/Others collapse the four shipping sub-statuses
+  // into one "Shipped" step (no detailed tracking; banner copy collapses in
+  // lib/statuses.js). AE/ZA walk the granular chain. country_split.md §6.
+  {
+    id: 'shipped_simple',
+    label: 'Shipped',
+    trigger: 'system',
+    event: 'shipment.shipped',
+    next: ['delivered'],
+    apply: (o) => ({
+      ...o,
+      statusId: 'shipped',
+      subStatusId: null,
+      courier: 'DHL Express',
+      trackingNumber: '25193399',
+      trackingUrl: 'https://www.dhl.com/track',
+      timeline: { ...o.timeline, shipped: '23 May · 11:02 AM' },
     }),
   },
   // ----- Compensation submitted (customer-triggered via ClaimFlow). Forks
