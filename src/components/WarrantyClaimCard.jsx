@@ -30,6 +30,7 @@ import {
   CourierStrip,
   SubStatusItem,
 } from './ReturnShipmentTracking'
+import { countryConfig } from '../lib/countries'
 
 // Tone palette mirrors ClaimCard's so the two card types feel like
 // siblings. Warranty tones: warn while the device is leaving the customer
@@ -115,16 +116,19 @@ export default function WarrantyClaimCard({
               while the device is still inbound: once the return shipment
               exists (`shipBack.awb`) the inbound leg disappears so the
               return shipment is the only detailed tracking on the surface. */}
-          {Boolean(claim.transitSubTimeline?.picked_up) && !claim.shipBack?.awb && (
-            <PickupTransitDetail claim={claim} order={order} />
-          )}
+          {Boolean(claim.transitSubTimeline?.picked_up) &&
+            !claim.shipBack?.awb &&
+            countryConfig(order).detailedTracking && (
+              <PickupTransitDetail claim={claim} order={order} />
+            )}
 
           {/* Return-shipment (Revibe → customer) detailed tracking,
               shared with InvalidClaimCard's paid surface. Surfaces once
               the AWB has been created. */}
-          {Boolean(claim.shipBack?.awb) && (
-            <ReturnShipmentTracking ship={claim.shipBack} />
-          )}
+          {Boolean(claim.shipBack?.awb) &&
+            countryConfig(order).detailedTracking && (
+              <ReturnShipmentTracking ship={claim.shipBack} />
+            )}
 
           {(() => {
             const history = getHistoryEvents(order, 'claim')

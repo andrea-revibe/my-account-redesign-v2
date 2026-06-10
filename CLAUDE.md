@@ -59,6 +59,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 - **History thread.** On layered cards, past events render as compact chips under the hero; tap expands one inline. Derived in `lib/events.js`. `orders.md` §6.
 - **Journey mode.** Opt-in demo (`?journey=<id>`) replaying an order via `JourneyDevPanel`; multi-journey + branching in `JOURNEYS` / `node.next`. Replay panels stack a `JourneyNotificationPanel` (WhatsApp/Email preview); copy is event-keyed data in `data/notifications/*` (logic in `lib/notifications.js`) — one event → one copy bar `variants` (claimRequiresProof). Each entry has a coverage `status` (`live`/`new`/`changed`/`missing`/`silent`-default) → badge + roll-up. `journey_backend_spec.md`.
 - **Sandbox journeys.** Parameter-driven journey variant (`kind: 'sandbox'`, `nodes: []`) with `useEddSandbox` / `EddSandboxPanel`; injects `order.statusBanner` only for SLA-divergence messages. `journey_backend_spec.md`.
+- **Country split.** Orthogonal dimension, not a journey/component fork: `order.country` (`AE`/`ZA`/`SA`/`Others`, default AE) → `countryConfig` flags (`lib/countries.js`) gate shared cards; sequence forks use per-edge `next` country tags (`{id,countries}`) filtered in `validNext`; `CountryPicker` / `?country=` selects it. `country_split.md`.
 
 ## Subagent discipline
 
@@ -99,6 +100,7 @@ Triage by change type — don't blanket-update everything:
 | Guided reset — `lib/devices.js` mapping, `ResetGuideSheet` variants, `Step3DevicePrep` | `docs/output/returns/guided_reset.md` + `CHANGELOG.md` |
 | Warranty / compensation scoping (when wired) | `docs/output/warranties_compensations.md` + `CHANGELOG.md` |
 | Journey mode (`?journey=<id>`), new journeys, branches, real-UI wiring | `docs/output/journey_backend_spec.md` (keep slim — see its **Editing this doc** section) + `CHANGELOG.md` |
+| Country split — `lib/countries.js` flags, country-gated cards, `CountryPicker`, per-edge journey `next` country tags | `docs/output/country_split.md` + `CHANGELOG.md` |
 | Operational state machine (drawio source) | `docs/input/return_flow_*.md` + the `.drawio` source file in lock-step |
 | User-visible copy / style / microcopy only | `CHANGELOG.md` only |
 | Internal refactor, no UX change | Neither |

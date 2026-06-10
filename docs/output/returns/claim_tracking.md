@@ -485,7 +485,7 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 | `invalidClaim.returnShipment.{deliveredOn, deliveredOnLong}` | InvalidClaimCard (delivered state) | Optional long/short delivered date for the green `Delivered on {date}` hero strip; falls back to the date part of `timeline.delivered`, then `estimatedDeliveryLong || estimatedDelivery`. |
 | `invalidClaim.returnShipment.{estimatedDelivery, estimatedDeliveryLong}` | InvalidClaimCard (paid state) | Populates the brand-tone ETA hero. |
 
-`order.country` *(optional, default `'AE'`)* sits at the top level of the order, not inside `claim`. Today no UI branches on it; kept on claim-carrying orders for future country-aware behaviour (the ZA/SA repair-partner track on change of mind, etc.).
+`order.country` *(optional, default `'AE'`)* sits at the top level of the order, not inside `claim`. It now drives the **country split**: `countryConfig(order).detailedTracking` (from `lib/countries.js`) gates the claim inbound-pickup and return-leg `See detailed tracking` dropdowns — hidden for `SA` / `Others`, shown for `AE` / `ZA`. Full model + the recipe for adding further country differences: `docs/output/country_split.md`.
 
 ## 6. UX decisions
 
@@ -543,7 +543,7 @@ src/
 - **PickupFailedCard.** `Edit` link on the pickup-address card is decorative, new AWB / slot are hand-written rather than generated, `Confirm` doesn't persist.
 - **ResetFailedCard.** Submit is local component state only — the guide-completed flag, unlink confirmation, and passcode are never transmitted, never persisted, and the warn-toned "received" view is a visual stub. The unlink walkthrough reuses the device-typed `ResetGuideSheet` remote route (§3.4.1), but the card chrome (confirm toggle + summary) is still iOS-worded — see the Android-branch open question. Auto-cancel countdown is hand-written. Production must encrypt the passcode in transit + at rest, scope visibility to the named technician, and delete it on a short timer once the wipe succeeds.
 - **SLA placeholders.** `CLAIM_SLAS` values are hand-guessed; ops to revise.
-- **`order.country` is unused.** No UI branches on it; future country-aware behaviour will need it.
+- **`order.country` drives the country split (partial).** It now gates the inbound-pickup + return-leg detailed-tracking dropdowns via `countryConfig` (`SA`/`Others` → hidden). Other country-aware behaviour (repair-partner routing, country-varying SLAs) is still future work. See `docs/output/country_split.md`.
 
 ## 9. Open questions
 
@@ -553,6 +553,6 @@ src/
 - **Telemetry hooks.** Production should fire events when (i) an action gate banner / takeover is shown, (ii) an action gate CTA is tapped.
 - **Auto-expand for active claims.** Extend `pickActiveOrderId` to consider `claimProgressIndex` if research shows customers want their active claim opened on land.
 - **Filter chip for claims.** No new filter chip was added for claims — they count toward `in_progress` while active, `delivered` when refunded. Revisit when more than one or two claim cards routinely show at once.
-- **Country-aware transit SLAs.** `in_transit` SLA likely differs domestic vs international. Deferred for the prototype.
+- **Country-aware transit SLAs.** `in_transit` SLA likely differs domestic vs international. Deferred for the prototype — a future capability on the country split (`docs/output/country_split.md` §8), driven by the same `order.country` the detailed-tracking gating already uses.
 - **`ResetFailedCard` Android branch.** The unlink walkthrough now reuses the device-typed `ResetGuideSheet` remote route (§3.4.1), so the Android remote path (Google + Samsung account removal) already renders if the guide opens for an Android device. What's still iOS-only is the surrounding card chrome — the `I've removed this device from my iCloud account` toggle and the `iCloud unlink` row in the `What you sent` summary. Generalise that copy (and resolve `deviceTypeForOrder` ahead of an Android mock) when an Android claim mock exists.
 - **Real auto-cancel + auto-retry behaviour after a failed `ResetFailedCard` submit.** Journey mode models a one-shot retry then a happy re-merge into QC. Production likely needs (a) a real second-attempt countdown with auto-cancel + return-shipment on a second failure, mirroring the invalid-paid branch; (b) a way for QC to flag a third-party-locked device (carrier lock, MDM enrollment) that the customer can't unlink. Deferred until ops surfaces the failure-rate data.

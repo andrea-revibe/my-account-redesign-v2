@@ -1,4 +1,5 @@
 import { RotateCcw } from 'lucide-react'
+import CountryPicker from './CountryPicker'
 
 // Sandbox sibling to JourneyDevPanel — same chrome (fixed bottom-right,
 // w-360, journey-picker chips), but instead of Next-button replay it
@@ -15,6 +16,8 @@ export default function EddSandboxPanel({
   journeys,
   activeJourneyId,
   onSelectJourney,
+  activeCountry,
+  onSelectCountry,
 }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[360px] bg-surface border border-line rounded-2xl shadow-lg p-4 max-h-[90vh] overflow-y-auto">
@@ -38,6 +41,13 @@ export default function EddSandboxPanel({
             )
           })}
         </div>
+      )}
+
+      {onSelectCountry && (
+        <CountryPicker
+          activeCountry={activeCountry}
+          onSelectCountry={onSelectCountry}
+        />
       )}
 
       <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-2">

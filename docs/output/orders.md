@@ -145,7 +145,7 @@ The component owns the whole block (label + pill + reveal). The label and a `rou
 
 **Expanded:**
 
-- Status banner (long form), the **Shipping progress** sub-timeline (shipped only), and the courier card with the "Track" link.
+- Status banner (long form), the **Shipping progress** sub-timeline (shipped only, and **country-gated** — hidden when `countryConfig(order).detailedTracking` is false, i.e. `SA`/`Others`; see `country_split.md`), and the courier card with the "Track" link (always shown — top-level tracking, not detailed).
 - `Order details` collapse with phone, address, and order date.
 - Action row: shipped → `Receipt` + `Get help`; in-flight cancelled → `Get help`.
 - Four-step **Full timeline** at the bottom.
@@ -296,7 +296,7 @@ The orders array (`src/data/orders.js`) is mock data today. Production will swap
 | `deviceOs` *(optional, `'ios' | 'android'`)* | string | Guided-reset OS fallback used only when `product.category_name` is absent; defaults to `'ios'`. See [returns/guided_reset.md](./returns/guided_reset.md). |
 | `currency` | string | Three-letter currency code (e.g. `"AED"`). |
 | `customerName` | string | Recipient's full name. |
-| `country` *(optional, default `'AE'`)* | string | Two-letter country code. Today no UI branches on it; kept for future country-aware behaviour (e.g. the ZA/SA repair-partner returns track in `returns/change_of_mind.md`). |
+| `country` *(optional, default `'AE'`)* | string | Country code (`AE` / `ZA` / `SA` / `Others`). Drives the **country split** — `countryConfig(order).detailedTracking` (`lib/countries.js`) gates the `HeroCard` `See detailed tracking` dropdown (`SA`/`Others` → hidden). Injected on the replayed order from the dev-panel CountryPicker / `?country=` param in journey mode. Model + future-difference recipe: `docs/output/country_split.md`. |
 
 ### 7.2 Status fields
 
@@ -420,7 +420,7 @@ Cancellation, returns-flow, and claim-tracking mocked-vs-prod items live in thei
 
 ## 11. Open questions
 
-- **Domestic vs international sub-status branching.** All shipped orders show all four sub-statuses (arrived in destination country → cleared customs → forwarded to third-party agent → out for delivery). For a domestic UAE shipment, "cleared customs" doesn't apply. Worth adding an `isInternational` flag.
+- **Domestic vs international sub-status branching.** When shown, all four sub-statuses appear (arrived in destination country → cleared customs → forwarded to third-party agent → out for delivery). For a domestic UAE shipment, "cleared customs" doesn't apply. Worth adding an `isInternational` flag — a natural fit for the country-split capability layer (`docs/output/country_split.md`). (The *whole* sub-timeline is already country-gated by `detailedTracking`; this is about which milestones show when it does.)
 - **Real DHL ETA shape.** Today `estimatedDelivery` is a freeform string. Real responses may carry structured date + time windows; `statusSubline` and the collapsed-card UI will need updating.
 - **Derive `delayed` from data, not a flag.** Compare timestamps against an SLA contract and set the warn-tone banner automatically.
 - **Make the date-range dropdown visibly affect the demo.** Either backdate one of the mock orders past 30 days, or add a `Today` preset.

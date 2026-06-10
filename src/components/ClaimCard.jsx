@@ -28,6 +28,7 @@ import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
 import ClaimProgressDots from './ClaimProgressDots'
+import { countryConfig } from '../lib/countries'
 
 // Card chrome is the refund-hero family (see PastOrderCard cancelled
 // branch): left accent strip, eyebrow, state pill, tinted hero, compact
@@ -106,9 +107,10 @@ export default function ClaimCard({
             />
           </div>
 
-          {Boolean(claim.transitSubTimeline?.picked_up) && (
-            <ClaimTransitDetail claim={claim} order={order} />
-          )}
+          {Boolean(claim.transitSubTimeline?.picked_up) &&
+            countryConfig(order).detailedTracking && (
+              <ClaimTransitDetail claim={claim} order={order} />
+            )}
 
           {(() => {
             const history = getHistoryEvents(order, 'claim')

@@ -17,6 +17,7 @@ import {
   statusDescription,
 } from '../lib/statuses'
 import { ProductSummary } from './ProductSummary'
+import { countryConfig } from '../lib/countries'
 
 // Hardcoded to a known-good DHL Express shipment so the demo lands on a real
 // tracking page even though the mock orders use placeholder tracking numbers.
@@ -68,7 +69,7 @@ export default function HeroCard({ order }) {
           <DotTimeline cur={cur} />
         </div>
 
-        {isShipped && (
+        {isShipped && countryConfig(order).detailedTracking && (
           <>
             <button
               onClick={() => setShowDetail((v) => !v)}

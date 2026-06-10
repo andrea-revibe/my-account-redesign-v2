@@ -23,6 +23,7 @@ import ShippingSubTimeline from './ShippingSubTimeline'
 import CancellationSubTimeline from './CancellationSubTimeline'
 import CancelOrderSheet from './CancelOrderSheet'
 import { ProductSummary } from './ProductSummary'
+import { countryConfig } from '../lib/countries'
 
 // Hardcoded so the demo lands on a real DHL test shipment regardless of the
 // placeholder tracking numbers in the mock data.
@@ -111,7 +112,7 @@ export default function OrderCard({ order, defaultExpanded = false, onCancelOrde
 
           {isCancelled && <CancellationSubTimeline order={order} />}
 
-          {isShipped && (
+          {isShipped && countryConfig(order).detailedTracking && (
             <div className="rounded-[14px] border border-line bg-surface p-3.5">
               <h4 className="m-0 mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted">
                 Shipping progress

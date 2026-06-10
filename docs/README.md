@@ -60,6 +60,7 @@ Every doc follows the same shape: `Overview → Flow (mermaid) → State models 
 | [output/returns/guided_reset.md](./output/returns/guided_reset.md) | Step 3 device prep — the `lib/devices.js` category→`os`/`device` mapping, the five `ResetGuideSheet` variants (frames, on-device vs remote routes, final checks), the OS-ambiguous `Tablet` chooser, and the `Step3DevicePrep` launcher + confirm gate |
 | [output/warranties_compensations.md](./output/warranties_compensations.md) | Warranty intake (Step 1 → 7, skips refund-method step) + tracking card (`WarrantyClaimCard` — 6-state repair-and-ship-back pipeline, state-specific heroes, brand-toned tracking dropdown reusing outbound `SHIPPING_SUB_STATUSES`). Plus compensation (still stub) |
 | [output/journey_backend_spec.md](./output/journey_backend_spec.md) | Journey mode (`?journey=<id>`) — single-order replays driving prototype components through one lifecycle. Conventions + recipe for adding a journey. Detailed backend-event spec deferred until data-warehouse column mapping. |
+| [output/country_split.md](./output/country_split.md) | Country split (`AE` / `ZA` / `SA` / `Others`) — the `lib/countries.js` capability layer, the `CountryPicker` / `?country=` selection, the shipped detailed-tracking gating, and the **playbook** for adding future card-design (capability flag) and journey-flow (per-edge `next` country tag) differences |
 | [output/diagrams.md](./output/diagrams.md) | Cross-cutting mermaid diagrams — card-routing decision tree, unified claim-lifecycle (all four pipelines + takeovers), returns submit→seed→project→render data-flow. The connective control flow that spans multiple files; linked from `code_map.md` |
 
 ## Doc tiers & review strategy
@@ -115,6 +116,7 @@ Triage by change type — don't blanket-update everything:
 | Guided reset — device mapping (`lib/devices.js`), `ResetGuideSheet` variants, `Step3DevicePrep` | [output/returns/guided_reset.md](./output/returns/guided_reset.md) + `CHANGELOG.md` |
 | Warranty / compensation scoping (when wired) | [output/warranties_compensations.md](./output/warranties_compensations.md) + `CHANGELOG.md` |
 | Journey mode (`?journey=<id>`), new journeys, branches, real-UI wiring | [output/journey_backend_spec.md](./output/journey_backend_spec.md) (keep slim — see its **Editing this doc** section) + `CHANGELOG.md` |
+| Country split — `lib/countries.js` flags, country-gated cards, `CountryPicker`, per-edge journey `next` country tags | [output/country_split.md](./output/country_split.md) + `CHANGELOG.md` |
 | Operational state machine (drawio source) | [input/](./input/) + the source `.drawio` file in lock-step |
 | User-visible copy / style / microcopy only | `CHANGELOG.md` only |
 | Internal refactor, no UX change | Neither |

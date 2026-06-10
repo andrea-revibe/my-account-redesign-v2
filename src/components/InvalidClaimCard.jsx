@@ -23,6 +23,7 @@ import {
 import { ProductSummary } from './ProductSummary'
 import ClaimProgressDots from './ClaimProgressDots'
 import { ReturnShipmentTracking } from './ReturnShipmentTracking'
+import { countryConfig } from '../lib/countries'
 import TapToFixCta from './TapToFixCta'
 import DeliveryAddressPill from './DeliveryAddressPill'
 
@@ -407,9 +408,10 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
               strip + outbound sub-status drill-down as WarrantyClaimCard's
               ship-back leg). Gated on ship being dispatched — pre-shipping
               there's nothing to track yet. */}
-          {ship.currentStatusId === 'shipped' && (
-            <ReturnShipmentTracking ship={ship} />
-          )}
+          {ship.currentStatusId === 'shipped' &&
+            countryConfig(order).detailedTracking && (
+              <ReturnShipmentTracking ship={ship} />
+            )}
 
           <div className="rounded-[10px] bg-brand-bg/60 border border-brand-bg2 px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
             <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued —{' '}
