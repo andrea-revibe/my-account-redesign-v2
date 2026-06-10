@@ -40,7 +40,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'iPhone 12',
       variant: 'Blue · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Ib4nP9',
@@ -104,7 +104,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'iPhone 12 mini',
       variant: 'Green · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Cf9wMz',
@@ -187,7 +187,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'iPhone 13',
       variant: 'Midnight · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Rs8tLp',
@@ -285,7 +285,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'iPhone 13',
       variant: 'Midnight · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'RETrXc1',
@@ -356,7 +356,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'Samsung Galaxy S22',
       variant: 'Phantom Black · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Ex5lAb',
@@ -436,7 +436,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'iPhone SE (3rd gen)',
       variant: 'Midnight · 64 GB · Excellent',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: '7yL4zx',
@@ -507,7 +507,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'Google Pixel 6',
       variant: 'Sorta Sage · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Q3kP7w',
@@ -592,7 +592,7 @@ export const CLAIM_ORDERS = [
     product: {
       name: 'iPhone 11 Pro',
       variant: 'Space Gray · 256 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Iv7nQk',

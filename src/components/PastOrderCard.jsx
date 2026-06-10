@@ -9,7 +9,6 @@ import {
   Hourglass,
   Receipt,
   Sparkles,
-  Home,
   PackageCheck,
   RotateCcw,
 } from 'lucide-react'
@@ -20,6 +19,7 @@ import KeepOrderSheet from './KeepOrderSheet'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
+import DeliveryAddressPill from './DeliveryAddressPill'
 
 // Compact card for past orders. Delivered keeps its one-row treatment +
 // Download receipt / Raise a claim footer. Cancelled past orders
@@ -86,13 +86,7 @@ function DeliveredHero({ order }) {
       <div className="mt-1 text-[26px] font-bold leading-[1.05] tracking-[-0.01em] text-success">
         {headline}
       </div>
-      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
-        <span>Delivered to</span>
-        <span className="inline-flex items-center rounded-full border bg-surface text-ink border-line font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5">
-          <Home size={12} strokeWidth={2} />
-          Home
-        </span>
-      </div>
+      <DeliveryAddressPill label="Delivered to" address={order.address} />
     </div>
   )
 }
@@ -312,7 +306,7 @@ function RefundHero({ order }) {
   )
 }
 
-function DestinationChip({ destination, accent }) {
+export function DestinationChip({ destination, accent }) {
   const isWallet = destination.kind === 'wallet'
   const isBnpl = destination.kind === 'bnpl'
   const Icon = isWallet ? Wallet : CreditCard

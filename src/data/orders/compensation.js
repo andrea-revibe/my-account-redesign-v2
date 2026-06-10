@@ -39,7 +39,7 @@ export const COMPENSATION_ORDERS = [
     product: {
       name: 'Samsung Galaxy S23',
       variant: 'Phantom Black · 256 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Cmp4Rk',
@@ -94,7 +94,7 @@ export const COMPENSATION_ORDERS = [
     product: {
       name: 'iPhone 12',
       variant: 'Blue · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Cmp9Tz',
@@ -151,7 +151,7 @@ export const COMPENSATION_ORDERS = [
     product: {
       name: 'Google Pixel 7',
       variant: 'Obsidian · 128 GB · Fair',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Cmp2Qx',

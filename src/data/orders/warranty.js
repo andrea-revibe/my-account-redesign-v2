@@ -39,7 +39,7 @@ export const WARRANTY_ORDERS = [
     product: {
       name: 'iPhone 14',
       variant: 'Midnight · 256 GB · Excellent',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Wr8nQp',
@@ -116,7 +116,7 @@ export const WARRANTY_ORDERS = [
     product: {
       name: 'Samsung Galaxy S22',
       variant: 'Phantom Black · 128 GB · Good',
-      image: '/iphone-midnight.png',
+      image: '/iphone-cutout.png',
     },
     claim: {
       claimRef: 'Sx2kLp',

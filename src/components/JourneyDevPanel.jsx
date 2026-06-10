@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronLeft, ChevronRight, ChevronDown, RotateCcw, PackageX } from 'lucide-react'
 import { journeyNotificationCoverage } from '../lib/notifications'
 
 // Fixed bottom-right dev tool — only rendered in journey mode. Sits outside
@@ -28,6 +29,10 @@ export default function JourneyDevPanel({
   const current = nodes.find((n) => n.id === currentNodeId) ?? nodes[currentIndex]
   const coverage = journeyNotificationCoverage(nodes)
   const nexts = validNext()
+  // Revibe-initiated cancellations are surfaced through a grouped picker (see
+  // RevibeCancelGroup) rather than as plain Next buttons — keyed on `revibe`.
+  const revibeNexts = nexts.filter((n) => n.revibe)
+  const normalNexts = nexts.filter((n) => !n.revibe)
   const isComplete = nexts.length === 0
   const stepNumber = currentIndex + 1
   const atStart = currentIndex === 0
@@ -93,7 +98,7 @@ export default function JourneyDevPanel({
           Journey complete
         </div>
       ) : (
-        nexts.map((node) => {
+        normalNexts.map((node) => {
           const isCustomer = node.trigger === 'customer'
           return (
             <button
@@ -125,6 +130,10 @@ export default function JourneyDevPanel({
         })
       )}
 
+      {revibeNexts.length > 0 && (
+        <RevibeCancelGroup nexts={revibeNexts} advance={advance} />
+      )}
+
       <button
         onClick={reset}
         disabled={atStart}
@@ -133,6 +142,47 @@ export default function JourneyDevPanel({
         <RotateCcw size={13} strokeWidth={2} />
         Reset journey
       </button>
+    </div>
+  )
+}
+
+// Grouped picker for Revibe-initiated cancellations: a single "Cancelled by
+// Revibe" button that expands an inline reason list, instead of one Next
+// button per reason cluttering the panel. System-tone (ops action, not a
+// customer "via UI" step). Reason labels come from each node's `revibe.label`,
+// so the panel stays data-driven.
+function RevibeCancelGroup({ nexts, advance }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition bg-ink/[0.04] text-ink border border-line hover:bg-ink/[0.07]"
+      >
+        <PackageX size={15} strokeWidth={2.25} className="shrink-0 text-muted" />
+        <span className="flex-1 text-left">Cancelled by Revibe</span>
+        <ChevronDown
+          size={16}
+          strokeWidth={2.25}
+          className="shrink-0 transition-transform"
+          style={{ transform: open ? 'rotate(180deg)' : 'none' }}
+        />
+      </button>
+      {open && (
+        <div className="mt-1.5 flex flex-col gap-1.5 pl-2">
+          {nexts.map((node) => (
+            <button
+              key={node.id}
+              onClick={() => advance(node.id)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[12.5px] font-medium transition bg-surface text-ink border border-line hover:border-ink/30 hover:bg-ink/[0.03]"
+            >
+              <span className="flex-1 text-left">{node.revibe.label}</span>
+              <ChevronRight size={14} strokeWidth={2.25} className="shrink-0 text-muted" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

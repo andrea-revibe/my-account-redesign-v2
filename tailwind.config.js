@@ -93,6 +93,22 @@ export default {
           '60%': { transform: 'translateX(-3px)' },
           '80%': { transform: 'translateX(3px)' },
         },
+        // RevibeCancellationCard "Browse similar devices" CTA: a magenta glow
+        // that breathes brand→accent, a shine band sweeping left→right, and a
+        // gentle arrow nudge — tying the action to the re-buy offer. All three
+        // are gated behind motion-reduce in the component.
+        ctaGlow: {
+          '0%, 100%': { boxShadow: '0 4px 14px -10px rgba(217,26,122,.5)' },
+          '50%': { boxShadow: '0 7px 18px -8px rgba(217,26,122,.4)' },
+        },
+        ctaShine: {
+          '0%': { left: '-65%' },
+          '40%, 100%': { left: '135%' },
+        },
+        ctaNudge: {
+          '0%, 38%, 100%': { transform: 'translateX(0)' },
+          '44%': { transform: 'translateX(3px)' },
+        },
       },
       animation: {
         slideDown: 'slideDown 0.3s ease',
@@ -100,6 +116,9 @@ export default {
         fadeIn: 'fadeIn 0.2s ease',
         heroPulse: 'heroPulse 1.6s ease-out infinite',
         shakeX: 'shakeX 0.4s ease',
+        ctaGlow: 'ctaGlow 3.8s ease-in-out infinite',
+        ctaShine: 'ctaShine 3.8s ease-in-out infinite',
+        ctaNudge: 'ctaNudge 3.8s ease-in-out infinite',
       },
     },
   },

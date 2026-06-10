@@ -28,7 +28,15 @@ export const CANCELLATION_NODES = [
     label: 'Order placed',
     trigger: 'customer',
     event: 'order.created',
-    next: ['cancel_before_qc_wallet', 'cancel_before_qc_card', 'order_late', 'qc_started'],
+    next: [
+      'cancel_before_qc_wallet',
+      'cancel_before_qc_card',
+      'order_late',
+      'qc_started',
+      'revibe_cancel_unavailable',
+      'revibe_cancel_price',
+      'revibe_cancel_address',
+    ],
     apply: (o) => o,
   },
   {
@@ -240,7 +248,14 @@ export const CANCELLATION_NODES = [
     label: 'Quality check started',
     trigger: 'system',
     event: 'order.quality_check.started',
-    next: ['cancellation_requested_wallet', 'cancellation_requested_card', 'qc_late'],
+    next: [
+      'cancellation_requested_wallet',
+      'cancellation_requested_card',
+      'qc_late',
+      'revibe_cancel_unavailable',
+      'revibe_cancel_price',
+      'revibe_cancel_address',
+    ],
     apply: (o) => ({
       ...o,
       statusId: 'quality_check',
@@ -620,6 +635,114 @@ export const CANCELLATION_NODES = [
       timeline: { ...o.timeline, delivered: '25 May · 3:14 PM' },
       deliveredOn: '2026-05-25',
       deliveredOnLong: 'Monday, 25 May',
+    }),
+  },
+  // ----- Revibe-initiated cancellation (Revibe cancels, customer never asked) -
+  // Three terminal nodes, one per reason, reachable from BOTH `placed`
+  // (created stage) and `qc_started` (quality_check stage). The dev panel
+  // surfaces them through a grouped "Cancelled by Revibe" picker (keyed on the
+  // `revibe` field) rather than as plain Next buttons.
+  //
+  // They are deliberately stage-agnostic: `apply` never touches `statusId` or
+  // `timeline`, so the order keeps whatever stage its predecessor set (created
+  // from `placed`, quality_check from `qc_started`). This lets a single node
+  // per reason serve both entry points — no per-stage duplication.
+  //
+  // Terminal + always `refunded`: a Revibe cancellation is a full, instant,
+  // no-fee refund (the 5% processing fee is customer-initiated only — see
+  // cancellations.md §7.5), so there's no requested→pending journey and no
+  // keep-my-order reversal. Routes straight to RevibeCancellationCard in Past
+  // orders via App.jsx's `cancellationInitiator === 'revibe'` branch.
+  {
+    id: 'revibe_cancel_unavailable',
+    label: 'Cancelled by Revibe — item unavailable',
+    trigger: 'system',
+    event: 'order.cancellation.revibe_initiated',
+    revibe: { reason: 'item_unavailable', label: 'Item not available' },
+    next: [],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationInitiator: 'revibe',
+      cancellationReason: 'item_unavailable',
+      cancellationStatusId: 'refunded',
+      cancellationRef: 'RVB-J0urN1',
+      reBuyOffer: { amount: 50, code: 'COMEBACK50', expiresAt: '30 Jun 2026' },
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '21 May · 2:40 PM',
+      },
+      refund: {
+        subtotal: 1029,
+        amount: 1029,
+        destination: { kind: 'card', label: 'Visa', last4: '4242' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
+    }),
+  },
+  {
+    id: 'revibe_cancel_price',
+    label: 'Cancelled by Revibe — wrong pricing',
+    trigger: 'system',
+    event: 'order.cancellation.revibe_initiated',
+    revibe: { reason: 'price_error', label: 'Wrong pricing' },
+    next: [],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationInitiator: 'revibe',
+      cancellationReason: 'price_error',
+      cancellationStatusId: 'refunded',
+      cancellationRef: 'RVB-J0urN2',
+      reBuyOffer: { amount: 50, code: 'COMEBACK50', expiresAt: '30 Jun 2026' },
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '21 May · 2:40 PM',
+      },
+      // Wallet refund variant — surfaces the brand→accent gradient chip.
+      refund: {
+        subtotal: 1029,
+        amount: 1029,
+        destination: { kind: 'wallet', label: 'Revibe Wallet' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+        fundsAvailable: 'Available now in your wallet',
+      },
+    }),
+  },
+  {
+    id: 'revibe_cancel_address',
+    label: 'Cancelled by Revibe — undeliverable address',
+    trigger: 'system',
+    event: 'order.cancellation.revibe_initiated',
+    revibe: { reason: 'undeliverable_address', label: 'Undeliverable address' },
+    next: [],
+    apply: (o) => ({
+      ...o,
+      state: 'cancelled',
+      cancellationInitiator: 'revibe',
+      cancellationReason: 'undeliverable_address',
+      cancellationStatusId: 'refunded',
+      cancellationRef: 'RVB-J0urN3',
+      reBuyOffer: { amount: 50, code: 'COMEBACK50', expiresAt: '30 Jun 2026' },
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refunded: '21 May · 2:40 PM',
+      },
+      refund: {
+        subtotal: 1029,
+        amount: 1029,
+        destination: { kind: 'card', label: 'Visa', last4: '4242' },
+        breakdown: [
+          { label: 'iPhone 13', amount: 939 },
+          { label: 'Revibe Care', amount: 90 },
+        ],
+      },
     }),
   },
 ]

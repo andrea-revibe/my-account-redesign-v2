@@ -12,6 +12,7 @@ import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
 import ResetFailedCard from './components/ResetFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
+import RevibeCancellationCard from './components/RevibeCancellationCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
 import CancelClaimSheet from './components/CancelClaimSheet'
@@ -574,6 +575,12 @@ export default function App() {
                           }
                         />
                       )
+                    }
+                    if (
+                      o.state === 'cancelled' &&
+                      o.cancellationInitiator === 'revibe'
+                    ) {
+                      return <RevibeCancellationCard key={o.id} order={o} />
                     }
                     return (
                       <PastOrderCard

@@ -8,6 +8,7 @@ covers:
   - src/components/UndoSnackbar.jsx
   - src/components/RefundDetailsSheet.jsx
   - src/components/PastOrderCard.jsx
+  - src/components/RevibeCancellationCard.jsx
   - src/lib/statuses.js
   - src/data/orders/baseline.js
 ---
@@ -24,6 +25,8 @@ Customers can cancel orders themselves from the `created` and `quality_check` st
 - A **reverse** flow — the `I want to keep my order` button on the refund-hero variant of `PastOrderCard`, shown only while the cancellation is still at `requested` (before the refund is accepted). Opens a single-step `KeepOrderSheet` confirm.
 
 Cancelled orders flip the order's `state` to `cancelled` and add a parallel `cancellationStatusId` / `cancellationTimeline` chain. The `statusId` is **not** changed — a cancelled order keeps the `statusId` it had at cancellation, so the timeline still renders where the order was when the customer pulled the plug.
+
+There are **two cancellation worlds**, discriminated by `cancellationInitiator`. **Customer-initiated** (default / absent / `'customer'`) is everything in §2–§5 below — the refund-hero `CancelledOrderCard`. **Revibe-initiated** (`'revibe'`) is the inverse case: Revibe had to cancel and the customer never asked. It renders a separate sibling card (`RevibeCancellationCard`, §11) that leads with an apology + a re-buy discount instead of a refund receipt.
 
 The **stage at cancellation changes the refund path** (modelled in the `cancellation` journey, `src/data/journey.js`). Cancelling **before QC** (`created`) skips supplier review entirely: nothing is packed yet, so the request lands straight on `refund_pending` — a `requested` timestamp is still stamped so the stepper reads Requested ✓ → Pending. Cancelling **at QC** (`quality_check`) waits on an ops review that can be accepted or declined, since the unit may already be packed.
 
@@ -93,7 +96,7 @@ The current prototype does **not** persist cancellation: tapping the final `Canc
 
 ### 2.5 Late + past-promise branch (fee waived + Wallet bonus)
 
-When an order has **blown its SLA at the current stage and is past the initial delivery promise** (the EDD the customer saw at checkout) while still at `created` / `quality_check`, the cancellation terms change: there's no longer a fee to argue about — the promise is already broken. This is signalled by a single order flag `promiseBreached` (see §7.5). `CancelOrderSheet` reads it (`breached = order.promiseBreached === true`) and adjusts all three steps:
+When an order has **blown its SLA at the current stage and is past the initial delivery promise** (the EDD the customer saw at checkout) while still at `created` / `quality_check`, the cancellation terms change: there's no longer a fee to argue about — the promise is already broken. This is signalled by a single order flag `promiseBreached` (see §7.4). `CancelOrderSheet` reads it (`breached = order.promiseBreached === true`) and adjusts all three steps:
 
 - **Original payment** — the 5% processing fee is **waived**. Select-step amount shows the full total back to the card with a `No cancellation fee · 5–10 business days` detail line (no `−fee` line); Confirm shows the full amount, no fee breakdown, and an info strip reading *"No cancellation fee — you're getting the full amount back."*
 - **Revibe Wallet** — full refund **+ a flat AED 100 bonus** (`LATE_PROMISE_WALLET_BONUS`, the cancellation analogue of the issue claim's `ISSUE_WALLET_BONUS`). The Select-step Wallet option renders the bonus as the **same purple `accent` pill** the issue/wrong-device claim uses (`bg-accent/15 text-accent`, `Sparkles` icon, `+AED 100 bonus`) above a success-tone `Full refund + bonus · available instantly` line; Confirm shows `total + 100` with a `Total {total} · +{bonus} bonus` sub-line and a bonus-acknowledging info strip.
@@ -211,7 +214,17 @@ Set only when an earlier cancellation request was rejected (see §5) or reversed
 |---|---|---|
 | `promiseBreached` *(optional)* | boolean | When `true` on a `created` / `quality_check` order, the cancel sheet waives the card processing fee and adds the `LATE_PROMISE_WALLET_BONUS` (AED 100) on the Wallet path (see §2.5). In the prototype it's a stamped flag (journey nodes `order_late` / `qc_late`; static mocks `89720` / `89205`). **Production** derives it from the EDD model — current-stage SLA is late **and** `today > initialPromise` (`src/lib/edd.js` → `orderStatus`). Usually paired with `delayed: true` + a `statusBanner` so `InProgressCard` shows the amber "Taking longer than usual" treatment (same as the Dynamic EDD sandbox's `order_late` / `qc_late`). |
 
-### 7.5 Fields read by the cancel sheet
+### 7.5 Revibe-initiated cancellation fields (optional)
+
+Set only on Revibe-initiated cancellations (§11). On these, `cancellationStatusId` is always `refunded` (the refund is full + instant) and the `refund` object carries **no `fee`** (Revibe waives it — the 5% fee is customer-initiated only).
+
+| Field | Type | Notes |
+|---|---|---|
+| `cancellationInitiator` | `'customer'` \| `'revibe'` | The discriminator. Absent / `'customer'` ⇒ refund-hero `CancelledOrderCard` (§3). `'revibe'` ⇒ `RevibeCancellationCard` (§11). |
+| `cancellationReason` | `'item_unavailable'` \| `'price_error'` \| `'undeliverable_address'` | Revibe-initiated only. Drives the apology icon + explanatory line. `undeliverable_address` also surfaces the delivery address (`DeliveryAddressPill`). |
+| `reBuyOffer` | `{ amount, code, expiresAt, label? }` | The fixed-amount re-buy credit. `amount` is in `order.currency`; `code` is the copyable discount code; `expiresAt` is a human-readable date. Rendered in the offer block. |
+
+### 7.6 Fields read by the cancel sheet
 
 For reference — these fields live on the order itself (see [orders.md](./orders.md) §7) but the cancel sheet's behaviour depends on them:
 
@@ -228,7 +241,8 @@ src/
 ├── components/
 │   ├── CancelOrderSheet.jsx          Two- or three-step bottom sheet (Select → Dissuade? → Confirm)
 │   ├── KeepOrderSheet.jsx            Single-step confirm sheet for reversing an in-flight cancellation
-│   ├── PastOrderCard.jsx             Branches on order.state — cancelled-past variant is the refund-hero card
+│   ├── PastOrderCard.jsx             Branches on order.state — cancelled-past variant is the refund-hero card; exports DestinationChip
+│   ├── RevibeCancellationCard.jsx    Revibe-initiated cancelled card (§11) — apology + re-buy offer + no-fee refund strip
 │   ├── RefundDetailsSheet.jsx        Bottom sheet for the past cancelled card's `View refund details` action
 │   ├── CancellationSubTimeline.jsx   Vertical sub-timeline retained for in-flight cancellations on OrderCard
 │   ├── HistoryThread.jsx             Drives the Cancel rejected chip on layered cards
@@ -254,3 +268,40 @@ src/
 - **Banner copy for cancelled state by refund method.** Once cancellation is wired up, the cancelled-state status banner should vary copy by chosen method (wallet vs original payment) — currently a single placeholder.
 - **Show a "Cancellation history" chip on the refund-hero card.** Today rejected-cancellation chips only appear on layered claim cards. A self-referential cancel-rejected chip on the refund hero would be redundant in normal flow but useful when a customer's first cancel request was rejected and a later one succeeded.
 - **In-flight `Cancel claim` on submitted returns.** Currently no affordance exists for cancelling an in-flight return claim. Likely lives in [returns/claim_tracking.md](./returns/claim_tracking.md) once introduced.
+
+## 11. Revibe-initiated cancellation card (`RevibeCancellationCard`)
+
+The inverse of §3: Revibe had to cancel the order and the customer never asked. The job flips from a refund receipt to an **apology + a reason to come back** — so it's a separate sibling card (`src/components/RevibeCancellationCard.jsx`), not a `PastOrderCard` branch. Discriminated by `cancellationInitiator: 'revibe'` (§7.5); routed in `App.jsx`'s Past-orders cancelled branch **instead of** `CancelledOrderCard`. It's a **terminal** state — full + instant no-fee refund, no `requested → pending` journey, no "keep my order" reversal — so it lives only in **Past orders** (`cancellationStatusId` is always `refunded`). Full design + redlines: [`docs/handoff/revibe-cancellation/design.md`](../handoff/revibe-cancellation/design.md).
+
+### 11.1 Layout (top → bottom)
+
+A single `article` with a 4px **magenta (`accent`) left strip** (one settled tone, ties to the offer). Content is a vertical flex, in order:
+
+1. **Eyebrow** — `Order · #{id}` (same treatment as every card). No header chevron — the card is always-visible; only the refund strip collapses.
+2. **State pill** — neutral "Cancelled by Revibe" (`bg-line-2` / `text-ink-2`, dot). Informational, **not** `danger`.
+3. **Apology block** (net-new) — light-lilac (`#faf8fd`) tile, brand-tinted icon tile, headline "We had to cancel your order", and a reason line closing in a bold **"you've been fully refunded."** The reason drives the icon + lead clause only (§11.2). On `undeliverable_address` it also renders the delivery address via the reused `DeliveryAddressPill`.
+4. **Offer block** (net-new, **subtle** variant) — light `brand-bg` tile on the `accent` promo vocabulary: a "A little something to make it right" eyebrow, the `{currency} {amount} off your next order` headline, a dashed code row with a **copy-to-clipboard** button (swaps to "Copied ✓" for 1800ms), and an `Expires {expiresAt}` line. This + the CTA form the focal forward zone.
+5. **CTA** — full-width **white·magenta** "Browse similar devices" (white fill, 1.5px `accent` border, magenta label + `ArrowRight`). Carries a magenta **glow pulse + shine sweep + arrow nudge** (keyframes `ctaGlow` / `ctaShine` / `ctaNudge` in `tailwind.config.js`), all suppressed under `motion-reduce`. Visual placeholder — no real catalogue route.
+6. **Product row** — reused `ProductSummary` (`tone="light"`) under a "What we cancelled" eyebrow. Unchanged: thumbnail, name, variant, Revibe Care callout, Total paid.
+7. **Refund strip** — collapsible green (`success`) reassurance. Always-visible teaser "{currency} {amount} fully refunded · **no fee**"; expands to a "Sent to" row with the reused `DestinationChip` (`card` → neutral chip; `wallet` → brand→accent gradient) + a "View refund details" button opening `RefundDetailsSheet`. No fee row in the sheet — `refund` carries no `fee`.
+
+### 11.2 Reason → apology copy
+
+The single unified card varies only the icon + lead clause by `cancellationReason`; layout, offer, and CTA are constant. All three close with "This wasn't your fault — **you've been fully refunded.**"
+
+| `cancellationReason` | Icon | Lead clause |
+|---|---|---|
+| `item_unavailable` | `PackageX` | "The seller no longer has this item in stock." |
+| `price_error` | `Tag` | "This item was listed at the wrong price, so we had to cancel the order." |
+| `undeliverable_address` | `Truck` | "Our courier partner can't deliver to your address." (+ delivery-address pill) |
+
+### 11.3 Component reuse
+
+`OrderEyebrow` / `StatePill` treatments mirror `PastOrderCard` (the shapes are tiny and inlined, not imported); `DestinationChip` is **imported** from `PastOrderCard` (now exported); `ProductSummary`, `DeliveryAddressPill`, and `RefundDetailsSheet` are reused as-is. Net-new are only the apology block, the offer/code block, and the CTA's motion CSS.
+
+### 11.4 Mocked vs production
+
+- **Three static mocks** in `src/data/orders/baseline.js`: `89640` (`item_unavailable`, card refund), `89641` (`price_error`, wallet refund), `89642` (`undeliverable_address`, card refund + address). One per reason so the single layout is exercised across all three.
+- **Wired into the Cancellation journey.** Three terminal nodes (`revibe_cancel_unavailable` / `revibe_cancel_price` / `revibe_cancel_address`) in `src/data/journeys/cancellation.js` are reachable from both `placed` (created stage) and `qc_started` (quality_check stage) — the two stages an order can be cancelled by Revibe. They're stage-agnostic (set only the cancellation fields, never `statusId`/`timeline`), terminal, and always `refunded` (full + no fee; `price_error` refunds to Wallet, the others to card). `JourneyDevPanel` surfaces them through a grouped **"Cancelled by Revibe"** dev-panel button (keyed on each node's `revibe: { reason, label }` tag) that expands the three reason options, rather than as plain Next buttons. Replay it via `?journey=cancellation`. Spec: `journey_backend_spec.md`.
+- **Notification is silent.** The journey event `order.cancellation.revibe_initiated` has no comm copy (resolves to the silent placeholder in `JourneyNotificationPanel`). Authoring an apology email/WhatsApp preview is a future step.
+- **Discount engine + catalogue route are placeholders.** `reBuyOffer` is hand-set data; "Browse similar devices" and "Copy" are decorative (no real route/engine), like Search and "Download receipt". Production reads the offer (amount/code/expiry) from a promo backend and the refund (full, no fee) from the cancellation record.

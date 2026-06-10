@@ -4,6 +4,14 @@ export const REVIBE_CARE_ICON =
 const CARE_GLOW =
   'radial-gradient(circle at 105% 0%, rgba(217,26,122,.45), transparent 55%), radial-gradient(circle at 0% 130%, rgba(122,61,211,.5), transparent 50%)'
 
+// §6 follow-up: bigger thumbnail tile + fill-zoom. One code path, two image
+// realities — flip CUTOUT_ART when product.image is a transparent cut-out
+// (PNG with alpha): the tile becomes a brand-tint well and the device floats
+// instead of being cropped. White-bg placeholders use the false path.
+const CUTOUT_ART = true
+const PRODUCT_WELL =
+  'radial-gradient(120% 120% at 50% 12%, rgb(243,237,251) 0%, rgb(236,226,250) 100%)'
+
 // Canonical product line-item shared across every order/claim card. One
 // adaptable treatment with two contexts (light card / dark hero), driven by
 // `tone`. Owns thumbnail, name, variant, the Revibe Care callout, and the
@@ -18,14 +26,22 @@ export function ProductSummary({ order, tone = 'light', className = '' }) {
     <div className={className}>
       <div className="flex items-center gap-3.5">
         <div
-          className={`w-[72px] h-[72px] rounded-[14px] grid place-items-center p-1.5 shrink-0 ${
-            hero ? 'bg-white/[.96]' : 'bg-surface border border-line'
+          className={`relative w-[98px] h-[98px] rounded-[14px] grid place-items-center shrink-0 overflow-hidden ${
+            CUTOUT_ART
+              ? hero
+                ? 'p-1 bg-white/[.10]'
+                : 'p-1 border border-line'
+              : hero
+                ? 'bg-white/[.96]'
+                : 'bg-surface border border-line'
           }`}
+          style={CUTOUT_ART && !hero ? { background: PRODUCT_WELL } : undefined}
         >
           <img
             src={order.product.image}
             alt={order.product.name}
-            className="max-w-full max-h-full object-contain"
+            className="w-full h-full object-contain"
+            style={{ transform: `scale(${CUTOUT_ART ? 1.04 : 1.3})` }}
           />
         </div>
 

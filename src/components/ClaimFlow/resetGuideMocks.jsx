@@ -1063,7 +1063,7 @@ function IntroDevice({ device }) {
           aria-hidden
         />
         <img
-          src="/iphone-midnight.png"
+          src="/iphone-cutout.png"
           alt=""
           className="relative w-[148px] h-[148px] object-contain drop-shadow-xl"
         />
