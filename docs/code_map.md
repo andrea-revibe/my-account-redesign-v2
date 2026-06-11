@@ -29,6 +29,7 @@
 | Return-shipment (Revibe → customer) `See detailed tracking` dropdown — shared by `WarrantyClaimCard` ship-back + `InvalidClaimCard` paid | `components/ReturnShipmentTracking.jsx` (exports `ReturnShipmentTracking` + `CourierStrip`; milestone rows render via `Timeline` dense) | `output/warranties_compensations.md` §2.3.3, `output/returns/claim_tracking.md` §3.3 |
 | **Any** step/milestone timeline (the single component — order status collapsed/hero/in-progress/past, claim/warranty/return progress, shipping + cancellation sub-timelines, transit dropdowns) | `components/Timeline.jsx` (props `{ orientation, tone, steps, currentIndex, stamps, dense, onDark, complete, frozen, toneForStep }`); status lists in `lib/statuses.js` + `lib/claims.js` | `docs/handoff/timeline/design.md`, `output/returns/claim_tracking.md`, `output/orders.md` |
 | Per-country capability flags / country-specific card + journey differences | `lib/countries.js` (`COUNTRIES`, `countryConfig`); selector `components/CountryPicker.jsx`; journey-flow forks via per-edge `next` country tags in `lib/journey.js` (`validNext`) | `output/country_split.md` |
+| Revibe Wallet — balance/ledger derivation, switchable-credit + Move-to-card deduction math, seed history; the `GreetRow` pill + `WalletSheet` | `lib/wallet.js` (`walletLedger`, `walletBalance`, `latestSwitchableCredit`, `cardEquivalentFor`) + `data/wallet.js` (`WALLET_SEED_TRANSACTIONS`); `components/WalletSheet.jsx`; pill in `components/GreetRow.jsx`; state in `App.jsx` (`walletTransfers`) | `output/wallet.md` |
 
 ## Coupling the import graph can't see
 
@@ -65,13 +66,13 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 
 | Module | LOC | In | Exports (line) |
 |---|--:|--:|---|
-| `App.jsx` | 732 | 1 | `App`·100 |
+| `App.jsx` | 806 | 1 | `App`·102 |
 | `components/BnplDisclaimerTooltip.jsx` | 86 | 6 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
 | `components/CancelClaimSheet.jsx` | 155 | 1 | `CancelClaimSheet`·15 |
-| `components/CancelOrderSheet.jsx` | 711 | 2 | `CancelOrderSheet`·19 |
+| `components/CancelOrderSheet.jsx` | 712 | 2 | `CancelOrderSheet`·20 |
 | `components/ChatFab.jsx` | 14 | 1 | `ChatFab`·3 |
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
-| `components/ClaimCard.jsx` | 395 | 1 | `ClaimCard`·42 |
+| `components/ClaimCard.jsx` | 415 | 1 | `ClaimCard`·43 |
 | `components/ClaimDetailsSheet.jsx` | 230 | 2 | `ClaimDetailsSheet`·16 |
 | `components/ClaimFlow/ClaimFlow.jsx` | 405 | 1 | `ClaimFlow`·21 |
 | `components/ClaimFlow/InlineError.jsx` | 16 | 8 | `InlineError`·6 |
@@ -99,7 +100,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/DeliveryAddressPill.jsx` | 44 | 5 | `DeliveryAddressPill`·9 |
 | `components/DocsRejectedCard.jsx` | 500 | 1 | `DocsRejectedCard`·34 |
 | `components/EddSandboxPanel.jsx` | 164 | 1 | `EddSandboxPanel`·10 |
-| `components/GreetRow.jsx` | 39 | 1 | `GreetRow`·3 |
+| `components/GreetRow.jsx` | 41 | 1 | `GreetRow`·3 |
 | `components/Header.jsx` | 50 | 1 | `Header`·6 |
 | `components/HeroCard.jsx` | 214 | 1 | `HeroCard`·30 |
 | `components/HistoryThread.jsx` | 218 | 3 | `HistoryThread`·86 |
@@ -110,17 +111,18 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/KeepOrderSheet.jsx` | 122 | 1 | `KeepOrderSheet`·9 |
 | `components/OrderCard.jsx` | 430 | 1 | `OrderCard`·38 |
 | `components/OrderFilters.jsx` | 151 | 1 | `STATUS_CHIPS`·4, `DATE_RANGES`·11, `OrderFilters`·21 |
-| `components/PastOrderCard.jsx` | 353 | 2 | `PastOrderCard`·30, `DestinationChip`·319 |
+| `components/PastOrderCard.jsx` | 372 | 2 | `PastOrderCard`·31, `DestinationChip`·320 |
 | `components/PickupFailedCard.jsx` | 428 | 1 | `PickupFailedCard`·21 |
 | `components/ProductSummary.jsx` | 152 | 15 | `REVIBE_CARE_ICON`·1, `ProductSummary`·20 |
 | `components/RefundDetailsSheet.jsx` | 165 | 2 | `RefundDetailsSheet`·7 |
 | `components/ResetFailedCard.jsx` | 494 | 1 | `ResetFailedCard`·27 |
 | `components/ReturnShipmentTracking.jsx` | 93 | 2 | `ReturnShipmentTracking`·15, `CourierStrip`·63 |
-| `components/RevibeCancellationCard.jsx` | 215 | 1 | `RevibeCancellationCard`·43 |
+| `components/RevibeCancellationCard.jsx` | 216 | 1 | `RevibeCancellationCard`·43 |
 | `components/TapToFixCta.jsx` | 14 | 4 | `TapToFixCta`·3 |
 | `components/Timeline.jsx` | 264 | 8 | `Timeline`·108 |
 | `components/UndoSnackbar.jsx` | 44 | 1 | `UndoSnackbar`·8 |
-| `components/WalletInfoTooltip.jsx` | 71 | 4 | `REVIBE_WALLET_ICON`·4, `WalletInfoTooltip`·7 |
+| `components/WalletInfoTooltip.jsx` | 71 | 5 | `REVIBE_WALLET_ICON`·4, `WalletInfoTooltip`·7 |
+| `components/WalletSheet.jsx` | 300 | 1 | `WalletSheet`·21 |
 | `components/WarrantyClaimCard.jsx` | 420 | 1 | `WarrantyClaimCard`·51 |
 | `data/journey.js` | 89 | 3 | `INITIAL_ORDER`·28, `JOURNEYS`·30 |
 | `data/journeys/cancellation.js` | 778 | 1 | `CANCELLATION_NODES`·25 |
@@ -139,6 +141,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/orders/claims.js` | 666 | 1 | `CLAIM_ORDERS`·4 |
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
+| `data/wallet.js` | 81 | 1 | `WALLET_SEED_TRANSACTIONS`·21 |
 | `lib/claims.js` | 607 | 12 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `RETURN_CLAIM_STATUSES`·124, `returnClaimProgressIndex`·137, `CLAIM_TRANSIT_SUB_STATUSES`·146, `transitSubProgressIndex`·153, `hasActiveClaim`·160, `isClaimRefunded`·168, `canCancelClaim`·182, `cancelNeedsShipBack`·193, `cancelReturnGate`·205, `isWarrantyDelivered`·225, `isReturnDelivered`·238, `claimPhaseTag`·244, `claimStatusHeadline`·261, `claimStatusSubline`·266, `WARRANTY_CLAIM_STATUSES`·284, `warrantyClaimToneFor`·332, `warrantyClaimProgressIndex`·340, `warrantyClaimPhaseTag`·344, `warrantyClaimStatusHeadline`·363, `warrantyClaimStatusSubline`·368, `REASON_LABELS`·384, `reasonText`·395, `devicePrepText`·403, `CLAIM_TYPE_LABELS`·411, `claimTypeLabel`·418, `claimRequiresProof`·427, `refundMethodLabel`·433, `CLAIM_SLAS`·452, `expectedCompletionFor`·475, `SUB_STATUS_LABELS`·500, `actionGateCopy`·561 |
 | `lib/countries.js` | 32 | 9 | `DEFAULT_COUNTRY`·15, `COUNTRIES`·17, `COUNTRY_CODES`·24, `countryConfig`·28 |
 | `lib/devices.js` | 65 | 3 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
@@ -147,8 +150,9 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `lib/events.js` | 152 | 3 | `getHistoryEvents`·119 |
 | `lib/journey.js` | 112 | 1 | `useJourney`·25 |
 | `lib/notifications.js` | 93 | 2 | `NOTIFICATIONS`·14, `NOTIFICATION_STATUSES`·26, `notificationStatus`·39, `notificationFor`·53, `journeyNotificationCoverage`·83 |
-| `lib/returns.js` | 267 | 5 | `RETURN_WINDOW_DAYS`·4, `RESTOCKING_FEE_RATE`·5, `ISSUE_WALLET_BONUS`·9, `addDays`·36, `startOfDay`·40, `eligibilityFor`·46, `groupOrdersByEligibility`·71, `refundBreakdown`·89, `formatMoney`·135, `formatLongDate`·140, `formatShortDate`·149, `generateClaimRef`·158, `BATTERY_BASELINE_BY_GRADE`·166, `conditionGradeOf`·175, `batteryBaselineFor`·182, `daysSinceDelivery`·193, `assessBattery`·210 |
+| `lib/returns.js` | 272 | 8 | `RETURN_WINDOW_DAYS`·4, `RESTOCKING_FEE_RATE`·5, `CANCELLATION_FEE_RATE`·10, `ISSUE_WALLET_BONUS`·14, `addDays`·41, `startOfDay`·45, `eligibilityFor`·51, `groupOrdersByEligibility`·76, `refundBreakdown`·94, `formatMoney`·140, `formatLongDate`·145, `formatShortDate`·154, `generateClaimRef`·163, `BATTERY_BASELINE_BY_GRADE`·171, `conditionGradeOf`·180, `batteryBaselineFor`·187, `daysSinceDelivery`·198, `assessBattery`·215 |
 | `lib/statuses.js` | 349 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·105, `cancellationStepsFor`·116, `statusDescription`·126, `pickActiveOrderId`·264, `statusHeadline`·277, `statusSubline`·296, `statusIconFor`·325 |
+| `lib/wallet.js` | 247 | 2 | `walletLedger`·89, `walletBalance`·158, `walletCurrency`·166, `latestSwitchableCredit`·175, `cardEquivalentFor`·188 |
 | `main.jsx` | 11 | 0 | _(none)_ |
 
 ### Shared-core consumers (blast radius)
@@ -159,13 +163,14 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 |---|---|
 | `lib/claims.js` | `App.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/InvalidClaimCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/notifications.js` |
 | `lib/countries.js` | `App.jsx`, `components/ClaimCard.jsx`, `components/CountryPicker.jsx`, `components/HeroCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/journey.js`, `lib/statuses.js` |
+| `lib/returns.js` | `components/CancelOrderSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/WalletSheet.jsx`, `lib/wallet.js` |
 | `lib/statuses.js` | `App.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ReturnShipmentTracking.jsx` |
-| `lib/returns.js` | `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx` |
 | `data/journey.js` | `App.jsx`, `lib/eddSandbox.js`, `lib/journey.js` |
 | `data/orders.js` | `App.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/flowReducer.js` |
 | `lib/devices.js` | `components/ClaimFlow/Step3DevicePrep.jsx`, `components/ClaimFlow/flowReducer.js`, `components/ResetFailedCard.jsx` |
 | `lib/events.js` | `components/ClaimCard.jsx`, `components/PastOrderCard.jsx`, `components/WarrantyClaimCard.jsx` |
 | `lib/notifications.js` | `components/JourneyDevPanel.jsx`, `components/JourneyNotificationPanel.jsx` |
+| `lib/wallet.js` | `App.jsx`, `components/WalletSheet.jsx` |
 | `data/journeys/cancellation.js` | `data/journey.js` |
 | `data/journeys/claimChangeOfMind.js` | `data/journey.js` |
 | `data/journeys/claimCompensation.js` | `data/journey.js` |
@@ -181,6 +186,7 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 | `data/orders/claims.js` | `data/orders.js` |
 | `data/orders/compensation.js` | `data/orders.js` |
 | `data/orders/warranty.js` | `data/orders.js` |
+| `data/wallet.js` | `lib/wallet.js` |
 | `lib/edd.js` | `lib/eddSandbox.js` |
 | `lib/eddSandbox.js` | `App.jsx` |
 | `lib/journey.js` | `App.jsx` |
@@ -208,6 +214,7 @@ graph LR
   data_orders_claims_js["data/orders/claims.js"]
   data_orders_compensation_js["data/orders/compensation.js"]
   data_orders_warranty_js["data/orders/warranty.js"]
+  data_wallet_js["data/wallet.js"]
   lib_claims_js["lib/claims.js"]
   lib_countries_js["lib/countries.js"]
   lib_devices_js["lib/devices.js"]
@@ -218,6 +225,7 @@ graph LR
   lib_notifications_js["lib/notifications.js"]
   lib_returns_js["lib/returns.js"]
   lib_statuses_js["lib/statuses.js"]
+  lib_wallet_js["lib/wallet.js"]
   data_journey_js --> data_journeys_initialOrder_js
   data_journey_js --> data_journeys_happyPath_js
   data_journey_js --> data_journeys_cancellation_js
@@ -239,8 +247,10 @@ graph LR
   lib_notifications_js --> data_notifications_index_js
   lib_notifications_js --> lib_claims_js
   lib_statuses_js --> lib_countries_js
+  lib_wallet_js --> lib_returns_js
+  lib_wallet_js --> data_wallet_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 85 modules, 24011 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 88 modules, 24761 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

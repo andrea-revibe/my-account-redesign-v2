@@ -40,7 +40,7 @@ const REASONS = {
   },
 }
 
-export default function RevibeCancellationCard({ order }) {
+export default function RevibeCancellationCard({ order, onOpenWallet }) {
   const [refundOpen, setRefundOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -190,6 +190,7 @@ export default function RevibeCancellationCard({ order }) {
                 <DestinationChip
                   destination={refund.destination}
                   accent={refund.destination.kind === 'wallet'}
+                  onOpenWallet={onOpenWallet}
                 />
               </div>
               <button

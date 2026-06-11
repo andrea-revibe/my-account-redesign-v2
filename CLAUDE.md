@@ -29,7 +29,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 - `src/App.jsx` — page composition + routing to one of eight cards (precedence in the **Card routing** model below). Owns filter state, the in-session `submittedClaims` map projected over `ORDERS`, and journey-mode state from `?journey=<id>`.
 - `src/components/` — one component per file: four baseline order cards (`InProgressCard` / `OrderCard` / `PastOrderCard` / `ClaimCard`), four claim takeover cards (`DocsRejected` / `PickupFailed` / `ResetFailed` / `InvalidClaim`), `WarrantyClaimCard`, the returns flow under `ClaimFlow/`, and shared pieces. Per-card behaviour: `docs/output/returns/claim_tracking.md` + `warranties_compensations.md`.
 - `src/data/` — thin barrels: mock orders (`orders/*`) and journey definitions (`journeys/*`). Field shapes: `orders.md` §7, `cancellations.md` §7, `claim_tracking.md` §5.
-- `src/lib/` — sources of truth (`statuses` / `returns` / `claims` / `events` / `edd` / `eddSandbox` / `journey` / `devices`). Use the *Where is X* table in `code_map.md` to land on the right one.
+- `src/lib/` — sources of truth (`statuses` / `returns` / `claims` / `events` / `edd` / `eddSandbox` / `journey` / `devices` / `countries` / `wallet`). Use the *Where is X* table in `code_map.md` to land on the right one.
 - **Guided reset (Step 3 device prep)** — `src/lib/devices.js` maps `category_name` → two dimensions (`os`, `device`) that select one of five guide variants in `ResetGuideSheet`; the OS-ambiguous `Tablet` is the only manual input (Step 3 Apple/Android chooser). Full spec incl. variants/frames/remote route: `docs/output/returns/guided_reset.md`.
 - `brief/` — source screenshots + design-system reference. `docs/` — see `docs/README.md` for the per-feature doc map (`input/` operational specs, `output/` UI specs).
 
@@ -60,6 +60,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 - **Journey mode.** Opt-in demo (`?journey=<id>`) replaying an order via `JourneyDevPanel`; multi-journey + branching in `JOURNEYS` / `node.next`. Replay panels stack a `JourneyNotificationPanel`; copy is event-keyed data in `data/notifications/*` — one event → one copy unless `variantBy` selects a `variants` set by an order field. Each entry has a coverage `status` (`live`/`new`/`changed`/`missing`/`silent`-default) → badge + roll-up. `journey_backend_spec.md`.
 - **Sandbox journeys.** Parameter-driven journey variant (`kind: 'sandbox'`, `nodes: []`) with `useEddSandbox` / `EddSandboxPanel`; injects `order.statusBanner` only for SLA-divergence messages. `journey_backend_spec.md`.
 - **Country split.** Orthogonal dimension, not a journey/component fork: `order.country` (`AE`/`ZA`/`SA`/`Others`, default AE) → `countryConfig` flags (`lib/countries.js`) gate shared cards; sequence forks use per-edge `next` country tags (`{id,countries}`) filtered in `validNext`; `CountryPicker` / `?country=` selects it. `country_split.md`.
+- **Revibe Wallet.** `GreetRow` pill / card wallet chip → `WalletSheet`; `lib/wallet.js` ledger = seed (`data/wallet.js`) + live refund (`journeyMode ? projectedOrders : []`), live pinned above seed. **Trap:** Move-to-card re-applies the waived deduction (zero for Revibe/compensation), latest refund only — funds-gated, no cascade, undoable. `wallet.md`.
 
 ## Subagent discipline
 
@@ -85,7 +86,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 - **Tailwind name collisions.** `text-{name}` maps to either a fontSize or a color; defining `colors.page` and `fontSize.page` together silently produces white text. We've removed `colors.page`; don't reintroduce it. Same risk applies for any new token name.
 - **Prototype links.** `CourierBanner` hardcodes the DHL Express tracking URL to a known-good test shipment (`tracking-id=3392654392`). Don't template it on `order.trackingNumber` — the demo orders have placeholder numbers that won't resolve.
 - **Date filter is plumbed but inert.** All mock orders fall inside "Last 30 days," so the range dropdown has no visible effect.
-- **Many things are visual placeholders.** Search, Wallet pill balance, profile menu, language toggle, "Download receipt" — all decorative. "Raise a claim" is wired for all four real branches (`change_of_mind`, `issue`, `warranty`, `compensation`). Submit seeds an in-session claim on the order (cleared on refresh, undoable via `UndoSnackbar`) — there's no backend, and seeding always lands on `initiated`. The `WarrantyClaimCard` has two hand-seeded mocks (89610 / 89580) exercising the `under_repair` / `ship_back` heroes; compensation has three (89630 under review, 89605 refunded, 89572 closed-invalid) for the surfaces submit-time seeding can't reach. Per-feature mocked-vs-prod lists in each `docs/output/*.md`.
+- **Many things are visual placeholders.** Search, profile menu, language toggle, "Download receipt" — all decorative. (The Wallet pill is now live — derived balance + `WalletSheet`; see `wallet.md`.) "Raise a claim" is wired for all four real branches (`change_of_mind`, `issue`, `warranty`, `compensation`). Submit seeds an in-session claim on the order (cleared on refresh, undoable via `UndoSnackbar`) — there's no backend, and seeding always lands on `initiated`. The `WarrantyClaimCard` has two hand-seeded mocks (89610 / 89580) exercising the `under_repair` / `ship_back` heroes; compensation has three (89630 under review, 89605 refunded, 89572 closed-invalid) for the surfaces submit-time seeding can't reach. Per-feature mocked-vs-prod lists in each `docs/output/*.md`.
 
 ## Doc update protocol
 
@@ -102,6 +103,7 @@ Triage by change type — don't blanket-update everything:
 | Warranty / compensation scoping (when wired) | `docs/output/warranties_compensations.md` + `CHANGELOG.md` |
 | Journey mode (`?journey=<id>`), new journeys, branches, real-UI wiring | `docs/output/journey_backend_spec.md` (keep slim — see its **Editing this doc** section) + `CHANGELOG.md` |
 | Country split — `lib/countries.js` flags, country-gated cards, `CountryPicker`, per-edge journey `next` country tags | `docs/output/country_split.md` + `CHANGELOG.md` |
+| Revibe Wallet — `lib/wallet.js` ledger/deduction math, `data/wallet.js` seed, `WalletSheet`, `GreetRow` pill, Move-to-card | `docs/output/wallet.md` + `CHANGELOG.md` |
 | Operational state machine (drawio source) | `docs/input/return_flow_*.md` + the `.drawio` source file in lock-step |
 | User-visible copy / style / microcopy only | `CHANGELOG.md` only |
 | Internal refactor, no UX change | Neither |
