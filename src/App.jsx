@@ -337,6 +337,26 @@ export default function App() {
     return false
   }
 
+  // "Submit details" on ResetFailedCard. Mirrors handleConfirmReschedule: in
+  // journey mode it advances the customer-triggered unlock-details node so the
+  // card flips to its "details received" state and the dev panel moves in
+  // lockstep — without resuming QC (the separate system `claim_reset_complete`
+  // "24h passed" step does that). Handles both the first submission and the
+  // retry resubmission with one handler; validNext picks whichever applies.
+  // Returns true when it advances; outside journey mode it returns false and
+  // the card falls back to local state (the standalone reset-failure mock).
+  const handleSubmitResetDetails = (orderId) => {
+    if (!journeyMode || isSandbox) return false
+    const target = ['claim_reset_details_received', 'claim_reset_retry_resubmitted'].find(
+      (id) => journey.validNext().some((n) => n.id === id)
+    )
+    if (target) {
+      journey.advance(target)
+      return true
+    }
+    return false
+  }
+
   // Step 7 "Track this return" — close the flow and signal the matched
   // ClaimCard to mount expanded. Bumping `n` forces the key change.
   const handleTrackClaim = (orderId) => {
@@ -535,6 +555,7 @@ export default function App() {
                           key={o.id}
                           order={o}
                           onRequestCancelClaim={onRequestCancelClaim}
+                          onSubmitResetDetails={handleSubmitResetDetails}
                         />
                       )
                     }

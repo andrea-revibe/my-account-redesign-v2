@@ -721,21 +721,47 @@ export const CLAIM_COM_NODES = [
     label: 'Unlock details received',
     trigger: 'customer',
     event: 'claim.reset.details_received',
-    // Forks: success path re-merges into the QC outcome (refund_issued or
-    // invalid_confirmed), failure path loops once through
-    // claim_reset_retry_failed.
-    next: ['claim_refund_issued', 'claim_invalid_confirmed', 'claim_reset_retry_failed'],
+    // Customer submitted unlink confirmation + passcode (via UI) — the card
+    // flips to its "reset in progress / details received" state, but the claim
+    // hasn't moved yet (resetFailed stays set, tagged with submittedAt). Ops
+    // attempting the wipe is the separate system step below; from there the
+    // reset either completes (claim_reset_complete → QC resumes) or fails
+    // again (claim_reset_retry_failed).
+    next: ['claim_reset_complete', 'claim_reset_retry_failed'],
     apply: (o) => ({
       ...o,
       claim: {
         ...o.claim,
-        subStatusId: undefined,
         actionRequired: undefined,
-        resetFailed: undefined,
+        resetFailed: {
+          ...o.claim.resetFailed,
+          submittedAt: '29 May · 12:48 PM',
+        },
         resetUnlock: {
           at: '29 May · 12:48 PM',
           attempt: 1,
         },
+      },
+    }),
+  },
+  // The "24h passed" system step: ops finished the wipe, so the takeover
+  // clears and quality check resumes (ClaimCard "Under Quality Check"), then
+  // forks to the QC outcome. Shared by the first submission and the retry
+  // resubmission. New event → silent until authored.
+  {
+    id: 'claim_reset_complete',
+    label: '24h passed — reset done',
+    trigger: 'system',
+    event: 'claim.reset.completed',
+    next: ['claim_refund_issued', 'claim_invalid_confirmed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'qc',
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
       },
     }),
   },
@@ -774,16 +800,21 @@ export const CLAIM_COM_NODES = [
     label: 'Updated unlock details received',
     trigger: 'customer',
     // Same customer comm as the first submission — both fire
-    // claim.reset.details_received (attempt distinguishes them).
+    // claim.reset.details_received (attempt distinguishes them). Mirrors the
+    // first submission: keeps resetFailed (adds submittedAt) so the card shows
+    // the "details received" state, then re-merges at the shared
+    // claim_reset_complete ("24h passed") step.
     event: 'claim.reset.details_received',
-    next: ['claim_refund_issued', 'claim_invalid_confirmed'],
+    next: ['claim_reset_complete'],
     apply: (o) => ({
       ...o,
       claim: {
         ...o.claim,
-        subStatusId: undefined,
         actionRequired: undefined,
-        resetFailed: undefined,
+        resetFailed: {
+          ...o.claim.resetFailed,
+          submittedAt: '30 May · 10:22 AM',
+        },
         resetUnlock: {
           at: '30 May · 10:22 AM',
           attempt: 2,
