@@ -7,7 +7,6 @@ import {
   Clock,
   KeyRound,
   Lock,
-  RotateCcw,
   ShieldCheck,
 } from 'lucide-react'
 
@@ -47,7 +46,6 @@ export default function ResetFailedCard({
         passcode={passcode}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
-        onUndo={() => setSubmitted(false)}
       />
     )
   }
@@ -191,7 +189,7 @@ export default function ResetFailedCard({
   )
 }
 
-function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle, onUndo }) {
+function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle }) {
   const claim = order.claim
   const r = claim.resetFailed
   const masked = maskPasscode(passcode)
@@ -251,18 +249,6 @@ function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle, onUndo 
           <DetailsSummary masked={masked} />
 
           <SecurityNote tone="warn" />
-
-          {/* Demo only — production submission is committal once the
-              technician picks up the device. Kept here so reviewers can
-              replay the confirmation flow without reloading. */}
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · replay the demo
-          </button>
         </div>
       )}
     </article>

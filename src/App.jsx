@@ -322,6 +322,21 @@ export default function App() {
     })
   }
 
+  // "Confirm new pickup" on PickupFailedCard. In journey mode this advances
+  // the customer-triggered `claim_pickup_rescheduled` node (so the dev panel
+  // moves in lockstep with the card flipping to its rescheduled state),
+  // guarded by validNext. Returns true when it advances so the card knows the
+  // journey took it; outside journey mode it returns false and the card falls
+  // back to local state (the standalone pickup-failure mock).
+  const handleConfirmReschedule = (orderId) => {
+    if (!journeyMode || isSandbox) return false
+    if (journey.validNext().some((n) => n.id === 'claim_pickup_rescheduled')) {
+      journey.advance('claim_pickup_rescheduled')
+      return true
+    }
+    return false
+  }
+
   // Step 7 "Track this return" — close the flow and signal the matched
   // ClaimCard to mount expanded. Bumping `n` forces the key change.
   const handleTrackClaim = (orderId) => {
@@ -510,6 +525,7 @@ export default function App() {
                           key={o.id}
                           order={o}
                           onRequestCancelClaim={onRequestCancelClaim}
+                          onConfirmReschedule={handleConfirmReschedule}
                         />
                       )
                     }

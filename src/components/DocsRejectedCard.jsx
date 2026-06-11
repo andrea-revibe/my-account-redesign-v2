@@ -8,7 +8,6 @@ import {
   Image as ImageIcon,
   Play,
   Plus,
-  RotateCcw,
   UploadCloud,
   X,
 } from 'lucide-react'
@@ -61,7 +60,6 @@ export default function DocsRejectedCard({
         note={note}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
-        onUndo={() => setSubmitted(false)}
       />
     )
   }
@@ -225,7 +223,7 @@ export default function DocsRejectedCard({
   )
 }
 
-function ResubmittedCard({ order, files, note, expanded, onToggle, onUndo }) {
+function ResubmittedCard({ order, files, note, expanded, onToggle }) {
   const claim = order.claim
   const r = claim.docsRejection
   return (
@@ -309,15 +307,6 @@ function ResubmittedCard({ order, files, note, expanded, onToggle, onUndo }) {
               <div className="text-[12.5px] text-ink leading-snug">{note}</div>
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · edit before review starts
-          </button>
         </div>
       )}
     </article>

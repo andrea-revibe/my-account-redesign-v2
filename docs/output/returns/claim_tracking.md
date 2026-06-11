@@ -197,7 +197,7 @@ When the claim is blocked on a single customer action, the card flips out of `Cl
 | Ops message | Avatar + name + role + timestamp + free-text reason (expanded view) |
 | Action gate | Single primary CTA, danger-red filled |
 | Auto-resolve | `autoCancelAt` (or `autoCloseAt`) — claim auto-cancels/closes if ignored |
-| Undo | Local component state, prototype only (replay-the-demo) |
+| Replay | No in-card undo — the post-commit state is replayed via journey mode (`JourneyDevPanel` Back/Next walks the takeover nodes) |
 
 ### 3.1 DocsRejectedCard — faulty-product evidence re-upload
 
@@ -221,7 +221,7 @@ stateDiagram-v2
 3. **`Note for Revibe Quality`** — optional 280-char free-text textarea; counter goes amber past 90%.
 4. **Footer** — `Cancel claim` (visual stub) + `Resubmit for review`. Resubmit is gated: shows `Add evidence to resubmit` in disabled grey until at least one file is added, then flips to a solid danger-red primary action.
 
-**Submitted state.** Tapping `Resubmit` flips the card in place to a warn-toned variant: amber accent strip, pulsing `Back under review` pill, `Resubmitted` phase tag, `Thanks — we've got your new evidence` headline, body that recaps what the customer sent (3-col grid of the same thumbnails + the quoted note when one was written). Footer button — `Undo · edit before review starts` — returns to the rejected state with files and note preserved.
+**Submitted state.** Tapping `Resubmit` flips the card in place to a warn-toned variant: amber accent strip, pulsing `Back under review` pill, `Resubmitted` phase tag, `Thanks — we've got your new evidence` headline, body that recaps what the customer sent (3-col grid of the same thumbnails + the quoted note when one was written).
 
 **After the claim moves on.** Once Quality has accepted the new evidence and the claim progresses (e.g., to `pickup` or `qc`), the order leaves `DocsRejectedCard` and returns to the regular `ClaimCard`. The resubmission survives as an `Evidence resubmitted` chip inside the `HistoryThread` — a one-line recap (`N new files sent · {date}`) rather than re-surfacing the rejected items or the original ops note. Driven by `claim.proofResubmission`.
 
@@ -232,10 +232,9 @@ Trigger: `claim.pickupFailure` is set. The courier attempted the pickup and it d
 ```mermaid
 stateDiagram-v2
     [*] --> failed: courier reports pickup didn't go through
-    failed --> rescheduled: customer confirms new pickup
+    failed --> rescheduled: customer confirms new pickup (via UI → claim_pickup_rescheduled)
     failed --> [*]: customer ignored → auto-cancel
-    rescheduled --> failed: undo (prototype only)
-    rescheduled --> collected: courier succeeds → ClaimCard resumes
+    rescheduled --> collected: courier collects (claim_picked_up) → ClaimCard resumes
 ```
 
 **Collapsed (failed state).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Pickup failed` label, headline `Pickup didn't go through`, one-line truncated courier quote, countdown strip (`3 days, 18 hours left to reschedule · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
@@ -247,11 +246,9 @@ stateDiagram-v2
 3. **Confirm summary line** — single sentence preview of what confirming creates: courier + scheduled slot (driven by `claim.pickupFailure.nextPickup`).
 4. **Footer** — `Cancel claim` (visual stub) + `Confirm new pickup` (solid danger-red primary action). Confirm is always enabled; the confirmation step itself is the gate.
 
-**Submitted state.** Tapping `Confirm new pickup` flips the card to a warn-toned variant: amber accent strip, pulsing `Pickup rescheduled` pill, `New AWB created` phase tag, `Your new pickup is on the way` headline, body that names the courier + slot + new AWB. Expanded shows a `Your new pickup` summary block (courier, AWB, slot, pickup-from address) followed by an `Undo · replay the demo` button.
+**Submitted (rescheduled) state.** Tapping `Confirm new pickup` flips the card to a warn-toned variant: amber accent strip, pulsing `Pickup rescheduled` pill, `New AWB created` phase tag, `Your new pickup is on the way` headline, body that names the courier + slot + new AWB. Expanded shows a `Your new pickup` summary block (courier, AWB, slot, pickup-from address). This state is **journey-driven** — the button calls `onConfirmReschedule` (`App.jsx`'s `validNext`-gated `handleConfirmReschedule`) which advances the `claim_pickup_rescheduled` node, and the card reads `claim.pickupFailure.rescheduledAt` live so the dev panel and the card stay in lockstep (mirrors `InvalidClaimCard`'s `paidAt`/`declinedAt`). A local-state fallback covers the standalone mock, where there's no journey to advance.
 
-In production rescheduling is committal once a new AWB is issued (rolling it back would require a courier cancellation); the undo is demo-only so reviewers can replay the confirmation flow without reloading the page.
-
-**After the claim moves on.** Once the courier successfully collects under the new AWB and the claim moves to `pickup`, the order leaves `PickupFailedCard` and returns to the regular `ClaimCard`. In production the `claim.pickupFailure` block would clear and the courier success event would surface through the existing claim timeline; no separate history-thread chip is introduced for the failed-then-rescheduled chapter at this stage.
+**After the claim moves on.** Courier collection is a separate step — the `system` `claim_picked_up` event clears `claim.pickupFailure` and moves the claim to `pickup`, so the order leaves `PickupFailedCard` and returns to the regular `ClaimCard` (AE/ZA then walk the detailed transit chain; SA/Others go straight to QC, via the inbound country fork on `claim_picked_up`). No separate history-thread chip is introduced for the failed-then-rescheduled chapter at this stage.
 
 ### 3.3 InvalidClaimCard — inspection invalid → pay return shipping
 
@@ -295,8 +292,6 @@ None of the transitions persist across re-renders or unmounts.
 - Hero: `Claim closed — device not returned` with a one-line explanation that the inspection didn't confirm the issue and the customer declined to cover return shipping.
 - Expanded body: a warn-toned reversal block headlined `Still want your device back?` with the copy-locked CTA `I changed my mind and will pay for the shipment fee` (CreditCard glyph). The verbatim string is fixed by product. Tapping it flips the card into the paid state.
 
-Both terminal branches expose an `Undo · replay the demo` button below the action area.
-
 ### 3.4 ResetFailedCard — Activation Lock still on at QC → remote unlink + passcode
 
 Trigger: `claim.resetFailed` is set. The technician tried to wipe the device during QC and Activation Lock was still on (the customer ticked "factory reset" on Step 3 / Step 7 but didn't actually unlink the device from their iCloud account). The customer must unlink the device remotely and share their device passcode before QC can resume. Same auto-cancel posture as docs-rejected — claim auto-cancels if the customer doesn't act before `autoCancelAt`. The unlink instructions reuse Step 3's `ResetGuideSheet` opened straight onto its **remote route** (the device is locked and already at Revibe, so the on-device path doesn't apply) — see §3.4.1 + [guided_reset.md](guided_reset.md). The guide itself is device-typed (`deviceTypeForOrder`), so it shows the correct walkthrough; the surrounding card chrome (confirmation toggle, `What you sent` summary) is still iOS-worded, so the card is **iOS-only** in practice until an Android claim mock exists.
@@ -322,7 +317,7 @@ stateDiagram-v2
 4. **Security note** — danger-tinted strip with ShieldCheck glyph: "Your passcode is encrypted and used only by our technician during the reset. It's deleted once the device is wiped." Reuses the tone of the hero so it reads as part of the action, not an afterthought.
 5. **Footer** — `Cancel claim` + `Submit details`. Submit is gated: shows `Confirm unlink + passcode` in disabled grey until both the toggle is on and the passcode is complete (6 digits), then flips to a solid danger-red primary action with the ShieldCheck glyph. `Cancel claim` is wired (§2.8): because the device is at Revibe by this point (`qc`), it takes the **ship-back** path — the confirmation sheet hands off to `InvalidClaimCard`'s pay-return-shipping surface (`reason: 'cancelled'`) rather than reverting to delivered.
 
-**Submitted state.** Tapping `Submit details` flips the card in place to a warn-toned variant: amber accent strip, pulsing `Reset in progress` pill, `Details received` phase tag, `Thanks — we'll attempt the reset` headline, body that names the technician and the 24-hour retry window. Expanded shows a `What you sent` summary card (iCloud unlink confirmation row with success check + masked passcode row showing the last two digits — `••••42`) followed by the warn-toned security note and an `Undo · replay the demo` button.
+**Submitted state.** Tapping `Submit details` flips the card in place to a warn-toned variant: amber accent strip, pulsing `Reset in progress` pill, `Details received` phase tag, `Thanks — we'll attempt the reset` headline, body that names the technician and the 24-hour retry window. Expanded shows a `What you sent` summary card (iCloud unlink confirmation row with success check + masked passcode row showing the last two digits — `••••42`) followed by the warn-toned security note.
 
 The masking convention (last two digits visible) is a prototype cue that the value was received and survives the round-trip without ever revealing it back to the customer in plaintext. Production should not echo the passcode at all once submitted.
 

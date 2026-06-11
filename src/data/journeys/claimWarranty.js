@@ -216,6 +216,9 @@ export const CLAIM_WARRANTY_NODES = [
     // Inbound-leg country fork — picked_up already seeds the functional pickup
     // state, so SA/Others skip the three granular transit sub-statuses straight
     // to QC (no detailed tracking). AE/ZA walk them. country_split.md §6.
+    // Also the re-merge point for the pickup-failed detour
+    // (claim_pickup_rescheduled → here): clears any pickupFailure / actionRequired
+    // left by that branch (no-op on the happy path).
     next: [
       { id: 'claim_transit_arrived_origin_hub', countries: ['AE', 'ZA'] },
       { id: 'claim_qc_started', countries: ['SA', 'Others'] },
@@ -225,6 +228,8 @@ export const CLAIM_WARRANTY_NODES = [
       claim: {
         ...o.claim,
         claimStatusId: 'pickup',
+        pickupFailure: undefined,
+        actionRequired: undefined,
         timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
         transitSubStatusId: 'picked_up',
         transitSubTimeline: {
@@ -605,34 +610,26 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Pickup rescheduled',
     trigger: 'customer',
     event: 'claim.pickup.rescheduled',
-    // Re-merges into the transit chain past the (now-redundant)
-    // claim_picked_up node — reschedule itself advances claimStatusId to
-    // 'pickup' and seeds the picked_up scan so the detailed-tracking
-    // dropdown is visible immediately after the customer confirms.
-    // Inbound-leg country fork (same as claim_picked_up) — SA/Others collapse
-    // straight to QC; AE/ZA re-enter the granular transit chain. §6.
-    next: [
-      { id: 'claim_transit_arrived_origin_hub', countries: ['AE', 'ZA'] },
-      { id: 'claim_qc_started', countries: ['SA', 'Others'] },
-    ],
+    // Customer confirmed the new pickup slot (via UI) — the card flips to its
+    // "new pickup on the way" state but the claim itself hasn't moved yet
+    // (pickupFailure stays set, tagged with rescheduledAt). Courier collection
+    // is the separate system event below; re-merges at claim_picked_up, which
+    // clears the failure, advances to 'pickup' and carries the country fork.
+    next: ['claim_picked_up'],
     apply: (o) => ({
       ...o,
       claim: {
         ...o.claim,
-        claimStatusId: 'pickup',
         subStatusId: undefined,
-        pickupFailure: undefined,
         actionRequired: undefined,
         scheduledPickup: {
           courier: 'DHL Express',
           date: 'Thursday, 28 May',
           slot: '10 AM – 12 PM',
         },
-        timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
-        transitSubStatusId: 'picked_up',
-        transitSubTimeline: {
-          ...(o.claim.transitSubTimeline ?? {}),
-          picked_up: '28 May · 10:14 AM',
+        pickupFailure: {
+          ...o.claim.pickupFailure,
+          rescheduledAt: '27 May · 9:15 AM',
         },
       },
     }),

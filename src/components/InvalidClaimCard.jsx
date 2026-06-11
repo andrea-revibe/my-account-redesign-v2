@@ -47,7 +47,7 @@ export default function InvalidClaimCard({
   // Mode is internal demo state, but mirror any matching signal on the
   // order data so a journey-driven advance (paidAt / declinedAt set on
   // claim.invalidClaim) flips the card the same way the in-card buttons
-  // would. The local Undo / Reverse handlers still toggle mode directly —
+  // would. The local Pay / Decline / Reverse handlers toggle mode directly —
   // they're demo affordances that don't write back to the order.
   const initialMode = order.claim.invalidClaim?.declinedAt
     ? 'declined'
@@ -64,7 +64,7 @@ export default function InvalidClaimCard({
 
   // Re-sync mode when the journey advances the order's invalidClaim
   // outcome fields. Only forward transitions are applied — the in-card
-  // Undo / Reverse buttons remain authoritative on local rewinds.
+  // Pay / Decline / Reverse buttons toggle mode directly.
   useEffect(() => {
     if (order.claim.invalidClaim?.declinedAt && mode !== 'declined') {
       setMode('declined')
@@ -94,7 +94,6 @@ export default function InvalidClaimCard({
         order={order}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
-        onUndo={() => setMode('action_needed')}
       />
     )
   }
@@ -106,7 +105,6 @@ export default function InvalidClaimCard({
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
         onReverse={() => setMode('paid')}
-        onUndo={() => setMode('action_needed')}
       />
     )
   }
@@ -263,7 +261,7 @@ export default function InvalidClaimCard({
 // it as a fresh fulfilment trajectory — the only signals it's a
 // post-claim shipment are the eyebrow ("Return from Claim RET-X") and
 // the state pill ("Return shipment").
-function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
+function PaidShipBackCard({ order, expanded, onToggle }) {
   const claim = order.claim
   const ship = claim.invalidClaim.returnShipment
   // Merge the claim's own head (initiated → pickup → qc, collected for QC
@@ -420,18 +418,6 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
               ? 'your device is on its way back because you cancelled the claim.'
               : 'the device is being shipped back as it was inspected.'}
           </div>
-
-          {/* Demo only — production would not let the customer rewind a
-              paid shipment. Kept here so reviewers can replay both
-              branches without reloading. */}
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · replay the demo
-          </button>
         </div>
       )}
     </article>
@@ -442,7 +428,7 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
 // refund, no device coming back. Single reversal CTA carries the
 // verbatim copy requested by product ("I changed my mind and will pay
 // for the shipment fee"); tapping it flips into the paid trajectory.
-function ClaimClosedCard({ order, expanded, onToggle, onReverse, onUndo }) {
+function ClaimClosedCard({ order, expanded, onToggle, onReverse }) {
   const claim = order.claim
   const fee = claim.invalidClaim.returnShipping
 
@@ -526,16 +512,6 @@ function ClaimClosedCard({ order, expanded, onToggle, onReverse, onUndo }) {
               I changed my mind and will pay for the shipment fee
             </button>
           </div>
-
-          {/* Demo only — see InvalidClaimCard header comment. */}
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · replay the demo
-          </button>
         </div>
       )}
     </article>
