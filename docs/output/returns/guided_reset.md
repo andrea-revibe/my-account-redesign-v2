@@ -101,6 +101,8 @@ A device that was never set up has no account linked and nothing to erase, so th
 
 The mapping and all five guide variants are real and exercised through the live `Raise a claim` → Step 3 path; pick any delivered order whose category resolves to the variant you want to see. The Windows `Laptop` fallback to the iPhone guide is a known gap (no Windows guide built). Device mockups in `resetGuideMocks.jsx` are CSS-art placeholders of the real OS screens.
 
+In **journey mode** (`?journey=`), `JourneyDevPanel`'s **Reset guide** chip row (`src/components/ResetGuidePicker.jsx`) opens any variant at its intro directly — running the same `deviceTypeForCategory` resolution (Tablet → Apple/Android chooser, Laptop → iPhone fallback), so the guides are previewable without walking the claim flow.
+
 ## See also
 
 - **Returns flow** mechanics (steps, reducer, soft validation): `docs/output/returns/change_of_mind.md`, `issue.md`.
