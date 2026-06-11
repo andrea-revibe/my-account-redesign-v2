@@ -37,18 +37,6 @@ import { useEddSandbox } from './lib/eddSandbox'
 import { COUNTRY_CODES, DEFAULT_COUNTRY } from './lib/countries'
 import { JOURNEYS } from './data/journey'
 
-const RANGE_DAYS = { '30d': 30, '3m': 90, '1y': 365, all: Infinity }
-
-// Parses 'DD/MM/YYYY HH:MM AM/PM' → epoch ms.
-function parsePlacedAt(s) {
-  const [datePart, timePart, ampm] = s.split(' ')
-  const [d, m, y] = datePart.split('/').map(Number)
-  let [hh, mm] = timePart.split(':').map(Number)
-  if (ampm === 'PM' && hh !== 12) hh += 12
-  if (ampm === 'AM' && hh === 12) hh = 0
-  return new Date(y, m - 1, d, hh, mm).getTime()
-}
-
 // A cancelled order is still "in flight" until the refund actually lands.
 // Requested / refund_pending sit in the open section; refunded drops to past.
 function isInFlightCancellation(order) {
@@ -92,16 +80,8 @@ function matchesStatus(order, status) {
   return true
 }
 
-function matchesRange(order, rangeId, now) {
-  const days = RANGE_DAYS[rangeId] ?? Infinity
-  if (days === Infinity) return true
-  const cutoff = now - days * 24 * 60 * 60 * 1000
-  return parsePlacedAt(order.placedAt) >= cutoff
-}
-
 export default function App() {
   const [activeStatus, setActiveStatus] = useState('all')
-  const [activeRange, setActiveRange] = useState('3m')
   const [claimFlowOrderId, setClaimFlowOrderId] = useState(null)
   // In-session map of orderId → claim seeded by the returns flow on
   // submit. Cleared on refresh — there's no backend. Listed orders are
@@ -431,29 +411,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [journey.currentNodeId, journeyId, journeyMode])
 
-  // Counts are computed off the date-range-filtered set so the chip badges
-  // stay accurate when the user widens / narrows the date window. Journey
-  // mode bypasses the date filter — its single order's placedAt is always
-  // "today" and the demo shouldn't disappear if the system clock drifts.
-  const dateFiltered = useMemo(() => {
-    if (journeyMode) return projectedOrders
-    const now = Date.now()
-    return projectedOrders.filter((o) => matchesRange(o, activeRange, now))
-  }, [journeyMode, projectedOrders, activeRange])
-
+  // Chip-badge counts are computed off the full projected set.
   const counts = useMemo(
     () => ({
-      all: dateFiltered.length,
-      in_progress: dateFiltered.filter(isOpen).length,
-      delivered: dateFiltered.filter(isDeliveredPast).length,
-      cancelled: dateFiltered.filter((o) => o.state === 'cancelled').length,
+      all: projectedOrders.length,
+      in_progress: projectedOrders.filter(isOpen).length,
+      delivered: projectedOrders.filter(isDeliveredPast).length,
+      cancelled: projectedOrders.filter((o) => o.state === 'cancelled').length,
     }),
-    [dateFiltered],
+    [projectedOrders],
   )
 
   const filtered = useMemo(
-    () => dateFiltered.filter((o) => matchesStatus(o, activeStatus)),
-    [dateFiltered, activeStatus],
+    () => projectedOrders.filter((o) => matchesStatus(o, activeStatus)),
+    [projectedOrders, activeStatus],
   )
 
   const activeId = useMemo(() => pickActiveOrderId(filtered), [filtered])
@@ -504,8 +475,6 @@ export default function App() {
         <OrderFilters
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
-          activeRange={activeRange}
-          onRangeChange={setActiveRange}
           counts={counts}
         />
 

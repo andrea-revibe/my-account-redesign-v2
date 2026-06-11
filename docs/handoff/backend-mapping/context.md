@@ -136,7 +136,7 @@ There is **no `delivered` sub-status** — when the package is delivered, the or
 | Delay flag | `delayed` (bool) | Optional. Flips banner tone to warn-amber. |
 | Per-stage timestamps | `timeline.created`, `timeline.quality_check`, `timeline.shipped`, `timeline.delivered` | One timestamp per stage entered. |
 | Per-sub-stage timestamps | `subTimeline.arrived_destination`, `subTimeline.cleared_customs`, `subTimeline.forwarded_to_agent`, `subTimeline.out_for_delivery` | |
-| Order placed (machine) | `placedAt` | DD/MM/YYYY HH:MM AM/PM — used for date-range filter. |
+| Order placed (machine) | `placedAt` | DD/MM/YYYY HH:MM AM/PM — canonical machine date. |
 | Order placed (human) | `placedAtFull` | E.g. "28 Apr 2026 · 2:15 PM". |
 | Delivered date (machine) | `deliveredOn` | ISO `YYYY-MM-DD`. |
 | Delivered date (human) | `deliveredOnLong` | E.g. "Friday, 8 May". |
@@ -469,7 +469,7 @@ Evidence uploads (`issueDetails.attachmentName`) need a file store. Today the pr
 ### 6.9 Things that are decorative in the prototype
 
 If a question is about one of these, the answer is **"not wired to the backend in the prototype"** — don't infer requirements from them:
-- Search bar, filter chips beyond "Last 30 days"
+- Search bar
 - Wallet pill balance (decorative)
 - Profile menu, language toggle
 - "Download receipt"
