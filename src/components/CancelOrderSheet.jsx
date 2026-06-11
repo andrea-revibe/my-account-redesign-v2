@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, ChevronLeft, Info, ShieldCheck, Sparkles } from 'lucide-react'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
 import { REVIBE_CARE_ICON } from './ProductSummary'
+import { CANCELLATION_FEE_RATE } from '../lib/returns'
 
 // Statuses where the dissuade screen fires on the original-payment path.
 // At these stages the order hasn't shipped yet, so the ship-deadline fee
@@ -50,7 +51,7 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
   // Late + past-promise orders get a full refund (fee waived) plus a flat
   // Wallet bonus on the store-credit path.
   const breached = order.promiseBreached === true
-  const fee = breached ? 0 : Math.round(total * 0.05 * 100) / 100
+  const fee = breached ? 0 : Math.round(total * CANCELLATION_FEE_RATE * 100) / 100
   const refundOriginal = Math.round((total - fee) * 100) / 100
   const walletBonus = breached ? LATE_PROMISE_WALLET_BONUS : 0
   const walletTotal = total + walletBonus

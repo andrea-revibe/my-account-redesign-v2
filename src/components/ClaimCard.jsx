@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   Wallet,
@@ -44,6 +45,7 @@ export default function ClaimCard({
   defaultExpanded = false,
   openSignal = 0,
   onRequestCancelClaim,
+  onOpenWallet,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -84,7 +86,7 @@ export default function ClaimCard({
           </span>
         </div>
         <StatePill claim={claim} tone={tone} />
-        <ClaimHero order={order} claim={claim} tone={tone} />
+        <ClaimHero order={order} claim={claim} tone={tone} onOpenWallet={onOpenWallet} />
         <ProductSummary order={order} />
       </button>
 
@@ -179,7 +181,7 @@ function StatePill({ claim, tone }) {
   )
 }
 
-function ClaimHero({ order, claim, tone }) {
+function ClaimHero({ order, claim, tone, onOpenWallet }) {
   const t = TONE[tone]
   const phase = claimPhaseTag(claim.claimStatusId)
   const isRefunded = claim.claimStatusId === 'refund_credited'
@@ -234,7 +236,7 @@ function ClaimHero({ order, claim, tone }) {
           </div>
           <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-2">
             <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
-            <DestinationChip claim={claim} order={order} accent={isWallet} />
+            <DestinationChip claim={claim} order={order} accent={isWallet} onOpenWallet={onOpenWallet} />
           </div>
         </div>
         {claim.expectedRefund ? (
@@ -293,7 +295,7 @@ function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText }) {
   )
 }
 
-function DestinationChip({ claim, order, accent }) {
+function DestinationChip({ claim, order, accent, onOpenWallet }) {
   const isWallet = claim.refundMethod === 'wallet'
   const Icon = isWallet ? Wallet : CreditCard
   const label = refundMethodLabel(claim, order)
@@ -302,10 +304,28 @@ function DestinationChip({ claim, order, accent }) {
   const tones = accent
     ? 'bg-gradient-to-r from-brand to-accent text-white border-transparent'
     : 'bg-surface text-ink border-line'
+  const base = `inline-flex items-center rounded-full border font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5 ${tones}`
+  // Wallet destination → tap to open the Revibe Wallet ledger. stopPropagation
+  // so it doesn't toggle the enclosing card-header button.
+  if (isWallet && onOpenWallet) {
+    return (
+      <button
+        type="button"
+        aria-label="Open Revibe Wallet"
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenWallet()
+        }}
+        className={`${base} hover:brightness-110 active:scale-[0.98] transition`}
+      >
+        <Icon size={12} strokeWidth={2} />
+        {label}
+        <ChevronRight size={13} strokeWidth={2.25} className="-mr-0.5 opacity-85" />
+      </button>
+    )
+  }
   return (
-    <span
-      className={`inline-flex items-center rounded-full border font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5 ${tones}`}
-    >
+    <span className={base}>
       <Icon size={12} strokeWidth={2} />
       {label}
       {showBnplTooltip && (

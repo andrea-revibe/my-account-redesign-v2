@@ -42,16 +42,26 @@ export function notificationStatus(event) {
   return raw.status ?? 'live'
 }
 
+// Pick the variant key for an entry. `variantBy` names a field on the live
+// order to read (e.g. 'cancellationReason'); absent it, fall back to the claim
+// proof split.
+function variantKey(raw, order) {
+  if (raw.variantBy) return order?.[raw.variantBy]
+  return claimRequiresProof(order?.claim) ? 'proof' : 'no_proof'
+}
+
 export function notificationFor(event, order) {
   const raw = NOTIFICATIONS[event]
   const status = notificationStatus(event)
   if (!raw) return { status, whatsapp: null, email: null }
-  // A few events (today only `claim.created`) carry per-claim-type variants:
-  // proof claims go into review, change-of-mind jumps to pickup. All other
-  // events resolve straight to their single copy.
-  const entry = raw.variants
-    ? raw.variants[claimRequiresProof(order?.claim) ? 'proof' : 'no_proof']
-    : raw
+  // Some events carry variants selected by a discriminator on the live order.
+  // The axis is named by `variantBy`: e.g. `cancellationReason` picks the
+  // Revibe-cancellation apology by reason (item_unavailable / price_error /
+  // undeliverable_address). The default axis (no `variantBy`) is the claim
+  // proof split (today only `claim.created`): proof claims go into review,
+  // change-of-mind jumps to pickup. Events without `variants` resolve to their
+  // single copy.
+  const entry = raw.variants ? raw.variants[variantKey(raw, order)] : raw
   if (!entry || (!entry.whatsapp && !entry.email)) {
     return { status, whatsapp: null, email: null }
   }

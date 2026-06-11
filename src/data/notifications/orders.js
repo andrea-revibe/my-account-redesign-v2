@@ -20,30 +20,96 @@ export const ORDER_NOTIFICATIONS = {
   'order.created': {
     status: 'live',
     whatsapp:
-      "Hi 👋 Your Revibe order is confirmed. We'll let you know the moment it's on the move — track it anytime in My Account.",
+      "Thank you for choosing Revibe! 🙌🏼 We received your order and soon we will start the quality check process. Please notice that our shipping time is 2 to 4 working days, so the expected delivery date for your device is by “today + 4 WD”. We will keep updating you during the process but if you want to see your order or create any request, please access to myaccount.",
     email: {
-      subject: 'Your Revibe order is confirmed 🎉',
-      body: "Thanks for shopping with Revibe! We've received your order and our team is getting it ready. We'll be in touch once it passes quality check and ships.",
+      subject: 'Thank you for choosing Revibe! 🙌🏼',
+      body: "We received your order and soon we will start the quality check process. Please notice that our shipping time is 2 to 4 working days, so the expected delivery date for your device is by “today + 4 WD”. We will keep updating you during the process but if you want to see your order or create any request, please access to myaccount.",
       screenshot: '/emails/orders/order-confirmed.png',
     },
   },
 
   'order.quality_check.started': {
     whatsapp:
-      "Your Revibe device is now in quality check ✅ Every device is inspected and certified before it ships. We'll update you the moment it's on its way.",
+      "Good news! Your order is being processed 😀 Your device is being checked by our experts! As soon as they give us green light, we will ship the device to you! Estimated arrival time: “today + 2 WD” We will keep updating you during the process but if you want to track your order, you can always do it from here:",
     email: {
-      subject: 'Your device is in quality check',
-      body: "Your order has reached our quality check stage. Our technicians are inspecting and certifying your device to Revibe standards. You'll get another update as soon as it ships.",
-      screenshot: '/emails/orders/quality-check.png',
+      subject: 'Good news! Your order is being processed 😀',
+      body: "Your device is being checked by our experts! As soon as they give us green light, we will ship the device to you! Estimated arrival time: “today + 2 WD” We will keep updating you during the process but if you want to track your order, you can always do it from here:",
+      screenshot: '/emails/orders/at-quality-check.png',
+    },
+  },
+
+  'order.cancellation.revibe_initiated': {
+    variantBy:'cancellationReason',
+    variants: {
+      item_unavailable: {
+        whatsapp:
+          "We are sorry! We are sorry to inform you that our seller couldn't ship the order and we have been forced to cancel it. The refund has been processed to your original payment method. Please note that it might take up to 7 days to reflect in your bank account depending in your personal bank. Please find a discount code that you can use in case you want to purchase a new device with us!",
+        email: {
+          subject: 'We are sorry!',
+          body: "We are sorry to inform you that our seller couldn't ship the order and we have been forced to cancel it. The refund has been processed to your original payment method. Please note that it might take up to 7 days to reflect in your bank account depending in your personal bank. Please find a discount code that you can use in case you want to purchase a new device with us!",
+          screenshot: '/emails/orders/we-are-sorry-not-available.png',
+        },
+      },
+      price_error: {
+        whatsapp:
+          "We are sorry! We are sorry to inform you that your order had a pricing issue in our website and we have been forced to cancel the order. The refund has been processed to your original payment method. Please note that it might take up to 7 days to reflect in your bank account depending in your personal bank. Please find a discount code that you can use in case you want to purchase a new device with us!",
+        email: {
+          subject: 'We are sorry!',
+          body: "We are sorry to inform you that your order had a pricing issue in our website and we have been forced to cancel the order. The refund has been processed to your original payment method. Please note that it might take up to 7 days to reflect in your bank account depending in your personal bank. Please find a discount code that you can use in case you want to purchase a new device with us!",
+          screenshot: '/emails/orders/we-are-sorry-pricing.png',
+        },
+      },
+      undeliverable_address: {
+        whatsapp:
+          "There was an issue with your shipping address! We are sorry to inform you that we canceled your order because our courier partner can’t deliver in your current address. The refund has been processed to your original payment method. Please note that it might take up to 7 days to reflect in your bank account depending in your personal bank. Please find a discount code that you can use in case you have another address where we can deliver and you want to purchase a new device with us!",
+        email: {
+          subject: 'There was an issue with your shipping address!',
+          body: "We are sorry to inform you that we canceled your order because our courier partner can’t deliver in your current address. The refund has been processed to your original payment method. Please note that it might take up to 7 days to reflect in your bank account depending in your personal bank. Please find a discount code that you can use in case you have another address where we can deliver and you want to purchase a new device with us!",
+          screenshot: '/emails/orders/we-are-sorry-remote-area.png',
+        },
+      },
+    },
+  },
+
+  'order.cancellation.requested': {
+    variantBy:'statusId',
+    variants: {
+      created: {
+        status: 'missing',
+        whatsapp:
+          "Your refund is being processed!",
+        email: {
+          subject: 'Your refund is being processed!',
+          body: "",
+          screenshot: '/emails/orders/missing.png',
+        },
+      },
+      quality_check: {
+        whatsapp:
+          "We received your cancellation request! We have successfully received your cancellation request and will do our best to cancel it. We cannot guarantee that cancellation will be accepted as our sellers might have already shipped the product. We will get back to you in the next 24 working hours. Estimated resolution date: “today () + 2 WD”",
+        email: {
+          subject: 'We received your cancellation request!',
+          body: "We have successfully received your cancellation request and will do our best to cancel it. We cannot guarantee that cancellation will be accepted as our sellers might have already shipped the product. We will get back to you in the next 24 working hours. Estimated resolution date: “today () + 2 WD”",
+          screenshot: '/emails/orders/to-be-canceled.png',
+        },
+      },
+    },
+  },
+
+    'order.cancellation.declined': {
+    whatsapp:
+      "Your order is on the way! We are sorry to inform you that we couldn't cancel the order as our seller already shipped it! Remember that with Revibe you have 10 days return policy once you receive your device!",
+    email: {
+      subject: 'Your order is on the way!',
+      body: "We are sorry to inform you that we couldn't cancel the order as our seller already shipped it! Remember that with Revibe you have 10 days return policy once you receive your device!",
+      screenshot: '/emails/orders/already-shipped.png',
     },
   },
 
   // --- Cancellation + order refund (scaffold) -----------------------------
   // Not yet authored — add entries here as the cancellation journey's
   // notifications are defined. Available events:
-  //   'order.cancellation.requested'
   //   'order.cancellation.accepted'
-  //   'order.cancellation.declined'
   //   'order.cancellation.reverted'
   //   'order.refund.completed'
   //   'order.sla.breached'

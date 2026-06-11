@@ -20,8 +20,10 @@ import UndoSnackbar from './components/UndoSnackbar'
 import JourneyDevPanel from './components/JourneyDevPanel'
 import JourneyNotificationPanel from './components/JourneyNotificationPanel'
 import EddSandboxPanel from './components/EddSandboxPanel'
+import WalletSheet from './components/WalletSheet'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
+import { walletLedger, walletBalance, walletCurrency } from './lib/wallet'
 import {
   hasActiveClaim,
   isClaimRefunded,
@@ -130,6 +132,11 @@ export default function App() {
   // changes → it remounts with defaultExpanded={true} even if the same
   // orderId was tracked previously (e.g. journey replay).
   const [autoOpenClaim, setAutoOpenClaim] = useState({ orderId: null, n: 0 })
+  // Revibe Wallet — opened from the GreetRow pill. `walletTransfers` is the
+  // in-session map of credit txId → true for credits the customer has moved
+  // to their card (mirrors submittedClaims; cleared on refresh, undoable).
+  const [walletOpen, setWalletOpen] = useState(false)
+  const [walletTransfers, setWalletTransfers] = useState({})
 
   // Journey mode — sourced from ?journey=<id> URL param. Replaces ORDERS
   // with a single replayed order driven by the JourneyDevPanel. Mutually
@@ -343,6 +350,19 @@ export default function App() {
     setAutoOpenClaim((prev) => ({ orderId, n: prev.n + 1 }))
   }
 
+  // Move the latest switchable Wallet credit to the order's original card.
+  // Records the transfer in-session, closes the sheet, and surfaces the undo
+  // snackbar (which keys off txId for this kind, not orderId).
+  const handleMoveToCard = (txId) => {
+    setWalletTransfers((prev) => ({ ...prev, [txId]: true }))
+    setWalletOpen(false)
+    setPendingUndo({ kind: 'wallet_transfer', txId, message: 'Moved to card' })
+  }
+
+  // Open the wallet ledger — from the GreetRow pill and from the "Revibe
+  // Wallet" refund-destination chip on the claim/cancellation cards.
+  const openWallet = () => setWalletOpen(true)
+
   const projectedOrders = useMemo(() => {
     // Overlay the in-session cancel state on a (possibly submitted-claim)
     // order: a clean cancel strips the claim; a post-collection cancel swaps
@@ -399,6 +419,15 @@ export default function App() {
     }
     setCancelledClaims(drop)
     setShipBackCancels(drop)
+    // Wallet transfers key off the credit's txId (cancel:<id> / claim:<id>),
+    // so a Move-to-card doesn't leak across replays/resets of this order.
+    setWalletTransfers((prev) => {
+      const keys = [`cancel:${id}`, `claim:${id}`].filter((k) => prev[k])
+      if (keys.length === 0) return prev
+      const next = { ...prev }
+      keys.forEach((k) => delete next[k])
+      return next
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [journey.currentNodeId, journeyId, journeyMode])
 
@@ -446,6 +475,21 @@ export default function App() {
   )
   const past = filtered.filter((o) => !isOpen(o))
 
+  // Wallet ledger = curated seed history (data/wallet.js) + the live in-context
+  // refund. In journey mode that's the replayed order's wallet refund (so a
+  // cancellation/return journey reaching a refunded-to-wallet node surfaces in
+  // the ledger); in the static demo there's no live order context — the seed
+  // is the whole history (we don't auto-sum every order's refund). The only
+  // in-session mutation is `walletTransfers` (credits moved to a card).
+  const walletData = useMemo(() => {
+    const ledger = walletLedger(journeyMode ? projectedOrders : [], walletTransfers)
+    return {
+      ledger,
+      balance: walletBalance(ledger),
+      currency: walletCurrency(ledger),
+    }
+  }, [journeyMode, projectedOrders, walletTransfers])
+
   return (
     <div className="min-h-full flex justify-center">
       <div className="w-full max-w-mobile bg-canvas shadow-sm relative pb-24">
@@ -453,6 +497,9 @@ export default function App() {
         <GreetRow
           totalOrders={counts.all}
           activeOrders={counts.in_progress}
+          creditsAmount={walletData.balance}
+          currency={walletData.currency}
+          onOpenWallet={openWallet}
         />
         <OrderFilters
           activeStatus={activeStatus}
@@ -536,6 +583,7 @@ export default function App() {
                             autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
                           }
                           onRequestCancelClaim={onRequestCancelClaim}
+                          onOpenWallet={openWallet}
                         />
                       )
                     }
@@ -545,6 +593,7 @@ export default function App() {
                           key={o.id}
                           order={o}
                           onKeep={handleKeepOrder}
+                          onOpenWallet={openWallet}
                         />
                       )
                     }
@@ -603,6 +652,7 @@ export default function App() {
                           openSignal={
                             autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
                           }
+                          onOpenWallet={openWallet}
                         />
                       )
                     }
@@ -610,13 +660,20 @@ export default function App() {
                       o.state === 'cancelled' &&
                       o.cancellationInitiator === 'revibe'
                     ) {
-                      return <RevibeCancellationCard key={o.id} order={o} />
+                      return (
+                        <RevibeCancellationCard
+                          key={o.id}
+                          order={o}
+                          onOpenWallet={openWallet}
+                        />
+                      )
                     }
                     return (
                       <PastOrderCard
                         key={o.id}
                         order={o}
                         onRaiseClaim={setClaimFlowOrderId}
+                        onOpenWallet={openWallet}
                       />
                     )
                   })}
@@ -655,11 +712,28 @@ export default function App() {
           onClose={() => setCancelClaimOrderId(null)}
         />
       )}
-      {claimFlowOrderId === null && cancelClaimOrderId === null && pendingUndo && (
+      <WalletSheet
+        open={walletOpen}
+        ledger={walletData.ledger}
+        balance={walletData.balance}
+        currency={walletData.currency}
+        onMoveToCard={handleMoveToCard}
+        onClose={() => setWalletOpen(false)}
+      />
+      {claimFlowOrderId === null &&
+        cancelClaimOrderId === null &&
+        !walletOpen &&
+        pendingUndo && (
         <UndoSnackbar
           message={pendingUndo.message}
           onUndo={() => {
-            if (pendingUndo.kind === 'cancel') {
+            if (pendingUndo.kind === 'wallet_transfer') {
+              setWalletTransfers((prev) => {
+                const next = { ...prev }
+                delete next[pendingUndo.txId]
+                return next
+              })
+            } else if (pendingUndo.kind === 'cancel') {
               setCancelledClaims((prev) => {
                 const next = { ...prev }
                 delete next[pendingUndo.orderId]
@@ -678,7 +752,7 @@ export default function App() {
         />
       )}
       {journeyMode && !isSandbox && (
-        <div className="fixed bottom-4 right-4 z-50 w-[400px] flex flex-col gap-3">
+        <div className="fixed bottom-4 right-4 z-50 w-[400px] max-h-[calc(100vh-2rem)] overflow-y-auto flex flex-col gap-3">
           <JourneyNotificationPanel
             event={
               journey.nodes.find((n) => n.id === journey.currentNodeId)?.event

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   ChevronDown,
+  ChevronRight,
   Check,
   Download,
   AlertTriangle,
@@ -27,9 +28,9 @@ import DeliveryAddressPill from './DeliveryAddressPill'
 // (requested / refund_pending / refunded) render the refund-hero card,
 // which leads with the refund amount and destination rather than the
 // fulfilment journey.
-export default function PastOrderCard({ order, onRaiseClaim, onKeep }) {
+export default function PastOrderCard({ order, onRaiseClaim, onKeep, onOpenWallet }) {
   if (order.state === 'cancelled')
-    return <CancelledOrderCard order={order} onKeep={onKeep} />
+    return <CancelledOrderCard order={order} onKeep={onKeep} onOpenWallet={onOpenWallet} />
   return <DeliveredOrderCard order={order} onRaiseClaim={onRaiseClaim} />
 }
 
@@ -122,7 +123,7 @@ const TONE = {
   success: { text: 'text-success', bg: 'bg-success', softBg: 'bg-success-bg', softText: 'text-success', border: 'border-[#c6ebd9]' },
 }
 
-function CancelledOrderCard({ order, onKeep }) {
+function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
   const [expanded, setExpanded] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [keepOpen, setKeepOpen] = useState(false)
@@ -155,7 +156,7 @@ function CancelledOrderCard({ order, onKeep }) {
           </span>
         </div>
         <StatePill cancellationStatusId={order.cancellationStatusId} />
-        <RefundHero order={order} />
+        <RefundHero order={order} onOpenWallet={onOpenWallet} />
         <ProductSummary order={order} />
       </button>
 
@@ -249,7 +250,7 @@ function StatePill({ cancellationStatusId }) {
   )
 }
 
-function RefundHero({ order }) {
+function RefundHero({ order, onOpenWallet }) {
   const tone = toneFor(order.cancellationStatusId)
   const t = TONE[tone]
   const isRefunded = order.cancellationStatusId === 'refunded'
@@ -297,7 +298,7 @@ function RefundHero({ order }) {
       </div>
       <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
         <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
-        <DestinationChip destination={dest} accent={isWallet} />
+        <DestinationChip destination={dest} accent={isWallet} onOpenWallet={onOpenWallet} />
       </div>
       {order.refund.bonus > 0 && (
         <div className="mt-2 text-[11.5px] text-accent inline-flex items-center gap-1">
@@ -316,7 +317,7 @@ function RefundHero({ order }) {
   )
 }
 
-export function DestinationChip({ destination, accent }) {
+export function DestinationChip({ destination, accent, onOpenWallet }) {
   const isWallet = destination.kind === 'wallet'
   const isBnpl = destination.kind === 'bnpl'
   const Icon = isWallet ? Wallet : CreditCard
@@ -328,10 +329,28 @@ export function DestinationChip({ destination, accent }) {
   const tones = accent
     ? 'bg-gradient-to-r from-brand to-accent text-white border-transparent'
     : 'bg-surface text-ink border-line'
+  const base = `inline-flex items-center rounded-full border font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5 ${tones}`
+  // Wallet destination → tap to open the Revibe Wallet ledger. stopPropagation
+  // so it doesn't toggle the enclosing card-header button.
+  if (isWallet && onOpenWallet) {
+    return (
+      <button
+        type="button"
+        aria-label="Open Revibe Wallet"
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenWallet()
+        }}
+        className={`${base} hover:brightness-110 active:scale-[0.98] transition`}
+      >
+        <Icon size={12} strokeWidth={2} />
+        {label}
+        <ChevronRight size={13} strokeWidth={2.25} className="-mr-0.5 opacity-85" />
+      </button>
+    )
+  }
   return (
-    <span
-      className={`inline-flex items-center rounded-full border font-semibold whitespace-nowrap h-7 px-2.5 text-[11.5px] gap-1.5 ${tones}`}
-    >
+    <span className={base}>
       <Icon size={12} strokeWidth={2} />
       {label}
       {isBnpl && (

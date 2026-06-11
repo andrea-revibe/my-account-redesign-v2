@@ -3,6 +3,11 @@
 
 export const RETURN_WINDOW_DAYS = 10
 export const RESTOCKING_FEE_RATE = 0.10
+// Card processing fee re-applied when a customer cancellation refunds to the
+// original card instead of the Wallet. Mirrors RESTOCKING_FEE_RATE: the
+// Wallet path waives it, the card path incurs it. Shared by CancelOrderSheet
+// (the cancel-time choice) and lib/wallet.js (the move-credit-to-card flow).
+export const CANCELLATION_FEE_RATE = 0.05
 // Flat Wallet bonus paid when the customer accepts store credit on an
 // issue (faulty product) claim. Acts as the equivalent of the
 // change-of-mind "fee waived on Wallet" — incentivises store credit.
