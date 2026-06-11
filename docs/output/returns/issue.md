@@ -8,7 +8,7 @@ covers:
 
 # Returns — Issue & Wrong device
 
-> Customer-facing UI of the faulty-product return branch, launched from `Raise a claim` → `Something's wrong with my device` → `Return for a refund or replacement` on a delivered `PastOrderCard`. Covers Steps 1 (shared), 2 (issue branch), and 3–7 (shared with change-of-mind). The operational state machine (drawio transcription — single repair-supplier path, country-aware AWB creation, LAB sub-flow) is documented separately in [`../../input/return_flow_issue.md`](../../input/return_flow_issue.md). Once submitted, the return appears on the customer's list as a `ClaimCard` — see [claim_tracking.md](./claim_tracking.md).
+> Customer-facing UI of the faulty-product return branch, launched from `Raise a claim` → `Something's wrong with my device` → `Return for a refund` on a delivered `PastOrderCard` (or reached from the change-of-mind flow's refund-vs-replacement choice — see [change_of_mind.md](./change_of_mind.md) §2.3). Covers Steps 1 (shared), 2 (issue branch), and 3–7 (shared with change-of-mind). The operational state machine (drawio transcription — single repair-supplier path, country-aware AWB creation, LAB sub-flow) is documented separately in [`../../input/return_flow_issue.md`](../../input/return_flow_issue.md). Once submitted, the return appears on the customer's list as a `ClaimCard` — see [claim_tracking.md](./claim_tracking.md).
 
 ## 1. Overview
 
@@ -34,7 +34,7 @@ The flow chrome (white surface, segmented progress, sticky action bar, only-fill
 flowchart TD
   entry([Tap 'Raise a claim' on delivered PastOrderCard]) --> s1[Step 1 — Claim type]
   s1 -->|I changed my mind| com[/Change-of-mind branch — see change_of_mind.md/]
-  s1 -->|Something's wrong with my device → Return for refund/replacement| s2[Step 2 — Reason · shared]
+  s1 -->|Something's wrong with my device → Return for a refund| s2[Step 2 — Reason · shared]
   s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
   s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
   s2 -->|No-fault reason → SwitchFlowSheet| com2[/Redirect to change of mind — see change_of_mind.md §2.3/]
@@ -52,7 +52,7 @@ flowchart TD
 
 See [change_of_mind.md](./change_of_mind.md) §2.2. The issue branch is reached via:
 
-`Something's wrong with my device` → expands inline accordion → `Return for a refund or replacement` → `claimType: 'issue'`.
+`Something's wrong with my device` → expands inline accordion → `Return for a refund` → `claimType: 'issue'`. (Also reachable from the change-of-mind flow's refund-vs-replacement choice when a fault reason is caught there — see [change_of_mind.md](./change_of_mind.md) §2.3.)
 
 ### 2.2 Step 2 — Reason (shared, required)
 

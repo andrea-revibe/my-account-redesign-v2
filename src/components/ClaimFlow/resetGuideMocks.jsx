@@ -24,7 +24,6 @@ import {
   Globe,
   Menu,
   ChevronUp,
-  MoreVertical,
 } from 'lucide-react'
 import { stepAnim } from './resetGuideAnim'
 
@@ -934,49 +933,57 @@ function SamsungWelcome({ Frame = MiniPhone }) {
   )
 }
 
-// Remote 1 · Google — the Your devices page with the ⋮ menu open and Sign out
-// glowing.
+// Remote 1 · Google — the device-detail page you land on after tapping this
+// device in "Your devices", with the Sign out button glowing (mirrors the real
+// myaccount.google.com/device-activity detail screen, where signing out is what
+// clears Factory Reset Protection).
 function GoogleRemoveRemote({ Frame = MiniPhone, tablet = false }) {
   const DeviceIcon = tablet ? Tablet : Smartphone
+  const rows = [
+    ['Account', 'yourname@gmail.com'],
+    ['First signed in', '12 Mar 2024'],
+    ['Recent activity', 'Active 6 min ago'],
+    ['Browser', 'Chrome'],
+  ]
   return (
     <Frame camera="hole">
       <StatusBar />
       <UrlPill url="myaccount.google.com" />
-      <div className="px-2.5 mt-2.5 flex items-center gap-1.5">
+      <div className="px-2.5 mt-2 flex items-center justify-between">
+        <div className="flex items-center gap-1 text-ink">
+          <ChevronLeft size={13} strokeWidth={2.4} />
+          <span className="text-[10.5px] font-bold">Your devices</span>
+        </div>
         <GoogleG size={16} />
-        <span className="text-[11px] font-bold text-ink">Your devices</span>
       </div>
-      <div className="px-2.5 mt-2">
-        <div className="text-[8.5px] text-muted leading-snug px-0.5 text-left">
-          Where you’re signed in to your Google Account.
-        </div>
-        <div className="mt-2 rounded-[12px] border border-line bg-white shadow-sm2 p-2.5">
-          <div className="flex items-start gap-2">
-            <DeviceIcon size={18} strokeWidth={1.6} className="text-ink/70 shrink-0" />
-            <span className="flex-1 min-w-0 text-left">
-              <span className="block text-[10.5px] font-bold text-ink leading-tight">
-                {tablet ? 'This tablet' : 'This phone'}
+      <div className="mt-2.5 flex flex-col items-center">
+        <span className="w-[34px] h-[34px] rounded-full bg-black/[0.04] grid place-items-center">
+          <DeviceIcon size={18} strokeWidth={1.6} className="text-ink/70" />
+        </span>
+        <span className="mt-1 text-[11.5px] font-bold text-ink leading-tight">
+          {tablet ? 'This tablet' : 'This phone'}
+        </span>
+        <span className="text-[8.5px] text-muted mt-0.5 whitespace-nowrap">
+          {tablet ? 'Galaxy Tab · Android 14' : 'Galaxy · Android 14'}
+        </span>
+      </div>
+      <div className="px-2.5 mt-2.5">
+        <div className="bg-white rounded-[14px] px-2.5 py-1 shadow-sm2 divide-y divide-line-2">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between gap-2 py-[6px]">
+              <span className="text-[8.5px] text-muted whitespace-nowrap">{k}</span>
+              <span className="text-[9.5px] font-medium text-ink truncate text-right">
+                {v}
               </span>
-              <span className="block text-[8.5px] text-muted mt-0.5">
-                {tablet ? 'Galaxy Tab · Active 6 min ago' : 'Galaxy · Active 6 min ago'}
-              </span>
-            </span>
-            <MoreVertical size={13} strokeWidth={2.2} className="text-ink/60 shrink-0" />
-          </div>
-        </div>
-        <div className="mt-1.5 rounded-[10px] overflow-hidden border border-line bg-white shadow-sm2">
-          <div className="px-2.5 py-[10px] text-[11px] font-medium text-muted text-left">
-            Manage
-          </div>
-          <div className="relative border-t border-line-2" style={HILITE}>
-            <div className="px-2.5 py-[10px] text-[11px] font-bold text-brand text-left">
-              Sign out
             </div>
-          </div>
+          ))}
         </div>
-        <div className="mt-2 px-1 text-[8.5px] text-muted leading-snug text-left">
-          Open the ⋮ menu, then tap{' '}
-          <span className="font-semibold text-ink-2">Sign out</span>.
+      </div>
+      <div className="px-2.5 mt-2.5">
+        <div className="relative rounded-[10px]" style={HILITE}>
+          <div className="rounded-[10px] border border-brand/60 px-2.5 py-[9px] text-center">
+            <span className="text-[10.5px] font-bold text-brand">Sign out</span>
+          </div>
         </div>
       </div>
     </Frame>

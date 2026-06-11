@@ -42,39 +42,33 @@ export default function InvalidClaimCard({
   order,
   defaultExpanded = false,
   onKeepClaim,
+  onPayReturnShipping,
+  onDeclineReturn,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  // Mode is internal demo state, but mirror any matching signal on the
-  // order data so a journey-driven advance (paidAt / declinedAt set on
-  // claim.invalidClaim) flips the card the same way the in-card buttons
-  // would. The local Undo / Reverse handlers still toggle mode directly —
-  // they're demo affordances that don't write back to the order.
-  const initialMode = order.claim.invalidClaim?.declinedAt
-    ? 'declined'
-    : order.claim.invalidClaim?.paidAt
-      ? 'paid'
+  // The card's state is derived from the order data, so a journey advance — or
+  // a dev-panel Back — flips the card both ways with no sync effect. paidAt
+  // wins over declinedAt: paying creates the ship-back, which is forward of a
+  // prior decline (the "I changed my mind and will pay" reversal sets paidAt
+  // while declinedAt lingers, since the paid node spreads the existing
+  // invalidClaim).
+  const dataMode = order.claim.invalidClaim?.paidAt
+    ? 'paid'
+    : order.claim.invalidClaim?.declinedAt
+      ? 'declined'
       : 'action_needed'
-  const [mode, setMode] = useState(initialMode)
+  // Local override for the standalone mock, where there's no journey to write
+  // paidAt / declinedAt back to the order. null = follow the data; set only by
+  // the in-card Pay / Decline / Reverse fallbacks when journey mode didn't take
+  // the transition.
+  const [localMode, setLocalMode] = useState(null)
+  const mode = localMode ?? dataMode
   const [details, setDetails] = useState(order.claim.pickupDetails)
   const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
-
-  // Re-sync mode when the journey advances the order's invalidClaim
-  // outcome fields. Only forward transitions are applied — the in-card
-  // Undo / Reverse buttons remain authoritative on local rewinds.
-  useEffect(() => {
-    if (order.claim.invalidClaim?.declinedAt && mode !== 'declined') {
-      setMode('declined')
-    } else if (
-      order.claim.invalidClaim?.paidAt &&
-      mode === 'action_needed'
-    ) {
-      setMode('paid')
-    }
-  }, [order.claim.invalidClaim?.paidAt, order.claim.invalidClaim?.declinedAt, mode])
 
   // Compensation claims keep the device, so an invalid verdict has no
   // return-shipping gate — it's a plain "claim closed, no refund" terminal.
@@ -94,7 +88,6 @@ export default function InvalidClaimCard({
         order={order}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
-        onUndo={() => setMode('action_needed')}
       />
     )
   }
@@ -105,8 +98,12 @@ export default function InvalidClaimCard({
         order={order}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
-        onReverse={() => setMode('paid')}
-        onUndo={() => setMode('action_needed')}
+        onReverse={() => {
+          // "I changed my mind and will pay" — same target as Pay: journey
+          // mode advances claim_return_shipping_paid (the declined node forks
+          // to it), falling back to a local flip for the standalone mock.
+          if (!onPayReturnShipping?.(order.id)) setLocalMode('paid')
+        }}
       />
     )
   }
@@ -232,14 +229,29 @@ export default function InvalidClaimCard({
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => (isCancel ? onKeepClaim?.(order.id) : setMode('declined'))}
+              onClick={() => {
+                // Cancel variant resumes the claim (Keep claim); invalid
+                // variant declines. Journey mode advances the matching node so
+                // the dev panel stays in lockstep; the invalid path falls back
+                // to a local flip for the standalone mock.
+                if (isCancel) {
+                  onKeepClaim?.(order.id)
+                } else if (!onDeclineReturn?.(order.id)) {
+                  setLocalMode('declined')
+                }
+              }}
               className="flex-1 h-[46px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[13px] hover:bg-line-2"
             >
               {isCancel ? 'Keep claim' : 'Decline'}
             </button>
             <button
               type="button"
-              onClick={() => setMode('paid')}
+              onClick={() => {
+                // Journey mode wins (advances the dev panel to the ship-back
+                // node in lockstep); falls back to local state for the
+                // standalone mock.
+                if (!onPayReturnShipping?.(order.id)) setLocalMode('paid')
+              }}
               className="flex-[2] h-[46px] rounded-[10px] border font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 bg-danger text-white border-danger hover:brightness-95 active:scale-[0.99] transition"
             >
               <CreditCard size={14} strokeWidth={2} />
@@ -263,7 +275,7 @@ export default function InvalidClaimCard({
 // it as a fresh fulfilment trajectory — the only signals it's a
 // post-claim shipment are the eyebrow ("Return from Claim RET-X") and
 // the state pill ("Return shipment").
-function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
+function PaidShipBackCard({ order, expanded, onToggle }) {
   const claim = order.claim
   const ship = claim.invalidClaim.returnShipment
   // Merge the claim's own head (initiated → pickup → qc, collected for QC
@@ -420,18 +432,6 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
               ? 'your device is on its way back because you cancelled the claim.'
               : 'the device is being shipped back as it was inspected.'}
           </div>
-
-          {/* Demo only — production would not let the customer rewind a
-              paid shipment. Kept here so reviewers can replay both
-              branches without reloading. */}
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · replay the demo
-          </button>
         </div>
       )}
     </article>
@@ -442,7 +442,7 @@ function PaidShipBackCard({ order, expanded, onToggle, onUndo }) {
 // refund, no device coming back. Single reversal CTA carries the
 // verbatim copy requested by product ("I changed my mind and will pay
 // for the shipment fee"); tapping it flips into the paid trajectory.
-function ClaimClosedCard({ order, expanded, onToggle, onReverse, onUndo }) {
+function ClaimClosedCard({ order, expanded, onToggle, onReverse }) {
   const claim = order.claim
   const fee = claim.invalidClaim.returnShipping
 
@@ -526,16 +526,6 @@ function ClaimClosedCard({ order, expanded, onToggle, onReverse, onUndo }) {
               I changed my mind and will pay for the shipment fee
             </button>
           </div>
-
-          {/* Demo only — see InvalidClaimCard header comment. */}
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · replay the demo
-          </button>
         </div>
       )}
     </article>

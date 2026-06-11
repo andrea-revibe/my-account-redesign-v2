@@ -7,7 +7,11 @@ import { expectedCompletionFor } from '../../lib/claims'
 import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
 import Step1ClaimType from './Step1ClaimType'
-import Step2Reason, { routeForReason, scopeForReason } from './Step2Reason'
+import Step2Reason, {
+  routeForReason,
+  scopeForReason,
+  isRemedyChoice,
+} from './Step2Reason'
 import SwitchFlowSheet from './SwitchFlowSheet'
 import Step2IssueDetails from './Step2IssueDetails'
 import Step2Compensation from './Step2Compensation'
@@ -72,11 +76,17 @@ export default function ClaimFlow({
     ? routeForReason(state.reason.value, state.claimType, order)
     : null
   const reasonIsSwitch = Boolean(reasonTarget && reasonTarget !== state.claimType)
+  // A fault reason caught in the change-of-mind flow doesn't pick a track for
+  // the customer — the sheet opens in choice mode (refund vs replacement).
+  const reasonIsChoice =
+    onReasonStep && state.reason.value
+      ? isRemedyChoice(state.reason.value, state.claimType)
+      : false
 
-  const routeFromReason = () =>
+  const routeTo = (target) =>
     dispatch({
       type: 'ROUTE_FROM_REASON',
-      target: reasonTarget,
+      target,
       scope: scopeForReason(state.reason.value),
     })
 
@@ -86,13 +96,14 @@ export default function ClaimFlow({
         dispatch({ type: 'ATTEMPT' })
         return
       }
-      // Mismatched reason → confirm the redirect in a sheet before leaving
-      // the step. Matching reason → advance straight away.
-      if (reasonIsSwitch) {
+      // Mismatched reason → confirm the redirect in a sheet before leaving the
+      // step (choice mode forks refund vs replacement; single mode confirms one
+      // switch). Matching reason → advance straight away.
+      if (reasonIsChoice || reasonIsSwitch) {
         setSwitchOpen(true)
         return
       }
-      routeFromReason()
+      routeTo(reasonTarget)
       return
     }
     if (isReview) {
@@ -248,9 +259,14 @@ export default function ClaimFlow({
         open={switchOpen}
         target={reasonTarget}
         order={order}
+        choice={reasonIsChoice}
         onConfirm={() => {
           setSwitchOpen(false)
-          routeFromReason()
+          routeTo(reasonTarget)
+        }}
+        onChoose={(target) => {
+          setSwitchOpen(false)
+          routeTo(target)
         }}
         onClose={() => setSwitchOpen(false)}
       />

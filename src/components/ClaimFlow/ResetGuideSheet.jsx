@@ -308,7 +308,7 @@ const REMOTE_STEPS = {
     {
       Mock: GoogleRemoveRemote,
       title: 'Remove it from your Google account',
-      lead: 'On any device, open myaccount.google.com/device-activity and sign in with the Google account that was on this phone. Find the device, open the ⋮ menu, and tap Sign out.',
+      lead: 'On any device, open myaccount.google.com/device-activity and sign in with the Google account that was on this phone. Tap this phone in the list, then tap Sign out.',
       why: 'This clears Factory Reset Protection so our technician can wipe and resell the device.',
       trouble: {
         label: 'How long does this take?',
@@ -330,7 +330,7 @@ const REMOTE_STEPS = {
     {
       Mock: AndroidTabletGoogleRemoveRemote,
       title: 'Remove it from your Google account',
-      lead: 'On any device, open myaccount.google.com/device-activity and sign in with the Google account that was on this tablet. Find the device, open the ⋮ menu, and tap Sign out.',
+      lead: 'On any device, open myaccount.google.com/device-activity and sign in with the Google account that was on this tablet. Tap this tablet in the list, then tap Sign out.',
       why: 'This clears Factory Reset Protection so our technician can wipe and resell the device.',
       trouble: {
         label: 'How long does this take?',

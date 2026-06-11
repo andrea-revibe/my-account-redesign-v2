@@ -40,6 +40,6 @@ npm run build    # production build into dist/
 
 Functional: the orders list, expand/collapse interactions, status communication, status filter chips, the status banner (with `delayed` and `statusMessage` overrides), the auto-expand-the-active-one rule, the cancellation bottom sheet, two returns-flow branches (change of mind, issue/wrong device — all seven steps wired end-to-end, submission is a stub), and **journey mode** (`?journey=1`) — an opt-in alternate demo that replays a single order through one lifecycle for immersive demos and as a backend-event spec for production engineering.
 
-Decorative (visual placeholder, no logic): site-wide search, the date-range dropdown's effect on the list (plumbed but all mock orders fall inside any range), the Revibe Wallet pill (the info tooltip is interactive but the balance is hardcoded), profile menu, language toggle, receipt download, the warranty and compensation claim branches (route to a stub note), the in-list "Find items" search field.
+Decorative (visual placeholder, no logic): site-wide search, profile menu, language toggle, receipt download, the warranty and compensation claim branches (route to a stub note), the in-list "Find an order or item" search field.
 
 Per-feature mocked-vs-production lists in each `docs/output/*.md`.

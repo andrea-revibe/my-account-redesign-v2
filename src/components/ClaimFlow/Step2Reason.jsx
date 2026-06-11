@@ -36,6 +36,17 @@ export const REDIRECT_REASON_IDS = new Set(
   REASONS.filter((r) => r.redirect).map((r) => r.id),
 )
 
+// The fault reasons that route to a repair/refund track (missing_parts is
+// excluded — it routes to compensation). When one of these is caught *inside*
+// the change-of-mind flow, the redirect sheet lets the customer choose between
+// a refund (issue) and a replacement (warranty) instead of auto-picking — every
+// device carries at least a 1-year warranty, so a replacement is always offered.
+export const FAULT_REASON_IDS = new Set(['defective', 'wrong_item', 'damaged'])
+
+export function isRemedyChoice(reasonId, claimType) {
+  return claimType === 'change_of_mind' && FAULT_REASON_IDS.has(reasonId)
+}
+
 // CTA copy when the chosen reason routes to a different track than the flow
 // the customer is currently in.
 export const SWITCH_CTA_LABELS = {
@@ -52,13 +63,16 @@ export const SWITCH_CTA_LABELS = {
 //   - Genuine reasons (incl. "other") → change of mind.
 //   - Fault / wrong item: if the customer is already inside an issue/warranty
 //     flow we leave them there (only catch the clear cross-track mistakes);
-//     if they're in the change-of-mind flow we route to the warranty flow
-//     when the order has Revibe Care, otherwise to the issue flow.
+//     if they're in the change-of-mind flow we no longer auto-pick — the
+//     redirect sheet offers refund-vs-replacement (see isRemedyChoice). We
+//     return the recommended default (warranty/replacement) so the reason
+//     still reads as a switch away from change of mind. `order` is kept for a
+//     future warranty-validity gate.
 export function routeForReason(reasonId, claimType, order) {
   if (reasonId === 'missing_parts') return 'compensation'
   if (!REDIRECT_REASON_IDS.has(reasonId)) return 'change_of_mind'
   if (claimType === 'issue' || claimType === 'warranty') return claimType
-  return (order?.warranty ?? 0) > 0 ? 'warranty' : 'issue'
+  return 'warranty'
 }
 
 // Pre-fills the issue-details scope when a fault reason routes into the

@@ -216,6 +216,9 @@ export const CLAIM_WARRANTY_NODES = [
     // Inbound-leg country fork — picked_up already seeds the functional pickup
     // state, so SA/Others skip the three granular transit sub-statuses straight
     // to QC (no detailed tracking). AE/ZA walk them. country_split.md §6.
+    // Also the re-merge point for the pickup-failed detour
+    // (claim_pickup_rescheduled → here): clears any pickupFailure / actionRequired
+    // left by that branch (no-op on the happy path).
     next: [
       { id: 'claim_transit_arrived_origin_hub', countries: ['AE', 'ZA'] },
       { id: 'claim_qc_started', countries: ['SA', 'Others'] },
@@ -225,6 +228,8 @@ export const CLAIM_WARRANTY_NODES = [
       claim: {
         ...o.claim,
         claimStatusId: 'pickup',
+        pickupFailure: undefined,
+        actionRequired: undefined,
         timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
         transitSubStatusId: 'picked_up',
         transitSubTimeline: {
@@ -605,34 +610,26 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Pickup rescheduled',
     trigger: 'customer',
     event: 'claim.pickup.rescheduled',
-    // Re-merges into the transit chain past the (now-redundant)
-    // claim_picked_up node — reschedule itself advances claimStatusId to
-    // 'pickup' and seeds the picked_up scan so the detailed-tracking
-    // dropdown is visible immediately after the customer confirms.
-    // Inbound-leg country fork (same as claim_picked_up) — SA/Others collapse
-    // straight to QC; AE/ZA re-enter the granular transit chain. §6.
-    next: [
-      { id: 'claim_transit_arrived_origin_hub', countries: ['AE', 'ZA'] },
-      { id: 'claim_qc_started', countries: ['SA', 'Others'] },
-    ],
+    // Customer confirmed the new pickup slot (via UI) — the card flips to its
+    // "new pickup on the way" state but the claim itself hasn't moved yet
+    // (pickupFailure stays set, tagged with rescheduledAt). Courier collection
+    // is the separate system event below; re-merges at claim_picked_up, which
+    // clears the failure, advances to 'pickup' and carries the country fork.
+    next: ['claim_picked_up'],
     apply: (o) => ({
       ...o,
       claim: {
         ...o.claim,
-        claimStatusId: 'pickup',
         subStatusId: undefined,
-        pickupFailure: undefined,
         actionRequired: undefined,
         scheduledPickup: {
           courier: 'DHL Express',
           date: 'Thursday, 28 May',
           slot: '10 AM – 12 PM',
         },
-        timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
-        transitSubStatusId: 'picked_up',
-        transitSubTimeline: {
-          ...(o.claim.transitSubTimeline ?? {}),
-          picked_up: '28 May · 10:14 AM',
+        pickupFailure: {
+          ...o.claim.pickupFailure,
+          rescheduledAt: '27 May · 9:15 AM',
         },
       },
     }),
@@ -851,7 +848,12 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Customer declined — claim closed',
     trigger: 'customer',
     event: 'claim.declined',
-    next: [],
+    // Declining isn't fully terminal: within the short reversal window the
+    // customer can still change their mind and pay return shipping (the closed
+    // card's "I changed my mind" CTA), which creates the ship-back — the same
+    // node as paying from the action-needed gate, so the dev panel stays in
+    // lockstep.
+    next: ['claim_return_shipping_paid'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -902,18 +904,47 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Unlock details received',
     trigger: 'customer',
     event: 'claim.reset.details_received',
-    next: ['claim_under_repair', 'claim_invalid_confirmed', 'claim_reset_retry_failed'],
+    // Customer submitted unlink confirmation + passcode (via UI) — the card
+    // flips to its "reset in progress / details received" state, but the claim
+    // hasn't moved yet (resetFailed stays set, tagged with submittedAt). Ops
+    // attempting the wipe is the separate system step below; from there the
+    // reset either completes (claim_reset_complete → QC resumes) or fails
+    // again (claim_reset_retry_failed).
+    next: ['claim_reset_complete', 'claim_reset_retry_failed'],
     apply: (o) => ({
       ...o,
       claim: {
         ...o.claim,
-        subStatusId: undefined,
         actionRequired: undefined,
-        resetFailed: undefined,
+        resetFailed: {
+          ...o.claim.resetFailed,
+          submittedAt: '29 May · 12:48 PM',
+        },
         resetUnlock: {
           at: '29 May · 12:48 PM',
           attempt: 1,
         },
+      },
+    }),
+  },
+  // The "24h passed" system step: ops finished the wipe, so the takeover
+  // clears and quality check resumes (ClaimCard "Under Quality Check"), then
+  // forks to the QC outcome. Shared by the first submission and the retry
+  // resubmission. New event → silent until authored.
+  {
+    id: 'claim_reset_complete',
+    label: '24h passed — reset done',
+    trigger: 'system',
+    event: 'claim.reset.completed',
+    next: ['claim_under_repair', 'claim_invalid_confirmed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'qc',
+        subStatusId: undefined,
+        actionRequired: undefined,
+        resetFailed: undefined,
       },
     }),
   },
@@ -952,16 +983,21 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Updated unlock details received',
     trigger: 'customer',
     // Same customer comm as the first submission — both fire
-    // claim.reset.details_received (attempt distinguishes them).
+    // claim.reset.details_received (attempt distinguishes them). Mirrors the
+    // first submission: keeps resetFailed (adds submittedAt) so the card shows
+    // the "details received" state, then re-merges at the shared
+    // claim_reset_complete ("24h passed") step.
     event: 'claim.reset.details_received',
-    next: ['claim_under_repair', 'claim_invalid_confirmed'],
+    next: ['claim_reset_complete'],
     apply: (o) => ({
       ...o,
       claim: {
         ...o.claim,
-        subStatusId: undefined,
         actionRequired: undefined,
-        resetFailed: undefined,
+        resetFailed: {
+          ...o.claim.resetFailed,
+          submittedAt: '30 May · 10:22 AM',
+        },
         resetUnlock: {
           at: '30 May · 10:22 AM',
           attempt: 2,

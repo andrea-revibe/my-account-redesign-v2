@@ -5,7 +5,6 @@ import {
   ChevronDown,
   Clock,
   MapPin,
-  RotateCcw,
   Settings2,
   Truck,
 } from 'lucide-react'
@@ -22,9 +21,16 @@ export default function PickupFailedCard({
   order,
   defaultExpanded = false,
   onRequestCancelClaim,
+  onConfirmReschedule,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const [confirmed, setConfirmed] = useState(false)
+  // The rescheduled "new pickup on the way" view is driven by the order data
+  // when journey mode advances claim_pickup_rescheduled (pickupFailure.rescheduledAt),
+  // read live so dev-panel Back/Next stay in sync (mirrors InvalidClaimCard's
+  // paidAt/declinedAt). localConfirmed is the fallback for the standalone mock,
+  // where there's no journey to advance.
+  const [localConfirmed, setLocalConfirmed] = useState(false)
+  const confirmed = !!order.claim.pickupFailure?.rescheduledAt || localConfirmed
   const [details, setDetails] = useState(order.claim.pickupDetails)
   const [editing, setEditing] = useState(false)
 
@@ -39,7 +45,6 @@ export default function PickupFailedCard({
         details={details}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
-        onUndo={() => setConfirmed(false)}
       />
     )
   }
@@ -155,7 +160,11 @@ export default function PickupFailedCard({
             </button>
             <button
               type="button"
-              onClick={() => setConfirmed(true)}
+              onClick={() => {
+                // Journey mode wins (advances the dev panel in lockstep);
+                // falls back to local state for the standalone mock.
+                if (!onConfirmReschedule?.(order.id)) setLocalConfirmed(true)
+              }}
               className="flex-[2] h-[46px] rounded-[10px] border font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 bg-danger text-white border-danger hover:brightness-95 active:scale-[0.99] transition"
             >
               <Truck size={14} strokeWidth={2} />
@@ -172,7 +181,7 @@ export default function PickupFailedCard({
   )
 }
 
-function PickupRescheduledCard({ order, details, expanded, onToggle, onUndo }) {
+function PickupRescheduledCard({ order, details, expanded, onToggle }) {
   const claim = order.claim
   const f = claim.pickupFailure
   const next = f.nextPickup
@@ -232,18 +241,6 @@ function PickupRescheduledCard({ order, details, expanded, onToggle, onUndo }) {
       {expanded && (
         <div className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3 animate-slideDown">
           <NewPickupSummary next={next} pickupDetails={pickupDetails} />
-
-          {/* Demo only — production rescheduling is committal once a new
-              AWB is created. Kept here so reviewers can replay the
-              confirmation flow without reloading. */}
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · replay the demo
-          </button>
         </div>
       )}
     </article>

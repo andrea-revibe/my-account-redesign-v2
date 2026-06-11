@@ -14,7 +14,7 @@ import InlineError from './InlineError'
 const ISSUE_SUBTYPES = [
   {
     id: 'issue',
-    label: 'Return for a refund or replacement',
+    label: 'Return for a refund',
     sub: 'Send the device back to us',
     icon: RotateCcw,
     inScope: true,

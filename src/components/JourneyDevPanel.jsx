@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, RotateCcw, PackageX } from 'lucide-react'
 import { journeyNotificationCoverage } from '../lib/notifications'
 import CountryPicker from './CountryPicker'
+import ResetGuidePicker from './ResetGuidePicker'
 
 // Fixed bottom-right dev tool — only rendered in journey mode. Sits outside
 // the mobile frame on wide viewports; overlaps the frame on narrow ones
@@ -70,6 +71,8 @@ export default function JourneyDevPanel({
           onSelectCountry={onSelectCountry}
         />
       )}
+
+      <ResetGuidePicker />
 
       <CoverageSummary counts={coverage} />
 

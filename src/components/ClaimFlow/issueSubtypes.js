@@ -1,4 +1,4 @@
-// Sub-issues shown under Step 1 → "Return for a refund or replacement". Two scopes:
+// Sub-issues shown under Step 1 → "Return for a refund". Two scopes:
 //   not_working   — the device is faulty
 //   wrong_device  — the unit doesn't match what was ordered
 //

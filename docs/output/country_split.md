@@ -121,7 +121,7 @@ Use this when a market has a *different sequence of steps*. The mechanism is **p
     { id: 'claim_invalid_return_delivered',           countries: ['SA', 'Others'] },
   ]
   ```
-  Same shape for warranty ship-back (`claim_ship_back_created` → `claim_device_returned`) and the inbound pickup leg (`claim_picked_up` → `claim_qc_started`). For inbound, fork **both** `claim_picked_up` *and* the rescheduled re-entry `claim_pickup_rescheduled` so the pickup-failed branch collapses too and nothing points into the middle of the skipped run.
+  Same shape for warranty ship-back (`claim_ship_back_created` → `claim_device_returned`) and the inbound pickup leg (`claim_picked_up` → `claim_qc_started`). The inbound fork lives **only** on `claim_picked_up`: the pickup-failed branch re-merges there (`claim_pickup_rescheduled` → `claim_picked_up`, untagged), so it inherits the same fork — no separate tagging on the reschedule node.
 
 The skipped nodes stay in each journey's array — they're simply unreached for `SA`/`Others`, reachable for `AE`/`ZA`. (The `expertReview` flag in §2 is still reserved for a future AE-only expert-revision step — same mechanism, not yet built.)
 

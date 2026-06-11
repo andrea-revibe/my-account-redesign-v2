@@ -85,7 +85,6 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 
 - **Tailwind name collisions.** `text-{name}` maps to either a fontSize or a color; defining `colors.page` and `fontSize.page` together silently produces white text. We've removed `colors.page`; don't reintroduce it. Same risk applies for any new token name.
 - **Prototype links.** `CourierBanner` hardcodes the DHL Express tracking URL to a known-good test shipment (`tracking-id=3392654392`). Don't template it on `order.trackingNumber` — the demo orders have placeholder numbers that won't resolve.
-- **Date filter is plumbed but inert.** All mock orders fall inside "Last 30 days," so the range dropdown has no visible effect.
 - **Many things are visual placeholders.** Search, profile menu, language toggle, "Download receipt" — all decorative. (The Wallet pill is now live — derived balance + `WalletSheet`; see `wallet.md`.) "Raise a claim" is wired for all four real branches (`change_of_mind`, `issue`, `warranty`, `compensation`). Submit seeds an in-session claim on the order (cleared on refresh, undoable via `UndoSnackbar`) — there's no backend, and seeding always lands on `initiated`. The `WarrantyClaimCard` has two hand-seeded mocks (89610 / 89580) exercising the `under_repair` / `ship_back` heroes; compensation has three (89630 under review, 89605 refunded, 89572 closed-invalid) for the surfaces submit-time seeding can't reach. Per-feature mocked-vs-prod lists in each `docs/output/*.md`.
 
 ## Doc update protocol

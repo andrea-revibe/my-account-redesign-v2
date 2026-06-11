@@ -38,8 +38,7 @@ This prototype is intentionally narrow: only the orders list and the expand/coll
 **Out of scope (faked or stubbed)**
 
 - Authentication, real backend, real customer data.
-- Site-wide search and the in-list "Find items" search field.
-- Date-range dropdown effect on the list (logic wired but all mock orders fall inside every range).
+- Site-wide search and the in-list "Find an order or item" search field.
 - Revibe Wallet pill balance and most of the page chrome around the list.
 - Right-to-left and Arabic localisation.
 - Real courier tracking — the "Track order" button hardcodes a known-good DHL Express test shipment so the demo always lands on a real tracking page.
@@ -235,15 +234,13 @@ A past cancelled order whose `cancellationInitiator === 'revibe'` routes instead
 
 ### 5.1 Filter chip row
 
-`OrderFilters` exposes a controlled chip row: `All / In progress / Delivered / Cancelled`. Filter logic lives in `App.jsx`; counts are derived from the same predicates that route cards (claim-carrying orders count toward `in_progress` while the claim is active; refunded claims count toward `delivered`).
-
-A date-range dropdown is plumbed in but currently inert because every mock order falls inside every range.
+`OrderFilters` exposes a controlled chip row: `All / In progress / Delivered / Cancelled`. Filter logic lives in `App.jsx`; counts are derived from the same predicates that route cards (claim-carrying orders count toward `in_progress` while the claim is active; refunded claims count toward `delivered`). Above the chips sits a full-width (decorative) search field.
 
 ### 5.2 Auto-expand rule
 
 ```mermaid
 flowchart TD
-    Land[Customer lands on My Account] --> Render[Filter orders by chip + range]
+    Land[Customer lands on My Account] --> Render[Filter orders by status chip]
     Render --> Pick["pickActiveOrderId: highest progressIndex among non-delivered, non-cancelled"]
     Pick --> Decide{Order is the active one?}
     Decide -->|Yes| E[Render expanded by default]
@@ -379,7 +376,7 @@ src/
     ├── FiltersRow.jsx            Filters icon + profile chip
     ├── GreetRow.jsx              Greeting row + Revibe Wallet pill
     ├── StoreCreditsCard.jsx      Wallet balance card (decorative)
-    ├── OrderFilters.jsx          Search field + range dropdown + chip row (controlled)
+    ├── OrderFilters.jsx          Full-width search field + status chip row (controlled)
     ├── ProductSummary.jsx        Shared product line-item (thumbnail · name · variant · Revibe Care callout · price breakdown); exports REVIBE_CARE_ICON (§3.0)
     ├── DeliveryAddressPill.jsx   Shared "Delivering to / Delivered to" address row used by four heroes (§3.0.1)
     ├── InProgressCard.jsx        Expandable card for non-cancelled created/quality_check
@@ -407,8 +404,7 @@ When the backend lands, the swap is small: `App.jsx` currently imports the stati
 - **Single carrier.** Code is generalised but mock data uses DHL only. Adding a second carrier requires no code change.
 - **Single-item orders.** The product object is a single entry; multi-item orders need a `products[]` array and a layout adjustment.
 - **Download receipt.** Buttons are present but do nothing.
-- **Site-wide search, in-list "Find items" search, Revibe Wallet pill.** Visual placeholders, no logic. The wallet balance is a hardcoded prop; the wallet info tooltip's `terms & conditions` link goes nowhere.
-- **Date-range dropdown.** Logic wired but visibly inert because every mock order falls inside every range. Status chips do filter the list.
+- **Site-wide search, in-list "Find an order or item" search.** Visual placeholders, no logic. (The Revibe Wallet pill is now live — see `wallet.md`.) The wallet info tooltip's `terms & conditions` link goes nowhere. Status chips do filter the list.
 - **Inter font.** Production is Graphik; substituted Inter via Google Fonts because Graphik is licensed.
 - **Brand assets.** Local copies in `public/` rather than CDN-served.
 - **No analytics or instrumentation.** No event tracking on expand/collapse, track-clicks, etc.
@@ -420,8 +416,7 @@ Cancellation, returns-flow, and claim-tracking mocked-vs-prod items live in thei
 - **Domestic vs international sub-status branching.** When shown, all four sub-statuses appear (arrived in destination country → cleared customs → forwarded to third-party agent → out for delivery). For a domestic UAE shipment, "cleared customs" doesn't apply. Worth adding an `isInternational` flag — a natural fit for the country-split capability layer (`docs/output/country_split.md`). (The *whole* sub-timeline is already country-gated by `detailedTracking`; this is about which milestones show when it does.)
 - **Real DHL ETA shape.** Today `estimatedDelivery` is a freeform string. Real responses may carry structured date + time windows; `statusSubline` and the collapsed-card UI will need updating.
 - **Derive `delayed` from data, not a flag.** Compare timestamps against an SLA contract and set the warn-tone banner automatically.
-- **Make the date-range dropdown visibly affect the demo.** Either backdate one of the mock orders past 30 days, or add a `Today` preset.
-- **Hook the in-list "Find items" search and the global search bar to anything.** Both are decorative.
+- **Hook the in-list "Find an order or item" search and the global search bar to anything.** Both are decorative. (A date-range filter was previously plumbed alongside the search field but removed — all mock orders fell inside every range, so it never had a visible effect; the freed space went to the search bar.)
 - **Returned and refunded states.** Not modelled as top-level statuses. Likely additions to `ORDER_STATES` plus their own banner copy.
 - **Re-order CTA on delivered orders.** Common pattern; not currently present.
 - **Multi-item orders.** Today the order shape carries a single `product` and the delivered card represents that one product line. Multi-product orders will need a `products[]` array and one delivered card per product line.

@@ -7,7 +7,6 @@ import {
   Clock,
   KeyRound,
   Lock,
-  RotateCcw,
   ShieldCheck,
 } from 'lucide-react'
 
@@ -28,17 +27,27 @@ export default function ResetFailedCard({
   order,
   defaultExpanded = false,
   onRequestCancelClaim,
+  onSubmitResetDetails,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [guideOpen, setGuideOpen] = useState(false)
   const [guideDone, setGuideDone] = useState(false)
   const [unlinked, setUnlinked] = useState(false)
   const [passcode, setPasscode] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+  // The "details received" view is driven by the order data when journey mode
+  // advances the unlock-details node (resetFailed.submittedAt), read live so
+  // dev-panel Back/Next stay in sync (mirrors PickupFailedCard's rescheduledAt).
+  // localSubmitted is the fallback for the standalone mock, where there's no
+  // journey to advance.
+  const [localSubmitted, setLocalSubmitted] = useState(false)
 
   useEffect(() => {
     setExpanded(defaultExpanded)
   }, [defaultExpanded])
+
+  const claim = order.claim
+  const r = claim.resetFailed
+  const submitted = !!r?.submittedAt || localSubmitted
 
   if (submitted) {
     return (
@@ -47,13 +56,9 @@ export default function ResetFailedCard({
         passcode={passcode}
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
-        onUndo={() => setSubmitted(false)}
       />
     )
   }
-
-  const claim = order.claim
-  const r = claim.resetFailed
   // The guided reset opens straight onto its remote route (device locked +
   // already at Revibe). Device-typed from the order so the right walkthrough
   // shows; falls back to the iPhone guide for the iOS mock here.
@@ -169,7 +174,12 @@ export default function ResetFailedCard({
             </button>
             <button
               type="button"
-              onClick={() => canSubmit && setSubmitted(true)}
+              onClick={() => {
+                if (!canSubmit) return
+                // Journey mode wins (advances the dev panel in lockstep);
+                // falls back to local state for the standalone mock.
+                if (!onSubmitResetDetails?.(order.id)) setLocalSubmitted(true)
+              }}
               disabled={!canSubmit}
               className={`flex-[2] h-[46px] rounded-[10px] border font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 transition ${
                 canSubmit
@@ -191,10 +201,13 @@ export default function ResetFailedCard({
   )
 }
 
-function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle, onUndo }) {
+function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle }) {
   const claim = order.claim
   const r = claim.resetFailed
-  const masked = maskPasscode(passcode)
+  // On a journey-replayed submission (Back/Next, no local entry) there's no
+  // passcode in component state — show a representative masked value so the
+  // "What you sent" summary isn't blank.
+  const masked = maskPasscode(passcode) || '••••42'
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2 animate-fadeIn">
@@ -251,18 +264,6 @@ function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle, onUndo 
           <DetailsSummary masked={masked} />
 
           <SecurityNote tone="warn" />
-
-          {/* Demo only — production submission is committal once the
-              technician picks up the device. Kept here so reviewers can
-              replay the confirmation flow without reloading. */}
-          <button
-            type="button"
-            onClick={onUndo}
-            className="h-[40px] rounded-[10px] bg-surface border border-line text-ink-2 font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 hover:bg-line-2"
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Undo · replay the demo
-          </button>
         </div>
       )}
     </article>
