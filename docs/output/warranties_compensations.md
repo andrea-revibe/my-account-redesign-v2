@@ -22,7 +22,7 @@ Step 1's full option set across the returns flow:
 | Step 1 option | Sub-options | Status |
 |---|---|---|
 | `I changed my mind` | — | **Wired** — see [returns/change_of_mind.md](./returns/change_of_mind.md) |
-| `Something's wrong with my device` | `Return for a refund or replacement` | **Wired** — see [returns/issue.md](./returns/issue.md) |
+| `Something's wrong with my device` | `Return for a refund` | **Wired** — see [returns/issue.md](./returns/issue.md) |
 | `Something's wrong with my device` | `Use my warranty` | **Wired** — intake + tracking — covered here (§2) |
 | `Request compensation` | shipping refund / faulty charger — keep the item | **Wired** — intake + tracking — covered here (§3) |
 
@@ -102,7 +102,7 @@ Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline
 
 ### 2.4 Intake flow
 
-The warranty intake reuses the existing returns-flow chrome and most of the existing steps. Total visible step count is **8** — it shares the required reason step with the other return flows but skips Refund method (no money changes hands). The reducer drives this from a per-type step-key sequence (`STEP_SEQUENCES.warranty` in `flowReducer.js`): `type → reason → issuedetails → deviceprep → packing → pickup → review → confirm`. `NEXT` / `BACK` / `GO_TO_STEP` walk that list (the refund key simply isn't in it), and `visibleStepCount('warranty')` → 8.
+The warranty intake reuses the existing returns-flow chrome and most of the existing steps. It's reached either by picking `Use my warranty` at Step 1, or by choosing **Get a replacement** in the change-of-mind flow's refund-vs-replacement sheet when a fault reason is caught there (see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.3). Total visible step count is **8** — it shares the required reason step with the other return flows but skips Refund method (no money changes hands). The reducer drives this from a per-type step-key sequence (`STEP_SEQUENCES.warranty` in `flowReducer.js`): `type → reason → issuedetails → deviceprep → packing → pickup → review → confirm`. `NEXT` / `BACK` / `GO_TO_STEP` walk that list (the refund key simply isn't in it), and `visibleStepCount('warranty')` → 8.
 
 | Step | Behaviour on warranty |
 |---|---|

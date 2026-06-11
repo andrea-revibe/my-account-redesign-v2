@@ -71,7 +71,7 @@ The Step 7 ack cards (§2.8) and the iOS reset-guide gate (§2.4) are the origin
 Three top-level cards; nothing pre-selected:
 
 - `I changed my mind` → `claimType: 'change_of_mind'`. Sets the type and exposes `Continue`.
-- `Something's wrong with my device` → no claim type set on tap. Expands an inline accordion that reveals two nested sub-cards: `Return for a refund or replacement` → `claimType: 'issue'`, and `Use my warranty` → `claimType: 'warranty'` (warranty branch — see [warranties_compensations.md](../warranties_compensations.md) §2).
+- `Something's wrong with my device` → no claim type set on tap. Expands an inline accordion that reveals two nested sub-cards: `Return for a refund` → `claimType: 'issue'`, and `Use my warranty` → `claimType: 'warranty'` (warranty branch — see [warranties_compensations.md](../warranties_compensations.md) §2).
 - `Request compensation` (shipping refund or faulty accessory — keep the item) — third primary card; stubbed.
 
 The compensation entry now sets `claimType: 'compensation'` (see [warranties_compensations.md](../warranties_compensations.md) §3). Continue stays clickable with nothing picked; clicking dispatches `ATTEMPT` and surfaces an `InlineError` (`Pick an option to continue.`) above the option list (`stepError` key `claimType`) — see §2.1.1.
@@ -89,9 +89,9 @@ The **"Why are you returning it?"** picker is now a **shared early step for the 
 | `arrived_late` | Arrived too late | change of mind |
 | `mistake` | Ordered by mistake | change of mind |
 | `changed_mind` | Changed my mind | change of mind |
-| `defective` | Item is defective or doesn't work | issue *(warranty if Revibe Care)* |
-| `wrong_item` | Wrong item was sent | issue *(warranty if Revibe Care)* |
-| `damaged` | Arrived damaged | issue *(warranty if Revibe Care)* |
+| `defective` | Item is defective or doesn't work | issue **or** warranty — customer chooses (refund vs replacement) |
+| `wrong_item` | Wrong item was sent | issue **or** warranty — customer chooses (refund vs replacement) |
+| `damaged` | Arrived damaged | issue **or** warranty — customer chooses (refund vs replacement) |
 | `missing_parts` | Missing or broken parts | compensation |
 | `other` | Other | change of mind |
 
@@ -101,9 +101,14 @@ The **"Why are you returning it?"** picker is now a **shared early step for the 
 
 - `missing_parts` → **compensation**, from any flow (keep the item, get compensated for the part).
 - genuine reasons + `other` → **change of mind**.
-- `defective` / `wrong_item` / `damaged` → if the customer is **already inside** an issue/warranty flow, stay there (only catch the clear cross-track mistakes); if caught **in the change-of-mind flow**, route to the **warranty** flow when the order has Revibe Care (`order.warranty > 0`), otherwise to **issue**.
+- `defective` / `wrong_item` / `damaged` → if the customer is **already inside** an issue/warranty flow, stay there (only catch the clear cross-track mistakes); if caught **in the change-of-mind flow**, the sheet opens in **choice mode** and the customer picks **refund (issue)** or **replacement (warranty)**. We no longer auto-pick from the Revibe Care add-on — every device carries at least a 1-year warranty, so a replacement is always available. `routeForReason` returns the recommended default (`warranty`) here so the reason still reads as a switch; `isRemedyChoice(reasonId, claimType)` (`Step2Reason.jsx`) flags this fork.
 
-**Redirect UX — the `SwitchFlowSheet` (`components/ClaimFlow/SwitchFlowSheet.jsx`).** The reason-step CTA is always `Continue`. When the resolved track differs from the current flow, clicking `Continue` opens a slide-up confirm sheet (same chrome as `CancelClaimSheet` — scrim, `animate-slideUp`, Escape/backdrop/X to dismiss, body-scroll lock handled by the flow). The sheet is **authoritative**: its two actions are **"Switch to {track}"** (primary → dispatches `ROUTE_FROM_REASON`) and **"Choose another reason" / X** (dismiss back to the list). There is no "continue anyway" — a faulty / wrong / incomplete item can't proceed down the no-fault change-of-mind track, and a no-fault reason can't sit in an issue/warranty flow. Track-specific copy + a 2–3 line "why this path" list + the `ProductSummary` are rendered per target.
+**Redirect UX — the `SwitchFlowSheet` (`components/ClaimFlow/SwitchFlowSheet.jsx`).** The reason-step CTA is always `Continue`. When the resolved track differs from the current flow, clicking `Continue` opens a slide-up confirm sheet (same chrome as `CancelClaimSheet` — scrim, `animate-slideUp`, Escape/backdrop/X to dismiss, body-scroll lock handled by the flow). The sheet has two modes, both **authoritative** (no "continue anyway"):
+
+- **Single-switch mode** (`change_of_mind` from an issue/warranty flow, or `compensation` from any flow): two actions — **"Switch to {track}"** (primary → dispatches `ROUTE_FROM_REASON`) and **"Choose another reason" / X** (dismiss back to the list). Track-specific copy + a 2–3 line "why this path" list + the `ProductSummary` are rendered per target.
+- **Choice mode** (`choice` prop true — a fault reason caught in the change-of-mind flow): a *"This sounds like a fault"* header + `ProductSummary`, then **two tappable cards** — **Get a replacement** (warranty target, carries a brand-toned `Recommended` badge — framed as a working device back, covered, no cost) and **Get a refund** (issue target) — each dispatching `ROUTE_FROM_REASON` with its own target via `onChoose`. A single **"Choose another reason"** footer dismisses. All icons are brand-toned.
+
+Neither mode lets a faulty / wrong / incomplete item proceed down the no-fault change-of-mind track, and a no-fault reason can't sit in an issue/warranty flow.
 
 **Scope pre-fill.** When routing into issue/warranty, `ROUTE_FROM_REASON` carries a `scope` from `scopeForReason` (`defective`/`damaged` → `not_working`, `wrong_item` → `wrong_device`) so the issue-details step opens on the matching scope group; the specific sub-type is reset so the customer still picks it. The reason itself is purely informational on the change-of-mind branch — eligibility and refund math don't branch on it.
 
@@ -257,7 +262,9 @@ How the customer-facing UI surfaces backend state:
 
 ## 5. UX decisions
 
-**Reason is required and routes the claim.** Step 2 used to be optional (with a `Skip`) and change-of-mind-only. It's now required and **shared across the three return flows**, because the reason is the safest place to catch a mis-routed claim: a faulty device sent down the no-fault change-of-mind track means substantial delays for the customer. The picker mixes genuine reasons with four fault/wrong/incomplete "catch" reasons; picking a catch reason (or a no-fault reason inside an issue/warranty flow) opens the authoritative `SwitchFlowSheet` rather than letting the wrong track proceed. The warranty-vs-issue split only fires when catching someone out of the change-of-mind flow — inside an issue/warranty flow a fault reason just continues (we only catch the clear cross-track mistakes). Routing lives in `routeForReason`; the redirect is a popup (not an inline nudge) so it's hard to skim past.
+**Reason is required and routes the claim.** Step 2 used to be optional (with a `Skip`) and change-of-mind-only. It's now required and **shared across the three return flows**, because the reason is the safest place to catch a mis-routed claim: a faulty device sent down the no-fault change-of-mind track means substantial delays for the customer. The picker mixes genuine reasons with four fault/wrong/incomplete "catch" reasons; picking a catch reason (or a no-fault reason inside an issue/warranty flow) opens the authoritative `SwitchFlowSheet` rather than letting the wrong track proceed. Routing lives in `routeForReason`; the redirect is a popup (not an inline nudge) so it's hard to skim past.
+
+**Refund vs replacement is the customer's call, not ours.** A fault reason caught in the change-of-mind flow used to auto-pick warranty-vs-issue from whether the order carried the paid Revibe Care add-on (`order.warranty > 0`). That conflated two different things — the paid add-on and basic coverage — and quietly decided the remedy for the customer. Every device carries at least a 1-year warranty, so a **replacement is always available**; the sheet now opens in **choice mode** and lets the customer pick refund (issue) or replacement (warranty). Replacement is the recommended path (it keeps the customer in a working device and avoids the refund/re-buy round-trip), surfaced with a single, deliberately light nudge — a `Recommended` badge on the replacement card, both cards otherwise reading the same. The word "replacement" is used as the customer-facing framing even though the warranty flow mechanically **repairs and returns the same unit** (no new device, no money moves — see [warranties_compensations.md](../warranties_compensations.md) §2.1).
 
 **Restocking fee shown as a red line, not folded into the headline.** The original-payment card's headline is the net amount (`gross − fee`), but the breakdown table renders the `Restocking fee (10%)` row in red so the customer sees explicitly what they're giving up. Earlier drafts hid the fee inside a tooltip — felt cagey.
 
