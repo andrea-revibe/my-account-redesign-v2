@@ -783,7 +783,12 @@ export const CLAIM_ISSUE_NODES = [
     label: 'Customer declined — claim closed',
     trigger: 'customer',
     event: 'claim.declined',
-    next: [],
+    // Declining isn't fully terminal: within the short reversal window the
+    // customer can still change their mind and pay return shipping (the closed
+    // card's "I changed my mind" CTA), which creates the ship-back — the same
+    // node as paying from the action-needed gate, so the dev panel stays in
+    // lockstep.
+    next: ['claim_return_shipping_paid'],
     apply: (o) => ({
       ...o,
       claim: {

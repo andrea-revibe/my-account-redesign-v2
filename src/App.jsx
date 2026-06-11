@@ -357,6 +357,37 @@ export default function App() {
     return false
   }
 
+  // "Pay return shipping" on InvalidClaimCard. Mirrors handleConfirmReschedule:
+  // in journey mode it advances the customer-triggered `claim_return_shipping_paid`
+  // node (so the dev panel moves in lockstep with the card flipping to its paid
+  // ship-back state), guarded by validNext. Reachable from both the invalid
+  // verdict gate (`claim_invalid_confirmed`), the post-collection cancel gate
+  // (`claim_cancelled_shipback`), and the declined card's "I changed my mind"
+  // reversal (`claim_invalid_declined`) — all three fork to that node. Returns
+  // true when it advances; outside journey mode it returns false and the card
+  // falls back to local state (the standalone invalid-claim mock).
+  const handlePayReturnShipping = (orderId) => {
+    if (!journeyMode || isSandbox) return false
+    if (journey.validNext().some((n) => n.id === 'claim_return_shipping_paid')) {
+      journey.advance('claim_return_shipping_paid')
+      return true
+    }
+    return false
+  }
+
+  // "Decline" on InvalidClaimCard's invalid-verdict surface — advances the
+  // customer-triggered `claim_invalid_declined` node (claim closed, no refund).
+  // Only the invalid variant reaches it; the cancel variant shows "Keep claim"
+  // instead. Falls back to local state outside journey mode.
+  const handleDeclineReturn = (orderId) => {
+    if (!journeyMode || isSandbox) return false
+    if (journey.validNext().some((n) => n.id === 'claim_invalid_declined')) {
+      journey.advance('claim_invalid_declined')
+      return true
+    }
+    return false
+  }
+
   // Step 7 "Track this return" — close the flow and signal the matched
   // ClaimCard to mount expanded. Bumping `n` forces the key change.
   const handleTrackClaim = (orderId) => {
@@ -565,6 +596,8 @@ export default function App() {
                           key={o.id}
                           order={o}
                           onKeepClaim={handleKeepClaim}
+                          onPayReturnShipping={handlePayReturnShipping}
+                          onDeclineReturn={handleDeclineReturn}
                         />
                       )
                     }
@@ -636,6 +669,8 @@ export default function App() {
                           key={o.id}
                           order={o}
                           onKeepClaim={handleKeepClaim}
+                          onPayReturnShipping={handlePayReturnShipping}
+                          onDeclineReturn={handleDeclineReturn}
                         />
                       )
                     }

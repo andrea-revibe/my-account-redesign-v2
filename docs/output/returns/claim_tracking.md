@@ -267,7 +267,7 @@ stateDiagram-v2
     action_needed --> [*]: customer ignored → auto-close
 ```
 
-None of the transitions persist across re-renders or unmounts.
+**Journey-driven (derived state).** The CTAs advance the journey, so the dev panel and the card stay in lockstep: `Pay` and the declined card's `I changed my mind and will pay` both advance `claim_return_shipping_paid` (the QC-verdict `claim_invalid_confirmed`, the post-collection cancel `claim_cancelled_shipback`, **and** the now-non-terminal `claim_invalid_declined` all fork to it), and `Decline` advances `claim_invalid_declined`. The card derives its state from the order data — **`paidAt` wins over `declinedAt`** (paying is forward of a prior decline, and the paid node spreads the existing `invalidClaim` so both stamps coexist after a reversal) — so a dev-panel Back re-syncs the card both ways with no sync effect. Each CTA is `validNext`-gated (`App.jsx`'s `handlePayReturnShipping` / `handleDeclineReturn`); a `localMode` override covers the standalone mock, where there's no journey to write the stamps back. Mirrors `PickupFailedCard` / `ResetFailedCard`.
 
 **Collapsed (action_needed).** Danger-toned left accent strip; eyebrow; `Action needed` pill; tinted hero with `Return claim` label, `Inspection complete` right-align phase tag (ShieldX glyph), headline `Claim couldn't be approved`, one-line truncated quote from Revibe Quality, countdown strip (`3 days, 8 hours left to pay return shipping · Claim auto-closes {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
 
@@ -276,7 +276,7 @@ None of the transitions persist across re-renders or unmounts.
 1. **Return shipping fee card** — single-row read-only summary showing the fee amount (`{currency} {amount}`) on the right and the `Return shipping fee` eyebrow on the left. Intentionally minimal — the address moved out of this card so each block has one job.
 2. **Delivery details card** — address + phone + email block carrying the saved values from `claim.pickupDetails`. Read-only by default; when the customer taps the `Change delivery details` button below it, the card flips into an inline edit mode (three input fields stacked with Save / Cancel beneath). Save commits the next values back to local component state and exits edit mode; Cancel discards the draft. Local state only — the change does not propagate back to the order data.
 3. **`Change delivery details` button** — solid border-brand outline, Settings2 glyph, copy and chrome borrowed from `InProgressCard`'s "Change details". Hidden while the delivery-details card is in edit mode.
-4. **Footer** — `Decline` (secondary outline) + `Pay {currency} {amount}` (solid danger-red primary action with CreditCard glyph). The two actions are mutually exclusive — both flip the card into a different terminal state.
+4. **Footer** — `Decline` (secondary outline) + `Pay {currency} {amount}` (solid danger-red primary action with CreditCard glyph). The two actions are mutually exclusive; both advance the journey to a different state (see **Journey-driven** above).
 
 **Paid / shipping-back state.** Tapping `Pay` (or a journey advancing `paidAt`) flips the card to a return-shipment trajectory. It is **tone-aware**: brand-purple while the device is in transit, flipping to **success-green** once delivered — the same tonal shift `WarrantyClaimCard` makes across `ship_back → device_returned`.
 
@@ -290,7 +290,7 @@ None of the transitions persist across re-renders or unmounts.
 
 - Muted-foreground left accent strip, `Claim closed` pill (ClipboardList glyph), `No refund issued` right-align tag.
 - Hero: `Claim closed — device not returned` with a one-line explanation that the inspection didn't confirm the issue and the customer declined to cover return shipping.
-- Expanded body: a warn-toned reversal block headlined `Still want your device back?` with the copy-locked CTA `I changed my mind and will pay for the shipment fee` (CreditCard glyph). The verbatim string is fixed by product. Tapping it flips the card into the paid state.
+- Expanded body: a warn-toned reversal block headlined `Still want your device back?` with the copy-locked CTA `I changed my mind and will pay for the shipment fee` (CreditCard glyph). The verbatim string is fixed by product. Tapping it advances the same `claim_return_shipping_paid` node as `Pay` (the declined node forks to it), flipping the card into the paid ship-back state — and the dev panel moves with it.
 
 ### 3.4 ResetFailedCard — Activation Lock still on at QC → remote unlink + passcode
 
