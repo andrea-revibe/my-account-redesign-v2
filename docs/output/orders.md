@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8333006
+verified_against: edad8a0
 covers:
   - src/App.jsx
   - src/lib/statuses.js

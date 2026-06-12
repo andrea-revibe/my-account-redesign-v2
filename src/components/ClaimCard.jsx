@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
-  Copy,
   Download,
   Wallet,
   CreditCard,
@@ -28,6 +27,7 @@ import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
 import Timeline from './Timeline'
+import { TrackingDropdown } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
 
 // Card chrome is the refund-hero family (see PastOrderCard cancelled
@@ -111,7 +111,11 @@ export default function ClaimCard({
 
           {Boolean(claim.transitSubTimeline?.picked_up) &&
             countryConfig(order).detailedTracking && (
-              <ClaimTransitDetail claim={claim} order={order} />
+              <TrackingDropdown
+                steps={CLAIM_TRANSIT_SUB_STATUSES}
+                currentIndex={transitSubProgressIndex(claim.transitSubStatusId)}
+                stamps={claim.transitSubTimeline}
+              />
             )}
 
           {(() => {
@@ -341,74 +345,4 @@ function DestinationChip({ claim, order, accent, onOpenWallet }) {
     </span>
   )
 }
-function ClaimTransitDetail({ claim, order }) {
-  const [show, setShow] = useState(false)
-  const cur = transitSubProgressIndex(claim.transitSubStatusId)
-
-  return (
-    <div className="px-1">
-      <button
-        type="button"
-        onClick={() => setShow((v) => !v)}
-        aria-expanded={show}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-[10px] border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-line-2"
-      >
-        <span>{show ? 'Hide detailed tracking' : 'See detailed tracking'}</span>
-        <ChevronDown
-          size={16}
-          strokeWidth={1.75}
-          className={`text-ink-2 transition-transform ${show ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {show && (
-        <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
-          {(order.courier || order.trackingNumber) && (
-            <TransitCourierStrip order={order} />
-          )}
-          <Timeline
-            orientation="vertical"
-            dense
-            tone="brand"
-            steps={CLAIM_TRANSIT_SUB_STATUSES}
-            currentIndex={cur}
-            stamps={claim.transitSubTimeline || {}}
-          />
-          <div className="pb-1" />
-        </div>
-      )}
-    </div>
-  )
-}
-
-function TransitCourierStrip({ order }) {
-  return (
-    <div className="flex items-center gap-2.5 p-2.5 mb-3 rounded-[10px] border border-line bg-surface">
-      <span className="w-9 h-7 rounded-md grid place-items-center text-[11px] font-extrabold tracking-[0.04em] bg-[#ffcc00] text-[#1a1a1a] shrink-0">
-        DHL
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-semibold text-ink truncate">
-          {order.courier || 'Courier'}
-        </div>
-        {order.trackingNumber && (
-          <div className="text-[11.5px] text-muted mt-px tabular-nums truncate">
-            Tracking #{order.trackingNumber}
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        aria-label="Copy tracking number"
-        onClick={() =>
-          order.trackingNumber &&
-          navigator.clipboard?.writeText(order.trackingNumber)
-        }
-        className="w-8 h-8 rounded-lg grid place-items-center border border-line text-ink-2 hover:bg-line-2 shrink-0"
-      >
-        <Copy size={14} strokeWidth={1.75} />
-      </button>
-    </div>
-  )
-}
-
 

@@ -4,6 +4,8 @@ Internal demo project. One line per material change, newest at the top. Phase he
 
 ## Unreleased
 
+- Harmonized every claim courier-leg `See detailed tracking` dropdown into one shared `TrackingDropdown` (`ReturnShipmentTracking.jsx`): `ClaimCard`'s inbound and `WarrantyClaimCard`'s inbound now reuse it (dropping the per-card `ClaimTransitDetail` / `PickupTransitDetail` helpers); `ReturnShipmentTracking` becomes a thin return-leg adapter. The copyable courier/AWB strip is replaced by a Track package (→ DHL test shipment) / Get Help (placeholder) action row; `CourierStrip` export removed. `src/components/{ReturnShipmentTracking,ClaimCard,WarrantyClaimCard}.jsx`.
+- Reworded the change-of-mind Step 1 claim-type label from "I changed my mind" to "My device works great, but I want to return it". `src/components/ClaimFlow/Step1ClaimType.jsx`.
 
 ## 2026-06-11
 

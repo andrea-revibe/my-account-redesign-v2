@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8333006
+verified_against: edad8a0
 covers:
   - src/components/WarrantyClaimCard.jsx
   - src/components/ClaimFlow/Step2Compensation.jsx
@@ -21,7 +21,7 @@ Step 1's full option set across the returns flow:
 
 | Step 1 option | Sub-options | Status |
 |---|---|---|
-| `I changed my mind` | — | **Wired** — see [returns/change_of_mind.md](./returns/change_of_mind.md) |
+| `My device works great, but I want to return it` | — | **Wired** — see [returns/change_of_mind.md](./returns/change_of_mind.md) |
 | `Something's wrong with my device` | `Return for a refund` | **Wired** — see [returns/issue.md](./returns/issue.md) |
 | `Something's wrong with my device` | `Use my warranty` | **Wired** — intake + tracking — covered here (§2) |
 | `Request compensation` | shipping refund / faulty charger — keep the item | **Wired** — intake + tracking — covered here (§3) |
@@ -76,8 +76,10 @@ Most states reuse a generic claim hero (eyebrow + headline + ref + updated times
 
 The card carries detailed tracking for **one leg at a time**, mirroring the device's physical journey:
 
-- **Inbound (customer → Revibe), neutral chrome.** `PickupTransitDetail` — a neutral-toned `See detailed tracking` button over the 4-stop inverse-journey `CLAIM_TRANSIT_SUB_STATUSES` (Picked up → … → Arrived at Revibe hub) plus a courier strip reading the order's `courier` / `trackingNumber`. Shown only while the device is still inbound: gated on `claim.transitSubTimeline?.picked_up` **and** `!claim.shipBack?.awb`, so the moment the return shipment exists the inbound dropdown disappears and the return one takes its place.
-- **Return (Revibe → customer), brand chrome.** The shared **`ReturnShipmentTracking`** component (`src/components/ReturnShipmentTracking.jsx`) — a brand-toned `See detailed tracking` button (Truck glyph, `border-brand bg-brand-bg/60 text-brand`, **collapsed by default**, the brand styling cues "tap me") surfaced whenever `claim.shipBack?.awb` is set. This is the **single source of truth** for the return leg, shared verbatim with `InvalidClaimCard`'s paid surface so the two return-shipment cards can't drift.
+Both legs now render through one shared **`TrackingDropdown`** (`src/components/ReturnShipmentTracking.jsx`) — brand chrome (Truck glyph, `border-brand bg-brand-bg/60 text-brand`, **collapsed by default**), passed the leg's stop list / progress / stamps:
+
+- **Inbound (customer → Revibe).** `TrackingDropdown` over the 4-stop inverse-journey `CLAIM_TRANSIT_SUB_STATUSES` (Picked up → … → Arrived at Revibe hub), driven by `transitSubProgressIndex(claim.transitSubStatusId)` + `claim.transitSubTimeline`. Shown only while the device is still inbound: gated on `claim.transitSubTimeline?.picked_up` **and** `!claim.shipBack?.awb`, so the moment the return shipment exists the inbound dropdown disappears and the return one takes its place.
+- **Return (Revibe → customer).** The `ReturnShipmentTracking` adapter (thin wrapper over the same `TrackingDropdown`) surfaced whenever `claim.shipBack?.awb` is set. This is the **single source of truth** for the return leg, shared verbatim with `InvalidClaimCard`'s paid surface so the two return-shipment cards can't drift.
 
 The return dropdown reuses the standard outbound `SHIPPING_SUB_STATUSES` from `lib/statuses.js` so a warranty return reads with the **same four milestones as a normal outgoing order**:
 
@@ -86,7 +88,7 @@ The return dropdown reuses the standard outbound `SHIPPING_SUB_STATUSES` from `l
 3. Forwarded to third-party agent
 4. Out for delivery
 
-Plus a courier strip (DHL chip + courier + AWB + copy button) above the timeline. Driven by `claim.shipBack.subStatusId` (one of the four ids) and `claim.shipBack.subTimeline` (map of id → timestamp).
+Followed by a Track package / Get Help action row (Track package → the hardcoded DHL test shipment; Get Help is a not-yet-wired placeholder) below the timeline. Driven by `claim.shipBack.subStatusId` (one of the four ids) and `claim.shipBack.subTimeline` (map of id → timestamp). The earlier copyable courier strip (DHL chip + courier + AWB + copy button) has been replaced by the action row.
 
 #### 2.3.4 Expanded view
 

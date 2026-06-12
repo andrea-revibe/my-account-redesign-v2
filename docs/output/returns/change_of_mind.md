@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8333006
+verified_against: edad8a0
 covers:
   - src/components/ClaimFlow
   - src/lib/returns.js
@@ -70,7 +70,7 @@ The Step 7 ack cards (§2.8) and the iOS reset-guide gate (§2.4) are the origin
 
 Three top-level cards; nothing pre-selected:
 
-- `I changed my mind` → `claimType: 'change_of_mind'`. Sets the type and exposes `Continue`.
+- `My device works great, but I want to return it` → `claimType: 'change_of_mind'`. Sets the type and exposes `Continue`.
 - `Something's wrong with my device` → no claim type set on tap. Expands an inline accordion that reveals two nested sub-cards: `Return for a refund` → `claimType: 'issue'`, and `Use my warranty` → `claimType: 'warranty'` (warranty branch — see [warranties_compensations.md](../warranties_compensations.md) §2).
 - `Request compensation` (shipping refund or faulty accessory — keep the item) — third primary card; stubbed.
 

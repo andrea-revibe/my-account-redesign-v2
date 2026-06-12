@@ -75,7 +75,7 @@ export default function Step1ClaimType({ state, dispatch, error }) {
           </span>
           <span className="flex-1 min-w-0">
             <span className="block text-[14.5px] font-semibold text-ink">
-              I changed my mind
+              My device works great, but I want to return it
             </span>
             <span className="block text-[12px] text-muted mt-0.5">
               Return the item for a refund
