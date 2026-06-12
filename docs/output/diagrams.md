@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8333006
+verified_against: edad8a0
 covers:
   - src/App.jsx
   - src/lib/claims.js
@@ -18,7 +18,7 @@ These are hand-maintained — there's no generator. When routing precedence, a c
 
 ## Card routing
 
-**Read before:** touching the routing precedence in `App.jsx`, adding a card variant, or adding a takeover flag. **Source:** `src/App.jsx` — `isOpen` L60, in-progress ladder L452–531, past ladder L548–586.
+**Read before:** touching the routing precedence in `App.jsx`, adding a card variant, or adding a takeover flag. **Source:** `src/App.jsx` — `isOpen` L51, in-progress ladder L562–649, past ladder L665–716.
 
 `App.jsx` routes in **two stages**, not one flat precedence list. First `isOpen(order)` partitions the filtered orders into the *In progress* and *Past* sections; then a precedence ladder inside each section picks the card. In journey mode the list is a single replayed order (`projectedOrders = [activeOrderFromJourney]`) routed through the *same* ladder. Each takeover branch in code is guarded by `hasActiveClaim(o) && o.claim?.X` — a takeover claim is always active, so what matters is the ladder order.
 
@@ -103,7 +103,7 @@ Notes:
 
 ## Returns data-flow
 
-**Read before:** changing how a submitted claim reaches a card, the undo, or the track-to-expand behaviour. **Source:** `src/App.jsx` — `handleSubmitClaim`·214, projection·316, `UndoSnackbar` wiring·629, `handleTrackClaim`·310; `src/components/ClaimFlow/ClaimFlow.jsx` (`onSubmitClaim`).
+**Read before:** changing how a submitted claim reaches a card, the undo, or the track-to-expand behaviour. **Source:** `src/App.jsx` — `handleSubmitClaim`·231, projection·412, `UndoSnackbar` wiring·768, `handleTrackClaim`·393; `src/components/ClaimFlow/ClaimFlow.jsx` (`onSubmitClaim`).
 
 The coupling here is a **runtime projection**, not an import: the seeded claim is stitched onto the order at render time. This is the path most likely to confuse, because no import edge connects `ClaimFlow` to the card that ends up rendering.
 
@@ -112,7 +112,7 @@ flowchart TD
   A["ClaimFlow overlay — user completes steps"] -->|"handlePrimary → onSubmitClaim(orderId, claim); seed always claimStatusId:'initiated'"| B{"journeyMode?"}
   B -- "yes (replay)" --> J["journey.advance('claim_submitted_*') — no submittedClaims write"]
   B -- "no" --> C["App.setSubmittedClaims({...prev, [orderId]: claim}) + setRecentSubmit"]
-  C --> D["projectedOrders = ORDERS.map(o => submittedClaims[o.id] ? {...o, claim} : o)  (App.jsx ~L316)"]
+  C --> D["projectedOrders = ORDERS.map(o => submittedClaims[o.id] ? {...o, claim} : o)  (App.jsx ~L436)"]
   D --> E["isOpen(o) re-partitions → order enters In-progress section"]
   E --> F["Card-routing ladder → ClaimCard / WarrantyClaimCard (or a takeover card if the claim carries a takeover flag)"]
   C --> G["UndoSnackbar (8s) — Undo deletes submittedClaims[orderId] → order reverts to PastOrderCard"]

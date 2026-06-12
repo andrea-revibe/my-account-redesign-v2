@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 104d3b7
+verified_against: edad8a0
 covers:
   - src/lib/wallet.js
   - src/data/wallet.js

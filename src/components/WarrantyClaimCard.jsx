@@ -27,7 +27,7 @@ import Timeline from './Timeline'
 import DeliveryAddressPill from './DeliveryAddressPill'
 import {
   ReturnShipmentTracking,
-  CourierStrip,
+  TrackingDropdown,
 } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
 
@@ -119,7 +119,11 @@ export default function WarrantyClaimCard({
           {Boolean(claim.transitSubTimeline?.picked_up) &&
             !claim.shipBack?.awb &&
             countryConfig(order).detailedTracking && (
-              <PickupTransitDetail claim={claim} order={order} />
+              <TrackingDropdown
+                steps={CLAIM_TRANSIT_SUB_STATUSES}
+                currentIndex={transitSubProgressIndex(claim.transitSubStatusId)}
+                stamps={claim.transitSubTimeline}
+              />
             )}
 
           {/* Return-shipment (Revibe → customer) detailed tracking,
@@ -370,49 +374,6 @@ function ShipBackHero({ order, claim }) {
           Claim · {claimTypeLabel(claim)}
         </span>
       </div>
-    </div>
-  )
-}
-// Pickup-leg (inbound) detailed tracking — mirrors ClaimCard's
-// ClaimTransitDetail. Uses the inverse-journey stop list
-// (CLAIM_TRANSIT_SUB_STATUSES). Neutral chrome — the shared
-// ReturnShipmentTracking dropdown owns the brand-toned styling, and the
-// two never show together (this is gated to the pre-return window).
-function PickupTransitDetail({ claim, order }) {
-  const [show, setShow] = useState(false)
-  const cur = transitSubProgressIndex(claim.transitSubStatusId)
-
-  return (
-    <div className="px-1">
-      <button
-        type="button"
-        onClick={() => setShow((v) => !v)}
-        aria-expanded={show}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-[10px] border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-line-2"
-      >
-        <span>{show ? 'Hide detailed tracking' : 'See detailed tracking'}</span>
-        <ChevronDown
-          size={16}
-          strokeWidth={1.75}
-          className={`text-ink-2 transition-transform ${show ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {show && (
-        <div className="mt-2.5 pt-3.5 px-3.5 pb-1 rounded-[12px] border border-line bg-canvas animate-slideDown">
-          {(order.courier || order.trackingNumber) && (
-            <CourierStrip courier={order.courier} awb={order.trackingNumber} />
-          )}
-          <Timeline
-            orientation="vertical"
-            dense
-            tone="brand"
-            steps={CLAIM_TRANSIT_SUB_STATUSES}
-            currentIndex={cur}
-            stamps={claim.transitSubTimeline || {}}
-          />
-          <div className="pb-1" />
-        </div>
-      )}
     </div>
   )
 }

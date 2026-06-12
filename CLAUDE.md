@@ -79,7 +79,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 - **Notification copy is owner-only.** Never add, edit, or remove entries in `src/data/notifications/*` (the customer-facing WhatsApp/email strings) — only Andrea touches that content. You may wire a node to a new `event` (an unauthored event resolves to a `silent` notification); leave authoring the copy to the owner.
 - New status / sub-status / state? Edit `src/lib/statuses.js` only — timeline, banner, header, chips are data-driven from there.
 - Tailwind: prefer custom tokens (`brand`, `accent`, `success`, `progress`, `chip-*`, `searchBg`, `ink`, `muted`, `line`, `surface`) over arbitrary values. Slash-opacity (`bg-brand/10`) works on every token.
-- "Need a screenshot for verification" → playwright at viewport 430×N, `deviceScaleFactor: 2`, `_snap.mjs` at the repo root.
+- "Need a screenshot for verification" → there's no checked-in harness; write a throwaway playwright script at viewport 430×N, `deviceScaleFactor: 2`, or verify manually in the running dev server.
 
 ## Gotchas
 
