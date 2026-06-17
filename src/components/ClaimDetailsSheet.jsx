@@ -5,6 +5,7 @@ import {
   devicePrepText,
   refundMethodLabel,
   claimTypeLabel,
+  formatClaimRef,
 } from '../lib/claims'
 import { COMPENSATION_SUBTYPE_LABELS } from './ClaimFlow/compensationSubtypes'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
@@ -57,7 +58,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
               Claim details
             </div>
             <div className="text-[12px] text-muted mt-0.5 truncate tabular-nums">
-              {claim.claimRef} · Order #{order.id}
+              {formatClaimRef(claim)} · Order #{order.id}
             </div>
           </div>
           <button

@@ -421,6 +421,30 @@ export function claimTypeLabel(typeOrClaim) {
   return CLAIM_TYPE_LABELS[type] || 'Claim'
 }
 
+// Typed claim-ref format: a self-describing prefix by claim type + the
+// uppercased bare ref (e.g. `Ib4nP9` change-of-mind → `RET-IB4NP9`). The
+// stored `claim.claimRef` is an inconsistent random string — sometimes bare
+// (`Ib4nP9`), sometimes already prefixed without a dash (`RETrXc1`) — so we
+// strip any leading type prefix before re-prefixing, making the format the
+// single source of truth at display time.
+export const CLAIM_REF_PREFIXES = {
+  change_of_mind: 'RET',
+  issue: 'RET',
+  warranty: 'WAR',
+  compensation: 'CMP',
+  cancellation: 'CXL',
+}
+
+export function formatClaimRef(claimOrRef, type) {
+  const raw =
+    typeof claimOrRef === 'string' ? claimOrRef : claimOrRef?.claimRef
+  if (!raw) return ''
+  const claimType = type ?? (typeof claimOrRef === 'object' ? claimOrRef?.type : undefined)
+  const prefix = CLAIM_REF_PREFIXES[claimType] || 'CLM'
+  const bare = raw.replace(/^(RET|WAR|CMP|CXL|RETURN)-?/i, '').toUpperCase()
+  return `${prefix}-${bare}`
+}
+
 // Every claim type submits proof (issue/warranty/compensation require an
 // attachment in ClaimFlow Step 2) except change-of-mind, which has nothing to
 // review. Drives the divergent `claim.created` intake notification.

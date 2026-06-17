@@ -160,6 +160,9 @@ export function formatShortDate(date) {
   })
 }
 
+// Returns the bare ref only — the self-describing type prefix (`RET-`/`WAR-`/
+// `CMP-`/`CXL-`) is applied at display time by `formatClaimRef` in lib/claims,
+// so the prototype's seeded refs and freshly-submitted ones format identically.
 export function generateClaimRef() {
   return 'IXipP8'
 }

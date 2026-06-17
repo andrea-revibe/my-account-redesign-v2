@@ -14,6 +14,8 @@ import {
 
 import { ProductSummary } from './ProductSummary'
 import TapToFixCta from './TapToFixCta'
+import OrderClaimLink from './OrderClaimLink'
+import { formatClaimRef } from '../lib/claims'
 
 const NOTE_MAX = 280
 
@@ -54,13 +56,15 @@ export default function DocsRejectedCard({
 
   if (submitted) {
     return (
-      <ResubmittedCard
-        order={order}
-        files={files}
-        note={note}
-        expanded={expanded}
-        onToggle={() => setExpanded((v) => !v)}
-      />
+      <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
+        <ResubmittedCard
+          order={order}
+          files={files}
+          note={note}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+        />
+      </OrderClaimLink>
     )
   }
 
@@ -68,6 +72,7 @@ export default function DocsRejectedCard({
   const r = claim.docsRejection
 
   return (
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2">
       <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 bg-danger" />
 
@@ -79,7 +84,7 @@ export default function DocsRejectedCard({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden
@@ -220,6 +225,7 @@ export default function DocsRejectedCard({
         </div>
       )}
     </article>
+    </OrderClaimLink>
   )
 }
 
@@ -238,7 +244,7 @@ function ResubmittedCard({ order, files, note, expanded, onToggle }) {
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden

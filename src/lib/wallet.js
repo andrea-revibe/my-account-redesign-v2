@@ -1,9 +1,10 @@
 // Single source of truth for the Revibe Wallet surface (the pill in GreetRow
-// + WalletSheet). The wallet is account-level, so the ledger is derived from
-// the full ORDERS set (not the filtered/projected list): every refund that
-// landed in the Wallet becomes a credit, merged with the hand-seeded history
-// in data/wallet.js. The only in-session mutation is `transfers` — a map of
-// txId → true for credits the customer has moved to their card.
+// + WalletSheet). The ledger is derived from whatever order list the caller
+// passes (App.jsx passes the journey-projected orders in journey mode, else
+// none): every refund that landed in the Wallet becomes a credit, merged with
+// the hand-seeded history in data/wallet.js. The only in-session mutation is
+// `transfers` — a map of txId → true for credits the customer has moved to
+// their card.
 //
 // Two refund paths credit the Wallet:
 //   • return claim    — claim.refundMethod 'wallet' + claimStatusId

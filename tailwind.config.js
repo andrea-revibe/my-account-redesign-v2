@@ -121,6 +121,14 @@ export default {
           '0%, 100%': { opacity: '0.8' },
           '50%': { opacity: '1' },
         },
+        // Brief highlight ring on the claim card after returning from the
+        // Original-order sheet's "Linked claim" link — an inset brand ring
+        // that breathes a few times then settles. Applied via motion-safe:
+        // so prefers-reduced-motion falls back to the overlay's static ring.
+        ringPulse: {
+          '0%, 100%': { boxShadow: 'inset 0 0 0 0 rgba(80,25,160,0)' },
+          '50%': { boxShadow: 'inset 0 0 0 2.5px rgba(80,25,160,0.85)' },
+        },
       },
       animation: {
         slideDown: 'slideDown 0.3s ease',
@@ -133,6 +141,7 @@ export default {
         ctaNudge: 'ctaNudge 3.8s ease-in-out infinite',
         timelinePulse: 'timelinePulse 2.4s ease-in-out infinite',
         timelineConnPulse: 'timelineConnPulse 2.4s ease-in-out infinite',
+        ringPulse: 'ringPulse 0.85s ease-in-out 3',
       },
     },
   },

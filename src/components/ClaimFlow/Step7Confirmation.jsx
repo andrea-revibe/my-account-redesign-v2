@@ -9,7 +9,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
-import { claimTypeLabel, expectedCompletionFor } from '../../lib/claims'
+import { claimTypeLabel, expectedCompletionFor, formatClaimRef } from '../../lib/claims'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 
 export default function Step7Confirmation({ state, order, onClose, onTrack }) {
@@ -39,8 +39,9 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
       ? 'You confirmed the device is factory reset.'
       : 'Thanks for unlinking the device and sharing your passcode.'
 
+  const claimRef = formatClaimRef(state.claimRef, state.claimType)
   const copy = () => {
-    navigator.clipboard?.writeText(state.claimRef)
+    navigator.clipboard?.writeText(claimRef)
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
   }
@@ -69,7 +70,7 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="text-[18px] font-bold text-ink tabular-nums tracking-[-0.01em]">
-              {state.claimRef}
+              {claimRef}
             </span>
             <button
               type="button"

@@ -16,11 +16,13 @@ import {
   warrantyClaimStatusHeadline,
   warrantyClaimStatusSubline,
   claimTypeLabel,
+  formatClaimRef,
   CLAIM_TRANSIT_SUB_STATUSES,
   transitSubProgressIndex,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
+import OrderClaimLink from './OrderClaimLink'
 import HistoryThread from './HistoryThread'
 import { ProductSummary } from './ProductSummary'
 import Timeline from './Timeline'
@@ -72,6 +74,7 @@ export default function WarrantyClaimCard({
   const t = TONE[tone]
 
   return (
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
       <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-1 ${t.bg}`} />
 
@@ -82,7 +85,9 @@ export default function WarrantyClaimCard({
         className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-center justify-between gap-2">
-          <OrderEyebrow id={order.id} />
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
+            {formatClaimRef(claim)}
+          </div>
           <span
             aria-hidden
             className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
@@ -167,14 +172,7 @@ export default function WarrantyClaimCard({
         onClose={() => setDetailsOpen(false)}
       />
     </article>
-  )
-}
-
-function OrderEyebrow({ id }) {
-  return (
-    <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-      Order · #{id}
-    </div>
+    </OrderClaimLink>
   )
 }
 
@@ -234,15 +232,9 @@ function WarrantyHero({ order, claim, tone }) {
         {headline}
       </div>
 
-      <div className="mt-1 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
-        <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
-        {subline && (
-          <>
-            <span className="text-muted/60">·</span>
-            <span>{subline}</span>
-          </>
-        )}
-      </div>
+      {subline && (
+        <div className="mt-1 text-[11.5px] text-ink-2">{subline}</div>
+      )}
 
       {showScheduledPickup && (
         <ScheduledPickupStrip
@@ -368,8 +360,6 @@ function ShipBackHero({ order, claim }) {
       </div>
       <DeliveryAddressPill label="Delivering to" address={order.address} />
       <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
-        <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
-        <span className="text-muted/60">·</span>
         <span className="font-semibold uppercase tracking-[0.08em] text-[10.5px]">
           Claim · {claimTypeLabel(claim)}
         </span>

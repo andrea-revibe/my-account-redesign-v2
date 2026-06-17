@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { X, AlertTriangle, RotateCcw, PackageCheck, Wallet, Truck } from 'lucide-react'
-import { claimTypeLabel, cancelNeedsShipBack, cancelReturnGate } from '../lib/claims'
+import { claimTypeLabel, cancelNeedsShipBack, cancelReturnGate, formatClaimRef } from '../lib/claims'
 import { ProductSummary } from './ProductSummary'
 
 // Confirmation sheet for cancelling an in-flight claim. Mirrors
@@ -49,7 +49,7 @@ export default function CancelClaimSheet({ order, open, onConfirm, onClose }) {
       <div className="relative w-full max-w-mobile bg-surface rounded-t-[22px] shadow-lg2 max-h-[92vh] flex flex-col animate-slideUp overflow-hidden">
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Claim {claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <button
             type="button"
