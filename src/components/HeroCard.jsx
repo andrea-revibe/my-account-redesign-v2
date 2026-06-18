@@ -27,7 +27,7 @@ const DHL_TRACKING_URL =
 // Hero card pulls the most-active order to the very top of the list with a
 // dark gradient background. Inside-out structure: eyebrow → headline →
 // product strip → dot timeline → optional detailed-tracking expand → CTAs.
-export default function HeroCard({ order }) {
+export default function HeroCard({ order, onRaiseClaim }) {
   const [showDetail, setShowDetail] = useState(false)
   if (!order) return null
 
@@ -122,7 +122,11 @@ export default function HeroCard({ order }) {
 
         <div className="mt-2 flex gap-2">
           <CancelOrderButton />
-          <GhostBtn icon={AlertTriangle} label="Raise a claim" />
+          <GhostBtn
+            icon={AlertTriangle}
+            label="Raise a claim"
+            onClick={() => onRaiseClaim?.(order.id)}
+          />
         </div>
       </div>
     </section>

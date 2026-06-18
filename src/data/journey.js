@@ -24,8 +24,24 @@ import { CLAIM_COM_NODES } from './journeys/claimChangeOfMind'
 import { CLAIM_WARRANTY_NODES } from './journeys/claimWarranty'
 import { CLAIM_ISSUE_NODES } from './journeys/claimIssue'
 import { CLAIM_COMPENSATION_NODES } from './journeys/claimCompensation'
+import {
+  withInTransitClaim,
+  IN_TRANSIT_ENTRY_STAGES,
+} from './journeys/inTransitClaim'
 
 export { INITIAL_ORDER }
+
+// Each claim journey also lets the customer raise the claim from the in-flight
+// hero (before delivery), gated by a silent agent delivery-confirmation step.
+// Grafted on here so the branch is identical across all four — see
+// journeys/inTransitClaim.js. `submitNodeIds` are that journey's existing
+// post-delivery submission nodes; the confirmed branch reuses them so the
+// wallet/card / compensation-subtype fork is preserved.
+const inTransit = (nodes, submitNodeIds) =>
+  withInTransitClaim(nodes, {
+    entryStageIds: IN_TRANSIT_ENTRY_STAGES,
+    submitNodeIds,
+  })
 
 export const JOURNEYS = [
   {
@@ -65,24 +81,33 @@ export const JOURNEYS = [
         image: '/iphone-cutout.png',
       },
     },
-    nodes: CLAIM_COM_NODES,
+    nodes: inTransit(CLAIM_COM_NODES, [
+      'claim_submitted_wallet',
+      'claim_submitted_card',
+    ]),
   },
   {
     id: 'claim_issue',
     label: 'Issue / wrong-device claim',
     initialOrder: INITIAL_ORDER,
-    nodes: CLAIM_ISSUE_NODES,
+    nodes: inTransit(CLAIM_ISSUE_NODES, [
+      'claim_submitted_wallet',
+      'claim_submitted_card',
+    ]),
   },
   {
     id: 'claim_warranty',
     label: 'Warranty claim',
     initialOrder: INITIAL_ORDER,
-    nodes: CLAIM_WARRANTY_NODES,
+    nodes: inTransit(CLAIM_WARRANTY_NODES, ['claim_submitted_warranty']),
   },
   {
     id: 'claim_compensation',
     label: 'Compensation claim',
     initialOrder: INITIAL_ORDER,
-    nodes: CLAIM_COMPENSATION_NODES,
+    nodes: inTransit(CLAIM_COMPENSATION_NODES, [
+      'claim_submitted_shipping_refund',
+      'claim_submitted_charger',
+    ]),
   },
 ]
