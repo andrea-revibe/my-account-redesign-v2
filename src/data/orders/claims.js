@@ -662,4 +662,80 @@ export const CLAIM_ORDERS = [
       },
     },
   },
+  // ----- Closed-by-Revibe mock: delivered → issue claim that QC reviewed and
+  // could not reproduce, so Revibe closed it without accepting (no refund, the
+  // customer keeps the device). `claim.closure` routes it to ClosedClaimCard
+  // (terminal, Past orders, Claims-filter `Closed` bucket). claimStatusId stays
+  // at `qc` — the closure flag is the terminal, not a refund state.
+  {
+    id: '89705',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '21/03/2026 09:12 AM',
+    placedAtFull: '21 Mar 2026 · 9:12 AM',
+    deliveredOn: '2026-03-28',
+    deliveredOnLong: 'Saturday, 28 March',
+    quantity: 1,
+    unitPrice: 549,
+    subtotal: 549,
+    warranty: 50,
+    total: 599,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193401',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '21 Mar · 9:12 AM',
+      quality_check: '23 Mar · 10:04 AM',
+      shipped: '25 Mar · 4:48 PM',
+      delivered: '28 Mar · 1:22 PM',
+    },
+    product: {
+      name: 'iPhone XR',
+      variant: 'White · 128 GB · Good',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Cl0sd2',
+      claimStatusId: 'qc',
+      type: 'issue',
+      submittedAt: '02 Apr 2026 · 8:30 AM',
+      units: 1,
+      issueDetails: {
+        category: 'screen',
+        description:
+          'Screen flickers occasionally when scrolling — happens maybe once or twice a day.',
+        attachmentName: 'IMG_0488.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 549, warranty: 50, gross: 599, fee: 0, net: 599, rate: 0 },
+      timeline: {
+        initiated: '2 Apr · 8:30 AM',
+        pickup: '4 Apr · 10:15 AM',
+        qc: '7 Apr · 11:40 AM',
+      },
+      closure: {
+        reason: 'not_reproduced',
+        closedAt: '9 Apr · 3:05 PM',
+        opsName: 'Marwa',
+        opsRole: 'Revibe Quality',
+        opsMessage:
+          'Hi Andrea — we ran an extended display diagnostic over 48 hours, including the scrolling and refresh-rate tests, and the screen behaved normally throughout. We weren’t able to reproduce the flicker you described, so we can’t approve this claim. The device is on its way back to you and there’s nothing further you need to do. If you can capture a short video of it happening, our support team is happy to take another look.',
+      },
+    },
+  },
 ]

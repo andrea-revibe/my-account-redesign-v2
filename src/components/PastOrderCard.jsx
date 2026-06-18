@@ -22,6 +22,7 @@ import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
 import DeliveryAddressPill from './DeliveryAddressPill'
+import OrderClaimLink from './OrderClaimLink'
 
 // Compact card for past orders. Delivered keeps its one-row treatment +
 // Download receipt / Raise a claim footer. Cancelled past orders
@@ -133,6 +134,7 @@ function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
   const canKeep = order.cancellationStatusId === 'requested'
 
   return (
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
       <span
         aria-hidden
@@ -146,7 +148,9 @@ function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
         className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-center justify-between gap-2">
-          <OrderEyebrow id={order.id} />
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
+            {order.cancellationRef ? `#${order.cancellationRef}` : 'Cancellation'}
+          </div>
           <span
             aria-hidden
             className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
@@ -220,6 +224,7 @@ function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
         />
       )}
     </article>
+    </OrderClaimLink>
   )
 }
 
@@ -281,7 +286,7 @@ function RefundHero({ order, onOpenWallet }) {
     <div className={`rounded-[14px] border p-3.5 ${heroBg} ${t.border}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
-          Cancellation{order.cancellationRef ? ` · #${order.cancellationRef}` : ''}
+          Cancellation
         </div>
         <span
           className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 ${t.text}`}

@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 41c6e4a
+verified_against: ff6d17e
 covers:
   - src/components/ClaimCard.jsx
   - src/components/ClaimActionBanner.jsx
@@ -9,6 +9,7 @@ covers:
   - src/components/PickupFailedCard.jsx
   - src/components/ResetFailedCard.jsx
   - src/components/InvalidClaimCard.jsx
+  - src/components/ClosedClaimCard.jsx
   - src/components/OrderClaimLink.jsx
   - src/components/OriginalOrderSheet.jsx
   - src/lib/claims.js
@@ -58,7 +59,11 @@ flowchart TD
   q7 -->|yes| warrantyPast[WarrantyClaimCard — Past orders]
   q7 -->|no| q8{isClaimRefunded?}
   q8 -->|yes| past[ClaimCard — Past orders]
+  q8 -->|no| q9{isClaimClosed?}
+  q9 -->|yes| closed[ClosedClaimCard — Past orders]
 ```
+
+`isClaimClosed` (`claim.closure` set) is a sixth terminal beyond the refund pipeline — Revibe **rejected** the claim at review (see §3.6); it ranks below `isClaimRefunded` and above the cancellation branches.
 
 The four takeover cards replace the baseline card's surface while the claim is blocked on a single customer action and auto-cancel (or auto-close) if ignored. They share a structural pattern (danger-toned hero with an ops/courier/quality message → action gate → customer commits → card flips to a warn-toned "submitted" state with an undo affordance). `WarrantyClaimCard` is a sibling card type for `claim.type === 'warranty'` — same chrome family as `ClaimCard`, different post-QC tail (repair-and-ship-back instead of refund). Spec at [`../warranties_compensations.md`](../warranties_compensations.md) §2.
 
@@ -340,6 +345,16 @@ The guide `device` is resolved with `deviceTypeForOrder(order)` (→ `iphone` fo
 
 Phase 30 (PickupFailedCard) and phase 32 (InvalidClaimCard) migrated their gates onto dedicated takeover cards. The inline `ClaimActionBanner` code path remains wired and is still the surface for `awaiting_documents` (Issue flow only) and any future claim that sets `actionRequired` without a dedicated takeover card. The `collection_failed`, `awaiting_payment`, and `reset_failed` branches in `actionGateCopy()` are retained for completeness but effectively dormant — no current mock claim exercises them through the inline banner.
 
+### 3.6 ClosedClaimCard — Revibe rejected the claim (terminal, Past orders)
+
+Trigger: `claim.closure` is set (`isClaimClosed(order)`, `lib/claims.js`). Distinct from the takeovers above — it is **not** a blocked-on-customer takeover but a **terminal Past-orders card**: Revibe reviewed the claim and could not accept it, so the customer keeps the device and no refund is issued. `claim.closure` is terminal regardless of the underlying `claimStatusId` — `hasActiveClaim` short-circuits to `false` when it is present, so the order falls out of "In progress" into Past orders. The card mirrors `InvalidClaimCard`'s muted `CompensationClosedCard` chrome (muted left accent, `Claim closed` pill, `No refund issued` tag) but is **reason-driven** and carries a forward path rather than a payment gate.
+
+**Reason taxonomy.** `claim.closure.reason` is one of `outside_window` / `not_eligible` / `evidence_insufficient` / `not_reproduced` / `duplicate` / `other`. Customer-facing copy (`label` / `headline` / `subline`) is owned by `CLAIM_CLOSURE_REASONS` in `lib/claims.js` (resolved via `closureCopyFor(claim)`) — edit copy there, not in the card. The card maps each reason to a glyph locally (`REASON_ICON`: `CalendarX2` / `Ban` / `FileX2` / `SearchX` / `CopyX` / `ClipboardList`); the icon is presentation so it stays in the component. Unknown reasons fall back to `other`.
+
+**Collapsed.** Muted left accent strip; eyebrow `Claim {formatClaimRef(claim)}`; `Claim closed` pill (muted, `ClipboardList`); a tinted hero block whose eyebrow pairs the reason glyph + `copy.label` with a right-aligned `No refund issued` tag (`ShieldX`), then `copy.headline` and `copy.subline`; the shared `ProductSummary` row. Wrapped in `OrderClaimLink` (§10) like the rest of the family, so it carries the parent-order strip + connector and a `Linked claim` row in `OriginalOrderSheet`.
+
+**Expanded.** An attributed Revibe-Quality ops block (avatar with `closure.opsName` initial, name · role, `closure.closedAt` timestamp, full `closure.opsMessage`) when present; a `Think this is wrong?` reassurance note; and a two-button footer — `Contact support` (placeholder) + `Raise a new claim` (`onRaiseClaim(order.id)` → reopens the returns flow on the same order; the only wired action). There is no undo and no replay — closure is terminal.
+
 ## 4. Sub-status & action-gate reference
 
 These tables are the canonical reference for sub-status copy, action-gate behaviour, and SLA placeholders. (The deprecated `Show detailed tracking` disclosure pattern that originally hosted them was removed; its design history is in git history.)
@@ -516,7 +531,8 @@ src/
 │   │                                     SUB_STATUS_LABELS, CLAIM_SLAS, actionGateCopy,
 │   │                                     REASON_LABELS, RETURN_METHOD_LABELS, reasonText, devicePrepText, refundMethodLabel,
 │   │                                     formatClaimRef, CLAIM_REF_PREFIXES,
-│   │                                     hasActiveClaim, isClaimRefunded
+│   │                                     hasActiveClaim, isClaimRefunded,
+│   │                                     isClaimClosed, CLAIM_CLOSURE_REASONS, closureCopyFor
 │   └── events.js                         getHistoryEvents(order, 'claim') — builds the HistoryThread events
 └── components/
     ├── ClaimCard.jsx                     5-state baseline expandable card; renders the shared TrackingDropdown for the inbound leg
@@ -529,6 +545,7 @@ src/
     ├── PickupFailedCard.jsx              Takeover: customer must confirm a new pickup
     ├── ResetFailedCard.jsx               Takeover: customer must unlink iCloud + share passcode after QC hit Activation Lock
     ├── InvalidClaimCard.jsx              Takeover: customer must pay return shipping after invalid inspection
+    ├── ClosedClaimCard.jsx               Terminal (Past orders): Revibe rejected the claim — reason hero + ops note + raise-new-claim (§3.6)
     └── HistoryThread.jsx                 Compact chip thread for past events on layered cards
 ```
 
@@ -543,6 +560,7 @@ src/
 - **DocsRejectedCard.** File picker is a fake-files cycle, countdown label is hand-written, `Resubmit` doesn't persist (warn state is local component state only), no notification + email trigger.
 - **PickupFailedCard.** `Edit` link on the pickup-address card is decorative, new AWB / slot are hand-written rather than generated, `Confirm` doesn't persist.
 - **ResetFailedCard.** Submit is local component state only — the guide-completed flag, unlink confirmation, and passcode are never transmitted, never persisted, and the warn-toned "received" view is a visual stub. The unlink walkthrough reuses the device-typed `ResetGuideSheet` remote route (§3.4.1), but the card chrome (confirm toggle + summary) is still iOS-worded — see the Android-branch open question. Auto-cancel countdown is hand-written. Production must encrypt the passcode in transit + at rest, scope visibility to the named technician, and delete it on a short timer once the wipe succeeds.
+- **ClosedClaimCard (§3.6).** Hand-seeded mock 89705 (delivered iPhone XR → issue claim closed `not_reproduced`); submit-time seeding can't reach a closed terminal. The closure ops note + timestamp are hand-written, `Contact support` is a placeholder, and only `Raise a new claim` is wired. Production needs a real ops-driven close action that sets `claim.closure` (reason + attributed note) and the notification/email it triggers.
 - **SLA placeholders.** `CLAIM_SLAS` values are hand-guessed; ops to revise.
 - **`order.country` drives the country split (partial).** It now gates the inbound-pickup + return-leg detailed-tracking dropdowns via `countryConfig` (`SA`/`Others` → hidden). Other country-aware behaviour (repair-partner routing, country-varying SLAs) is still future work. See `docs/output/country_split.md`.
 
@@ -560,13 +578,13 @@ src/
 
 ## 10. Order↔claim linkage (`OrderClaimLink` + `OriginalOrderSheet`)
 
-A submitted claim **replaces** the delivered order card in the list, so the original order has no standalone card to navigate to. `OrderClaimLink` (`src/components/OrderClaimLink.jsx`) restores a two-way link, wrapping the entire claim-card family — `ClaimCard`, `WarrantyClaimCard`, and all four takeover cards (`DocsRejected` / `PickupFailed` / `ResetFailed` / `InvalidClaim`). It is the single source of truth for the linkage chrome; the wrapped card is passed as `children` and stays otherwise untouched.
+A submitted claim **replaces** the delivered order card in the list, so the original order has no standalone card to navigate to. `OrderClaimLink` (`src/components/OrderClaimLink.jsx`) restores a two-way link, wrapping the entire claim-card family — `ClaimCard`, `WarrantyClaimCard`, and all four takeover cards (`DocsRejected` / `PickupFailed` / `ResetFailed` / `InvalidClaim`) — **and the cancelled-order refund-hero card** (`CancelledOrderCard`, [cancellations.md](../cancellations.md) §3): a cancellation is the order's linked entity when there's no claim, so it gets the same parent-strip + connector + sheet linkage. It is the single source of truth for the linkage chrome; the wrapped card is passed as `children` and stays otherwise untouched.
 
 **Props:** `{ order, onReveal, children }`. `onReveal` lets the wrapped card expand itself on the round-trip back from the sheet (each card passes `() => setExpanded(true)`; it's a no-op for always-expanded surfaces).
 
 **Parent order strip + connector.** Above the card, a tappable strip shows the product thumbnail, `Order #{id}` eyebrow, `Placed {date}`, and a `View ›` affordance. A connector thread (a vertical brand gradient line with a hollow node at the order strip and a filled node at the card) renders to the left as the "these belong together" cue; nodes are positioned absolutely so the card's variable expanded height doesn't move them.
 
-**`OriginalOrderSheet`** (`src/components/OriginalOrderSheet.jsx`) opens on tap — a bottom sheet mirroring `ClaimDetailsSheet` / `RefundDetailsSheet` chrome (scrim, slide-up, Escape, body-scroll lock). It carries the original-order header (`#{id}`, `Delivered` chip when `statusId === 'delivered'`, placed date), a `ProductSummary` (`tone="light"`), an order-total / payment key-value block, and — the reciprocal half of the link — a **`Linked claim`** row: a tone-coloured single-letter type chip (`TYPE_CODE` × `claimToneFor`) + `formatClaimRef(claim)` that, when tapped, fires `onGoToClaim`. A decorative `Download receipt` button closes the sheet.
+**`OriginalOrderSheet`** (`src/components/OriginalOrderSheet.jsx`) opens on tap — a bottom sheet mirroring `ClaimDetailsSheet` / `RefundDetailsSheet` chrome (scrim, slide-up, Escape, body-scroll lock). It carries the original-order header (`#{id}`, `Delivered` chip when `statusId === 'delivered'`, placed date), a `ProductSummary` (`tone="light"`), an order-total / payment key-value block, and — the reciprocal half of the link — a **`Linked claim`** row: a tone-coloured single-letter type chip (`TYPE_CODE` × `claimToneFor`) + `formatClaimRef(claim)` that, when tapped, fires `onGoToClaim`. **For a cancelled order with no claim** the same row reads **`Linked cancellation`**, the chip carries the `TYPE_CODE.cancellation` letter, the ref is `#{order.cancellationRef}`, and the row tone tracks the refund phase (`cancellationStatusId`: `refunded` → success, `refund_pending` → brand, else warn — mirroring the refund-hero accent) rather than `claimToneFor`. A decorative `Download receipt` button closes the sheet.
 
 **Round-trip ring pulse.** `goToClaim` dismisses the sheet, calls `onReveal?.()` (card expands), and bumps a `reveal` counter that keys a brief inset brand-ring overlay on the card via the `ringPulse` keyframe (`tailwind.config.js`, `animate-ringPulse`, 3 breaths). `motion-reduce:` falls back to the overlay's static ring so prefers-reduced-motion gets a stable highlight rather than animation.
 

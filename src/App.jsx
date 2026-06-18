@@ -12,6 +12,7 @@ import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
 import ResetFailedCard from './components/ResetFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
+import ClosedClaimCard from './components/ClosedClaimCard'
 import RevibeCancellationCard from './components/RevibeCancellationCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
@@ -29,6 +30,7 @@ import {
   isClaimRefunded,
   isWarrantyDelivered,
   isReturnDelivered,
+  isClaimClosed,
   cancelNeedsShipBack,
   cancelReturnGate,
 } from './lib/claims'
@@ -694,6 +696,15 @@ export default function App() {
                             autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
                           }
                           onOpenWallet={openWallet}
+                        />
+                      )
+                    }
+                    if (isClaimClosed(o)) {
+                      return (
+                        <ClosedClaimCard
+                          key={o.id}
+                          order={o}
+                          onRaiseClaim={setClaimFlowOrderId}
                         />
                       )
                     }

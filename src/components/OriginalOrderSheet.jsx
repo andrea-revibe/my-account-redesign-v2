@@ -48,7 +48,20 @@ export default function OriginalOrderSheet({ order, open, onClose, onGoToClaim }
   const claim = order.claim
   const { currency } = order
   const isDelivered = order.statusId === 'delivered'
-  const tone = claim ? claimToneFor(claim.claimStatusId) : 'brand'
+  // A cancellation is the order's linked entity when there's no claim — its
+  // tone tracks the refund phase, mirroring the refund-hero card's accent.
+  const isCancelled = !claim && order.state === 'cancelled'
+  const cxlTone =
+    order.cancellationStatusId === 'refunded'
+      ? 'success'
+      : order.cancellationStatusId === 'refund_pending'
+      ? 'brand'
+      : 'warn'
+  const tone = claim
+    ? claimToneFor(claim.claimStatusId)
+    : isCancelled
+    ? cxlTone
+    : 'brand'
   const isBnplPay = order.paymentMethod?.type === 'bnpl'
 
   return (
@@ -120,7 +133,7 @@ export default function OriginalOrderSheet({ order, open, onClose, onGoToClaim }
                 </span>
               }
             />
-            {claim && (
+            {(claim || isCancelled) && (
               <>
                 <Divider />
                 <button
@@ -129,16 +142,16 @@ export default function OriginalOrderSheet({ order, open, onClose, onGoToClaim }
                   className="w-full flex items-center justify-between gap-3 px-3.5 py-3 text-left hover:bg-line-2/60 transition-colors"
                 >
                   <span className="text-[13px] text-muted shrink-0">
-                    Linked claim
+                    {claim ? 'Linked claim' : 'Linked cancellation'}
                   </span>
                   <span className="inline-flex items-center gap-2 min-w-0">
                     <span
                       className={`grid place-items-center w-[18px] h-[18px] rounded-[5px] text-white text-[9.5px] font-extrabold shrink-0 ${TONE_BG[tone]}`}
                     >
-                      {TYPE_CODE[claim.type] || 'C'}
+                      {claim ? TYPE_CODE[claim.type] || 'C' : TYPE_CODE.cancellation}
                     </span>
                     <span className="text-[13px] font-bold text-ink tabular-nums truncate">
-                      {formatClaimRef(claim)}
+                      {claim ? formatClaimRef(claim) : `#${order.cancellationRef}`}
                     </span>
                     <ChevronRight
                       size={15}

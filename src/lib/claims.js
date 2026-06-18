@@ -156,9 +156,12 @@ export function transitSubProgressIndex(transitSubStatusId) {
 
 // Terminal state differs by claim type: refund flows land on
 // `refund_credited`, warranty flows land on `device_returned`. Anything else
-// is in-flight and surfaces in "In progress".
+// is in-flight and surfaces in "In progress". A `closure` flag (Revibe
+// rejected the claim, see `isClaimClosed`) is terminal regardless of the
+// underlying `claimStatusId`, so it never counts as active.
 export function hasActiveClaim(order) {
   if (!order?.claim) return false
+  if (order.claim.closure) return false
   if (order.claim.type === 'warranty') {
     return order.claim.claimStatusId !== 'device_returned'
   }
@@ -167,6 +170,63 @@ export function hasActiveClaim(order) {
 
 export function isClaimRefunded(order) {
   return Boolean(order?.claim) && order.claim.claimStatusId === 'refund_credited'
+}
+
+// Terminal: Revibe closed the claim without accepting it (outside the return
+// window, ineligible, evidence insufficient, couldn't reproduce, duplicate).
+// The customer keeps the device and no refund is issued. Drives the
+// `ClosedClaimCard` Past-orders surface and the Claims-filter `Closed` bucket.
+// `claim.closure` carries the reason + attributed ops note (see §3 of
+// docs/output/returns/claim_tracking.md). This is distinct from a customer's
+// own cancel (which strips the claim or ships the device back).
+export function isClaimClosed(order) {
+  return Boolean(order?.claim?.closure)
+}
+
+// Reason → customer-facing copy for a Revibe claim closure. Edit copy here,
+// not in `ClosedClaimCard`; the card maps each reason to a glyph locally.
+export const CLAIM_CLOSURE_REASONS = {
+  outside_window: {
+    label: 'Outside return window',
+    headline: 'Claim closed — return window passed',
+    subline:
+      'This order is past the return window, so we weren’t able to accept the claim. You keep your device.',
+  },
+  not_eligible: {
+    label: 'Not eligible',
+    headline: 'Claim closed — not eligible',
+    subline:
+      'This item isn’t eligible for the claim you raised, so no refund will be issued. You keep your device.',
+  },
+  evidence_insufficient: {
+    label: 'Evidence insufficient',
+    headline: 'Claim closed — we couldn’t verify the issue',
+    subline:
+      'The photos and details we received weren’t enough to confirm the issue, so we couldn’t approve the claim. You keep your device.',
+  },
+  not_reproduced: {
+    label: 'Issue not reproduced',
+    headline: 'Claim closed — issue not reproduced',
+    subline:
+      'Our technicians couldn’t reproduce the issue you described, so we couldn’t approve the claim. You keep your device.',
+  },
+  duplicate: {
+    label: 'Duplicate claim',
+    headline: 'Claim closed — duplicate request',
+    subline:
+      'This matches another claim already on file, so we closed it as a duplicate. You keep your device.',
+  },
+  other: {
+    label: 'Claim closed',
+    headline: 'Claim closed — no refund',
+    subline:
+      'We reviewed your claim and couldn’t approve it, so no refund will be issued. You keep your device.',
+  },
+}
+
+export function closureCopyFor(claim) {
+  const reason = claim?.closure?.reason
+  return CLAIM_CLOSURE_REASONS[reason] || CLAIM_CLOSURE_REASONS.other
 }
 
 // Whether the customer can still cancel a submitted claim — the whole
