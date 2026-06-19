@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: afedc65
+verified_against: 38cdddd
 covers:
   - src/components/ClaimFlow
   - src/components/RefundSplitRows.jsx

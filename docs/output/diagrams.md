@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: edad8a0
+verified_against: 38cdddd
 covers:
   - src/App.jsx
   - src/lib/claims.js
@@ -52,12 +52,14 @@ flowchart TD
   p1 -- yes --> WCP["WarrantyClaimCard"]
   p1 -- no --> p2{"isClaimRefunded?"}
   p2 -- yes --> CCP["ClaimCard"]
-  p2 -- no --> p3{"cancelled &amp; cancellationInitiator == 'revibe'?"}
+  p2 -- no --> p2b{"isClaimClosed?"}
+  p2b -- yes --> CLC["ClosedClaimCard (onRaiseClaim)"]
+  p2b -- no --> p3{"cancelled &amp; cancellationInitiator == 'revibe'?"}
   p3 -- yes --> RCC["RevibeCancellationCard"]
   p3 -- no --> POC["PastOrderCard (onRaiseClaim)"]
 ```
 
-The first four in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline. (The `invalidClaim` branch is also reached via the post-collection cancel projection — see [returns/claim_tracking.md](./returns/claim_tracking.md) §2.8.) In the past ladder, a Revibe-initiated cancellation (`cancellationInitiator === 'revibe'`) routes to `RevibeCancellationCard` ahead of the customer `PastOrderCard` fallback. Full prose tree: [orders.md](./orders.md) §2.
+The first four in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline. (The `invalidClaim` branch is also reached via the post-collection cancel projection — see [returns/claim_tracking.md](./returns/claim_tracking.md) §2.8.) In the past ladder, a Revibe-closed claim (`isClaimClosed` — `claim.closure` set, no refund) routes to `ClosedClaimCard` ahead of the cancellation check, and a Revibe-initiated cancellation (`cancellationInitiator === 'revibe'`) routes to `RevibeCancellationCard` ahead of the customer `PastOrderCard` fallback. Full prose tree: [orders.md](./orders.md) §2.
 
 ---
 
@@ -95,7 +97,7 @@ flowchart LR
 ```
 
 Notes:
-- **In progress vs Past.** `hasActiveClaim` keeps a claim in the *In progress* section until its terminal state — `refund_credited` (refund/compensation) or `device_returned` (warranty) — which flips it to *Past* via `isClaimRefunded` / `isWarrantyDelivered`.
+- **In progress vs Past.** `hasActiveClaim` keeps a claim in the *In progress* section until its terminal state — `refund_credited` (refund/compensation) or `device_returned` (warranty) — which flips it to *Past* via `isClaimRefunded` / `isWarrantyDelivered`. A `claim.closure` flag (Revibe closed the claim, no refund) is terminal regardless of `claimStatusId`: `hasActiveClaim` returns false and the order routes to *Past* via `isClaimClosed` → `ClosedClaimCard`.
 - **Compensation reuses the refund status ids** (`initiated` / `qc` / `refund_issued` / `refund_credited`) minus the pickup leg, so the tone/phase helpers apply unchanged.
 - **Projection invariant.** A freshly-submitted claim always lands on `initiated` (see [Returns data-flow](#returns-data-flow)). Every post-`initiated` state and all four takeovers are reachable only via hand-seeded mocks in `data/orders/*` — see each `docs/output/*.md` "Mocked vs production" list. Spec: [returns/claim_tracking.md](./returns/claim_tracking.md), [warranties_compensations.md](./warranties_compensations.md).
 
@@ -112,7 +114,7 @@ flowchart TD
   A["ClaimFlow overlay — user completes steps"] -->|"handlePrimary → onSubmitClaim(orderId, claim); seed always claimStatusId:'initiated'"| B{"journeyMode?"}
   B -- "yes (replay)" --> J["journey.advance('claim_submitted_*') — no submittedClaims write"]
   B -- "no" --> C["App.setSubmittedClaims({...prev, [orderId]: claim}) + setRecentSubmit"]
-  C --> D["projectedOrders = ORDERS.map(o => submittedClaims[o.id] ? {...o, claim} : o)  (App.jsx ~L436)"]
+  C --> D["projectedOrders = ORDERS.map(o => submittedClaims[o.id] ? {...o, claim} : o)  (App.jsx ~L452); a claim raised from the in-flight hero also flips statusId→'delivered' so routing demotes the hero to ClaimCard"]
   D --> E["isOpen(o) re-partitions → order enters In-progress section"]
   E --> F["Card-routing ladder → ClaimCard / WarrantyClaimCard (or a takeover card if the claim carries a takeover flag)"]
   C --> G["UndoSnackbar (8s) — Undo deletes submittedClaims[orderId] → order reverts to PastOrderCard"]

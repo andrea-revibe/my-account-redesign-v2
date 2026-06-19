@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 4edaa54
+verified_against: 38cdddd
 covers:
   - src/components/ClaimCard.jsx
   - src/components/ClaimActionBanner.jsx
@@ -589,4 +589,4 @@ A submitted claim **replaces** the delivered order card in the list, so the orig
 
 **`OriginalOrderSheet` retired.** The summary sheet (order total / payment / receipt + reciprocal `Linked claim` row) and the `View order details` trigger beneath the open order half are **gone** — the expanded real `PastOrderCard` (or `PreCancellationOrderCard`) is now the only order surface. Order total + payment are covered by `ProductSummary`'s price breakdown inside the delivered card; the reciprocal "linked entity" affordance is the order/claim compact rows themselves (tapping either flips the accordion). The component file was deleted.
 
-**Journey order id.** `INITIAL_ORDER.id` in `src/data/journeys/initialOrder.js` changed `JOURNEY-001` → `89610` so the journey-replayed order reads as a real order number in the order half / sheet.
+**Journey order id.** `INITIAL_ORDER.id` in `src/data/journeys/initialOrder.js` changed `JOURNEY-001` → `89610` so the journey-replayed order reads as a real order number in the order half.
