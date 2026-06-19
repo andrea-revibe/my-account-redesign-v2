@@ -17,15 +17,19 @@ import {
   claimStatusHeadline,
   claimStatusSubline,
   claimTypeLabel,
+  formatClaimRef,
   refundMethodLabel,
   transitSubProgressIndex,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
+import OrderClaimLink from './OrderClaimLink'
 import ClaimActionBanner from './ClaimActionBanner'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
+import RefundSplitRows from './RefundSplitRows'
+import { isSplitPaid } from '../lib/returns'
 import Timeline from './Timeline'
 import { TrackingDropdown } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
@@ -66,8 +70,9 @@ export default function ClaimCard({
   const steps = claimStatusesFor(claim)
 
   return (
-    <article className="bg-surface rounded-card border border-line overflow-hidden relative">
-      <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-1 ${t.bg}`} />
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
+      <article className="bg-surface rounded-card border border-line overflow-hidden relative">
+        <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-1 ${t.bg}`} />
 
       <button
         type="button"
@@ -76,7 +81,9 @@ export default function ClaimCard({
         className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-center justify-between gap-2">
-          <OrderEyebrow id={order.id} />
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
+            {formatClaimRef(claim)}
+          </div>
           <span
             aria-hidden
             className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
@@ -155,20 +162,13 @@ export default function ClaimCard({
         </div>
       )}
 
-      <ClaimDetailsSheet
-        order={order}
-        open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
-      />
-    </article>
-  )
-}
-
-function OrderEyebrow({ id }) {
-  return (
-    <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-      Order · #{id}
-    </div>
+        <ClaimDetailsSheet
+          order={order}
+          open={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
+        />
+      </article>
+    </OrderClaimLink>
   )
 }
 
@@ -194,6 +194,13 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
   const subline = claimStatusSubline(claim)
   const showScheduledPickup =
     claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup)
+  // When the refund is split across the original payment, the split rows below
+  // name each destination (with the BNPL note on its own line) — so the single
+  // "Going to <chip>" summary is redundant and is replaced by a captioned split.
+  const showRefundSplit =
+    claim.refundMethod === 'original' &&
+    Boolean(claim.expectedRefund) &&
+    isSplitPaid(order)
 
   return (
     <div className={`rounded-[14px] border p-3.5 ${t.heroBg} ${t.border}`}>
@@ -215,15 +222,9 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
         {headline}
       </div>
 
-      <div className="mt-1 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
-        <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
-        {subline && (
-          <>
-            <span className="text-muted/60">·</span>
-            <span>{subline}</span>
-          </>
-        )}
-      </div>
+      {subline && (
+        <div className="mt-1 text-[11.5px] text-ink-2">{subline}</div>
+      )}
 
       {showScheduledPickup && (
         <ScheduledPickupStrip
@@ -238,10 +239,12 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
             {isRefunded ? 'Refunded' : 'Expected refund'}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-2">
-            <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
-            <DestinationChip claim={claim} order={order} accent={isWallet} onOpenWallet={onOpenWallet} />
-          </div>
+          {!showRefundSplit && (
+            <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-2">
+              <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
+              <DestinationChip claim={claim} order={order} accent={isWallet} onOpenWallet={onOpenWallet} />
+            </div>
+          )}
         </div>
         {claim.expectedRefund ? (
           <div
@@ -257,6 +260,15 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
           </div>
         )}
       </div>
+
+      {showRefundSplit && (
+        <RefundSplitRows
+          order={order}
+          net={claim.expectedRefund.net}
+          caption={isRefunded ? 'Sent to' : 'Going to'}
+          className="mt-3 pt-3 border-t border-line-2/70"
+        />
+      )}
     </div>
   )
 }

@@ -24,8 +24,24 @@ import { CLAIM_COM_NODES } from './journeys/claimChangeOfMind'
 import { CLAIM_WARRANTY_NODES } from './journeys/claimWarranty'
 import { CLAIM_ISSUE_NODES } from './journeys/claimIssue'
 import { CLAIM_COMPENSATION_NODES } from './journeys/claimCompensation'
+import {
+  withInTransitClaim,
+  IN_TRANSIT_ENTRY_STAGES,
+} from './journeys/inTransitClaim'
 
 export { INITIAL_ORDER }
+
+// Each claim journey also lets the customer raise the claim from the in-flight
+// hero (before delivery), gated by a silent agent delivery-confirmation step.
+// Grafted on here so the branch is identical across all four — see
+// journeys/inTransitClaim.js. `submitNodeIds` are that journey's existing
+// post-delivery submission nodes; the confirmed branch reuses them so the
+// wallet/card / compensation-subtype fork is preserved.
+const inTransit = (nodes, submitNodeIds) =>
+  withInTransitClaim(nodes, {
+    entryStageIds: IN_TRANSIT_ENTRY_STAGES,
+    submitNodeIds,
+  })
 
 export const JOURNEYS = [
   {
@@ -48,7 +64,11 @@ export const JOURNEYS = [
   {
     id: 'cancellation',
     label: 'Cancellation',
-    initialOrder: INITIAL_ORDER,
+    // Split-paid (card + gift card): the original-payment refund fork pays
+    // back along the same split (card → card, gift card → Wallet); the wallet
+    // fork stays whole-to-wallet. The split is derived from `paymentSplit` by
+    // the refund surfaces + lib/wallet, so the existing nodes need no changes.
+    initialOrder: { ...INITIAL_ORDER, paymentSplit: { card: 343, giftCard: 686 } },
     nodes: CANCELLATION_NODES,
   },
   {
@@ -57,6 +77,11 @@ export const JOURNEYS = [
     initialOrder: {
       ...INITIAL_ORDER,
       paymentMethod: { type: 'bnpl', provider: 'tabby', brand: 'Tabby' },
+      // Split-paid (Tabby BNPL + gift card): the original-payment refund fork
+      // pays the BNPL portion back to Tabby and the gift-card portion to the
+      // Wallet; the wallet fork stays whole-to-wallet. Derived from
+      // `paymentSplit` — the card/original nodes need no changes.
+      paymentSplit: { card: 343, giftCard: 686 },
       deviceOs: 'android',
       product: {
         name: 'Samsung Galaxy S21',
@@ -65,24 +90,33 @@ export const JOURNEYS = [
         image: '/iphone-cutout.png',
       },
     },
-    nodes: CLAIM_COM_NODES,
+    nodes: inTransit(CLAIM_COM_NODES, [
+      'claim_submitted_wallet',
+      'claim_submitted_card',
+    ]),
   },
   {
     id: 'claim_issue',
     label: 'Issue / wrong-device claim',
     initialOrder: INITIAL_ORDER,
-    nodes: CLAIM_ISSUE_NODES,
+    nodes: inTransit(CLAIM_ISSUE_NODES, [
+      'claim_submitted_wallet',
+      'claim_submitted_card',
+    ]),
   },
   {
     id: 'claim_warranty',
     label: 'Warranty claim',
     initialOrder: INITIAL_ORDER,
-    nodes: CLAIM_WARRANTY_NODES,
+    nodes: inTransit(CLAIM_WARRANTY_NODES, ['claim_submitted_warranty']),
   },
   {
     id: 'claim_compensation',
     label: 'Compensation claim',
     initialOrder: INITIAL_ORDER,
-    nodes: CLAIM_COMPENSATION_NODES,
+    nodes: inTransit(CLAIM_COMPENSATION_NODES, [
+      'claim_submitted_shipping_refund',
+      'claim_submitted_charger',
+    ]),
   },
 ]

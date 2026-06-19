@@ -17,11 +17,14 @@ import { cancellationStepsFor } from '../lib/statuses'
 import Timeline from './Timeline'
 import { getHistoryEvents } from '../lib/events'
 import RefundDetailsSheet from './RefundDetailsSheet'
+import RefundSplitRows from './RefundSplitRows'
+import { isSplitPaid } from '../lib/returns'
 import KeepOrderSheet from './KeepOrderSheet'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
 import DeliveryAddressPill from './DeliveryAddressPill'
+import OrderClaimLink from './OrderClaimLink'
 
 // Compact card for past orders. Delivered keeps its one-row treatment +
 // Download receipt / Raise a claim footer. Cancelled past orders
@@ -48,13 +51,17 @@ function DeliveredOrderCard({ order, onRaiseClaim }) {
         <DeliveredHero order={order} />
         <ProductSummary order={order} />
         {history.length > 0 && <HistoryThread events={history} />}
-        <div className="flex justify-end gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
-          <PastButton icon={Download} label="Download receipt" />
+        <div className="flex flex-col gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
           <PastButton
             icon={AlertTriangle}
-            label="Raise a claim"
+            label="I need help with this device"
+            tone="brand"
+            full
             onClick={() => onRaiseClaim?.(order.id)}
           />
+          <div className="flex justify-end">
+            <PastButton icon={Download} label="Download receipt" tone="quiet" />
+          </div>
         </div>
       </div>
     </article>
@@ -92,14 +99,21 @@ function DeliveredHero({ order }) {
     </div>
   )
 }
-function PastButton({ icon: Icon, label, onClick }) {
+function PastButton({ icon: Icon, label, onClick, tone = 'muted', full }) {
+  const styles = {
+    brand:
+      'px-3 py-2 rounded-full border border-brand/30 bg-brand/5 text-brand hover:bg-brand/10',
+    muted:
+      'px-3 py-1.5 rounded-full border border-line bg-surface text-ink hover:bg-line-2',
+    quiet: 'px-2 py-1 rounded-md text-muted hover:text-ink hover:bg-line-2',
+  }[tone]
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-line bg-surface text-[12px] font-medium text-ink hover:bg-line-2"
+      className={`inline-flex items-center justify-center gap-1.5 text-[12px] font-medium ${styles}${full ? ' w-full' : ''}`}
     >
-      <Icon size={13} strokeWidth={1.75} className="opacity-75" />
+      <Icon size={13} strokeWidth={1.75} className={tone === 'brand' ? '' : 'opacity-75'} />
       {label}
     </button>
   )
@@ -133,6 +147,7 @@ function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
   const canKeep = order.cancellationStatusId === 'requested'
 
   return (
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
     <article className="bg-surface rounded-card border border-line overflow-hidden relative">
       <span
         aria-hidden
@@ -146,7 +161,9 @@ function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
         className="w-full text-left pl-4 pr-3.5 pt-3 pb-3.5 flex flex-col gap-3"
       >
         <div className="flex items-center justify-between gap-2">
-          <OrderEyebrow id={order.id} />
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
+            {order.cancellationRef ? `#${order.cancellationRef}` : 'Cancellation'}
+          </div>
           <span
             aria-hidden
             className="w-6 h-6 rounded-full bg-line-2 text-ink-2 grid place-items-center shrink-0 transition-transform duration-200"
@@ -220,6 +237,7 @@ function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
         />
       )}
     </article>
+    </OrderClaimLink>
   )
 }
 
@@ -256,6 +274,7 @@ function RefundHero({ order, onOpenWallet }) {
   const isRefunded = order.cancellationStatusId === 'refunded'
   const dest = order.refund.destination
   const isWallet = dest.kind === 'wallet'
+  const showSplit = isSplitPaid(order) && !isWallet
 
   const heroBg =
     tone === 'success'
@@ -281,7 +300,7 @@ function RefundHero({ order, onOpenWallet }) {
     <div className={`rounded-[14px] border p-3.5 ${heroBg} ${t.border}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
-          Cancellation{order.cancellationRef ? ` · #${order.cancellationRef}` : ''}
+          Cancellation
         </div>
         <span
           className={`text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 ${t.text}`}
@@ -296,10 +315,19 @@ function RefundHero({ order, onOpenWallet }) {
       <div className={`mt-1 text-[28px] font-bold tabular-nums leading-none ${t.text}`}>
         {order.currency} {order.refund.amount.toLocaleString()}
       </div>
-      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
-        <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
-        <DestinationChip destination={dest} accent={isWallet} onOpenWallet={onOpenWallet} />
-      </div>
+      {showSplit ? (
+        <RefundSplitRows
+          order={order}
+          net={order.refund.amount}
+          caption={isRefunded ? 'Sent to' : 'Going to'}
+          className="mt-2.5"
+        />
+      ) : (
+        <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
+          <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
+          <DestinationChip destination={dest} accent={isWallet} onOpenWallet={onOpenWallet} />
+        </div>
+      )}
       {order.refund.bonus > 0 && (
         <div className="mt-2 text-[11.5px] text-accent inline-flex items-center gap-1">
           <Sparkles size={11} strokeWidth={2} />

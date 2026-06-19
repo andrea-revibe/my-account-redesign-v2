@@ -1,9 +1,10 @@
 // Single source of truth for the Revibe Wallet surface (the pill in GreetRow
-// + WalletSheet). The wallet is account-level, so the ledger is derived from
-// the full ORDERS set (not the filtered/projected list): every refund that
-// landed in the Wallet becomes a credit, merged with the hand-seeded history
-// in data/wallet.js. The only in-session mutation is `transfers` — a map of
-// txId → true for credits the customer has moved to their card.
+// + WalletSheet). The ledger is derived from whatever order list the caller
+// passes (App.jsx passes the journey-projected orders in journey mode, else
+// none): every refund that landed in the Wallet becomes a credit, merged with
+// the hand-seeded history in data/wallet.js. The only in-session mutation is
+// `transfers` — a map of txId → true for credits the customer has moved to
+// their card.
 //
 // Two refund paths credit the Wallet:
 //   • return claim    — claim.refundMethod 'wallet' + claimStatusId
@@ -18,6 +19,8 @@
 
 import {
   refundBreakdown,
+  refundDestinations,
+  isSplitPaid,
   RESTOCKING_FEE_RATE,
   CANCELLATION_FEE_RATE,
   ISSUE_WALLET_BONUS,
@@ -111,6 +114,34 @@ export function walletLedger(orders = [], transfers = {}) {
       })
     }
 
+    // Split-paid order refunded to the *original* payment: the gift-card
+    // (store-credit) portion comes back into the Wallet, the card portion
+    // goes to the card. Not switchable — it was store credit, not card money,
+    // so there's no card to "move it back" to.
+    if (
+      claim &&
+      claim.refundMethod === 'original' &&
+      claim.claimStatusId === 'refund_credited' &&
+      claim.expectedRefund &&
+      isSplitPaid(order)
+    ) {
+      const split = refundDestinations(order, claim.expectedRefund.net)
+      if (split && split.giftCard > 0) {
+        raw.push({
+          id: `claim-gift:${order.id}`,
+          kind: 'credit',
+          source: `Return refund · gift card · #${order.id}`,
+          dateLabel: claim.timeline?.refund_credited,
+          year: yearOf(order),
+          amount: split.giftCard,
+          currency: order.currency,
+          switchable: false,
+          via: 'claim',
+          order,
+        })
+      }
+    }
+
     if (
       order.refund?.destination?.kind === 'wallet' &&
       order.cancellationStatusId === 'refunded'
@@ -128,6 +159,31 @@ export function walletLedger(orders = [], transfers = {}) {
         via: 'cancellation',
         order,
       })
+    }
+
+    // Split-paid cancellation refunded to the original payment (destination
+    // isn't the Wallet): only the gift-card portion lands back in the Wallet.
+    if (
+      order.refund &&
+      order.refund.destination?.kind !== 'wallet' &&
+      order.cancellationStatusId === 'refunded' &&
+      isSplitPaid(order)
+    ) {
+      const split = refundDestinations(order, order.refund.amount)
+      if (split && split.giftCard > 0) {
+        raw.push({
+          id: `cancel-gift:${order.id}`,
+          kind: 'credit',
+          source: `Order cancelled · gift card · #${order.id}`,
+          dateLabel: order.cancellationTimeline?.refunded || order.placedAtFull,
+          year: yearOf(order),
+          amount: split.giftCard,
+          currency: order.currency,
+          switchable: false,
+          via: 'cancellation',
+          order,
+        })
+      }
     }
   }
 

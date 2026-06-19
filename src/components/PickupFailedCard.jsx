@@ -11,6 +11,8 @@ import {
 
 import { ProductSummary } from './ProductSummary'
 import TapToFixCta from './TapToFixCta'
+import OrderClaimLink from './OrderClaimLink'
+import { formatClaimRef } from '../lib/claims'
 
 // Routed in App.jsx when `claim.pickupFailure` is set on a claim. Mirrors
 // the DocsRejectedCard pattern: a full danger-tone takeover for a claim
@@ -40,12 +42,14 @@ export default function PickupFailedCard({
 
   if (confirmed) {
     return (
-      <PickupRescheduledCard
-        order={order}
-        details={details}
-        expanded={expanded}
-        onToggle={() => setExpanded((v) => !v)}
-      />
+      <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
+        <PickupRescheduledCard
+          order={order}
+          details={details}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+        />
+      </OrderClaimLink>
     )
   }
 
@@ -53,6 +57,7 @@ export default function PickupFailedCard({
   const f = claim.pickupFailure
 
   return (
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2">
       <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 bg-danger" />
 
@@ -64,7 +69,7 @@ export default function PickupFailedCard({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden
@@ -178,6 +183,7 @@ export default function PickupFailedCard({
         </div>
       )}
     </article>
+    </OrderClaimLink>
   )
 }
 
@@ -199,7 +205,7 @@ function PickupRescheduledCard({ order, details, expanded, onToggle }) {
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden

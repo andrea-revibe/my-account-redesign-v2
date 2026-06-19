@@ -18,9 +18,11 @@ import {
   RETURN_CLAIM_STATUSES,
   returnClaimProgressIndex,
   claimTypeLabel,
+  formatClaimRef,
 } from '../lib/claims'
 
 import { ProductSummary } from './ProductSummary'
+import OrderClaimLink from './OrderClaimLink'
 import Timeline from './Timeline'
 import { ReturnShipmentTracking } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
@@ -74,37 +76,43 @@ export default function InvalidClaimCard({
   // return-shipping gate — it's a plain "claim closed, no refund" terminal.
   if (order.claim.type === 'compensation') {
     return (
-      <CompensationClosedCard
-        order={order}
-        expanded={expanded}
-        onToggle={() => setExpanded((v) => !v)}
-      />
+      <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
+        <CompensationClosedCard
+          order={order}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+        />
+      </OrderClaimLink>
     )
   }
 
   if (mode === 'paid') {
     return (
-      <PaidShipBackCard
-        order={order}
-        expanded={expanded}
-        onToggle={() => setExpanded((v) => !v)}
-      />
+      <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
+        <PaidShipBackCard
+          order={order}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+        />
+      </OrderClaimLink>
     )
   }
 
   if (mode === 'declined') {
     return (
-      <ClaimClosedCard
-        order={order}
-        expanded={expanded}
-        onToggle={() => setExpanded((v) => !v)}
-        onReverse={() => {
+      <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
+        <ClaimClosedCard
+          order={order}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+          onReverse={() => {
           // "I changed my mind and will pay" — same target as Pay: journey
           // mode advances claim_return_shipping_paid (the declined node forks
           // to it), falling back to a local flip for the standalone mock.
           if (!onPayReturnShipping?.(order.id)) setLocalMode('paid')
-        }}
-      />
+          }}
+        />
+      </OrderClaimLink>
     )
   }
 
@@ -125,6 +133,7 @@ export default function InvalidClaimCard({
     'You asked to cancel this claim. Your device is at our hub — cover return shipping and we’ll send it straight back.'
 
   return (
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2">
       <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 bg-danger" />
 
@@ -136,7 +145,7 @@ export default function InvalidClaimCard({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden
@@ -267,6 +276,7 @@ export default function InvalidClaimCard({
         </div>
       )}
     </article>
+    </OrderClaimLink>
   )
 }
 
@@ -310,7 +320,7 @@ function PaidShipBackCard({ order, expanded, onToggle }) {
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Return from Claim RET-{claim.claimRef}
+            Return · Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden
@@ -363,8 +373,6 @@ function PaidShipBackCard({ order, expanded, onToggle }) {
               </span>
             </div>
             <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
-              <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
-              <span className="text-muted/60">·</span>
               <span className="font-semibold uppercase tracking-[0.08em] text-[10.5px]">
                 Claim · {claimTypeLabel(claim)}
               </span>
@@ -389,8 +397,6 @@ function PaidShipBackCard({ order, expanded, onToggle }) {
             </div>
             <DeliveryAddressPill label="Delivering to" address={order.address} />
             <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
-              <span className="font-semibold tracking-[0.02em]">{claim.claimRef}</span>
-              <span className="text-muted/60">·</span>
               <span className="font-semibold uppercase tracking-[0.08em] text-[10.5px]">
                 Claim · {claimTypeLabel(claim)}
               </span>
@@ -427,7 +433,7 @@ function PaidShipBackCard({ order, expanded, onToggle }) {
             )}
 
           <div className="rounded-[10px] bg-brand-bg/60 border border-brand-bg2 px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
-            <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim RET-{claim.claimRef}. No refund will be issued —{' '}
+            <span className="font-semibold text-ink">Heads up:</span> this leg is linked to Claim {formatClaimRef(claim)}. No refund will be issued —{' '}
             {claim.invalidClaim.reason === 'cancelled'
               ? 'your device is on its way back because you cancelled the claim.'
               : 'the device is being shipped back as it was inspected.'}
@@ -458,7 +464,7 @@ function ClaimClosedCard({ order, expanded, onToggle, onReverse }) {
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden
@@ -552,7 +558,7 @@ function CompensationClosedCard({ order, expanded, onToggle }) {
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim {claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden

@@ -1,6 +1,6 @@
 // Baseline order every journey replays from (overridden per-journey in JOURNEYS).
 export const INITIAL_ORDER = {
-  id: 'JOURNEY-001',
+  id: '89610',
   phone: '+971 50 559 5034',
   email: 'andrea@revibe.me',
   address: 'Ontario Tower, Office 103, Business Bay Dubai',

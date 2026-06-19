@@ -44,6 +44,19 @@ export const WALLET_SEED_TRANSACTIONS = [
     year: 2026,
     amount: 400,
   },
+  // Gift-card portion of a split-paid cancellation (#89518) refunded to the
+  // original payment: the card portion went back to the card, this store-credit
+  // portion came back into the Wallet. History-only (not switchable — it was
+  // never card money). Pairs with the refund-hero/RefundDetailsSheet split on
+  // order 89518.
+  {
+    id: 'seed:cancel-gift-89518',
+    kind: 'credit',
+    source: 'Order cancelled · gift card · #89518',
+    dateLabel: '16 Mar · 10:15 AM',
+    year: 2026,
+    amount: 950,
+  },
   // Older refund, already settled into the balance (history, not movable).
   {
     id: 'seed:cancel-89150',

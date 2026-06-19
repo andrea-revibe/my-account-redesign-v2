@@ -8,8 +8,9 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react'
-import { refundBreakdown, formatMoney } from '../../lib/returns'
-import { claimTypeLabel, expectedCompletionFor } from '../../lib/claims'
+import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
+import RefundSplitRows from '../RefundSplitRows'
+import { claimTypeLabel, expectedCompletionFor, formatClaimRef } from '../../lib/claims'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 
 export default function Step7Confirmation({ state, order, onClose, onTrack }) {
@@ -39,8 +40,9 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
       ? 'You confirmed the device is factory reset.'
       : 'Thanks for unlinking the device and sharing your passcode.'
 
+  const claimRef = formatClaimRef(state.claimRef, state.claimType)
   const copy = () => {
-    navigator.clipboard?.writeText(state.claimRef)
+    navigator.clipboard?.writeText(claimRef)
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
   }
@@ -69,7 +71,7 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="text-[18px] font-bold text-ink tabular-nums tracking-[-0.01em]">
-              {state.claimRef}
+              {claimRef}
             </span>
             <button
               type="button"
@@ -144,10 +146,12 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
               ) : isBnpl(order) ? (
                 <span className="inline-flex items-center gap-1">
                   {order.paymentMethod.brand}
-                  <BnplDisclaimerTooltip
-                    provider={order.paymentMethod.provider}
-                    align="left"
-                  />
+                  {!isSplitPaid(order) && (
+                    <BnplDisclaimerTooltip
+                      provider={order.paymentMethod.provider}
+                      align="left"
+                    />
+                  )}
                 </span>
               ) : (
                 `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`
@@ -155,6 +159,14 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
               <span className="block mt-1 text-[12px] text-muted">
                 {timeline}
               </span>
+              {state.refundMethod === 'original' && (
+                <RefundSplitRows
+                  order={order}
+                  net={refund.net}
+                  caption="Split across your original payment"
+                  className="mt-2.5 pt-2.5 border-t border-dashed border-line"
+                />
+              )}
             </Row>
           )}
           {!isCompensation && (

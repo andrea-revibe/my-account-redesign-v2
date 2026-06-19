@@ -137,6 +137,30 @@ export function refundBreakdown(order, units, method, claimType = 'change_of_min
   return { itemTotal, warranty, gross, fee: 0, bonus: 0, net: gross, rate: 0 }
 }
 
+// An order is "split-paid" when it was settled with BOTH a bank card and a
+// gift card (store credit). `paymentSplit` records the two original amounts;
+// `paymentMethod` still carries the card brand/last4 for the card portion's
+// label. Absent (or single-source) → not split.
+export function isSplitPaid(order) {
+  const s = order?.paymentSplit
+  return Boolean(s && s.card > 0 && s.giftCard > 0)
+}
+
+// Splits a post-fee refund total across the original card↔gift-card ratio,
+// so the customer is paid back the same way they paid (deductions kept
+// proportional). The card portion is rounded and the gift-card portion takes
+// the remainder, so the two always sum back to exactly `net`. Returns null
+// for orders that weren't split-paid, so callers can render unconditionally.
+//   e.g. net 1350 on a 1000 gift + 500 card order → { card: 450, giftCard: 900 }
+export function refundDestinations(order, net) {
+  if (!isSplitPaid(order) || net == null) return null
+  const { card, giftCard } = order.paymentSplit
+  const paid = card + giftCard
+  const cardAmount = Math.round((net * card) / paid * 100) / 100
+  const giftCardAmount = Math.round((net - cardAmount) * 100) / 100
+  return { card: cardAmount, giftCard: giftCardAmount }
+}
+
 export function formatMoney(n) {
   if (n == null) return ''
   return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)
@@ -160,6 +184,9 @@ export function formatShortDate(date) {
   })
 }
 
+// Returns the bare ref only — the self-describing type prefix (`RET-`/`WAR-`/
+// `CMP-`/`CXL-`) is applied at display time by `formatClaimRef` in lib/claims,
+// so the prototype's seeded refs and freshly-submitted ones format identically.
 export function generateClaimRef() {
   return 'IXipP8'
 }

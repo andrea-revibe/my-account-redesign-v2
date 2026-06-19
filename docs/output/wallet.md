@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: edad8a0
+verified_against: 38cdddd
 covers:
   - src/lib/wallet.js
   - src/data/wallet.js
@@ -44,12 +44,16 @@ flowchart TD
 
 `walletLedger(contextOrders, transfers)` (`lib/wallet.js`) builds the ledger from the **curated seed** (`data/wallet.js`) plus any **live refund** derived from `contextOrders`. `App.jsx` passes `journeyMode ? projectedOrders : []` — so in journey mode the replayed order's wallet refund appears live, and in the static demo the seed is the whole history (we don't auto-sum every order's refund — that read as an unrealistic pile).
 
-Live-derived credits come from two refund paths:
+Live-derived credits come from four refund paths (two whole-to-Wallet, two split):
 
 | Source | Credit when | Amount |
 |---|---|---|
 | Return claim | `claim.refundMethod === 'wallet'` **and** `claimStatusId === 'refund_credited'` | `claim.expectedRefund.net` |
 | Cancellation | `refund.destination.kind === 'wallet'` **and** `cancellationStatusId === 'refunded'` | `refund.amount` |
+| Return claim — split-paid, original path | `claim.refundMethod === 'original'` **and** `refund_credited` **and** `isSplitPaid(order)` (id `claim-gift:<id>`) | gift-card portion = `refundDestinations(order, expectedRefund.net).giftCard` |
+| Cancellation — split-paid, original path | `cancellationStatusId === 'refunded'` **and** `refund.destination.kind !== 'wallet'` **and** `isSplitPaid(order)` (id `cancel-gift:<id>`) | gift-card portion = `refundDestinations(order, refund.amount).giftCard` |
+
+**Split refunds — only the gift-card portion lands in the Wallet.** When a split-paid order (`order.paymentSplit`, see [orders.md](./orders.md) §7.1) is refunded to the **original payment**, the gift card *is* store credit, so its share returns to the Wallet; the card portion goes to the card and never enters the ledger. These two credits are **not switchable** (`switchable: false`) — store credit was never card money, so there's no Move-to-card. The wallet-method forks are unchanged (whole `net` to Wallet), and the `kind !== 'wallet'` / `refundMethod === 'original'` guards mean a single refund never double-credits.
 
 **Ordering — live refund pins to the top.** The sort is tiered: live-derived credits (`via` `claim`/`cancellation`) rank **above** all seeded entries (`via: 'seed'`), then newest-date, then id. So the journey refund is always row 1 regardless of the date its node hardcodes (seed dates are kept in spring 2026, earlier than the journeys' late-May base, so the display also stays chronological).
 

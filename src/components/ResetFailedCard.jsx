@@ -13,7 +13,9 @@ import {
 import { ProductSummary } from './ProductSummary'
 import TapToFixCta from './TapToFixCta'
 import ResetGuideSheet from './ClaimFlow/ResetGuideSheet'
+import OrderClaimLink from './OrderClaimLink'
 import { deviceTypeForOrder } from '../lib/devices'
+import { formatClaimRef } from '../lib/claims'
 
 const PASSCODE_LEN = 6
 
@@ -51,12 +53,14 @@ export default function ResetFailedCard({
 
   if (submitted) {
     return (
-      <ResetDetailsReceivedCard
-        order={order}
-        passcode={passcode}
-        expanded={expanded}
-        onToggle={() => setExpanded((v) => !v)}
-      />
+      <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
+        <ResetDetailsReceivedCard
+          order={order}
+          passcode={passcode}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+        />
+      </OrderClaimLink>
     )
   }
   // The guided reset opens straight onto its remote route (device locked +
@@ -66,6 +70,7 @@ export default function ResetFailedCard({
   const canSubmit = unlinked && passcode.length === PASSCODE_LEN
 
   return (
+    <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2">
       <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 bg-danger" />
 
@@ -77,7 +82,7 @@ export default function ResetFailedCard({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden
@@ -198,6 +203,7 @@ export default function ResetFailedCard({
         </div>
       )}
     </article>
+    </OrderClaimLink>
   )
 }
 
@@ -221,7 +227,7 @@ function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle }) {
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted tabular-nums">
-            Order · #{order.id} · Claim RET-{claim.claimRef}
+            Claim {formatClaimRef(claim)}
           </div>
           <span
             aria-hidden

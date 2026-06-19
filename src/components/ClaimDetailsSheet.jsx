@@ -5,9 +5,12 @@ import {
   devicePrepText,
   refundMethodLabel,
   claimTypeLabel,
+  formatClaimRef,
 } from '../lib/claims'
 import { COMPENSATION_SUBTYPE_LABELS } from './ClaimFlow/compensationSubtypes'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
+import RefundSplitRows from './RefundSplitRows'
+import { isSplitPaid } from '../lib/returns'
 
 // Bottom sheet surfacing the full set of choices captured during the
 // raise-a-claim flow: reason, device prep, pickup details (address +
@@ -57,7 +60,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
               Claim details
             </div>
             <div className="text-[12px] text-muted mt-0.5 truncate tabular-nums">
-              {claim.claimRef} · Order #{order.id}
+              {formatClaimRef(claim)} · Order #{order.id}
             </div>
           </div>
           <button
@@ -109,7 +112,9 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
                       />
                     )}
                     <span>{refundMethodLabel(claim, order)}</span>
-                    {claim.refundMethod === 'original' && isBnpl(order) && (
+                    {claim.refundMethod === 'original' &&
+                      isBnpl(order) &&
+                      !(isSplitPaid(order) && !isWarranty && !isCompensation) && (
                       <BnplDisclaimerTooltip
                         provider={order.paymentMethod.provider}
                         align="right"
@@ -196,6 +201,14 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
                     maximumFractionDigits: 2,
                   })}
                 </div>
+              )}
+              {claim.refundMethod === 'original' && (
+                <RefundSplitRows
+                  order={order}
+                  net={claim.expectedRefund.net}
+                  caption="Split across your original payment"
+                  className="mt-2.5 pt-2.5 border-t border-dashed border-line"
+                />
               )}
             </SectionCard>
           )}

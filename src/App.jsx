@@ -12,6 +12,7 @@ import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
 import ResetFailedCard from './components/ResetFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
+import ClosedClaimCard from './components/ClosedClaimCard'
 import RevibeCancellationCard from './components/RevibeCancellationCard'
 import ChatFab from './components/ChatFab'
 import ClaimFlow from './components/ClaimFlow/ClaimFlow'
@@ -29,6 +30,7 @@ import {
   isClaimRefunded,
   isWarrantyDelivered,
   isReturnDelivered,
+  isClaimClosed,
   cancelNeedsShipBack,
   cancelReturnGate,
 } from './lib/claims'
@@ -233,6 +235,20 @@ export default function App() {
       // Sandbox journeys have no node graph to advance and no Past-order
       // surfaces — claim submit is a no-op there.
       if (isSandbox) return
+      // Raised from the in-flight hero (order not yet delivered): hand off to
+      // the current shipment stage's silent delivery-confirmation node. The
+      // agent's verdict is then a dev-panel branch (confirmed → claim initiated
+      // / unconfirmed → back to this stage), so the confirm step shows up as a
+      // state in the journey sequence rather than a hidden toggle. The raised
+      // node is stage-specific, so resolve whichever is currently reachable.
+      const preDelivery = activeOrderFromJourney?.statusId !== 'delivered'
+      if (preDelivery) {
+        const raised = journey
+          .validNext()
+          .find((n) => n.id.startsWith('claim_raised_in_transit__'))
+        if (raised) journey.advance(raised.id)
+        return
+      }
       const target =
         claim.type === 'warranty'
           ? 'claim_submitted_warranty'
@@ -433,11 +449,16 @@ export default function App() {
       return o
     }
     if (journeyMode) return [applyCancel(activeOrderFromJourney)]
-    return ORDERS.map((o) =>
-      applyCancel(
-        submittedClaims[o.id] ? { ...o, claim: submittedClaims[o.id] } : o,
-      ),
-    )
+    return ORDERS.map((o) => {
+      const submitted = submittedClaims[o.id]
+      if (!submitted) return applyCancel(o)
+      // A claim raised from the in-flight hero carries the agent's delivery
+      // confirmation (the gate only seeds when confirmed), so flip the order
+      // to delivered — routing then demotes it from the hero to the ClaimCard.
+      const withClaim = { ...o, claim: submitted }
+      if (o.statusId !== 'delivered') withClaim.statusId = 'delivered'
+      return applyCancel(withClaim)
+    })
   }, [
     journeyMode,
     activeOrderFromJourney,
@@ -544,7 +565,9 @@ export default function App() {
           counts={counts}
         />
 
-        {showHero && <HeroCard order={activeOrder} />}
+        {showHero && (
+          <HeroCard order={activeOrder} onRaiseClaim={setClaimFlowOrderId} />
+        )}
 
         {filtered.length === 0 ? (
           <p className="px-4 py-10 text-small text-muted text-center">
@@ -694,6 +717,15 @@ export default function App() {
                             autoOpenClaim.orderId === o.id ? autoOpenClaim.n : 0
                           }
                           onOpenWallet={openWallet}
+                        />
+                      )
+                    }
+                    if (isClaimClosed(o)) {
+                      return (
+                        <ClosedClaimCard
+                          key={o.id}
+                          order={o}
+                          onRaiseClaim={setClaimFlowOrderId}
                         />
                       )
                     }

@@ -23,6 +23,9 @@ export const BASELINE_ORDERS = [
     trackingNumber: null,
     customerName: 'Andrea Grossi',
     paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    // Split-paid (card + gift card): a cancellation refund is paid back along
+    // the same split. Demonstrates the split rows in CancelOrderSheet.
+    paymentSplit: { card: 283, giftCard: 566 },
     timeline: {
       created: '28 Apr · 2:15 PM',
     },
@@ -239,6 +242,9 @@ export const BASELINE_ORDERS = [
     trackingUrl: 'https://www.dhl.com/track',
     customerName: 'Andrea Grossi',
     paymentMethod: { type: 'card', brand: 'Mastercard', last4: '8210' },
+    // Split-paid (card + gift card): a return refund keeps the same split.
+    // Demonstrates the split rows across the returns flow (Steps 5/6/7).
+    paymentSplit: { card: 1499, giftCard: 2000 },
     deviceOs: 'ios',
     timeline: {
       created: '24 May · 9:15 AM',
@@ -378,6 +384,58 @@ export const BASELINE_ORDERS = [
     product: {
       name: 'iPhone X',
       variant: 'Silver · 64 GB · Good',
+      image: '/iphone-cutout.png',
+    },
+  },
+  // Split-paid (card + gift card) cancellation, refunded to the *original*
+  // payment: the refund is paid back along the same split — card portion to
+  // the card, gift-card portion back into the Wallet. Exercises the split
+  // rows on the refund-hero card + RefundDetailsSheet (destination is not the
+  // Wallet, so the split shows). The gift-card portion also seeds a Wallet
+  // ledger entry (see data/wallet.js `seed:cancel-gift-89518`).
+  {
+    id: '89518',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    placedAt: '10/03/2026 11:20 AM',
+    placedAtFull: '10 Mar 2026 · 11:20 AM',
+    quantity: 1,
+    subtotal: 1400,
+    warranty: 100,
+    total: 1500,
+    currency: 'AED',
+    statusId: 'quality_check',
+    state: 'cancelled',
+    cancellationStatusId: 'refunded',
+    cancellationRef: '4BTb2x',
+    courier: null,
+    trackingNumber: null,
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    paymentSplit: { card: 500, giftCard: 1000 },
+    timeline: {
+      created: '10 Mar · 11:20 AM',
+      quality_check: '12 Mar · 9:40 AM',
+    },
+    cancellationTimeline: {
+      requested: '13 Mar · 2:05 PM',
+      refund_pending: '14 Mar · 9:30 AM',
+      refunded: '16 Mar · 10:15 AM',
+    },
+    refund: {
+      subtotal: 1500,
+      fee: { label: 'Processing fee', rate: 0.05, amount: 75 },
+      amount: 1425,
+      destination: { kind: 'card', label: 'Visa', last4: '4242' },
+      breakdown: [
+        { label: 'iPhone 15', amount: 1400 },
+        { label: 'Revibe Care', amount: 100 },
+      ],
+    },
+    product: {
+      name: 'iPhone 15',
+      variant: 'Black · 128 GB · Excellent',
       image: '/iphone-cutout.png',
     },
   },

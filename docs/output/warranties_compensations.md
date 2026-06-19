@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: edad8a0
+verified_against: 38cdddd
 covers:
   - src/components/WarrantyClaimCard.jsx
   - src/components/ClaimFlow/Step2Compensation.jsx
@@ -53,7 +53,7 @@ The head (`initiated → pickup → qc`) is shared with the refund pipeline; the
 
 ### 2.3 WarrantyClaimCard
 
-Lives at `src/components/WarrantyClaimCard.jsx`. Mirrors `ClaimCard`'s chrome (left accent strip, eyebrow, state pill, tinted hero, compact product row, expand-on-tap, history thread, view-details footer) but the hero block and post-QC tail diverge.
+Lives at `src/components/WarrantyClaimCard.jsx`. Wrapped in shared `OrderClaimLink` (order↔claim accordion) like the rest of the claim-card family. Mirrors `ClaimCard`'s chrome (left accent strip, typed claim-ref header eyebrow via `formatClaimRef(claim)` → `WAR-…`, state pill, tinted hero, compact product row, expand-on-tap, history thread, view-details footer) but the hero block and post-QC tail diverge.
 
 #### 2.3.1 Tone progression
 
@@ -65,11 +65,11 @@ Lives at `src/components/WarrantyClaimCard.jsx`. Mirrors `ClaimCard`'s chrome (l
 
 #### 2.3.2 State-specific heroes
 
-Most states reuse a generic claim hero (eyebrow + headline + ref + updated timestamp). Three states layer state-specific content inside or in place of that hero:
+Most states reuse a generic claim hero (headline + optional subline). The claim ref now lives only in the card header eyebrow (`formatClaimRef`), not in the hero. Three states layer state-specific content inside or in place of that hero:
 
 - **`initiated`** — `ScheduledPickupStrip` (CalendarClock + scheduled date/slot, MapPin + pickup address). Same shape as `ClaimCard`'s initiated strip.
 - **`under_repair`** — `RepairWindowStrip`: Wrench-iconed "Estimated repair complete" date + optional one-line note ("Charging-port assembly swap — typically wraps up within 7–10 days").
-- **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, a `DeliveryAddressPill` ("Delivering to" + the order's actual address, falling back to "Home" only when `order.address` is unset), claim-ref + type subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
+- **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, a `DeliveryAddressPill` ("Delivering to" + the order's actual address, falling back to "Home" only when `order.address` is unset), "Claim · {type}" subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
 - **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Delivered on {date}" (headline + state pill read "Delivered").
 
 #### 2.3.3 Detailed tracking dropdowns

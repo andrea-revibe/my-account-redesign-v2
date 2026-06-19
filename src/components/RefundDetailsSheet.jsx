@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
+import RefundSplitRows from './RefundSplitRows'
+import { isSplitPaid } from '../lib/returns'
 
 // Bottom sheet for past cancelled orders. Strictly the money math:
 // line items → subtotal → fee (if any) → total refund. Destination,
@@ -22,8 +24,9 @@ export default function RefundDetailsSheet({ order, open, onClose }) {
   if (!open) return null
 
   const { currency } = order
-  const { subtotal, fee, bonus, amount, breakdown } = order.refund
+  const { subtotal, fee, bonus, amount, breakdown, destination } = order.refund
   const tone = toneFor(order.cancellationStatusId)
+  const showSplit = isSplitPaid(order) && destination?.kind !== 'wallet'
 
   return (
     <div
@@ -123,6 +126,15 @@ export default function RefundDetailsSheet({ order, open, onClose }) {
                 {currency} {formatMoney(amount)}
               </span>
             </div>
+            {showSplit && (
+              <RefundSplitRows
+                order={order}
+                net={amount}
+                currency={currency}
+                caption="Refunded to"
+                className="mt-1 pt-2.5 border-t border-dashed border-line"
+              />
+            )}
           </div>
         </div>
       </div>

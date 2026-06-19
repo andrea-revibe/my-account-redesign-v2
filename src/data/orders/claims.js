@@ -67,6 +67,70 @@ export const CLAIM_ORDERS = [
       },
     },
   },
+  // ----- Split-paid (card + gift card) change-of-mind claim refunding to the
+  // *original* payment, mid-pipeline at `qc`. The refund keeps the original
+  // split: card portion → card, gift-card portion → Wallet, with the 10%
+  // restocking fee applied proportionally to both. Numbers mirror the canonical
+  // example: 1500 paid (1000 gift + 500 card) → 1350 refund (900 gift + 450
+  // card). Exercises the split rows on ClaimCard + ClaimDetailsSheet.
+  {
+    id: '89868',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '01/05/2026 10:05 AM',
+    placedAtFull: '1 May 2026 · 10:05 AM',
+    deliveredOn: '2026-05-16',
+    deliveredOnLong: 'Saturday, 16 May',
+    quantity: 1,
+    unitPrice: 1400,
+    subtotal: 1400,
+    warranty: 100,
+    total: 1500,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193509',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    paymentSplit: { card: 500, giftCard: 1000 },
+    deviceOs: 'ios',
+    timeline: {
+      created: '1 May · 10:05 AM',
+      quality_check: '3 May · 9:30 AM',
+      shipped: '6 May · 4:10 PM',
+      delivered: '16 May · 11:20 AM',
+    },
+    product: {
+      name: 'iPhone 15',
+      variant: 'Black · 128 GB · Excellent',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Sp5kR2',
+      claimStatusId: 'qc',
+      type: 'change_of_mind',
+      submittedAt: '18 May 2026 · 2:40 PM',
+      units: 1,
+      reason: { value: 'changed_mind', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 1400, warranty: 100, gross: 1500, fee: 150, net: 1350, rate: 0.10 },
+      timeline: {
+        initiated: '18 May · 2:40 PM',
+        pickup: '20 May · 10:15 AM',
+        qc: '23 May · 11:40 AM',
+      },
+    },
+  },
   // ----- Layered mock: delivered → change-of-mind claim → courier
   // pickup failed. The customer must confirm a new AWB before the claim
   // auto-cancels. Routed via `claim.pickupFailure` to PickupFailedCard
@@ -659,6 +723,82 @@ export const CLAIM_ORDERS = [
             shipped: '20 May · 9:15 AM',
           },
         },
+      },
+    },
+  },
+  // ----- Closed-by-Revibe mock: delivered → issue claim that QC reviewed and
+  // could not reproduce, so Revibe closed it without accepting (no refund, the
+  // customer keeps the device). `claim.closure` routes it to ClosedClaimCard
+  // (terminal, Past orders, Claims-filter `Closed` bucket). claimStatusId stays
+  // at `qc` — the closure flag is the terminal, not a refund state.
+  {
+    id: '89705',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '21/03/2026 09:12 AM',
+    placedAtFull: '21 Mar 2026 · 9:12 AM',
+    deliveredOn: '2026-03-28',
+    deliveredOnLong: 'Saturday, 28 March',
+    quantity: 1,
+    unitPrice: 549,
+    subtotal: 549,
+    warranty: 50,
+    total: 599,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193401',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '21 Mar · 9:12 AM',
+      quality_check: '23 Mar · 10:04 AM',
+      shipped: '25 Mar · 4:48 PM',
+      delivered: '28 Mar · 1:22 PM',
+    },
+    product: {
+      name: 'iPhone XR',
+      variant: 'White · 128 GB · Good',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Cl0sd2',
+      claimStatusId: 'qc',
+      type: 'issue',
+      submittedAt: '02 Apr 2026 · 8:30 AM',
+      units: 1,
+      issueDetails: {
+        category: 'screen',
+        description:
+          'Screen flickers occasionally when scrolling — happens maybe once or twice a day.',
+        attachmentName: 'IMG_0488.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 549, warranty: 50, gross: 599, fee: 0, net: 599, rate: 0 },
+      timeline: {
+        initiated: '2 Apr · 8:30 AM',
+        pickup: '4 Apr · 10:15 AM',
+        qc: '7 Apr · 11:40 AM',
+      },
+      closure: {
+        reason: 'not_reproduced',
+        closedAt: '9 Apr · 3:05 PM',
+        opsName: 'Marwa',
+        opsRole: 'Revibe Quality',
+        opsMessage:
+          'Hi Andrea — we ran an extended display diagnostic over 48 hours, including the scrolling and refresh-rate tests, and the screen behaved normally throughout. We weren’t able to reproduce the flicker you described, so we can’t approve this claim. The device is on its way back to you and there’s nothing further you need to do. If you can capture a short video of it happening, our support team is happy to take another look.',
       },
     },
   },

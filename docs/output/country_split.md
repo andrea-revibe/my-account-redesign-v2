@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: edad8a0
+verified_against: 38cdddd
 covers:
   - src/lib/countries.js
   - src/components/CountryPicker.jsx
