@@ -120,13 +120,17 @@ export default function HeroCard({ order, onRaiseClaim }) {
           <GhostBtn icon={Headphones} label="Get help" />
         </div>
 
-        <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={() => onRaiseClaim?.(order.id)}
+          className="mt-2 w-full h-10 rounded-[10px] inline-flex items-center justify-center gap-1.5 bg-white/[.20] border border-white/40 text-white font-semibold text-[13.5px]"
+        >
+          <AlertTriangle size={16} strokeWidth={1.75} />
+          I need help with this device
+        </button>
+
+        <div className="mt-2">
           <CancelOrderButton />
-          <GhostBtn
-            icon={AlertTriangle}
-            label="Raise a claim"
-            onClick={() => onRaiseClaim?.(order.id)}
-          />
         </div>
       </div>
     </section>

@@ -51,13 +51,17 @@ function DeliveredOrderCard({ order, onRaiseClaim }) {
         <DeliveredHero order={order} />
         <ProductSummary order={order} />
         {history.length > 0 && <HistoryThread events={history} />}
-        <div className="flex justify-end gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
-          <PastButton icon={Download} label="Download receipt" />
+        <div className="flex flex-col gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
           <PastButton
             icon={AlertTriangle}
-            label="Raise a claim"
+            label="I need help with this device"
+            tone="brand"
+            full
             onClick={() => onRaiseClaim?.(order.id)}
           />
+          <div className="flex justify-end">
+            <PastButton icon={Download} label="Download receipt" tone="quiet" />
+          </div>
         </div>
       </div>
     </article>
@@ -95,14 +99,21 @@ function DeliveredHero({ order }) {
     </div>
   )
 }
-function PastButton({ icon: Icon, label, onClick }) {
+function PastButton({ icon: Icon, label, onClick, tone = 'muted', full }) {
+  const styles = {
+    brand:
+      'px-3 py-2 rounded-full border border-brand/30 bg-brand/5 text-brand hover:bg-brand/10',
+    muted:
+      'px-3 py-1.5 rounded-full border border-line bg-surface text-ink hover:bg-line-2',
+    quiet: 'px-2 py-1 rounded-md text-muted hover:text-ink hover:bg-line-2',
+  }[tone]
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-line bg-surface text-[12px] font-medium text-ink hover:bg-line-2"
+      className={`inline-flex items-center justify-center gap-1.5 text-[12px] font-medium ${styles}${full ? ' w-full' : ''}`}
     >
-      <Icon size={13} strokeWidth={1.75} className="opacity-75" />
+      <Icon size={13} strokeWidth={1.75} className={tone === 'brand' ? '' : 'opacity-75'} />
       {label}
     </button>
   )

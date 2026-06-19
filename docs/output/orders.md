@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 9247a82
+verified_against: 0ec8829
 covers:
   - src/App.jsx
   - src/lib/statuses.js
@@ -157,7 +157,7 @@ The delivered card is **not expandable** — there is no chevron and no expanded
 - Success-tinted `Delivered` state pill (`PackageCheck` icon).
 - Success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (falls back to the date part of `order.timeline.delivered`); a `Delivered to [📍 …]` address pill below (shared `DeliveryAddressPill`, §3.0.1).
 - The shared `ProductSummary` row (§3.0). The cancelled refund-hero card (§3.4) also uses `ProductSummary` — the `RefundHero` carries the refund amount, the row carries the device + Revibe Care + Total paid.
-- Right-aligned chip-style footer with `Download receipt` + `Raise a claim`, separated by a top dashed border. `Raise a claim` is the entry point to the returns flow — see [returns/change_of_mind.md](./returns/change_of_mind.md) / [returns/issue.md](./returns/issue.md).
+- Stacked footer separated by a top border: a full-width brand-tinted `I need help with this device` button (the relabelled `Raise a claim` CTA — entry point to the returns flow, see [returns/change_of_mind.md](./returns/change_of_mind.md) / [returns/issue.md](./returns/issue.md)) above a right-aligned, quiet `Download receipt`. `PastButton` takes a `tone` (`brand` / `muted` / `quiet`) + `full` to drive this.
 
 A single-row `HistoryThread` (mode `'delivered'`) carrying just the `Order placed` event sits between the product row and the footer buttons, collapsed by default. Delivery is the active hero so it is intentionally absent from the thread.
 
@@ -166,7 +166,7 @@ A single-row `HistoryThread` (mode `'delivered'`) carrying just the `Order place
 - **`PastOrderCard` — cancelled past:** documented in [cancellations.md](./cancellations.md) (refund-hero card variants).
 - **`RevibeCancellationCard` — Revibe-initiated cancellation:** the Past-section card for orders cancelled by Revibe (`state === 'cancelled' && cancellationInitiator === 'revibe'`); documented in [cancellations.md](./cancellations.md).
 - **`ClaimCard` + takeover cards (incl. `ResetFailedCard`) + `WarrantyClaimCard`:** documented in [returns/claim_tracking.md](./returns/claim_tracking.md) and [warranties_compensations.md](./warranties_compensations.md).
-- **HeroCard:** the active in-flight order (currently the out-for-delivery one) has two stacked rows of full-width buttons beneath the headline — `Track package` (filled white, brand text — the only filled CTA in the app), `Get help` (ghost), `Cancel order` + `Raise a claim` (ghost). `Cancel order` toggles a small dark tooltip — *"You cannot cancel the order at this stage"* — the cancellation rule is prototype-only.
+- **HeroCard:** the active in-flight order (currently the out-for-delivery one) has stacked buttons beneath the headline — a `Track package` / `Get help` row (`Track package` filled white, brand text — the only filled CTA in the app; `Get help` ghost), then a full-width translucent-white `I need help with this device` button (the relabelled claim CTA), then a `Cancel order` row. `Cancel order` toggles a small dark tooltip — *"You cannot cancel the order at this stage"* — the cancellation rule is prototype-only.
 
 ## 4. State models
 
@@ -215,7 +215,7 @@ There is intentionally no `delivered` sub-status. When the parcel is delivered, 
 | `created` | `InProgressCard` | If most in-flight | `Delivery by` + ETA (`estimatedDeliveryLong`) | brand | "On track" (Zap) | `Cancel order` + `Change details` |
 | `quality_check` | `InProgressCard` | If most in-flight | `Delivery by` + ETA | brand hero; amber tag when `delayed` (see §8) | "On track" (Zap) or amber "Taking longer than expected" (Clock) when `delayed` | `Cancel order` + `Change details` |
 | `shipped` (sub-status drives headline) | `OrderCard` | If most in-flight | status icon + sub-status label (e.g. "Out for delivery") + `Delivery by` ETA subtitle | brand | banner-driven ("On track" / "Arriving today") | `Receipt` + `Get help` |
-| `delivered` | `PastOrderCard` (delivered branch) | Never (no expand) | `Delivered on` + `deliveredOnLong` | success | "Complete" (Check) | `Download receipt` + `Raise a claim` |
+| `delivered` | `PastOrderCard` (delivered branch) | Never (no expand) | `Delivered on` + `deliveredOnLong` | success | "Complete" (Check) | full-width `I need help with this device` (brand) + quiet `Download receipt` |
 | `cancelled` — in flight (`state === 'cancelled'` + non-terminal `statusId`) | `OrderCard` | Never | "Cancelled" + status banner | danger | n/a | `Get help` |
 | `cancelled` — past order | `PastOrderCard` (cancelled branch) | Never | `Refund of` / `Refunded` + amount | warn / brand / success per phase | "Requested" / "Processing" / "Complete" | `View refund details` + icon-only `Download receipt` |
 
