@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { X, ChevronLeft, Info, ShieldCheck, Sparkles } from 'lucide-react'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
 import { REVIBE_CARE_ICON } from './ProductSummary'
-import { CANCELLATION_FEE_RATE } from '../lib/returns'
+import RefundSplitRows from './RefundSplitRows'
+import { CANCELLATION_FEE_RATE, isSplitPaid } from '../lib/returns'
 
 // Statuses where the dissuade screen fires on the original-payment path.
 // At these stages the order hasn't shipped yet, so the ship-deadline fee
@@ -273,7 +274,20 @@ function SelectStep({
               selected={method === 'original'}
               onSelect={() => setMethod('original')}
               title="Original payment method"
-              amountLine={`${currency} ${formatMoney(refundOriginal)} back to ${cardLabel}`}
+              amountLine={
+                isSplitPaid(order)
+                  ? `${currency} ${formatMoney(refundOriginal)} back to your original payment`
+                  : `${currency} ${formatMoney(refundOriginal)} back to ${cardLabel}`
+              }
+              extra={
+                <RefundSplitRows
+                  order={order}
+                  net={refundOriginal}
+                  showTotal
+                  totalLabel="Total refund"
+                  className="mt-2.5 pt-2.5 border-t border-dashed border-line"
+                />
+              }
               detailLine={
                 breached
                   ? 'No cancellation fee · 5–10 business days'
@@ -311,8 +325,13 @@ function ConfirmStep({
   walletTotal,
 }) {
   const isStoreCredit = method === 'store_credit'
+  const isSplit = !isStoreCredit && isSplitPaid(order)
   const amount = isStoreCredit ? (breached ? walletTotal : total) : refundOriginal
-  const destination = isStoreCredit ? 'Revibe Wallet' : cardLabel
+  const destination = isStoreCredit
+    ? 'Revibe Wallet'
+    : isSplit
+      ? 'original payment'
+      : cardLabel
   const eta = isStoreCredit
     ? 'Available instantly after cancellation.'
     : 'Refunded to your card in 5–10 business days.'
@@ -385,6 +404,15 @@ function ConfirmStep({
               <span>{destination}</span>
             )}
           </div>
+          {isSplit && (
+            <RefundSplitRows
+              order={order}
+              net={refundOriginal}
+              showTotal
+              totalLabel="Total refund"
+              className="mt-3 pt-3 border-t border-dashed border-line text-left"
+            />
+          )}
           <div className="mt-3 text-[12px] text-muted">{eta}</div>
         </div>
         <div className="flex items-start gap-2.5 rounded-[12px] border border-line bg-line-2 p-3 text-[12.5px] text-ink leading-[1.45]">
@@ -602,6 +630,7 @@ function RefundOption({
   bonusPill,
   detailLine,
   detailHighlight,
+  extra,
 }) {
   const handleKey = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -645,6 +674,7 @@ function RefundOption({
           {info && <WalletInfoTooltip stopPropagation />}
         </span>
         <span className="block mt-1 text-[13px] text-ink">{amountLine}</span>
+        {extra}
         {bonusPill && (
           <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-accent/15 text-accent font-bold uppercase tracking-[0.06em] h-5 px-2 text-[10px]">
             <Sparkles size={10} strokeWidth={2} />

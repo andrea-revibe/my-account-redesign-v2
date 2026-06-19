@@ -9,6 +9,7 @@ import {
 } from '../lib/claims'
 import { COMPENSATION_SUBTYPE_LABELS } from './ClaimFlow/compensationSubtypes'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
+import RefundSplitRows from './RefundSplitRows'
 
 // Bottom sheet surfacing the full set of choices captured during the
 // raise-a-claim flow: reason, device prep, pickup details (address +
@@ -197,6 +198,14 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
                     maximumFractionDigits: 2,
                   })}
                 </div>
+              )}
+              {claim.refundMethod === 'original' && (
+                <RefundSplitRows
+                  order={order}
+                  net={claim.expectedRefund.net}
+                  caption="Split across your original payment"
+                  className="mt-2.5 pt-2.5 border-t border-dashed border-line"
+                />
               )}
             </SectionCard>
           )}

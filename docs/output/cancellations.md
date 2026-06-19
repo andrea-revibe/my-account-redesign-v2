@@ -1,8 +1,9 @@
 ---
 status: live
-verified_against: ff6d17e
+verified_against: afedc65
 covers:
   - src/components/CancelOrderSheet.jsx
+  - src/components/RefundSplitRows.jsx
   - src/components/KeepOrderSheet.jsx
   - src/components/Timeline.jsx
   - src/components/UndoSnackbar.jsx
@@ -61,6 +62,7 @@ Header (`Cancel order` + `#id`), then an order-summary card with the product str
 
 - **Revibe Wallet** (wallet icon + tap-toggle info `i`, success-tone detail line) — full refund of the order total, available instantly. The recommendation is signalled by rendering the "Full refund · available instantly" detail line in `text-success font-semibold` rather than a `Recommended` pill. The `i` opens a tooltip explaining wallet credits can be used on any product and are combinable with any payment method, with a placeholder `terms & conditions` link. Same tooltip surfaces wherever "Revibe Wallet" is named (credits pill in `GreetRow`, confirm-step destination line) — all driven by the shared `WalletInfoTooltip`.
 - **Original payment method** — total minus a 5% processing fee, refunded to the card in 5–10 business days. The amount line names the actual card the money is going back to (`{currency} {amount} back to {brand} •• {last4}` — e.g. `AED 806.55 back to Visa •• 4242`), driven by `order.paymentMethod`. The fee is shown explicitly as a negative line under the amount (e.g. `−AED 42.45 (5% processing fee)`).
+  - **Split-paid orders** (`order.paymentSplit`, see [orders.md](./orders.md) §7.1): the amount line reads `back to your original payment` and a `RefundSplitRows` block lists the post-fee refund split proportionally across the two sources (card portion → card label, gift-card portion → `Gift card`), closing with a `Total refund` row that sums back to the net. The Wallet option is unaffected (whole refund to Wallet, fee waived).
 
 The `Continue` CTA is disabled until a method is picked. `Keep order` closes the sheet without changes. `Continue` routes to **Dissuade** when the gate fires, otherwise straight to **Confirm**.
 
@@ -81,7 +83,7 @@ The dissuade step does not show the refund amount or breakdown — those live on
 A back arrow returns to the previous step (Dissuade if the user came through it, otherwise Select). Body shows a centered amount block (`You'll receive` / amount / destination / ETA copy):
 
 - **Wallet path** — destination line reads `back to your [wallet icon] Revibe Wallet [i]`, same shared info tooltip.
-- **Original-payment path** — block also carries a muted breakdown line (e.g. `Total AED 849 · −AED 42.45 fee`) between the headline figure and the destination; destination names the same card as Step 1 — `back to your {brand} •• {last4}` (e.g. `back to your Visa •• 4242`), falling back to `back to your your card` when `order.paymentMethod` is absent.
+- **Original-payment path** — block also carries a muted breakdown line (e.g. `Total AED 849 · −AED 42.45 fee`) between the headline figure and the destination; destination names the same card as Step 1 — `back to your {brand} •• {last4}` (e.g. `back to your Visa •• 4242`), falling back to `back to your your card` when `order.paymentMethod` is absent. **Split-paid:** destination reads `back to your original payment` and a `RefundSplitRows` block (with the `Total refund` row) shows the per-source split below the destination line.
 
 Beneath the amount block sits a neutral info-tone strip with method-specific copy:
 
@@ -107,6 +109,8 @@ The bonus is **Wallet-only** — the card path is a full refund with no bonus, e
 ## 3. Refund-hero card (`PastOrderCard` — cancelled branch)
 
 The refund-hero card leads with the **refund** as the visual hero rather than the fulfilment journey. The whole card is wrapped in `OrderClaimLink` (§10 of [claim_tracking.md](./returns/claim_tracking.md)) so a cancelled order, like a claim, gets the parent-order strip + connector thread and a reciprocal `Linked cancellation` row in `OriginalOrderSheet`. A `w-1` left accent strip carries the phase tone (warn amber for `requested`, brand purple for `refund_pending`, success green for `refunded`). The top eyebrow now reads `#{cancellationRef}` (the cancellation ref — `Cancellation` when absent), since the wrapper's strip already owns the `Order #{id}`; the phase pill sits on its own row below; then a tinted hero block whose internal eyebrow reads simply `Cancellation` (the ref moved up to the card eyebrow) — parallel to `ClaimCard`'s `Claim · {type}` eyebrow. Below that, a smaller `Refund of` / `Refunded` label sits above the refund amount (`text-[28px]` tabular-nums) and a destination chip — wallet destinations get a brand→accent gradient chip (echoes the `GreetRow` credits pill) that, when an `onOpenWallet` handler is threaded, is a tappable button (chevron, `stopPropagation`) opening the `WalletSheet` ledger (see [wallet.md](./wallet.md)); card destinations get a neutral chip. BNPL destinations (`refund.destination.kind === 'bnpl'`) render the same neutral chip but with just the provider brand as the label (no `•• last4`), and an inline `BnplDisclaimerTooltip` Info-icon (`stopPropagation` because the header is the tap target) opens a popover: "{provider} may charge additional fees on refunded purchases. Check your {provider} account for details." Refunded orders surface a `fundsAvailable` sub-copy line ("Available now in your wallet"); the two earlier phases make no ETA promise. When the refund carries a late-promise Wallet bonus (`refund.bonus > 0`, see §2.5), a success-tone *"Includes AED 100 Wallet bonus"* line (`Sparkles`) renders under the hero amount on every phase. `RefundDetailsSheet` shows the bonus as a `Subtotal` → `Revibe Wallet bonus +AED 100` (success tone) block parallel to the card-refund fee block, with `Total refund` = `subtotal + bonus`.
+
+**Split-paid cancellations** (`order.paymentSplit`, see [orders.md](./orders.md) §7.1) refunded to the original payment (`refund.destination.kind !== 'wallet'`): the single destination chip is replaced by a `RefundSplitRows` block listing the card and gift-card portions of `refund.amount` (kept proportional to the original split), and `RefundDetailsSheet` appends the same split under its `Total refund`. The gift-card portion also lands in the Wallet ledger ([wallet.md](./wallet.md) §3). Wallet-destination cancellations are unaffected.
 
 Expanded reveals a 3-step numbered dot stepper titled "Cancellation progress" (mirrors `ClaimCard`'s "Claim progress" header for symmetry). Both cancellation paths render the same three steps (`Requested` / `Pending` / `Refunded`); the difference is timing — on the created-stage path the `requested` step ticks over instantly (no supplier check needed), while on the `quality_check` path it waits on supplier confirmation. Each reached/current step carries the timestamp it entered that phase underneath its label (sourced from `order.cancellationTimeline[step.id]`); upcoming steps render the label only.
 

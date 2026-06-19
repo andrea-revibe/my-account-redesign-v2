@@ -9,6 +9,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
+import RefundSplitRows from '../RefundSplitRows'
 import { claimTypeLabel, expectedCompletionFor, formatClaimRef } from '../../lib/claims'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 
@@ -156,6 +157,14 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
               <span className="block mt-1 text-[12px] text-muted">
                 {timeline}
               </span>
+              {state.refundMethod === 'original' && (
+                <RefundSplitRows
+                  order={order}
+                  net={refund.net}
+                  caption="Split across your original payment"
+                  className="mt-2.5 pt-2.5 border-t border-dashed border-line"
+                />
+              )}
             </Row>
           )}
           {!isCompensation && (

@@ -5,6 +5,7 @@ import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
 import { REVIBE_CARE_ICON } from '../ProductSummary'
+import RefundSplitRows from '../RefundSplitRows'
 
 export default function Step5RefundMethod({ state, dispatch, order, error }) {
   if (!order) return null
@@ -130,6 +131,14 @@ export default function Step5RefundMethod({ state, dispatch, order, error }) {
               />
             </div>
           )}
+          <RefundSplitRows
+            order={order}
+            net={original.net}
+            caption="Split across your original payment"
+            showTotal
+            totalLabel="Total refund"
+            className="mt-3 pt-3 border-t border-dashed border-line"
+          />
           <div className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2 leading-[1.4] whitespace-nowrap">
             <Clock size={12} strokeWidth={2} className="text-ink-2 shrink-0" />
             {isIssue

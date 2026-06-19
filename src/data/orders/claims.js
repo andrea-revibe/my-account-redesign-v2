@@ -67,6 +67,70 @@ export const CLAIM_ORDERS = [
       },
     },
   },
+  // ----- Split-paid (card + gift card) change-of-mind claim refunding to the
+  // *original* payment, mid-pipeline at `qc`. The refund keeps the original
+  // split: card portion → card, gift-card portion → Wallet, with the 10%
+  // restocking fee applied proportionally to both. Numbers mirror the canonical
+  // example: 1500 paid (1000 gift + 500 card) → 1350 refund (900 gift + 450
+  // card). Exercises the split rows on ClaimCard + ClaimDetailsSheet.
+  {
+    id: '89868',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '01/05/2026 10:05 AM',
+    placedAtFull: '1 May 2026 · 10:05 AM',
+    deliveredOn: '2026-05-16',
+    deliveredOnLong: 'Saturday, 16 May',
+    quantity: 1,
+    unitPrice: 1400,
+    subtotal: 1400,
+    warranty: 100,
+    total: 1500,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193509',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    paymentSplit: { card: 500, giftCard: 1000 },
+    deviceOs: 'ios',
+    timeline: {
+      created: '1 May · 10:05 AM',
+      quality_check: '3 May · 9:30 AM',
+      shipped: '6 May · 4:10 PM',
+      delivered: '16 May · 11:20 AM',
+    },
+    product: {
+      name: 'iPhone 15',
+      variant: 'Black · 128 GB · Excellent',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Sp5kR2',
+      claimStatusId: 'qc',
+      type: 'change_of_mind',
+      submittedAt: '18 May 2026 · 2:40 PM',
+      units: 1,
+      reason: { value: 'changed_mind', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 1400, warranty: 100, gross: 1500, fee: 150, net: 1350, rate: 0.10 },
+      timeline: {
+        initiated: '18 May · 2:40 PM',
+        pickup: '20 May · 10:15 AM',
+        qc: '23 May · 11:40 AM',
+      },
+    },
+  },
   // ----- Layered mock: delivered → change-of-mind claim → courier
   // pickup failed. The customer must confirm a new AWB before the claim
   // auto-cancels. Routed via `claim.pickupFailure` to PickupFailedCard

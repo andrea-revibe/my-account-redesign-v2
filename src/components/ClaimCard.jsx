@@ -28,6 +28,8 @@ import ClaimActionBanner from './ClaimActionBanner'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
+import RefundSplitRows from './RefundSplitRows'
+import { isSplitPaid } from '../lib/returns'
 import Timeline from './Timeline'
 import { TrackingDropdown } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
@@ -249,6 +251,16 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
           </div>
         )}
       </div>
+
+      {claim.refundMethod === 'original' &&
+        claim.expectedRefund &&
+        isSplitPaid(order) && (
+          <RefundSplitRows
+            order={order}
+            net={claim.expectedRefund.net}
+            className="mt-3 pt-3 border-t border-line-2/70"
+          />
+        )}
     </div>
   )
 }

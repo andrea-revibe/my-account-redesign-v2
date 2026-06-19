@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: ff6d17e
+verified_against: afedc65
 covers:
   - src/components/ClaimCard.jsx
   - src/components/ClaimActionBanner.jsx
@@ -95,6 +95,7 @@ This piggybacks the existing `warn` / `brand` / `success` tokens — no new colo
   - Sub-line with the most recent timeline timestamp. (The `claimRef` was dropped from the hero sub-line once it became the card eyebrow.)
   - **Scheduled pickup strip** (only when `claim.claimStatusId === 'initiated'` and `claim.scheduledPickup` is set): a faint-divider-separated block carrying a `SCHEDULED PICKUP` eyebrow, a CalendarClock-iconed `{date} · {slot}` row in tone colour, and a MapPin-iconed truncated `{pickupDetails.address}` row beneath. Surfaces the courier date/slot Revibe assigned + the address the customer submitted, in one place, while the claim is still pre-collection. Hidden once the claim advances past `initiated`.
   - Separated by a faint divider: `Expected refund` (or `Refunded` once terminal) eyebrow + destination chip on the left and the net refund amount in `text-[22px]` tabular-nums on the right. The destination chip reuses the brand→accent gradient when wallet-bound (echoes the `GreetRow` credits pill) and a neutral chip when card-bound. When the original payment method is BNPL (`paymentMethod.type === 'bnpl'`) **and** `claim.refundMethod === 'original'`, the chip label collapses to just the provider brand (`Tabby` / `Tamara`) and a `BnplDisclaimerTooltip` Info-icon is appended inside the chip — `stopPropagation` so it doesn't toggle the card header. Same tooltip is rendered next to the refund destination row in `ClaimDetailsSheet`.
+  - **Split-paid orders** (`order.paymentSplit`, see [../orders.md](../orders.md) §7.1) with `claim.refundMethod === 'original'`: a `RefundSplitRows` block is appended below the amount row, splitting the net proportionally across the card and gift-card sources (`ClaimDetailsSheet` shows the same under its Refund card). The net stays the hero figure; the split is the breakdown. The gift-card portion credits the Wallet once `refund_credited` ([wallet.md](../wallet.md) §3).
 - A compact product row (image / name / variant / `Revibe Care +{currency} {amount}` line / total / chevron).
 
 ### 2.3 Expanded view

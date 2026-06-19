@@ -17,6 +17,8 @@ import { cancellationStepsFor } from '../lib/statuses'
 import Timeline from './Timeline'
 import { getHistoryEvents } from '../lib/events'
 import RefundDetailsSheet from './RefundDetailsSheet'
+import RefundSplitRows from './RefundSplitRows'
+import { isSplitPaid } from '../lib/returns'
 import KeepOrderSheet from './KeepOrderSheet'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip from './BnplDisclaimerTooltip'
@@ -261,6 +263,7 @@ function RefundHero({ order, onOpenWallet }) {
   const isRefunded = order.cancellationStatusId === 'refunded'
   const dest = order.refund.destination
   const isWallet = dest.kind === 'wallet'
+  const showSplit = isSplitPaid(order) && !isWallet
 
   const heroBg =
     tone === 'success'
@@ -301,10 +304,19 @@ function RefundHero({ order, onOpenWallet }) {
       <div className={`mt-1 text-[28px] font-bold tabular-nums leading-none ${t.text}`}>
         {order.currency} {order.refund.amount.toLocaleString()}
       </div>
-      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
-        <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
-        <DestinationChip destination={dest} accent={isWallet} onOpenWallet={onOpenWallet} />
-      </div>
+      {showSplit ? (
+        <RefundSplitRows
+          order={order}
+          net={order.refund.amount}
+          caption={isRefunded ? 'Sent to' : 'Going to'}
+          className="mt-2.5"
+        />
+      ) : (
+        <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-2">
+          <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
+          <DestinationChip destination={dest} accent={isWallet} onOpenWallet={onOpenWallet} />
+        </div>
+      )}
       {order.refund.bonus > 0 && (
         <div className="mt-2 text-[11.5px] text-accent inline-flex items-center gap-1">
           <Sparkles size={11} strokeWidth={2} />

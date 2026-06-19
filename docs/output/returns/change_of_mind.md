@@ -1,8 +1,9 @@
 ---
 status: live
-verified_against: edad8a0
+verified_against: afedc65
 covers:
   - src/components/ClaimFlow
+  - src/components/RefundSplitRows.jsx
   - src/lib/returns.js
 ---
 
@@ -166,6 +167,7 @@ Two stacked refund cards built off `refundBreakdown(order, units, method, 'chang
 
 - **Wallet card.** Full amount + wallet-info tooltip (`WalletInfoTooltip` + `REVIBE_WALLET_ICON`), with a success-green tagline `Full refund · instantly once return is complete`.
 - **Original-payment card.** Net amount in the headline, then an inline breakdown table — `Product` + `Revibe Care` (when `order.warranty > 0`) + `Subtotal` + a red `Restocking fee (10%)` row — then a clock-icon ETA line `5–10 business days once return is complete`. The card label uses `order.paymentMethod.brand` + `last4` — except when `paymentMethod.type === 'bnpl'`, in which case it reads just the provider brand (`Tabby` / `Tamara`) with a `BnplDisclaimerTooltip` Info-icon to its right that opens a popover: "{provider} may charge additional fees on refunded purchases. Check your {provider} account for details." Same tooltip surfaces on Steps 7 & 8 next to the refund destination, and on the live `ClaimCard` / `ClaimDetailsSheet` after submit.
+  - **Split-paid orders** (`order.paymentSplit`, see [../orders.md](../orders.md) §7.1): a `RefundSplitRows` block sits below the breakdown, splitting the net proportionally across the card and gift-card sources and closing with a `Total refund` row (= net). It carries through to Steps 7 (Review, under the refund figure) and 8 (Confirmation, under the destination), shown only on the `original` path. The gift-card portion lands in the Wallet once the refund credits ([wallet.md](../wallet.md) §3).
 
 Both cards keep `whitespace-nowrap` on anchor lines.
 

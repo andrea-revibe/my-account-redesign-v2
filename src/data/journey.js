@@ -64,7 +64,11 @@ export const JOURNEYS = [
   {
     id: 'cancellation',
     label: 'Cancellation',
-    initialOrder: INITIAL_ORDER,
+    // Split-paid (card + gift card): the original-payment refund fork pays
+    // back along the same split (card → card, gift card → Wallet); the wallet
+    // fork stays whole-to-wallet. The split is derived from `paymentSplit` by
+    // the refund surfaces + lib/wallet, so the existing nodes need no changes.
+    initialOrder: { ...INITIAL_ORDER, paymentSplit: { card: 343, giftCard: 686 } },
     nodes: CANCELLATION_NODES,
   },
   {
@@ -73,6 +77,11 @@ export const JOURNEYS = [
     initialOrder: {
       ...INITIAL_ORDER,
       paymentMethod: { type: 'bnpl', provider: 'tabby', brand: 'Tabby' },
+      // Split-paid (Tabby BNPL + gift card): the original-payment refund fork
+      // pays the BNPL portion back to Tabby and the gift-card portion to the
+      // Wallet; the wallet fork stays whole-to-wallet. Derived from
+      // `paymentSplit` — the card/original nodes need no changes.
+      paymentSplit: { card: 343, giftCard: 686 },
       deviceOs: 'android',
       product: {
         name: 'Samsung Galaxy S21',

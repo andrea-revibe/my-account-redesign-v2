@@ -15,6 +15,7 @@ import StepHeading from './StepHeading'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney } from '../../lib/returns'
+import RefundSplitRows from '../RefundSplitRows'
 import { expectedCompletionFor } from '../../lib/claims'
 import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
 import { PACKING_LABELS } from './Step4Packing'
@@ -324,6 +325,14 @@ export default function Step6Review({
                 </div>
               </div>
             </div>
+            {state.refundMethod === 'original' && (
+              <RefundSplitRows
+                order={order}
+                net={refund.net}
+                caption="Split across your original payment"
+                className="mt-3 pt-3 border-t border-dashed border-line"
+              />
+            )}
           </Section>
         )}
 
