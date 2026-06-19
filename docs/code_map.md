@@ -69,13 +69,13 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | Module | LOC | In | Exports (line) |
 |---|--:|--:|---|
 | `App.jsx` | 879 | 1 | `App`·85 |
-| `components/BnplDisclaimerTooltip.jsx` | 86 | 6 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
+| `components/BnplDisclaimerTooltip.jsx` | 86 | 7 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
 | `components/CancelClaimSheet.jsx` | 155 | 1 | `CancelClaimSheet`·15 |
 | `components/CancelOrderSheet.jsx` | 742 | 2 | `CancelOrderSheet`·21 |
 | `components/ChatFab.jsx` | 14 | 1 | `ChatFab`·3 |
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
-| `components/ClaimCard.jsx` | 353 | 1 | `ClaimCard`·47 |
-| `components/ClaimDetailsSheet.jsx` | 240 | 2 | `ClaimDetailsSheet`·18 |
+| `components/ClaimCard.jsx` | 361 | 1 | `ClaimCard`·47 |
+| `components/ClaimDetailsSheet.jsx` | 243 | 2 | `ClaimDetailsSheet`·19 |
 | `components/ClaimFlow/ClaimFlow.jsx` | 421 | 1 | `ClaimFlow`·25 |
 | `components/ClaimFlow/InlineError.jsx` | 16 | 8 | `InlineError`·6 |
 | `components/ClaimFlow/ProgressBar.jsx` | 28 | 1 | `ProgressBar`·3 |
@@ -87,9 +87,9 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimFlow/Step3DevicePrep.jsx` | 549 | 1 | `Step3DevicePrep`·37 |
 | `components/ClaimFlow/Step4Packing.jsx` | 253 | 2 | `PACKING_OPTIONS`·15, `PACKING_LABELS`·36, `Step4Packing`·40 |
 | `components/ClaimFlow/Step4PickupDetails.jsx` | 427 | 1 | `Step4PickupDetails`·53 |
-| `components/ClaimFlow/Step5RefundMethod.jsx` | 278 | 1 | `Step5RefundMethod`·10 |
+| `components/ClaimFlow/Step5RefundMethod.jsx` | 280 | 1 | `Step5RefundMethod`·10 |
 | `components/ClaimFlow/Step6Review.jsx` | 609 | 1 | `Step6Review`·29 |
-| `components/ClaimFlow/Step7Confirmation.jsx` | 217 | 1 | `Step7Confirmation`·16 |
+| `components/ClaimFlow/Step7Confirmation.jsx` | 219 | 1 | `Step7Confirmation`·16 |
 | `components/ClaimFlow/StepHeading.jsx` | 16 | 9 | `StepHeading`·1 |
 | `components/ClaimFlow/StickyActionBar.jsx` | 38 | 1 | `StickyActionBar`·1 |
 | `components/ClaimFlow/SwitchFlowSheet.jsx` | 304 | 1 | `SwitchFlowSheet`·93 |
@@ -120,7 +120,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/PickupFailedCard.jsx` | 431 | 1 | `PickupFailedCard`·22 |
 | `components/ProductSummary.jsx` | 152 | 17 | `REVIBE_CARE_ICON`·1, `ProductSummary`·20 |
 | `components/RefundDetailsSheet.jsx` | 177 | 2 | `RefundDetailsSheet`·9 |
-| `components/RefundSplitRows.jsx` | 106 | 8 | `RefundSplitRows`·21 |
+| `components/RefundSplitRows.jsx` | 121 | 8 | `RefundSplitRows`·22 |
 | `components/ResetFailedCard.jsx` | 501 | 1 | `ResetFailedCard`·28 |
 | `components/ResetGuidePicker.jsx` | 98 | 1 | `ResetGuidePicker`·30 |
 | `components/ReturnShipmentTracking.jsx` | 107 | 3 | `TrackingDropdown`·24, `ReturnShipmentTracking`·70 |
@@ -158,7 +158,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `lib/events.js` | 152 | 3 | `getHistoryEvents`·119 |
 | `lib/journey.js` | 112 | 1 | `useJourney`·25 |
 | `lib/notifications.js` | 93 | 2 | `NOTIFICATIONS`·14, `NOTIFICATION_STATUSES`·26, `notificationStatus`·39, `notificationFor`·53, `journeyNotificationCoverage`·83 |
-| `lib/returns.js` | 299 | 12 | `RETURN_WINDOW_DAYS`·4, `RESTOCKING_FEE_RATE`·5, `CANCELLATION_FEE_RATE`·10, `ISSUE_WALLET_BONUS`·14, `addDays`·41, `startOfDay`·45, `eligibilityFor`·51, `groupOrdersByEligibility`·76, `refundBreakdown`·94, `isSplitPaid`·144, `refundDestinations`·155, `formatMoney`·164, `formatLongDate`·169, `formatShortDate`·178, `generateClaimRef`·190, `BATTERY_BASELINE_BY_GRADE`·198, `conditionGradeOf`·207, `batteryBaselineFor`·214, `daysSinceDelivery`·225, `assessBattery`·242 |
+| `lib/returns.js` | 299 | 13 | `RETURN_WINDOW_DAYS`·4, `RESTOCKING_FEE_RATE`·5, `CANCELLATION_FEE_RATE`·10, `ISSUE_WALLET_BONUS`·14, `addDays`·41, `startOfDay`·45, `eligibilityFor`·51, `groupOrdersByEligibility`·76, `refundBreakdown`·94, `isSplitPaid`·144, `refundDestinations`·155, `formatMoney`·164, `formatLongDate`·169, `formatShortDate`·178, `generateClaimRef`·190, `BATTERY_BASELINE_BY_GRADE`·198, `conditionGradeOf`·207, `batteryBaselineFor`·214, `daysSinceDelivery`·225, `assessBattery`·242 |
 | `lib/statuses.js` | 349 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·105, `cancellationStepsFor`·116, `statusDescription`·126, `pickActiveOrderId`·264, `statusHeadline`·277, `statusSubline`·296, `statusIconFor`·325 |
 | `lib/wallet.js` | 303 | 2 | `walletLedger`·92, `walletBalance`·214, `walletCurrency`·222, `latestSwitchableCredit`·231, `cardEquivalentFor`·244 |
 | `main.jsx` | 11 | 0 | _(none)_ |
@@ -170,7 +170,7 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 | Source-of-truth module | Consumers |
 |---|---|
 | `lib/claims.js` | `App.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/ClosedClaimCard.jsx`, `components/DocsRejectedCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OriginalOrderSheet.jsx`, `components/PickupFailedCard.jsx`, `components/ResetFailedCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/notifications.js` |
-| `lib/returns.js` | `components/CancelOrderSheet.jsx`, `components/ClaimCard.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/PastOrderCard.jsx`, `components/RefundDetailsSheet.jsx`, `components/RefundSplitRows.jsx`, `components/WalletSheet.jsx`, `lib/wallet.js` |
+| `lib/returns.js` | `components/CancelOrderSheet.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/PastOrderCard.jsx`, `components/RefundDetailsSheet.jsx`, `components/RefundSplitRows.jsx`, `components/WalletSheet.jsx`, `lib/wallet.js` |
 | `lib/countries.js` | `App.jsx`, `components/ClaimCard.jsx`, `components/CountryPicker.jsx`, `components/HeroCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/journey.js`, `lib/statuses.js` |
 | `lib/statuses.js` | `App.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ReturnShipmentTracking.jsx` |
 | `lib/devices.js` | `components/ClaimFlow/Step3DevicePrep.jsx`, `components/ClaimFlow/flowReducer.js`, `components/ResetFailedCard.jsx`, `components/ResetGuidePicker.jsx` |
@@ -262,6 +262,6 @@ graph LR
   lib_wallet_js --> data_wallet_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 94 modules, 26203 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 94 modules, 26233 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

@@ -1,5 +1,6 @@
 import { CreditCard } from 'lucide-react'
 import { REVIBE_WALLET_ICON } from './WalletInfoTooltip'
+import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { refundDestinations, formatMoney } from '../lib/returns'
 
 // Card-portion label for a split refund. Mirrors the inline label logic the
@@ -54,6 +55,19 @@ export default function RefundSplitRows({
           />
         }
         label={cardLabelFor(order)}
+        labelAfter={
+          isBnpl(order) && (
+            <BnplDisclaimerTooltip
+              provider={order.paymentMethod.provider}
+              align="left"
+              iconClassName={
+                onDark
+                  ? 'text-white/85 hover:text-white'
+                  : 'text-muted hover:text-ink'
+              }
+            />
+          )
+        }
         value={`${currency} ${formatMoney(split.card)}`}
         labelTone={labelTone}
         valueTone={valueTone}
@@ -90,12 +104,13 @@ export default function RefundSplitRows({
   )
 }
 
-function Row({ icon, label, value, labelTone, valueTone }) {
+function Row({ icon, label, labelAfter, value, labelTone, valueTone }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className={`inline-flex items-center gap-1.5 min-w-0 text-[12.5px] ${labelTone}`}>
         {icon}
         <span className="truncate">{label}</span>
+        {labelAfter}
       </span>
       <span className={`text-[13px] font-semibold tabular-nums shrink-0 ${valueTone}`}>
         {value}

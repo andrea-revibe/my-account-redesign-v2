@@ -3,7 +3,7 @@ import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
-import { refundBreakdown, formatMoney } from '../../lib/returns'
+import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import { REVIBE_CARE_ICON } from '../ProductSummary'
 import RefundSplitRows from '../RefundSplitRows'
 
@@ -83,10 +83,12 @@ export default function Step5RefundMethod({ state, dispatch, order, error }) {
               {isBnpl(order) ? (
                 <>
                   <span>{order.paymentMethod.brand}</span>
-                  <BnplDisclaimerTooltip
-                    provider={order.paymentMethod.provider}
-                    align="left"
-                  />
+                  {!isSplitPaid(order) && (
+                    <BnplDisclaimerTooltip
+                      provider={order.paymentMethod.provider}
+                      align="left"
+                    />
+                  )}
                 </>
               ) : (
                 <span>

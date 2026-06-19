@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react'
-import { refundBreakdown, formatMoney } from '../../lib/returns'
+import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
 import { claimTypeLabel, expectedCompletionFor, formatClaimRef } from '../../lib/claims'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
@@ -146,10 +146,12 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
               ) : isBnpl(order) ? (
                 <span className="inline-flex items-center gap-1">
                   {order.paymentMethod.brand}
-                  <BnplDisclaimerTooltip
-                    provider={order.paymentMethod.provider}
-                    align="left"
-                  />
+                  {!isSplitPaid(order) && (
+                    <BnplDisclaimerTooltip
+                      provider={order.paymentMethod.provider}
+                      align="left"
+                    />
+                  )}
                 </span>
               ) : (
                 `${order.paymentMethod?.brand || 'Card'} •• ${order.paymentMethod?.last4 || '0000'}`

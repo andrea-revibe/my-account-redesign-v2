@@ -10,6 +10,7 @@ import {
 import { COMPENSATION_SUBTYPE_LABELS } from './ClaimFlow/compensationSubtypes'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import RefundSplitRows from './RefundSplitRows'
+import { isSplitPaid } from '../lib/returns'
 
 // Bottom sheet surfacing the full set of choices captured during the
 // raise-a-claim flow: reason, device prep, pickup details (address +
@@ -111,7 +112,9 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
                       />
                     )}
                     <span>{refundMethodLabel(claim, order)}</span>
-                    {claim.refundMethod === 'original' && isBnpl(order) && (
+                    {claim.refundMethod === 'original' &&
+                      isBnpl(order) &&
+                      !(isSplitPaid(order) && !isWarranty && !isCompensation) && (
                       <BnplDisclaimerTooltip
                         provider={order.paymentMethod.provider}
                         align="right"

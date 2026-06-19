@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: afedc65
+verified_against: 9247a82
 covers:
   - src/App.jsx
   - src/lib/statuses.js
@@ -289,7 +289,7 @@ The orders array (`src/data/orders.js`) is mock data today. Production will swap
 | `total` | number, no currency | Total amount paid. Should equal `subtotal + warranty` when both are present. |
 | `unitPrice` *(optional)* | number, no currency | Per-unit device price used by the returns flow's `refundBreakdown` (`gross = unitPrice * units`). Falls back to `subtotal`, then `total`. |
 | `paymentMethod` *(optional)* | `{ type: 'card', brand, last4 }` or `{ type: 'bnpl', provider, brand }` | Payment instrument. Drives the original-payment card label on the cancellation sheet + returns refund step; BNPL collapses the label to the provider brand and adds `BnplDisclaimerTooltip`. Falls back to a generic `Card •• 0000`. |
-| `paymentSplit` *(optional)* | `{ card, giftCard }` (numbers summing to the paid gross) | Marks the order as **split-paid** — settled with both a bank card and a gift card (store credit). On the **original-payment** refund path the refund is paid back along the same ratio (`refundDestinations` in `lib/returns.js` splits the post-fee `net` proportionally; card portion → card, gift-card portion → Wallet) and rendered via the shared `RefundSplitRows`. Absent / single-source → today's single-destination display. `paymentMethod` still carries the card-portion label. See [cancellations.md](./cancellations.md), [returns/change_of_mind.md](./returns/change_of_mind.md), [wallet.md](./wallet.md). |
+| `paymentSplit` *(optional)* | `{ card, giftCard }` (numbers summing to the paid gross) | Marks the order as **split-paid** — settled with both a bank card and a gift card (store credit). On the **original-payment** refund path the refund is paid back along the same ratio (`refundDestinations` in `lib/returns.js` splits the post-fee `net` proportionally; card portion → card, gift-card portion → Wallet) and rendered via the shared `RefundSplitRows`. When the split rows show, they **replace** (not augment) the single "Going to / Sent to <destination>" summary chip — `RefundSplitRows` takes that wording via its `caption` prop instead. For a **BNPL** split-paid order the `BnplDisclaimerTooltip` rides on the card-portion split row (via the component's own `labelAfter`); the standalone BNPL tooltip is suppressed on every surface that renders the split (`ClaimCard`, `ClaimDetailsSheet`, `Step5RefundMethod`/`Step6Review`/`Step7Confirmation`) so it's never shown twice. Absent / single-source → today's single-destination display. `paymentMethod` still carries the card-portion label. See [cancellations.md](./cancellations.md), [returns/change_of_mind.md](./returns/change_of_mind.md), [wallet.md](./wallet.md). |
 | `deviceOs` *(optional, `'ios' | 'android'`)* | string | Guided-reset OS fallback used only when `product.category_name` is absent; defaults to `'ios'`. See [returns/guided_reset.md](./returns/guided_reset.md). |
 | `currency` | string | Three-letter currency code (e.g. `"AED"`). |
 | `customerName` | string | Recipient's full name. |

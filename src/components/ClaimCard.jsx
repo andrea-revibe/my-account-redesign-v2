@@ -194,6 +194,13 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
   const subline = claimStatusSubline(claim)
   const showScheduledPickup =
     claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup)
+  // When the refund is split across the original payment, the split rows below
+  // name each destination (with the BNPL note on its own line) — so the single
+  // "Going to <chip>" summary is redundant and is replaced by a captioned split.
+  const showRefundSplit =
+    claim.refundMethod === 'original' &&
+    Boolean(claim.expectedRefund) &&
+    isSplitPaid(order)
 
   return (
     <div className={`rounded-[14px] border p-3.5 ${t.heroBg} ${t.border}`}>
@@ -232,10 +239,12 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
           <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
             {isRefunded ? 'Refunded' : 'Expected refund'}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-2">
-            <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
-            <DestinationChip claim={claim} order={order} accent={isWallet} onOpenWallet={onOpenWallet} />
-          </div>
+          {!showRefundSplit && (
+            <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-2">
+              <span>{isRefunded ? 'Sent to' : 'Going to'}</span>
+              <DestinationChip claim={claim} order={order} accent={isWallet} onOpenWallet={onOpenWallet} />
+            </div>
+          )}
         </div>
         {claim.expectedRefund ? (
           <div
@@ -252,15 +261,14 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
         )}
       </div>
 
-      {claim.refundMethod === 'original' &&
-        claim.expectedRefund &&
-        isSplitPaid(order) && (
-          <RefundSplitRows
-            order={order}
-            net={claim.expectedRefund.net}
-            className="mt-3 pt-3 border-t border-line-2/70"
-          />
-        )}
+      {showRefundSplit && (
+        <RefundSplitRows
+          order={order}
+          net={claim.expectedRefund.net}
+          caption={isRefunded ? 'Sent to' : 'Going to'}
+          className="mt-3 pt-3 border-t border-line-2/70"
+        />
+      )}
     </div>
   )
 }
