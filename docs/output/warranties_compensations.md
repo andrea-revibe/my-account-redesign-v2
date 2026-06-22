@@ -102,6 +102,10 @@ Followed by a Track package / Get Help action row (Track package → the hardcod
 
 `hasActiveClaim` is type-aware: warranty's terminal is `device_returned` (refund pipelines remain `refund_credited`). The new helper `isWarrantyDelivered(order)` flags warranty terminals for the **Past orders** section. Both routings live in `App.jsx`.
 
+#### 2.3.6 Status explainer ("Learn more")
+
+The warranty state pill is routed through the shared `StatusExplainer` (see [orders.md](orders.md) §4.6 + [returns/claim_tracking.md](returns/claim_tracking.md) §2.2.1): an inline `ⓘ Learn more` link beside the pill reveals a full-width plain-language definition of the current warranty stage below the chip row. Copy is data-driven from `lib/claims.js` — `WARRANTY_EXPLANATIONS` (the 6-state repair-and-return chain, no money-movement copy) resolved by `warrantyClaimExplanation(claim)`. Always shown (the `WarrantyClaimCard` header carries no banner of its own).
+
 ### 2.4 Intake flow
 
 The warranty intake reuses the existing returns-flow chrome and most of the existing steps. It's reached either by picking `Use my warranty` at Step 1, or by choosing **Get a replacement** in the change-of-mind flow's refund-vs-replacement sheet when a fault reason is caught there (see [returns/change_of_mind.md](./returns/change_of_mind.md) §2.3). Total visible step count is **8** — it shares the required reason step with the other return flows but skips Refund method (no money changes hands). The reducer drives this from a per-type step-key sequence (`STEP_SEQUENCES.warranty` in `flowReducer.js`): `type → reason → issuedetails → deviceprep → packing → pickup → review → confirm`. `NEXT` / `BACK` / `GO_TO_STEP` walk that list (the refund key simply isn't in it), and `visibleStepCount('warranty')` → 8.

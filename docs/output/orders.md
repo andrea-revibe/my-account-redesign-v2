@@ -230,6 +230,12 @@ A past cancelled order whose `cancellationInitiator === 'revibe'` routes instead
 3. otherwise → `STATUS_DESCRIPTIONS[statusId]` (or `shipped:{subStatusId}` — **but only when `countryConfig(order).detailedTracking` is true**; `SA`/`Others` collapse to the single `shipped` message so no destination-country / customs copy shows, see `country_split.md` §4)
 4. `statusMessage` overrides body only
 
+### 4.6 Status explainer ("Learn more")
+
+A `StatusExplainer` (`src/components/StatusExplainer.jsx`) renders an inline `ⓘ Learn more` link **on the same row as the status pill**; tapping reveals a full-width plain-language *stage definition* below the chip, then taps shut (it `stopPropagation`s so it never toggles the card header). This is distinct in voice from the §4.5 condition banner — the banner says "On track · your device is undergoing inspection"; the explainer answers "what does Quality check mean?". Copy is data-driven: `STATUS_EXPLANATIONS` + `statusExplanation(order)` in `lib/statuses.js`, defined only for the stages that route through the explainer — `created` / `quality_check` (keyed by `statusId`) and `cancellation_{id}`. `shipped` / `delivered` are deliberately absent (those surfaces explain themselves), so the resolver returns null and nothing renders there.
+
+It appears only where the card header doesn't already define the stage: **`InProgressCard`** (`created`/`quality_check`) and the cancelled **`PastOrderCard`** (the `cancellation_refund_pending` copy clarifies the cancellation was *accepted* and the order won't ship — the prior gap). It is intentionally **absent** from the delivered `PastOrderCard`, `HeroCard`, and the shipped/delivered `OrderCard` (already carries `StatusBannerInline`), all of which are self-explaining. Claim/warranty equivalents: `claim_tracking.md` §2.2.1, `warranties_compensations.md` §2.3.6.
+
 ## 5. Filters & auto-expand
 
 ### 5.1 Filter chip row

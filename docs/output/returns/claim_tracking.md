@@ -97,6 +97,10 @@ This piggybacks the existing `warn` / `brand` / `success` tokens — no new colo
   - **Split-paid orders** (`order.paymentSplit`, see [../orders.md](../orders.md) §7.1) with `claim.refundMethod === 'original'`: a `RefundSplitRows` block is appended below the amount row, splitting the net proportionally across the card and gift-card sources (`ClaimDetailsSheet` shows the same under its Refund card). The net stays the hero figure; the split is the breakdown. The gift-card portion credits the Wallet once `refund_credited` ([wallet.md](../wallet.md) §3).
 - A compact product row (image / name / variant / `Revibe Care +{currency} {amount}` line / total / chevron).
 
+#### 2.2.1 Status explainer ("Learn more")
+
+The state pill is routed through the shared `StatusExplainer` (`src/components/StatusExplainer.jsx`, see [../orders.md](../orders.md) §4.6), which adds an inline `ⓘ Learn more` link beside the pill; tapping reveals a full-width plain-language definition of the current claim stage below the chip row (`stopPropagation`, so the card header doesn't toggle). Copy is data-driven from `lib/claims.js` — `CLAIM_EXPLANATIONS` (refund) / `COMPENSATION_EXPLANATIONS` resolved by `claimExplanation(claim)` (keyed on `claim.type` × `claimStatusId`). Suppressed when `claim.actionRequired` is set (the expanded `ClaimActionBanner` then owns the explanation; see §3.5).
+
 ### 2.3 Expanded view
 
 1. **Optional `ClaimActionBanner`** (`src/components/ClaimActionBanner.jsx`), rendered above the dot strip whenever `claim.actionRequired` is present. Warn-toned card with an alert glyph, headline, one-line body, deadline countdown copy (`claim.actionRequired.deadlineLabel`, e.g. "2 days left"), and a single primary CTA. Three gate kinds are wired today via `actionGateCopy()` in `src/lib/claims.js` — see §4.3. The CTA stops propagation so it doesn't toggle the card.

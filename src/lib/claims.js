@@ -101,6 +101,40 @@ export function claimStatusesFor(claim) {
     : CLAIM_STATUSES
 }
 
+// Plain-language stage definitions surfaced by the `StatusExplainer` inline
+// "Learn more" accordion under a claim card's status chip. Refund and
+// compensation share status ids but read differently (compensation keeps the
+// device and skips pickup), so each gets its own map. Basic copy — tune freely.
+export const CLAIM_EXPLANATIONS = {
+  initiated:
+    "We've received your claim and our team is reviewing it. We will get back to you if needed.",
+  pickup:
+    'Your device has been picked up and is on its way to us. We will notify you as soon as it arrives.',
+  qc: "We have received your device and our quality control team is now inspecting it. We will update you as soon as the review is complete.",
+  refund_issued:
+    'Your claim has been approved and your payment is being processed.',
+  refund_credited:
+    'Your cancellation is complete and your refund has been issued. Funds can take up to 10 business days to appear depending on your payment method.',
+}
+
+export const COMPENSATION_EXPLANATIONS = {
+  initiated:
+    "We've received your compensation request our team is reviewing it. We will get back to you if needed.",
+  qc: 'Our team is reviewing your request and the evidence you provided. We will update you as soon as the review is complete.',
+  refund_issued:
+    'Your compensation has been approved and your refund is being processed.',
+  refund_credited:
+    'Your compensation is complete and your payment has been issued. Funds can take up to 10 business days to appear depending on your payment method.',
+}
+
+// Resolves the stage definition for a refund / compensation claim — warranty
+// has its own (`warrantyClaimExplanation`). Returns null when none exists.
+export function claimExplanation(claim) {
+  const map =
+    claim?.type === 'compensation' ? COMPENSATION_EXPLANATIONS : CLAIM_EXPLANATIONS
+  return map[claim?.claimStatusId] ?? null
+}
+
 // Tone progression: amber while the unit is leaving the customer or being
 // verified, brand-purple once we're staging the payout, success-green when
 // the money has moved. Matches the conventions used by `PastOrderCard` for
@@ -429,6 +463,27 @@ export function warrantyClaimStatusSubline(claim) {
   const ts = claim.timeline?.[claim.claimStatusId]
   if (ts) return `Updated ${ts}`
   return null
+}
+
+// Plain-language stage definitions for the warranty pipeline, surfaced by the
+// `StatusExplainer` "Learn more" accordion. Repair-and-return tail, so no
+// money-movement copy. Basic copy — tune freely.
+export const WARRANTY_EXPLANATIONS = {
+  initiated:
+    "We've received your warranty claim. Next we'll arrange to collect the device for repair.",
+  pickup:
+    'Our courier is collecting the device so our team can inspect and repair it.',
+  qc: "We've received the device and are diagnosing the fault before starting the repair.",
+  under_repair:
+    "Our technicians are repairing your device. We'll ship it back as soon as it's fixed.",
+  ship_back:
+    'Your repaired device has left Revibe and is on its way back to you.',
+  device_returned:
+    'Your repaired device has been delivered. Thanks for your patience!',
+}
+
+export function warrantyClaimExplanation(claim) {
+  return WARRANTY_EXPLANATIONS[claim?.claimStatusId] ?? null
 }
 
 // Ship-back tracking reuses the standard outbound SHIPPING_SUB_STATUSES

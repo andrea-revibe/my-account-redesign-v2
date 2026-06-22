@@ -74,7 +74,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/CancelOrderSheet.jsx` | 742 | 2 | `CancelOrderSheet`·21 |
 | `components/ChatFab.jsx` | 14 | 1 | `ChatFab`·3 |
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
-| `components/ClaimCard.jsx` | 361 | 1 | `ClaimCard`·47 |
+| `components/ClaimCard.jsx` | 366 | 1 | `ClaimCard`·49 |
 | `components/ClaimDetailsSheet.jsx` | 243 | 2 | `ClaimDetailsSheet`·19 |
 | `components/ClaimFlow/ClaimFlow.jsx` | 421 | 1 | `ClaimFlow`·25 |
 | `components/ClaimFlow/InlineError.jsx` | 16 | 8 | `InlineError`·6 |
@@ -107,7 +107,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/Header.jsx` | 50 | 1 | `Header`·6 |
 | `components/HeroCard.jsx` | 222 | 1 | `HeroCard`·30 |
 | `components/HistoryThread.jsx` | 218 | 3 | `HistoryThread`·86 |
-| `components/InProgressCard.jsx` | 218 | 1 | `InProgressCard`·29 |
+| `components/InProgressCard.jsx` | 222 | 1 | `InProgressCard`·30 |
 | `components/InvalidClaimCard.jsx` | 792 | 1 | `InvalidClaimCard`·43 |
 | `components/JourneyDevPanel.jsx` | 257 | 1 | `JourneyDevPanel`·16 |
 | `components/JourneyNotificationPanel.jsx` | 205 | 1 | `JourneyNotificationPanel`·29 |
@@ -115,7 +115,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/OrderCard.jsx` | 430 | 1 | `OrderCard`·38 |
 | `components/OrderClaimLink.jsx` | 248 | 8 | `OrderClaimLink`·182 |
 | `components/OrderFilters.jsx` | 75 | 1 | `STATUS_CHIPS`·3, `OrderFilters`·13 |
-| `components/PastOrderCard.jsx` | 400 | 3 | `PastOrderCard`·34, `DestinationChip`·348 |
+| `components/PastOrderCard.jsx` | 404 | 3 | `PastOrderCard`·35, `DestinationChip`·352 |
 | `components/PickupFailedCard.jsx` | 431 | 1 | `PickupFailedCard`·22 |
 | `components/ProductSummary.jsx` | 152 | 17 | `REVIBE_CARE_ICON`·1, `ProductSummary`·20 |
 | `components/RefundDetailsSheet.jsx` | 177 | 2 | `RefundDetailsSheet`·9 |
@@ -124,12 +124,13 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ResetGuidePicker.jsx` | 98 | 1 | `ResetGuidePicker`·30 |
 | `components/ReturnShipmentTracking.jsx` | 107 | 3 | `TrackingDropdown`·24, `ReturnShipmentTracking`·70 |
 | `components/RevibeCancellationCard.jsx` | 216 | 1 | `RevibeCancellationCard`·43 |
+| `components/StatusExplainer.jsx` | 51 | 4 | `StatusExplainer`·14 |
 | `components/TapToFixCta.jsx` | 14 | 4 | `TapToFixCta`·3 |
 | `components/Timeline.jsx` | 264 | 8 | `Timeline`·108 |
 | `components/UndoSnackbar.jsx` | 44 | 1 | `UndoSnackbar`·8 |
 | `components/WalletInfoTooltip.jsx` | 71 | 6 | `REVIBE_WALLET_ICON`·4, `WalletInfoTooltip`·7 |
 | `components/WalletSheet.jsx` | 300 | 1 | `WalletSheet`·21 |
-| `components/WarrantyClaimCard.jsx` | 371 | 1 | `WarrantyClaimCard`·53 |
+| `components/WarrantyClaimCard.jsx` | 376 | 1 | `WarrantyClaimCard`·55 |
 | `data/journey.js` | 123 | 3 | `INITIAL_ORDER`·32, `JOURNEYS`·46 |
 | `data/journeys/cancellation.js` | 778 | 1 | `CANCELLATION_NODES`·25 |
 | `data/journeys/claimChangeOfMind.js` | 831 | 1 | `CLAIM_COM_NODES`·19 |
@@ -149,7 +150,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
 | `data/wallet.js` | 94 | 1 | `WALLET_SEED_TRANSACTIONS`·21 |
-| `lib/claims.js` | 691 | 17 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `claimToneFor`·108, `claimProgressIndex`·114, `RETURN_CLAIM_STATUSES`·124, `returnClaimProgressIndex`·137, `CLAIM_TRANSIT_SUB_STATUSES`·146, `transitSubProgressIndex`·153, `hasActiveClaim`·162, `isClaimRefunded`·171, `isClaimClosed`·182, `CLAIM_CLOSURE_REASONS`·188, `closureCopyFor`·227, `canCancelClaim`·242, `cancelNeedsShipBack`·253, `cancelReturnGate`·265, `isWarrantyDelivered`·285, `isReturnDelivered`·298, `claimPhaseTag`·304, `claimStatusHeadline`·321, `claimStatusSubline`·326, `WARRANTY_CLAIM_STATUSES`·344, `warrantyClaimToneFor`·392, `warrantyClaimProgressIndex`·400, `warrantyClaimPhaseTag`·404, `warrantyClaimStatusHeadline`·423, `warrantyClaimStatusSubline`·428, `REASON_LABELS`·444, `reasonText`·455, `devicePrepText`·463, `CLAIM_TYPE_LABELS`·471, `claimTypeLabel`·478, `CLAIM_REF_PREFIXES`·490, `formatClaimRef`·498, `claimRequiresProof`·511, `refundMethodLabel`·517, `CLAIM_SLAS`·536, `expectedCompletionFor`·559, `SUB_STATUS_LABELS`·584, `actionGateCopy`·645 |
+| `lib/claims.js` | 746 | 17 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `CLAIM_EXPLANATIONS`·108, `COMPENSATION_EXPLANATIONS`·120, `claimExplanation`·132, `claimToneFor`·142, `claimProgressIndex`·148, `RETURN_CLAIM_STATUSES`·158, `returnClaimProgressIndex`·171, `CLAIM_TRANSIT_SUB_STATUSES`·180, `transitSubProgressIndex`·187, `hasActiveClaim`·196, `isClaimRefunded`·205, `isClaimClosed`·216, `CLAIM_CLOSURE_REASONS`·222, `closureCopyFor`·261, `canCancelClaim`·276, `cancelNeedsShipBack`·287, `cancelReturnGate`·299, `isWarrantyDelivered`·319, `isReturnDelivered`·332, `claimPhaseTag`·338, `claimStatusHeadline`·355, `claimStatusSubline`·360, `WARRANTY_CLAIM_STATUSES`·378, `warrantyClaimToneFor`·426, `warrantyClaimProgressIndex`·434, `warrantyClaimPhaseTag`·438, `warrantyClaimStatusHeadline`·457, `warrantyClaimStatusSubline`·462, `WARRANTY_EXPLANATIONS`·471, `warrantyClaimExplanation`·485, `REASON_LABELS`·499, `reasonText`·510, `devicePrepText`·518, `CLAIM_TYPE_LABELS`·526, `claimTypeLabel`·533, `CLAIM_REF_PREFIXES`·545, `formatClaimRef`·553, `claimRequiresProof`·566, `refundMethodLabel`·572, `CLAIM_SLAS`·591, `expectedCompletionFor`·614, `SUB_STATUS_LABELS`·639, `actionGateCopy`·700 |
 | `lib/countries.js` | 32 | 9 | `DEFAULT_COUNTRY`·15, `COUNTRIES`·17, `COUNTRY_CODES`·24, `countryConfig`·28 |
 | `lib/devices.js` | 65 | 4 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
 | `lib/edd.js` | 245 | 1 | `MARKETS`·24, `STAGE_ORDER_CREATED`·60, `STAGE_QC`·61, `STAGE_SHIPPED`·62, `SLA_ON_TIME`·64, `SLA_LATE`·65, `MSG_ORDER_LATE`·72, `MSG_QC_BACK_ON_TRACK`·74, `MSG_QC_LATE`·76, `MSG_SHIPPED_LATE`·78, `workdayIntl`·100, `currentStage`·117, `calculateEdd`·125, `buildCustomerMessage`·161, `orderStatus`·185 |
@@ -158,7 +159,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `lib/journey.js` | 112 | 1 | `useJourney`·25 |
 | `lib/notifications.js` | 93 | 2 | `NOTIFICATIONS`·14, `NOTIFICATION_STATUSES`·26, `notificationStatus`·39, `notificationFor`·53, `journeyNotificationCoverage`·83 |
 | `lib/returns.js` | 299 | 13 | `RETURN_WINDOW_DAYS`·4, `RESTOCKING_FEE_RATE`·5, `CANCELLATION_FEE_RATE`·10, `ISSUE_WALLET_BONUS`·14, `addDays`·41, `startOfDay`·45, `eligibilityFor`·51, `groupOrdersByEligibility`·76, `refundBreakdown`·94, `isSplitPaid`·144, `refundDestinations`·155, `formatMoney`·164, `formatLongDate`·169, `formatShortDate`·178, `generateClaimRef`·190, `BATTERY_BASELINE_BY_GRADE`·198, `conditionGradeOf`·207, `batteryBaselineFor`·214, `daysSinceDelivery`·225, `assessBattery`·242 |
-| `lib/statuses.js` | 349 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·105, `cancellationStepsFor`·116, `statusDescription`·126, `pickActiveOrderId`·264, `statusHeadline`·277, `statusSubline`·296, `statusIconFor`·325 |
+| `lib/statuses.js` | 399 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·105, `cancellationStepsFor`·116, `statusDescription`·126, `STATUS_EXPLANATIONS`·257, `statusExplanation`·288, `pickActiveOrderId`·314, `statusHeadline`·327, `statusSubline`·346, `statusIconFor`·375 |
 | `lib/wallet.js` | 303 | 2 | `walletLedger`·92, `walletBalance`·214, `walletCurrency`·222, `latestSwitchableCredit`·231, `cardEquivalentFor`·244 |
 | `main.jsx` | 11 | 0 | _(none)_ |
 
@@ -261,6 +262,6 @@ graph LR
   lib_wallet_js --> data_wallet_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 93 modules, 26212 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 94 modules, 26386 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->
