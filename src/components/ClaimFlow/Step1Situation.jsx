@@ -1,4 +1,4 @@
-import { ChevronRight, Undo2, AlertTriangle, ArrowLeftRight, BadgePercent } from 'lucide-react'
+import { ChevronRight, Undo2, AlertTriangle, PackageX, HandCoins } from 'lucide-react'
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 
@@ -21,13 +21,13 @@ const SITUATIONS = [
   },
   {
     id: 'wrong_item',
-    icon: ArrowLeftRight,
+    icon: PackageX,
     title: 'I received the wrong item',
     sub: 'Wrong colour, storage, specs, or model',
   },
   {
     id: 'keep_compensation',
-    icon: BadgePercent,
+    icon: HandCoins,
     title: "I'm keeping the device, but something's wrong",
     sub: 'A missing or broken accessory, or a shipping charge to refund',
   },
@@ -63,7 +63,7 @@ export default function Step1Situation({ state, dispatch, error }) {
             >
               <span
                 className={`w-10 h-10 rounded-[10px] grid place-items-center shrink-0 ${
-                  selected ? 'bg-brand text-white' : 'bg-line-2 text-ink-2'
+                  selected ? 'bg-brand text-white' : 'bg-brand-bg text-brand'
                 }`}
               >
                 <Icon size={18} strokeWidth={1.75} />

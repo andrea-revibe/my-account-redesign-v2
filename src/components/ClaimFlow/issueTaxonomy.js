@@ -10,7 +10,7 @@
 // A charger is an accessory, so it is NOT in here — it lives in the
 // compensation branch (keep the device, get compensated).
 import {
-  BatteryCharging,
+  BatteryMedium,
   Smartphone,
   Camera,
   Cpu,
@@ -58,7 +58,7 @@ export const ISSUE_CATEGORIES = [
   {
     id: 'battery_power',
     label: 'Battery, charging & heat',
-    icon: BatteryCharging,
+    icon: BatteryMedium,
     issues: [
       {
         id: 'battery_drain',

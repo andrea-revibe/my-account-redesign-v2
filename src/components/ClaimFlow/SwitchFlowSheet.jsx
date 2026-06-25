@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   BadgePercent,
+  Undo2,
   Wrench,
   Truck,
   Clock,
@@ -47,6 +48,15 @@ const SITUATION_SWITCH = {
     points: [
       [PackageCheck, 'Keep the device — only the accessory is the problem.'],
       [Wallet, "We'll confirm the amount after reviewing your details."],
+    ],
+  },
+  change_of_mind: {
+    icon: Undo2,
+    tone: 'brand',
+    title: 'Sounds like a change of mind',
+    body: "If the item's correct and works fine, this is a change-of-mind return rather than a wrong-item one.",
+    points: [
+      [Truck, "We'll arrange a courier to collect it from your address."],
     ],
   },
 }

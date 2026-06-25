@@ -89,7 +89,7 @@ export default function Step2Reason({ state, dispatch, error }) {
           ))}
         </div>
 
-        <Divider>or, if it's not really a change of mind</Divider>
+        <Divider>or</Divider>
 
         <div className="flex flex-col gap-2">
           {REASON_TRIPWIRES.map((t) => (

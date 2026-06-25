@@ -17,7 +17,8 @@
 | Claim pipeline states / tone / SLAs / sub-status copy / action-gate copy | `lib/claims.js` | `output/returns/claim_tracking.md` |
 | Cancel claim — window / clean-revert vs ship-back / confirm sheet | `lib/claims.js` (`canCancelClaim`·159, `cancelNeedsShipBack`·170, `cancelReturnGate`·182), `components/CancelClaimSheet.jsx`, `components/InvalidClaimCard.jsx` (`reason: 'cancelled'`), `App.jsx` (`cancelledClaims` / `shipBackCancels`) | `output/returns/claim_tracking.md` §2.8 |
 | Returns eligibility / refund math / fee rate / window / `generateClaimRef` | `lib/returns.js` | `output/returns/change_of_mind.md`, `issue.md` |
-| Returns-flow steps, soft validation, step-skips | `components/ClaimFlow/` + `flowReducer.js` (`stepError`·199) | `output/returns/*.md`, `warranties_compensations.md` |
+| Returns-flow steps, soft validation, situation→remedy→claimType derivation | `components/ClaimFlow/` + `flowReducer.js` (`sequenceFor`·57, `claimTypeFor`·65, `progressFor`·109, `stepError`·329) | `output/returns/*.md`, `warranties_compensations.md` |
+| Returns decision phase — situation-first Screen 1 (4 situations) → per-branch screens → derived remedy/claimType; the issue taxonomy (6 categories ≤5 issues + wrong-item details) | `Step1Situation.jsx` (situations), `Step2Reason.jsx` (CoM reasons + tripwires), `StepIssueCategory.jsx`/`StepIssueSpecific.jsx` (device_fault), `StepWrongItem.jsx` (wrong_item), `StepRemedy.jsx` (refund/repair/replacement), `StepEvidence.jsx` (proof + description), `issueTaxonomy.js` (`ISSUE_CATEGORIES`/`WRONG_ITEM_DETAILS`/`findSpecificIssue`), `SwitchFlowSheet.jsx` (tripwire safety net) | `output/returns/change_of_mind.md`, `issue.md` |
 | Guided-reset mapping / copy / steps / device frames | `lib/devices.js` + `components/ClaimFlow/ResetGuideSheet.jsx` + `Step3DevicePrep.jsx` | `output/returns/guided_reset.md` |
 | History-thread events | `lib/events.js` (`getHistoryEvents`·119) | `output/orders.md` §6 |
 | EDD / SLA model | `lib/edd.js`; sandbox: `lib/eddSandbox.js` + `data/journey.js` | `output/journey_backend_spec.md` |
@@ -42,7 +43,8 @@ These are **string contracts**: a value written as a literal in data/flow code, 
 | `subStatusId` (shipping legs) | `data/orders.js` | `lib/statuses.js` (`SHIPPING_SUB_STATUSES`), `Timeline` (via `OrderCard`/`HeroCard`/`ReturnShipmentTracking`) | `SHIPPING_SUB_STATUSES` in `statuses.js` |
 | `state` (`open`/`close`/`cancelled`) | `data/orders.js` | `lib/statuses.js` (`ORDER_STATES`), header chips | `ORDER_STATES` in `statuses.js` |
 | `claim.claimStatusId` (`initiated`→…→`refund_credited` / warranty tail) | `data/orders.js`, `ClaimFlow` seed (always `initiated`) | `lib/claims.js` (`CLAIM_STATUSES` / `COMPENSATION_` / `WARRANTY_`), `hasActiveClaim`, `isClaimRefunded`, `isWarrantyDelivered` | the right status list in `claims.js` + the `hasActive`/`isRefunded` predicates |
-| `claim.type` (`change_of_mind`/`issue`/`warranty`/`compensation`) | `ClaimFlow`, `data/orders.js` | `App.jsx` routing, `claimStatusesFor`, `flowReducer` step-skips (`visibleStepCount`) | routing in `App.jsx` + step-skip logic in `flowReducer.js` |
+| `claim.type` (`change_of_mind`/`issue`/`warranty`/`compensation`) | `ClaimFlow` (derived from `situation`+`remedy` via `claimTypeFor`), `data/orders.js` | `App.jsx` routing, `claimStatusesFor`, `flowReducer` step tails (`sequenceFor`) | routing in `App.jsx` + `claimTypeFor`/`sequenceFor` in `flowReducer.js` |
+| `state.situation` (`changed_mind`/`device_fault`/`wrong_item`/`keep_compensation`) + `state.remedy` (`refund`/`repair`/`replacement`) | flow state only (Step1Situation / StepRemedy) | `flowReducer.js` (`DECISION_STEPS`, `tailSteps`, `claimTypeFor`); tripwire sentinels `WRONG_ITEM_FAULT_TRIP`/`CATEGORY_COM_TRIP`/`trip_*` → `SwitchFlowSheet` via `ClaimFlow.pendingSwitch` | `claimTypeFor`/`DECISION_STEPS` in `flowReducer.js` + the `pendingSwitch` map in `ClaimFlow.jsx` |
 | Takeover flags `claim.docsRejection` / `pickupFailure` / `resetFailed` / `invalidClaim` | `data/orders.js` (hand-seeded only) | `App.jsx` routing **precedence** → takeover cards | the routing precedence list in `App.jsx` (order matters) |
 | `claim.invalidClaim.reason` (`invalid` default / `cancelled`) | `data/journeys/claim*.js`, `lib/claims.js` (`cancelReturnGate`), `App.jsx` (`shipBackCancels` projection) | `components/InvalidClaimCard.jsx` (copy + `Decline`-vs-`Keep claim`) | the `reason` branches in `InvalidClaimCard.jsx` |
 | `category_name` (`iPhone`/`Macbook`/`Samsung phone`/`Tablet`/`Laptop`) | `data/orders.js` product | `lib/devices.js` → `ResetGuideSheet` variant | mapping in `devices.js` + a guide variant in `ResetGuideSheet.jsx` |
@@ -76,27 +78,32 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
 | `components/ClaimCard.jsx` | 366 | 1 | `ClaimCard`·49 |
 | `components/ClaimDetailsSheet.jsx` | 243 | 2 | `ClaimDetailsSheet`·19 |
-| `components/ClaimFlow/ClaimFlow.jsx` | 421 | 1 | `ClaimFlow`·25 |
-| `components/ClaimFlow/InlineError.jsx` | 16 | 9 | `InlineError`·6 |
+| `components/ClaimFlow/BatteryHealthCheck.jsx` | 260 | 1 | `BatteryHealthCheck`·16 |
+| `components/ClaimFlow/ClaimFlow.jsx` | 451 | 1 | `ClaimFlow`·25 |
+| `components/ClaimFlow/InlineError.jsx` | 16 | 13 | `InlineError`·6 |
 | `components/ClaimFlow/IssueEvidence.jsx` | 398 | 1 | `IssueEvidence`·61 |
-| `components/ClaimFlow/ProgressBar.jsx` | 28 | 1 | `ProgressBar`·3 |
+| `components/ClaimFlow/ProgressBar.jsx` | 38 | 1 | `ProgressBar`·6 |
 | `components/ClaimFlow/ResetGuideSheet.jsx` | 803 | 3 | `ResetGuideSheet`·424 |
-| `components/ClaimFlow/Step1ClaimType.jsx` | 225 | 1 | `Step1ClaimType`·33 |
-| `components/ClaimFlow/Step2Compensation.jsx` | 229 | 1 | `Step2Compensation`·22 |
-| `components/ClaimFlow/Step2IssueDetails.jsx` | 478 | 1 | `Step2IssueDetails`·29 |
-| `components/ClaimFlow/Step2Reason.jsx` | 174 | 3 | `REASONS`·13, `REASON_LABELS`·29, `REDIRECT_REASON_IDS`·35, `FAULT_REASON_IDS`·44, `isRemedyChoice`·46, `SWITCH_CTA_LABELS`·52, `routeForReason`·71, `scopeForReason`·80, `Step2Reason`·86 |
+| `components/ClaimFlow/Step1Situation.jsx` | 91 | 1 | `Step1Situation`·36 |
+| `components/ClaimFlow/Step2Compensation.jsx` | 238 | 1 | `Step2Compensation`·23 |
+| `components/ClaimFlow/Step2Reason.jsx` | 163 | 2 | `REASONS`·13, `REASON_TRIPWIRES`·24, `REASON_LABELS`·42, `tripwireFor`·49, `Step2Reason`·53 |
 | `components/ClaimFlow/Step3DevicePrep.jsx` | 549 | 1 | `Step3DevicePrep`·37 |
 | `components/ClaimFlow/Step4Packing.jsx` | 253 | 2 | `PACKING_OPTIONS`·15, `PACKING_LABELS`·36, `Step4Packing`·40 |
 | `components/ClaimFlow/Step4PickupDetails.jsx` | 427 | 1 | `Step4PickupDetails`·53 |
 | `components/ClaimFlow/Step5RefundMethod.jsx` | 280 | 1 | `Step5RefundMethod`·10 |
-| `components/ClaimFlow/Step6Review.jsx` | 609 | 1 | `Step6Review`·29 |
-| `components/ClaimFlow/Step7Confirmation.jsx` | 219 | 1 | `Step7Confirmation`·16 |
-| `components/ClaimFlow/StepHeading.jsx` | 16 | 9 | `StepHeading`·1 |
+| `components/ClaimFlow/Step6Review.jsx` | 638 | 1 | `Step6Review`·30 |
+| `components/ClaimFlow/Step7Confirmation.jsx` | 236 | 1 | `Step7Confirmation`·17 |
+| `components/ClaimFlow/StepEvidence.jsx` | 88 | 1 | `StepEvidence`·12 |
+| `components/ClaimFlow/StepHeading.jsx` | 16 | 12 | `StepHeading`·1 |
+| `components/ClaimFlow/StepIssueCategory.jsx` | 92 | 1 | `CATEGORY_COM_TRIP`·9, `StepIssueCategory`·15 |
+| `components/ClaimFlow/StepIssueSpecific.jsx` | 148 | 1 | `StepIssueSpecific`·15 |
+| `components/ClaimFlow/StepRemedy.jsx` | 100 | 1 | `StepRemedy`·40 |
+| `components/ClaimFlow/StepWrongItem.jsx` | 112 | 1 | `WRONG_ITEM_FAULT_TRIP`·10, `StepWrongItem`·14 |
 | `components/ClaimFlow/StickyActionBar.jsx` | 38 | 1 | `StickyActionBar`·1 |
-| `components/ClaimFlow/SwitchFlowSheet.jsx` | 304 | 1 | `SwitchFlowSheet`·93 |
-| `components/ClaimFlow/compensationSubtypes.js` | 30 | 3 | `COMPENSATION_SUBTYPES`·6, `COMPENSATION_SUBTYPE_LABELS`·23, `findCompensationSubtype`·27 |
-| `components/ClaimFlow/flowReducer.js` | 331 | 2 | `STEP_SEQUENCES`·12, `visibleStepCount`·55, `visibleStepIndex`·61, `initialState`·66, `flowReducer`·138, `stepError`·265, `canAdvance`·328 |
-| `components/ClaimFlow/issueSubtypes.js` | 205 | 3 | `PROOF_GUIDE_LABEL`·14, `DEFAULT_PROOF_GUIDE_URL`·17, `ISSUE_SCOPES`·24, `NOT_WORKING_SUBTYPES`·37, `WRONG_DEVICE_SUBTYPES`·165, `findSubtype`·192, `scopeForSubtype`·200 |
+| `components/ClaimFlow/SwitchFlowSheet.jsx` | 173 | 1 | `SwitchFlowSheet`·64 |
+| `components/ClaimFlow/compensationSubtypes.js` | 39 | 3 | `COMPENSATION_SUBTYPES`·8, `COMPENSATION_SUBTYPE_LABELS`·32, `findCompensationSubtype`·36 |
+| `components/ClaimFlow/flowReducer.js` | 401 | 2 | `BRANCH_ENTRY`·28, `sequenceFor`·57, `claimTypeFor`·65, `progressFor`·109, `initialState`·127, `flowReducer`·224, `stepError`·329, `canAdvance`·398 |
+| `components/ClaimFlow/issueTaxonomy.js` | 348 | 6 | `PROOF_GUIDE_LABEL`·22, `DEFAULT_PROOF_GUIDE_URL`·25, `ISSUE_CATEGORIES`·57, `WRONG_ITEM_DETAILS`·246, `SOMETHING_ELSE_ID`·275, `categoryById`·290, `findSpecificIssue`·294, `scopeForIssue`·300, `visibleIssuesFor`·312, `labelForIssue`·320, `resolveNeed`·331, `evidenceSubFor`·343 |
 | `components/ClaimFlow/resetGuideAnim.js` | 10 | 2 | `STEP_ANIM_CSS`·3, `stepAnim`·8 |
 | `components/ClaimFlow/resetGuideMocks.jsx` | 1654 | 1 | _(none)_ |
 | `components/ClosedClaimCard.jsx` | 164 | 1 | `ClosedClaimCard`·47 |
@@ -151,9 +158,9 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/orders/compensation.js` | 184 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 174 | 1 | `WARRANTY_ORDERS`·3 |
 | `data/wallet.js` | 94 | 1 | `WALLET_SEED_TRANSACTIONS`·21 |
-| `lib/claims.js` | 746 | 17 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `CLAIM_EXPLANATIONS`·108, `COMPENSATION_EXPLANATIONS`·120, `claimExplanation`·132, `claimToneFor`·142, `claimProgressIndex`·148, `RETURN_CLAIM_STATUSES`·158, `returnClaimProgressIndex`·171, `CLAIM_TRANSIT_SUB_STATUSES`·180, `transitSubProgressIndex`·187, `hasActiveClaim`·196, `isClaimRefunded`·205, `isClaimClosed`·216, `CLAIM_CLOSURE_REASONS`·222, `closureCopyFor`·261, `canCancelClaim`·276, `cancelNeedsShipBack`·287, `cancelReturnGate`·299, `isWarrantyDelivered`·319, `isReturnDelivered`·332, `claimPhaseTag`·338, `claimStatusHeadline`·355, `claimStatusSubline`·360, `WARRANTY_CLAIM_STATUSES`·378, `warrantyClaimToneFor`·426, `warrantyClaimProgressIndex`·434, `warrantyClaimPhaseTag`·438, `warrantyClaimStatusHeadline`·457, `warrantyClaimStatusSubline`·462, `WARRANTY_EXPLANATIONS`·471, `warrantyClaimExplanation`·485, `REASON_LABELS`·499, `reasonText`·510, `devicePrepText`·518, `CLAIM_TYPE_LABELS`·526, `claimTypeLabel`·533, `CLAIM_REF_PREFIXES`·545, `formatClaimRef`·553, `claimRequiresProof`·566, `refundMethodLabel`·572, `CLAIM_SLAS`·591, `expectedCompletionFor`·614, `SUB_STATUS_LABELS`·639, `actionGateCopy`·700 |
+| `lib/claims.js` | 747 | 17 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `CLAIM_EXPLANATIONS`·108, `COMPENSATION_EXPLANATIONS`·120, `claimExplanation`·132, `claimToneFor`·142, `claimProgressIndex`·148, `RETURN_CLAIM_STATUSES`·158, `returnClaimProgressIndex`·171, `CLAIM_TRANSIT_SUB_STATUSES`·180, `transitSubProgressIndex`·187, `hasActiveClaim`·196, `isClaimRefunded`·205, `isClaimClosed`·216, `CLAIM_CLOSURE_REASONS`·222, `closureCopyFor`·261, `canCancelClaim`·276, `cancelNeedsShipBack`·287, `cancelReturnGate`·299, `isWarrantyDelivered`·319, `isReturnDelivered`·332, `claimPhaseTag`·338, `claimStatusHeadline`·355, `claimStatusSubline`·360, `WARRANTY_CLAIM_STATUSES`·378, `warrantyClaimToneFor`·426, `warrantyClaimProgressIndex`·434, `warrantyClaimPhaseTag`·438, `warrantyClaimStatusHeadline`·457, `warrantyClaimStatusSubline`·462, `WARRANTY_EXPLANATIONS`·471, `warrantyClaimExplanation`·485, `REASON_LABELS`·499, `reasonText`·511, `devicePrepText`·519, `CLAIM_TYPE_LABELS`·527, `claimTypeLabel`·534, `CLAIM_REF_PREFIXES`·546, `formatClaimRef`·554, `claimRequiresProof`·567, `refundMethodLabel`·573, `CLAIM_SLAS`·592, `expectedCompletionFor`·615, `SUB_STATUS_LABELS`·640, `actionGateCopy`·701 |
 | `lib/countries.js` | 32 | 9 | `DEFAULT_COUNTRY`·15, `COUNTRIES`·17, `COUNTRY_CODES`·24, `countryConfig`·28 |
-| `lib/devices.js` | 65 | 4 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
+| `lib/devices.js` | 65 | 5 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
 | `lib/edd.js` | 245 | 1 | `MARKETS`·24, `STAGE_ORDER_CREATED`·60, `STAGE_QC`·61, `STAGE_SHIPPED`·62, `SLA_ON_TIME`·64, `SLA_LATE`·65, `MSG_ORDER_LATE`·72, `MSG_QC_BACK_ON_TRACK`·74, `MSG_QC_LATE`·76, `MSG_SHIPPED_LATE`·78, `workdayIntl`·100, `currentStage`·117, `calculateEdd`·125, `buildCustomerMessage`·161, `orderStatus`·185 |
 | `lib/eddSandbox.js` | 231 | 1 | `useEddSandbox`·187 |
 | `lib/events.js` | 152 | 3 | `getHistoryEvents`·119 |
@@ -171,10 +178,10 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 | Source-of-truth module | Consumers |
 |---|---|
 | `lib/claims.js` | `App.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/ClosedClaimCard.jsx`, `components/DocsRejectedCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderClaimLink.jsx`, `components/PickupFailedCard.jsx`, `components/ResetFailedCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/notifications.js` |
-| `lib/returns.js` | `components/CancelOrderSheet.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/IssueEvidence.jsx`, `components/ClaimFlow/Step2IssueDetails.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/PastOrderCard.jsx`, `components/RefundDetailsSheet.jsx`, `components/RefundSplitRows.jsx`, `components/WalletSheet.jsx`, `lib/wallet.js` |
+| `lib/returns.js` | `components/CancelOrderSheet.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/BatteryHealthCheck.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/IssueEvidence.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/PastOrderCard.jsx`, `components/RefundDetailsSheet.jsx`, `components/RefundSplitRows.jsx`, `components/WalletSheet.jsx`, `lib/wallet.js` |
 | `lib/countries.js` | `App.jsx`, `components/ClaimCard.jsx`, `components/CountryPicker.jsx`, `components/HeroCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/journey.js`, `lib/statuses.js` |
 | `lib/statuses.js` | `App.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ReturnShipmentTracking.jsx` |
-| `lib/devices.js` | `components/ClaimFlow/Step3DevicePrep.jsx`, `components/ClaimFlow/flowReducer.js`, `components/ResetFailedCard.jsx`, `components/ResetGuidePicker.jsx` |
+| `lib/devices.js` | `components/ClaimFlow/Step3DevicePrep.jsx`, `components/ClaimFlow/flowReducer.js`, `components/ClaimFlow/issueTaxonomy.js`, `components/ResetFailedCard.jsx`, `components/ResetGuidePicker.jsx` |
 | `data/journey.js` | `App.jsx`, `lib/eddSandbox.js`, `lib/journey.js` |
 | `data/orders.js` | `App.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/flowReducer.js` |
 | `lib/events.js` | `components/ClaimCard.jsx`, `components/PastOrderCard.jsx`, `components/WarrantyClaimCard.jsx` |
@@ -263,6 +270,6 @@ graph LR
   lib_wallet_js --> data_wallet_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 95 modules, 26677 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 100 modules, 27041 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

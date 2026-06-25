@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8fb818a
+verified_against: e000edd
 covers:
   - src/components/ClaimFlow
   - src/components/RefundSplitRows.jsx
@@ -9,7 +9,7 @@ covers:
 
 # Returns — Issue & Wrong device
 
-> Customer-facing UI of the faulty-product return branch, launched from `Raise a claim` → `Something's wrong with my device` → `Return for a refund` on a delivered `PastOrderCard` (or reached from the change-of-mind flow's refund-vs-replacement choice — see [change_of_mind.md](./change_of_mind.md) §2.3). Covers Steps 1 (shared), 2 (issue branch), and 3–7 (shared with change-of-mind). The operational state machine (drawio transcription — single repair-supplier path, country-aware AWB creation, LAB sub-flow) is documented separately in [`../../input/return_flow_issue.md`](../../input/return_flow_issue.md). Once submitted, the return appears on the customer's list as a `ClaimCard` — see [claim_tracking.md](./claim_tracking.md).
+> Customer-facing UI of the **device-fault** and **wrong-item** return branches. Both are reached from Screen 1 of the situation-first decision phase — `Something's wrong with the device` (`device_fault`) or `I received the wrong item` (`wrong_item`); the `device_fault` → repair remedy forks off to warranty ([warranties_compensations.md](../warranties_compensations.md) §2). The shared decision-phase mechanics (Screen 1, the remedy fork, tripwires, `SwitchFlowSheet`, the derived `claimType`) live in [change_of_mind.md](./change_of_mind.md) §0 + §2.2–2.3.2; this doc covers the **issue-specific** decision screens (category / specific / wrong-item / evidence) and the issue refund math. The operational state machine (drawio transcription — single repair-supplier path, country-aware AWB creation, LAB sub-flow) is documented separately in [`../../input/return_flow_issue.md`](../../input/return_flow_issue.md). Once submitted, the return appears on the customer's list as a `ClaimCard` — see [claim_tracking.md](./claim_tracking.md).
 
 ## 1. Overview
 
@@ -22,7 +22,7 @@ The issue branch is the entry point used when something is wrong with the delive
 
 Distinguishing characteristics vs change of mind:
 
-- A shared, **required** reason step (Step 2, "Why are you returning it?") now precedes issue details — it's the authoritative router (a no-fault reason picked here redirects to the change-of-mind flow via `SwitchFlowSheet`). See [change_of_mind.md](./change_of_mind.md) §2.3. Issue details (Step 3) then collects required structured evidence (sub-issue from a two-scope picker, free-text description, attachment); when the customer arrived from a fault reason the matching scope is pre-filled.
+- The customer arrives by picking a fault/wrong-item **situation** on Screen 1, then describes it: `device_fault` → `category` → `specific` → `remedy`; `wrong_item` → `wrongitem` → `remedy`. The `remedy` fork is where the downstream `claimType` resolves (`device_fault`: refund→issue / repair→warranty; `wrong_item`: refund→issue / replacement→issue). After the fork, an `evidence` step collects the required structured proof (the specific issue is already chosen, so it gates only attachment + description).
 - No restocking fee on the original-payment path.
 - A flat AED 100 Wallet bonus (`ISSUE_WALLET_BONUS`) is added on the Wallet path — the implicit framing is "we owe you because something went wrong, and we'd like you to stay in the ecosystem".
 - The operational flow has a single repair-supplier route (Original supplier) regardless of country, vs change-of-mind's three-way country split.
@@ -33,54 +33,57 @@ The flow chrome (white surface, segmented progress, sticky action bar, only-fill
 
 ```mermaid
 flowchart TD
-  entry([Tap 'Raise a claim' on delivered PastOrderCard]) --> s1[Step 1 — Claim type]
-  s1 -->|I changed my mind| com[/Change-of-mind branch — see change_of_mind.md/]
-  s1 -->|Something's wrong with my device → Return for a refund| s2[Step 2 — Reason · shared]
-  s1 -->|Use my warranty| warranty[/Warranty branch — see warranties_compensations.md §2/]
-  s1 -->|Request compensation| stub2[/Stub — see warranties_compensations.md §3/]
-  s2 -->|No-fault reason → SwitchFlowSheet| com2[/Redirect to change of mind — see change_of_mind.md §2.3/]
-  s2 -->|Fault / wrong reason + Continue| s3[Step 3 — Issue details]
-  s3 -->|Scope + sub-issue + description + attachment| s4[Step 4 — Device prep]
-  s4 -->|Guided reset completed + confirmed| s5[Step 5 — Packing]
-  s5 -->|Original Revibe box OR sturdy post box selected| s6[Step 6 — Pickup details]
-  s6 -->|3 fields confirmed + checkbox| s7[Step 7 — Refund method]
-  s7 -->|Wallet +100 AED or Original payment| s8[Step 8 — Review & submit]
-  s8 -->|Both acks ticked → Submit return request| s9[Step 9 — Confirmation]
-  s9 -->|Back to my account| close([Close overlay])
+  entry([Screen 1 — situation]) -->|Something's wrong with the device| cat[category · 6 categories]
+  entry -->|I received the wrong item| wi[wrongitem · how it differs]
+  cat -->|"It works fine…" tripwire| comTrip[/SwitchFlowSheet → change of mind/]
+  cat -->|Category picked| spec[specific · ≤5 issues, or free-text]
+  spec --> rem[remedy · refund | repair]
+  wi -->|"It's faulty…" tripwire| dfTrip[/SwitchFlowSheet → device_fault/]
+  wi -->|Difference picked| rem2[remedy · refund | replacement]
+  rem -->|repair → warranty| warranty[/Warranty branch — warranties_compensations.md §2/]
+  rem -->|refund → issue| ev[evidence]
+  rem2 -->|refund or replacement → issue| ev
+  ev -->|Attachment + description| prep[Device prep → packing → pickup]
+  prep --> refund[Refund method · skipped on replacement/repair]
+  refund --> review[Review & submit]
+  review --> done[Confirmation]
+  done -->|Back to my account| close([Close overlay])
 ```
 
-### 2.1 Step 1 — Claim type (shared)
+### 2.1 The decision phase (shared, situation-first)
 
-See [change_of_mind.md](./change_of_mind.md) §2.2. The issue branch is reached via:
+Screen 1, the remedy fork, the tripwires, and the `SwitchFlowSheet` are documented once in [change_of_mind.md](./change_of_mind.md) §0 + §2.2–2.3.2. The issue branches are reached by picking `Something's wrong with the device` (`device_fault`) or `I received the wrong item` (`wrong_item`) on Screen 1. The `claimType` is derived on the **remedy** screen, not picked up front.
 
-`Something's wrong with my device` → expands inline accordion → `Return for a refund` → `claimType: 'issue'`. (Also reachable from the change-of-mind flow's refund-vs-replacement choice when a fault reason is caught there — see [change_of_mind.md](./change_of_mind.md) §2.3.)
+### 2.2 Issue decision screens (the redesigned taxonomy)
 
-### 2.2 Step 2 — Reason (shared, required)
+The flat ~19-item two-scope picker is gone, replaced by `issueTaxonomy.js`:
 
-The shared "Why are you returning it?" picker — the same step the change-of-mind and warranty flows use, and the authoritative router. A fault / wrong reason (`defective` / `wrong_item` / `damaged`) continues into the issue flow (pre-filling the issue-details scope); a no-fault reason opens `SwitchFlowSheet` and redirects to change of mind; `missing_parts` redirects to compensation. Full table + routing rule + sheet in [change_of_mind.md](./change_of_mind.md) §2.3.
+**`device_fault` — `category` then `specific`.** `StepIssueCategory` shows six recognisable categories (each `< 5` specific issues), then `StepIssueSpecific` drills into the chosen category:
 
-### 2.3 Step 3 — Issue details (issue branch, required)
+| Category id | Label | Specific issues |
+|---|---|---|
+| `battery_power` | Battery, charging & heat | `battery_drain`, `wont_charge`, `overheat`, `power_other` |
+| `screen_body` | Screen & physical condition | `screen`, `body`, `button`, `spen` *(Samsung only)*, `body_other` |
+| `camera_audio` | Camera, mic & speaker | `camera`, `mic`, `speaker`, `av_other` |
+| `software_region` | Software & region | `software_bug`, `no_updates`, `language`, `intl_version`, `sw_other` |
+| `account_lock` | Account & activation lock | `linked_account`, `prev_owner_pw`, `lock_other` |
+| `something_else` | Something else | *(free-text capture — no radio list)* |
 
-A required structured-evidence form. `Skip` is hidden; the step gates on `issueSubtypeId` + a stubbed filename + non-empty description, surfaced one at a time via the flow-wide soft validation (`stepError` order: `subtype` → `attachment` → `description`; Continue never grays — see [change_of_mind.md](./change_of_mind.md) §2.1.1). The attachment precedes the description in the error order because the uploader sits **above** the description textarea in the redesigned layout — the error always lights the first unmet field in reading order.
+The category screen carries a warn-toned **`CATEGORY_COM_TRIP`** tripwire (*"It works fine, it's just not good enough for me"*) that opens `SwitchFlowSheet` to change of mind. The `something_else` category is `freeText: true`: `StepIssueSpecific` renders a textarea (pinned to the `something_else` subtype id) instead of a list, and gates on a non-empty description (`stepError` key `description`). Otherwise the specific screen gates on `issueSubtypeId` (`subtype`). Each specific issue carries the evidence contract (`need` / `mediaType` / `proofGuideUrl` / `examples` / `tryFirst`) the later `evidence` step reads — the same shape the old `issueSubtypes` entries had.
 
-**Two-scope sub-issue picker.** Sourced from `src/components/ClaimFlow/issueSubtypes.js`:
+**Brand-conditional copy.** `spen` is filtered out unless the order is a Samsung/Galaxy device (`visibleIssuesFor`). The `linked_account` issue's label and `need` copy adapt per OS via `labelForIssue` / `resolveNeed` — *Apple Account (iCloud)* / Activation Lock on iOS, *Google account* / Factory Reset Protection on Android.
 
-| Scope | Sub-issues (count) |
-|---|---|
-| `Device not working as expected` | 15 items (battery, software, physical, screen, charger, overheating, camera, etc.) |
-| `I received the wrong device` | 4 items |
+**`wrong_item` — `wrongitem`.** `StepWrongItem` lists the four ways the device can differ (`wrong_colour`, `wrong_storage`, `wrong_specs`, `wrong_region` from `WRONG_ITEM_DETAILS`, scope `wrong_device`), plus a warn-toned **`WRONG_ITEM_FAULT_TRIP`** tripwire (*"It's faulty or damaged, not the wrong item"*) that switches to `device_fault`. Gates on `subtype`.
 
-Scopes are mutually exclusive expandable sections; tapping a sub-issue commits the selection (`issueScope` + `issueSubtypeId`) and collapses the picker down to just the chosen row. The selected row shows only the optional `Try this first` preflight tip (e.g. "Have you tried a soft reset?"), rendered only when the sub-type defines one. It carries an `X` button that clears the selection and reopens the picker on the same scope so the user can pick again.
+A charger is an accessory, not a device fault, so it's **not** in this taxonomy — it lives in the compensation branch (`accessory_broken`; see [warranties_compensations.md](../warranties_compensations.md) §3).
 
-The per-issue evidence ask + the **`How to provide valid proof`** link live in the **`What good proof looks like`** evidence block (`IssueEvidence`, see below) — guidance sits where the customer actually attaches proof, above the uploader.
+### 2.3 `evidence` — Show us the issue (issue / warranty, required)
 
-**Evidence block + description.** Below the picker, in reading order:
+After the remedy fork, both refund-issue and warranty-repair walk an `evidence` step (`StepEvidence`). The specific issue is **already chosen** upstream, so this step only gates the proof + description — `stepError` order `attachment` → `description` (the uploader sits above the textarea, so the error lights the first unmet field in reading order). Continue never grays (§2.1.1 in [change_of_mind.md](./change_of_mind.md)). Contents, top to bottom:
 
-- The **`What good proof looks like`** evidence section (`src/components/ClaimFlow/IssueEvidence.jsx`) — one reusable block shown for every sub-type. See §2.3.1.
-- The optional `BatteryHealthCheck` card (battery sub-type only — unchanged, see below).
+- The **`What good proof looks like`** evidence block (`IssueEvidence`) — the `sub` it renders is resolved via `evidenceSubFor(issueSubtypeId, order)` (which folds in the OS-adapted account-lock copy). See §2.3.1.
+- The optional `BatteryHealthCheck` card — rendered only on the `battery_drain` issue (it now lives in its own file, extracted from the old issue-details screen). Unchanged behaviour, see below.
 - A required free-text description (500-char max).
-
-`IssueEvidence` owns the attachment, so the uploader now sits **above** the description (driving the `attachment → description` error order).
 
 ### 2.3.1 Evidence block (`IssueEvidence`)
 
@@ -94,13 +97,13 @@ Every proof thumbnail is tappable → opens a **paging lightbox** (`ProofLightbo
 
 Below the card sits the single gated **`Add photos or video`** uploader: a dashed drop-zone with an inline `Required — claims without proof are often rejected or delayed` warn line (the standalone warn banner is gone — the reinforcement folds into the empty drop-zone). It's a **fake** slot — clicking stubs in a cycled filename; the prototype has no real file picker. Once attached it shows the filename + an `Add another` action; the `attachment` validation error reddens the drop-zone and shows *"Attach a photo or video — it's required."*
 
-**Real proof-guide links.** `How to provide valid proof` is a live `<a target="_blank">` (no longer a placeholder). It resolves per sub-type via `sub.proofGuideUrl`, falling back to `DEFAULT_PROOF_GUIDE_URL` ("how-to-show-us-your-issue") for any sub-type without its own article. Specific articles today: `battery` → battery-draining guide; `physical` → device-conditions guide; the four hardware sub-types (`camera` / `microphone` / `button` / `speaker`) share one `HARDWARE_PROOF_GUIDE_URL`. All defined in `issueSubtypes.js`.
+**Real proof-guide links.** `How to provide valid proof` is a live `<a target="_blank">` (no longer a placeholder). It resolves per issue via `sub.proofGuideUrl`, falling back to `DEFAULT_PROOF_GUIDE_URL` ("how-to-show-us-your-issue") for any issue without its own article. Specific articles today: `battery_drain` → battery-draining guide; `body` → device-conditions guide; the hardware faults (`button` / `camera` / `mic` / `speaker`) share one `HARDWARE_PROOF_GUIDE_URL`. All defined in `issueTaxonomy.js`.
 
-**Physical-condition disclaimer.** When `issueSubtypeId === 'physical'` and the device's condition grade (from `conditionGradeOf(order)`) is known and **not `excellent`** (i.e. very good / good / fair), an amber `PhysicalConditionNote` renders inside Group A of the `IssueEvidence` card. It names the grade ("Your device is graded **Good**…") and explains that some signs of previous use are expected at that grade and aren't treated as a defect. Renders nothing for Excellent-grade devices or when the grade can't be derived.
+**Physical-condition disclaimer.** When `issueSubtypeId === 'body'` and the device's condition grade (from `conditionGradeOf(order)`) is known and **not `excellent`** (i.e. very good / good / fair), an amber `PhysicalConditionNote` renders inside Group A of the `IssueEvidence` card. It names the grade ("Your device is graded **Good**…") and explains that some signs of previous use are expected at that grade and aren't treated as a defect. Renders nothing for Excellent-grade devices or when the grade can't be derived.
 
-The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` consumes `issueSubtypeId` (via `findSubtype(id)` in `issueSubtypes.js`) and `issueScope`.
+The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` consumes `issueSubtypeId` (via `findSpecificIssue(id)` in `issueTaxonomy.js`) and `issueScope`.
 
-**Optional battery check (battery sub-type only).** When `issueSubtypeId === 'battery'`, a `BatteryHealthCheck` card renders between the `IssueEvidence` block and the description (in both the issue **and** the warranty issue-details step — both reuse `Step2IssueDetails`). It lets the customer self-assess against the §7.2 Battery Standards before committing:
+**Optional battery check (`battery_drain` issue only).** When `issueSubtypeId === 'battery_drain'`, a `BatteryHealthCheck` card (now its own file) renders between the `IssueEvidence` block and the description on the `evidence` step (shared by the issue **and** warranty paths). It lets the customer self-assess against the §7.2 Battery Standards before committing:
 
 - A **capacity %** input (the figure from Settings → Battery → Battery Health) and a **non-original part** self-report toggle. Both live in `state.batteryCheck` (`SET_BATTERY_CHECK`); **fully optional** — never gates `canAdvance`, so the customer can skip it and submit proof + description as usual.
 - The card derives the device's guaranteed floor from its condition grade (last segment of `product.variant`): `excellent` 95, `very good` 90, `good` 85, `fair` 85 (no published floor — treated as Good). Time-since-delivery comes from `deliveredOn`.
@@ -110,22 +113,24 @@ The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` c
 
 The filled-in result is carried onto the claim as `claim.batteryAssessment` (`{ capacity, baseline, degradation, nonOriginal, remedy, reason }`) for the issue and warranty shapes — data only; no tracking-card surface reads it yet. Logic + thresholds live in `src/lib/returns.js` (`BATTERY_BASELINE_BY_GRADE`, `conditionGradeOf`, `batteryBaselineFor`, `assessBattery`).
 
-### 2.4 Steps 4 – 6 — Device prep + packing + pickup (shared)
+### 2.4 `deviceprep` / `packing` / `pickup` (shared)
 
-Identical to the change-of-mind branch (device prep / packing / pickup). See [change_of_mind.md](./change_of_mind.md) §2.4–2.6.
+Identical to the change-of-mind branch. See [change_of_mind.md](./change_of_mind.md) §2.4–2.6.
 
-### 2.5 Step 7 — Refund method (shared chrome, issue math)
+### 2.5 `refund` — Refund method (shared chrome, issue math)
+
+> Present on the refund-issue path only. The `wrong_item` → `replacement` and `device_fault` → `repair` (warranty) paths skip it (`tailSteps` drops `refund`).
 
 Two stacked refund cards built off `refundBreakdown(order, units, method, 'issue')`. Chrome is identical to the change-of-mind refund step; only the math and secondary copy diverge.
 
 - **Wallet card.** Net amount (= `gross + AED 100 bonus`) + an accent-tinted `+AED 100 bonus` chip + tagline `Full refund + bonus · instantly once return is complete`.
 - **Original-payment card.** Full net (no fee), no breakdown table, tagline `Full refund · 5–10 business days once return is complete`. Card label uses `order.paymentMethod.brand` + `last4`. BNPL handling identical to the change-of-mind flow — see [change_of_mind.md](./change_of_mind.md) §2.7 for the `BnplDisclaimerTooltip` treatment. **Split-paid orders** (`order.paymentSplit`) get the shared `RefundSplitRows` block on the `original` path (here splitting the full net, no fee), carried through Review & Confirmation — see [change_of_mind.md](./change_of_mind.md) §2.7.
 
-### 2.6 Step 8 — Review & submit (shared)
+### 2.6 `review` — Review & submit (shared)
 
 Sectioned summary. Issue-specific section:
 
-- **Issue** — category label (resolved via `findSubtype(id)` against `issueSubtypes.js`) + description + attachment chip.
+- **Issue** (refund) / **Fault** (warranty) — specific-issue label (resolved via `findSpecificIssue(id)` against `issueTaxonomy.js`) + a scope chip (`Device fault` / `Wrong item`) + description + attachment chip. The section's Edit link jumps to `wrongitem` when `situation === 'wrong_item'`, else `specific`.
 
 Shared sections: Device prep (shows `Factory reset confirmed` — the single guided-reset path; `Unlinked + passcode shared` survives only for seeded credentials mocks), Packing summary (with the chosen method label), Pickup, Refund.
 
@@ -135,9 +140,9 @@ The refund block surfaces the final net + an explanatory line: `Includes AED 100
 
 The sticky bar swaps `Continue` for a success-tone `Submit return request`.
 
-### 2.7 Step 9 — Confirmation (shared)
+### 2.7 `confirm` — Confirmation (shared)
 
-Same as change of mind. See [change_of_mind.md](./change_of_mind.md) §2.8.
+Same as change of mind (see [change_of_mind.md](./change_of_mind.md) §2.9). The **`wrong_item` → `replacement`** path diverges: the type badge reads `Replacement`, the `Expected refund` row becomes a `What you'll get back` row (*"The correct item"* + a no-refund explainer + the seller-stock disclaimer), and the track button reads `Track this replacement`.
 
 ## 3. Eligibility & refund math
 
@@ -184,9 +189,9 @@ How the customer-facing UI surfaces backend state:
 
 ## 5. UX decisions
 
-**Two-scope picker, not a flat list.** Earlier drafts had a single 19-item list of sub-issues. Splitting into `Device not working as expected` (15) and `I received the wrong device` (4) reduced perceived overwhelm — most customers can predict which scope their issue lives in and only need to scan ~15 items, not 19. It also creates a natural place to attach scope-specific guidance later.
+**Category → specific drill-down, not a flat list.** Earlier drafts had a single ~19-item flat list of sub-issues; the redesign groups faults into six recognisable categories (`< 5` specific issues each) the customer drills into. Most customers can predict which category their issue lives in and only scan a handful of specifics. The `wrong_item` situation gets its own short list (four ways the device differs), and each category carries a catch-all `*_other` free-text option so nothing is unrepresentable.
 
-**Per-sub-issue guidance, not a generic ask.** Once a sub-issue is picked, the proof card shows what evidence is needed *for that specific issue* (`need` line + media-type chip). Generic asks ("Please provide photo evidence") got ignored. Specific asks ("A 30-second video showing the battery draining…") get followed.
+**Per-issue guidance, not a generic ask.** Once a specific issue is picked, the proof card shows what evidence is needed *for that issue* (`need` line + media-type chip). Generic asks ("Please provide photo evidence") got ignored. Specific asks ("A 30-second video showing the battery draining…") get followed.
 
 **Unified proof card with worked examples, not a guidance line + bare uploader.** Earlier drafts surfaced the per-issue ask as a thin brand-tinted box above the upload zone. It told the customer *what* to send but not *what good looks like*. The redesigned `IssueEvidence` card splits proof into two concepts — `For this issue` (per-issue ask + media-type chip + captioned **approved-example** thumbnails) and `For every return` (a universal 4-photo checklist: screen, back & camera, accessories, packed safely) — backed by real customer-proof images and a paging lightbox. The intent is to cut the rejected-evidence rate by showing concrete examples, not just describing them. The standalone warn banner collapsed into the empty drop-zone (one required reinforcement, not two).
 
@@ -196,15 +201,17 @@ How the customer-facing UI surfaces backend state:
 
 **AED 100 bonus on Wallet, not "double the bonus on original payment".** Earlier drafts had a sliding bonus that doubled when the customer chose Wallet. The clean +100 framing is simpler to communicate and easier to A/B against the change-of-mind branch's "no bonus, just a fee waiver".
 
-**Packing and factory-reset acks moved onto Review as a soft-validated pair.** Earlier drafts had a single trailing packing checkbox on Review that hard-gated Submit; an even earlier version merged packing with a "testing acknowledged" checkbox to fix a negation-tick bug. Both got replaced when Step 4 became a dedicated packing-instructions screen — packing is now its own surface, and the *acknowledgments* (factory-reset + packed-properly) live on Review where they're enforced right before submission. See [change_of_mind.md](./change_of_mind.md) §5 for the rationale on splitting the two acks and using soft validation instead of disabling Submit.
+**Packing and factory-reset acks moved onto Review as a soft-validated pair.** Earlier drafts had a single trailing packing checkbox on Review that hard-gated Submit; an even earlier version merged packing with a "testing acknowledged" checkbox to fix a negation-tick bug. Both got replaced when packing became a dedicated instructions screen — packing is now its own surface, and the *acknowledgments* (factory-reset + packed-properly) live on Review where they're enforced right before submission. See [change_of_mind.md](./change_of_mind.md) §5 for the rationale on splitting the two acks and using soft validation instead of disabling Submit.
 
-**`category` field was replaced by `issueSubtypeId` + `issueScope`.** The pre-redesign flat `category` field couldn't differentiate "wrong device" from "battery issue" cleanly. Review now consumes the structured pair via `findSubtype(id)`.
+**`category` field was replaced by `issueSubtypeId` + `issueScope`.** The pre-redesign flat `category` field couldn't differentiate "wrong device" from "battery issue" cleanly. Review now consumes the structured pair via `findSpecificIssue(id)`.
+
+**Remedy is chosen after the issue, and shows only eligible outcomes.** Earlier the customer picked refund vs warranty up front (outcome-first). The redesign asks what's wrong first, then offers the remedy menu — for `device_fault`, refund or repair; for `wrong_item`, refund or get-the-correct-item. This keeps the refund/replacement/repair fork off the customer's plate until they've described the problem, and lets the menu hide outcomes that don't apply. See [change_of_mind.md](./change_of_mind.md) §5.
 
 ## 6. Data model
 
 ### 6.1 Order fields read by the flow
 
-Same as change of mind (see [change_of_mind.md](./change_of_mind.md) §6.1), plus — for the optional battery check on the `battery` sub-type — `order.product.variant` (the condition grade is its last `·`-separated segment) and `order.deliveredOn` (delivery date for the time-window math). Both are read through `conditionGradeOf` / `batteryBaselineFor` / `daysSinceDelivery` in `src/lib/returns.js`.
+Same as change of mind (see [change_of_mind.md](./change_of_mind.md) §6.1), plus — for the optional battery check on the `battery_drain` issue — `order.product.variant` (the condition grade is its last `·`-separated segment) and `order.deliveredOn` (delivery date for the time-window math). Both are read through `conditionGradeOf` / `batteryBaselineFor` / `daysSinceDelivery` in `src/lib/returns.js`. `product.category_name` is also read by `issueTaxonomy.js` (`visibleIssuesFor`) to gate the Samsung-only S Pen issue, and `deviceOsForOrder` to swap the account-lock copy.
 
 ### 6.2 Claim object written at submit (issue shape)
 
@@ -212,12 +219,13 @@ The full claim-object reference (including takeover-card extensions) lives in [c
 
 | Field | Type | Notes |
 |---|---|---|
-| `claim.type` | `'issue'` | Constant for this branch. |
-| `claim.issueDetails` | `{ description, attachmentName }` | `description` is the customer's free-text; `attachmentName` is a stub filename today. The sub-issue id and scope are **separate** top-level fields (below), not nested here. |
-| `claim.issueSubtypeId` | string | One of the sub-issue ids (`battery` / `software` / `physical` / `screen` / `charger` / `overheating` / `camera` / `wrong_item` / …), resolved via `findSubtype(id)` in `issueSubtypes.js`. |
-| `claim.issueScope` | `'not_working' | 'wrong_device'` | The two-scope picker value; pre-filled from the fault reason via `scopeForReason`. |
-| `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Written **only** when the `battery` sub-type's optional check was filled in (a capacity entered or the non-original toggle ticked). `remedy` is `'refund'` / `'replacement'` / `'none'` / `null`; `reason` is `'non_original'` / `'refund_10d'` / `'replacement_6m'` / `'replacement_12m'` / `'normal_wear'` / `null`. Computed by `assessBattery(...)` in `src/lib/returns.js`. Data only — no tracking-card / `ClaimDetailsSheet` surface reads it yet. |
-| `claim.expectedRefund.bonus` | number | `ISSUE_WALLET_BONUS` (`100`) when `refundMethod === 'wallet'`; `0` otherwise. |
+| `claim.type` | `'issue'` | Derived (`claimTypeFor`) — both `device_fault` + refund and `wrong_item` + refund/replacement land on `issue`. |
+| `claim.remedy` | `'refund' | 'replacement'` | The remedy fork. `replacement` (wrong-item → correct item) carries **no** `refundMethod` / `expectedRefund` block — no money moves. `refund` carries both. |
+| `claim.issueDetails` | `{ description, attachmentName }` | `description` is the customer's free-text; `attachmentName` is a stub filename today. The specific-issue id and scope are **separate** top-level fields (below), not nested here. |
+| `claim.issueSubtypeId` | string | One of the specific-issue ids from `issueTaxonomy.js` (`battery_drain` / `wont_charge` / `screen` / `body` / `camera` / `linked_account` / `wrong_colour` / `something_else` / …), resolved via `findSpecificIssue(id)`. |
+| `claim.issueScope` | `'not_working' | 'wrong_device'` | Derived from the issue via `scopeForIssue` (wrong-item details → `wrong_device`, everything else → `not_working`); also pre-filled by an accepted tripwire (`SWITCH_SITUATION` carries the scope). |
+| `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Written **only** when the `battery_drain` issue's optional check was filled in (a capacity entered or the non-original toggle ticked). `remedy` is `'refund'` / `'replacement'` / `'none'` / `null`; `reason` is `'non_original'` / `'refund_10d'` / `'replacement_6m'` / `'replacement_12m'` / `'normal_wear'` / `null`. Computed by `assessBattery(...)`. Data only. |
+| `claim.expectedRefund.bonus` | number | `ISSUE_WALLET_BONUS` (`100`) when `refundMethod === 'wallet'`; `0` otherwise. Absent on the replacement path. |
 
 Fields common to both branches (`claimRef`, `claimStatusId`, `submittedAt`, `units`, `devicePrep`, `pickupDetails`, `refundMethod`, `expectedRefund`, `timeline`) are documented in [change_of_mind.md](./change_of_mind.md) §6.2.
 
@@ -229,16 +237,26 @@ Same shared components as change of mind. Issue-specific surfaces:
 
 ```
 src/components/ClaimFlow/
-├── Step2IssueDetails.jsx       Two-scope picker (IssuePicker) + IssueEvidence + required description.
-│                               Private BatteryHealthCheck + BatteryVerdict + BatteryThresholds
-│                               render on the `battery` sub-type (also used by the warranty flow,
-│                               which reuses this component). Receives `order`.
+├── StepIssueCategory.jsx       device_fault screen 1 — six category cards + CATEGORY_COM_TRIP
+│                               change-of-mind tripwire. Exports CATEGORY_COM_TRIP.
+├── StepIssueSpecific.jsx       device_fault screen 2 — the chosen category's ≤5 issues (radio list),
+│                               or a free-text capture on the `something_else` category.
+├── StepWrongItem.jsx           wrong_item screen — four WRONG_ITEM_DETAILS rows + WRONG_ITEM_FAULT_TRIP
+│                               fault tripwire. Exports WRONG_ITEM_FAULT_TRIP.
+├── StepRemedy.jsx              remedy fork (refund|repair · refund|replacement) — SET_REMEDY resolves
+│                               claimType; replacement reveals the seller-stock disclaimer.
+├── StepEvidence.jsx            issue/warranty proof step — IssueEvidence (sub via evidenceSubFor)
+│                               + optional BatteryHealthCheck (on `battery_drain`) + description.
+├── BatteryHealthCheck.jsx      The optional battery self-check card (extracted from the old issue-
+│                               details screen) + BatteryVerdict + BatteryThresholds. Receives `order`.
 ├── IssueEvidence.jsx           Unified proof card (Group A per-issue `need` + media chip + Approved
 │                               examples; Group B universal 4-photo checklist) + gated uploader +
 │                               paging ProofLightbox. Exported default; private ProofThumb /
 │                               PhysicalConditionNote / AttachedFile / UploadDropzone.
-└── issueSubtypes.js            ISSUE_SCOPES (2) + SUBTYPES (15 + 4); each sub-type carries `mediaType`
-                                + optional `examples`; findSubtype(id) resolver
+└── issueTaxonomy.js            ISSUE_CATEGORIES (6, ≤5 issues each) + WRONG_ITEM_DETAILS (4); each
+                                issue carries `mediaType` + optional `examples`/`tryFirst`/`proofGuideUrl`.
+                                findSpecificIssue / scopeForIssue / visibleIssuesFor (Samsung S Pen) /
+                                labelForIssue + resolveNeed (iCloud/Google) / evidenceSubFor resolvers.
 ```
 
 Proof images are static assets under `public/proof/<id>/` (per-issue examples) and `public/proof/minimum-required/` (the universal checklist).
@@ -250,7 +268,7 @@ Proof images are static assets under `public/proof/<id>/` (per-issue examples) a
 - **Submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
 - **Attachment slot is fake.** Clicking the drop-zone stubs in a filename. No real file picker, no upload endpoint, no file-type/size validation.
 - **AED 100 bonus is hardcoded** as `ISSUE_WALLET_BONUS` in `src/lib/returns.js`. Production should read from a backend config (per-order or per-category).
-- **Sub-issue guidance copy + media-type chips are hardcoded** in `issueSubtypes.js` (`need`, `mediaType`, `examples`). Production should source from a content management system so non-engineers can revise.
+- **Issue guidance copy + media-type chips are hardcoded** in `issueTaxonomy.js` (`need`, `mediaType`, `examples`). Production should source from a content management system so non-engineers can revise.
 - **Approved-example + checklist images are static demo assets** under `public/proof/`. Only the `battery` sub-type has worked examples today; production should attach examples per sub-type from a content store, and the universal 4-photo checklist should reference the canonical packing/condition guidance images.
 - **No de-duplication / fraud check.** Production needs to flag repeat claimants and stop submission before it reaches ops.
 - **`Try this first` preflight steps are placeholders.** Real preflight scripts (factory reset, signal-strength check, charge-cycle test) need to be sourced from device-care content.

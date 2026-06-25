@@ -1,4 +1,4 @@
-import { ChevronRight, RotateCcw, Wrench, ArrowLeftRight } from 'lucide-react'
+import { ChevronRight, RotateCcw, Wrench, ArrowLeftRight, Info } from 'lucide-react'
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 
@@ -23,16 +23,16 @@ const REMEDIES = {
   ],
   wrong_item: [
     {
-      id: 'replacement',
-      icon: ArrowLeftRight,
-      title: 'Get the correct item',
-      sub: "We send you the right one — you won't be charged",
-    },
-    {
       id: 'refund',
       icon: RotateCcw,
       title: 'Return for a refund',
       sub: 'Send it back, get your money back',
+    },
+    {
+      id: 'replacement',
+      icon: ArrowLeftRight,
+      title: 'Get the correct item',
+      sub: "We send you the right one — you won't be charged",
     },
   ],
 }
@@ -66,7 +66,7 @@ export default function StepRemedy({ state, dispatch, error }) {
             >
               <span
                 className={`w-10 h-10 rounded-[10px] grid place-items-center shrink-0 ${
-                  selected ? 'bg-brand text-white' : 'bg-line-2 text-ink-2'
+                  selected ? 'bg-brand text-white' : 'bg-brand-bg text-brand'
                 }`}
               >
                 <Icon size={18} strokeWidth={1.75} />
@@ -83,6 +83,16 @@ export default function StepRemedy({ state, dispatch, error }) {
             </button>
           )
         })}
+
+        {state.situation === 'wrong_item' && state.remedy === 'replacement' && (
+          <div className="mt-1 flex items-start gap-2.5 rounded-[12px] border border-line bg-canvas px-3.5 py-3 animate-slideDown">
+            <Info size={15} strokeWidth={2} className="text-brand shrink-0 mt-px" />
+            <p className="m-0 text-[12px] leading-[1.45] text-ink-2">
+              Getting the correct item depends on our sellers' current stock. If
+              it's not available, we'll refund you instead.
+            </p>
+          </div>
+        )}
       </div>
     </>
   )

@@ -38,7 +38,10 @@ export default function Step6Review({
   const isIssue = state.claimType === 'issue'
   const isWarranty = state.claimType === 'warranty'
   const isCompensation = state.claimType === 'compensation'
-  const refund = isWarranty || isCompensation
+  // Wrong-item replacement rides the issue pipeline but returns the correct
+  // device rather than money — no refund method, no refund amount.
+  const isReplacement = state.remedy === 'replacement'
+  const refund = isWarranty || isCompensation || isReplacement
     ? null
     : refundBreakdown(
         order,
@@ -75,7 +78,7 @@ export default function Step6Review({
           subtitle: 'Required before pickup. Unreset devices may delay your refund.',
         }
 
-  const refundMethodLabel = isWarranty
+  const refundMethodLabel = isWarranty || isReplacement
     ? null
     : state.refundMethod === 'wallet'
       ? 'Revibe Wallet'
@@ -97,9 +100,11 @@ export default function Step6Review({
         title={
           isWarranty
             ? 'Review your warranty claim'
-            : isCompensation
-              ? 'Review your compensation request'
-              : 'Review your return'
+            : isReplacement
+              ? 'Review your replacement'
+              : isCompensation
+                ? 'Review your compensation request'
+                : 'Review your return'
         }
         subtitle="Double-check before you submit. You can edit any section."
       />
@@ -262,6 +267,27 @@ export default function Step6Review({
                 </div>
                 <div className="text-[14px] font-semibold text-ink leading-[1.2] mt-1">
                   {warrantyEta?.long || '—'}
+                </div>
+              </div>
+            </div>
+          </Section>
+        ) : isReplacement ? (
+          <Section title="What you'll get back">
+            <div className="flex items-start gap-2.5">
+              <Package
+                size={13}
+                strokeWidth={1.75}
+                className="text-ink-2 mt-1 shrink-0"
+              />
+              <div className="min-w-0">
+                <div className="text-[13.5px] text-ink">The correct item</div>
+                <div className="text-[11.5px] text-muted mt-0.5 leading-[1.4]">
+                  No refund — once we receive the item you send back, we'll ship
+                  the correct one to you.
+                </div>
+                <div className="text-[11.5px] text-muted mt-1 leading-[1.4]">
+                  Subject to seller stock — if it's unavailable, we'll refund you
+                  instead.
                 </div>
               </div>
             </div>

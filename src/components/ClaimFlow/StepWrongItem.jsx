@@ -45,7 +45,7 @@ export default function StepWrongItem({ state, dispatch, error }) {
           ))}
         </div>
 
-        <Divider>or, if it's not actually the wrong item</Divider>
+        <Divider>or</Divider>
 
         <Row
           label="It's faulty or damaged, not the wrong item"

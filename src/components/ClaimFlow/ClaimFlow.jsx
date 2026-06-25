@@ -8,7 +8,7 @@ import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
 import Step1Situation from './Step1Situation'
 import Step2Reason, { tripwireFor } from './Step2Reason'
-import StepIssueCategory from './StepIssueCategory'
+import StepIssueCategory, { CATEGORY_COM_TRIP } from './StepIssueCategory'
 import StepIssueSpecific from './StepIssueSpecific'
 import StepRemedy from './StepRemedy'
 import StepWrongItem, { WRONG_ITEM_FAULT_TRIP } from './StepWrongItem'
@@ -81,6 +81,9 @@ export default function ClaimFlow({
     ) {
       return { situation: 'device_fault', scope: 'not_working' }
     }
+    if (state.step === 'category' && state.issueCategory === CATEGORY_COM_TRIP) {
+      return { situation: 'change_of_mind' }
+    }
     return null
   })()
 
@@ -132,7 +135,9 @@ export default function ClaimFlow({
       ? 'Submit warranty claim'
       : state.claimType === 'compensation'
         ? 'Submit compensation request'
-        : 'Submit return request'
+        : state.remedy === 'replacement'
+          ? 'Submit replacement request'
+          : 'Submit return request'
     : 'Continue'
   const primaryVariant = isReview ? 'success' : 'brand'
 
@@ -263,7 +268,9 @@ export default function ClaimFlow({
         dismissLabel={
           state.step === 'wrongitem'
             ? "No, it's the wrong item"
-            : "No, it's just a change of mind"
+            : state.step === 'category'
+              ? "No, something's wrong with it"
+              : "No, it's just a change of mind"
         }
         onConfirm={() => {
           setSwitchOpen(false)
@@ -280,6 +287,8 @@ export default function ClaimFlow({
             dispatch({ type: 'SET_REASON', value: { value: null } })
           } else if (state.step === 'wrongitem') {
             dispatch({ type: 'SET_ISSUE_SUBTYPE', scope: 'wrong_device', id: null })
+          } else if (state.step === 'category') {
+            dispatch({ type: 'SET_CATEGORY', value: null })
           }
         }}
       />
@@ -398,13 +407,19 @@ function buildClaim({ state, order, claimRef }) {
   }
 
   if (state.claimType === 'issue') {
-    return {
+    const issueBase = {
       ...base,
       issueDetails: { ...state.issueDetails },
       issueScope: state.issueScope,
       issueSubtypeId: state.issueSubtypeId,
       remedy: state.remedy,
       ...(batteryAssessment ? { batteryAssessment } : {}),
+    }
+    // Wrong-item replacement returns the correct device — no money moves, so no
+    // refund method or expected-refund block.
+    if (state.remedy === 'replacement') return issueBase
+    return {
+      ...issueBase,
       refundMethod: state.refundMethod,
       expectedRefund: refundBreakdown(
         order,

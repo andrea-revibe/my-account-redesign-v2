@@ -7,6 +7,7 @@ import {
   Clock,
   ShieldCheck,
   Wrench,
+  Package,
 } from 'lucide-react'
 import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
@@ -18,7 +19,9 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
   if (!order) return null
   const isWarranty = state.claimType === 'warranty'
   const isCompensation = state.claimType === 'compensation'
-  const refund = isWarranty || isCompensation
+  // Wrong-item replacement returns the correct device, not money.
+  const isReplacement = state.remedy === 'replacement'
+  const refund = isWarranty || isCompensation || isReplacement
     ? null
     : refundBreakdown(
         order,
@@ -57,7 +60,7 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
           Your request has been submitted
         </h1>
         <div className="mt-3 inline-flex items-center rounded-full bg-brand-bg text-brand font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px]">
-          {claimTypeLabel(state.claimType)}
+          {isReplacement ? 'Replacement' : claimTypeLabel(state.claimType)}
         </div>
         <p className="mt-3 text-[13.5px] leading-[1.45] text-muted">
           We'll email you the next steps shortly.
@@ -99,7 +102,7 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
           <Row Icon={Mail} title="Check your inbox">
             {isCompensation
               ? "We've sent your compensation request details to your email."
-              : `We've sent ${isWarranty ? 'warranty claim' : 'return'} instructions and your pickup details to your email.`}
+              : `We've sent ${isWarranty ? 'warranty claim' : isReplacement ? 'replacement' : 'return'} instructions and your pickup details to your email.`}
           </Row>
           {isCompensation ? (
             <Row Icon={Clock} title="Expected refund">
@@ -133,6 +136,18 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
               <span className="block mt-1 text-[12px] text-muted">
                 No refund is issued — the same device is returned to you after
                 repair.
+              </span>
+            </Row>
+          ) : isReplacement ? (
+            <Row Icon={Package} title="What you'll get back">
+              <span className="text-ink font-semibold">The correct item</span>
+              <span className="block mt-1 text-[12px] text-muted">
+                No refund — once we receive the item you send back, we'll ship
+                the correct one to you.
+              </span>
+              <span className="block mt-1 text-[12px] text-muted">
+                Subject to seller stock — if it's unavailable, we'll refund you
+                instead.
               </span>
             </Row>
           ) : (
@@ -192,9 +207,11 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
         >
           {isWarranty
             ? 'Track this claim'
-            : isCompensation
-              ? 'Track this compensation'
-              : 'Track this return'}
+            : isReplacement
+              ? 'Track this replacement'
+              : isCompensation
+                ? 'Track this compensation'
+                : 'Track this return'}
         </button>
       </div>
     </div>
