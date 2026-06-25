@@ -10,10 +10,11 @@ import {
   Zap,
   Clock,
 } from 'lucide-react'
-import { STATUSES, progressIndex, statusDescription } from '../lib/statuses'
+import { STATUSES, progressIndex, statusDescription, statusExplanation } from '../lib/statuses'
 import CancelOrderSheet from './CancelOrderSheet'
 import { ProductSummary } from './ProductSummary'
 import DeliveryAddressPill from './DeliveryAddressPill'
+import StatusExplainer from './StatusExplainer'
 import Timeline from './Timeline'
 
 const STATE_LABELS = {
@@ -64,7 +65,10 @@ export default function InProgressCard({ order, defaultExpanded = false, onCance
             <ChevronDown size={12} strokeWidth={1.75} />
           </span>
         </div>
-        <StatePill order={order} />
+        <StatusExplainer
+          pill={<StatePill order={order} />}
+          explanation={statusExplanation(order)}
+        />
 
         <ETAHero order={order} desc={desc} />
 

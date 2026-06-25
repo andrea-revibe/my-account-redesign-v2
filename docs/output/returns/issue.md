@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 38cdddd
+verified_against: 8fb818a
 covers:
   - src/components/ClaimFlow
   - src/components/RefundSplitRows.jsx
@@ -61,7 +61,7 @@ The shared "Why are you returning it?" picker — the same step the change-of-mi
 
 ### 2.3 Step 3 — Issue details (issue branch, required)
 
-A required structured-evidence form. `Skip` is hidden; the step gates on `issueSubtypeId` + non-empty description + a stubbed filename, surfaced one at a time via the flow-wide soft validation (`stepError` order: `subtype` → `description` → `attachment`; Continue never grays — see [change_of_mind.md](./change_of_mind.md) §2.1.1).
+A required structured-evidence form. `Skip` is hidden; the step gates on `issueSubtypeId` + a stubbed filename + non-empty description, surfaced one at a time via the flow-wide soft validation (`stepError` order: `subtype` → `attachment` → `description`; Continue never grays — see [change_of_mind.md](./change_of_mind.md) §2.1.1). The attachment precedes the description in the error order because the uploader sits **above** the description textarea in the redesigned layout — the error always lights the first unmet field in reading order.
 
 **Two-scope sub-issue picker.** Sourced from `src/components/ClaimFlow/issueSubtypes.js`:
 
@@ -72,22 +72,35 @@ A required structured-evidence form. `Skip` is hidden; the step gates on `issueS
 
 Scopes are mutually exclusive expandable sections; tapping a sub-issue commits the selection (`issueScope` + `issueSubtypeId`) and collapses the picker down to just the chosen row. The selected row shows only the optional `Try this first` preflight tip (e.g. "Have you tried a soft reset?"), rendered only when the sub-type defines one. It carries an `X` button that clears the selection and reopens the picker on the same scope so the user can pick again.
 
-The per-issue **`What we need`** evidence ask + the **`How to provide valid proof`** link have moved out of the selected-row panel and down into the **Photo or video of the issue** section (see below) — guidance now sits where the customer actually attaches proof.
+The per-issue evidence ask + the **`How to provide valid proof`** link live in the **`What good proof looks like`** evidence block (`IssueEvidence`, see below) — guidance sits where the customer actually attaches proof, above the uploader.
 
-**Description and attachment.** Below the picker:
+**Evidence block + description.** Below the picker, in reading order:
 
+- The **`What good proof looks like`** evidence section (`src/components/ClaimFlow/IssueEvidence.jsx`) — one reusable block shown for every sub-type. See §2.3.1.
+- The optional `BatteryHealthCheck` card (battery sub-type only — unchanged, see below).
 - A required free-text description (500-char max).
-- The **Photo or video of the issue** section. Once a sub-type is picked it leads with a brand-tinted `ProofGuidance` box — the sub-type's one-line `What we need` ask + a `How to provide valid proof` link — placed above the upload box. Before a sub-type is picked, the section shows just the upload box (no guidance).
-- A **fake** attachment slot — clicking the dashed drop-zone stubs in a filename; the prototype has no real file picker.
-- A warn-tinted banner reinforces that attachments are required (kept alongside the per-issue guidance).
+
+`IssueEvidence` owns the attachment, so the uploader now sits **above** the description (driving the `attachment → description` error order).
+
+### 2.3.1 Evidence block (`IssueEvidence`)
+
+One reusable proof component rendered for every issue/wrong-device sub-type. A single white **proof card** holds two labelled groups above the gated uploader:
+
+- **Group A — `For this issue`** (per-issue, data-driven). The sub-type's `need` ask, prefixed by a brand-tinted **media-type chip** (`Screenshot` / `Video` / `Photo` / `Voice memo`) resolved from `sub.mediaType` (the catch-all `other` has `mediaType: 'none'` → no chip). When the sub-type defines `examples`, an **`Approved examples`** strip renders captioned reference thumbnails of real valid proof (battery is seeded today — three images: two timestamped battery-% photos + the Battery Health screen; any sub-type can add `examples` by dropping files under `public/proof/<id>/`). The `physical` sub-type's amber `PhysicalConditionNote` (grade disclaimer) renders inside this group. Before a sub-type is picked, the group shows a placeholder ("Pick your issue above…") and the uploader is still shown.
+- **Group B — `For every return`** (universal, identical for every issue). A four-item photo checklist — Screen · Back & camera · Accessories · Packed safely — each with a thumbnail and one-line description (`MINIMUM_PROOF_ITEMS` in `IssueEvidence.jsx`, images under `public/proof/minimum-required/`).
+- One **`How to provide valid proof`** guide link below both groups, resolved per sub-type via `sub.proofGuideUrl` → `DEFAULT_PROOF_GUIDE_URL` fallback (see "Real proof-guide links" below).
+
+Every proof thumbnail is tappable → opens a **paging lightbox** (`ProofLightbox`) that cycles across all images in the card (Group A examples first, then the Group B checklist), with keyboard arrows / Escape.
+
+Below the card sits the single gated **`Add photos or video`** uploader: a dashed drop-zone with an inline `Required — claims without proof are often rejected or delayed` warn line (the standalone warn banner is gone — the reinforcement folds into the empty drop-zone). It's a **fake** slot — clicking stubs in a cycled filename; the prototype has no real file picker. Once attached it shows the filename + an `Add another` action; the `attachment` validation error reddens the drop-zone and shows *"Attach a photo or video — it's required."*
 
 **Real proof-guide links.** `How to provide valid proof` is a live `<a target="_blank">` (no longer a placeholder). It resolves per sub-type via `sub.proofGuideUrl`, falling back to `DEFAULT_PROOF_GUIDE_URL` ("how-to-show-us-your-issue") for any sub-type without its own article. Specific articles today: `battery` → battery-draining guide; `physical` → device-conditions guide; the four hardware sub-types (`camera` / `microphone` / `button` / `speaker`) share one `HARDWARE_PROOF_GUIDE_URL`. All defined in `issueSubtypes.js`.
 
-**Physical-condition disclaimer.** When `issueSubtypeId === 'physical'` and the device's condition grade (from `conditionGradeOf(order)`) is known and **not `excellent`** (i.e. very good / good / fair), an amber `PhysicalConditionNote` renders in the photo section beside the guidance. It names the grade ("Your device is graded **Good**…") and explains that some signs of previous use are expected at that grade and aren't treated as a defect. Renders nothing for Excellent-grade devices or when the grade can't be derived.
+**Physical-condition disclaimer.** When `issueSubtypeId === 'physical'` and the device's condition grade (from `conditionGradeOf(order)`) is known and **not `excellent`** (i.e. very good / good / fair), an amber `PhysicalConditionNote` renders inside Group A of the `IssueEvidence` card. It names the grade ("Your device is graded **Good**…") and explains that some signs of previous use are expected at that grade and aren't treated as a defect. Renders nothing for Excellent-grade devices or when the grade can't be derived.
 
 The pre-redesign flat `category` field is gone; `Step6Review`'s `IssueSummary` consumes `issueSubtypeId` (via `findSubtype(id)` in `issueSubtypes.js`) and `issueScope`.
 
-**Optional battery check (battery sub-type only).** When `issueSubtypeId === 'battery'`, a `BatteryHealthCheck` card renders under the selected-sub-type guidance (in both the issue **and** the warranty issue-details step — both reuse `Step2IssueDetails`). It lets the customer self-assess against the §7.2 Battery Standards before committing:
+**Optional battery check (battery sub-type only).** When `issueSubtypeId === 'battery'`, a `BatteryHealthCheck` card renders between the `IssueEvidence` block and the description (in both the issue **and** the warranty issue-details step — both reuse `Step2IssueDetails`). It lets the customer self-assess against the §7.2 Battery Standards before committing:
 
 - A **capacity %** input (the figure from Settings → Battery → Battery Health) and a **non-original part** self-report toggle. Both live in `state.batteryCheck` (`SET_BATTERY_CHECK`); **fully optional** — never gates `canAdvance`, so the customer can skip it and submit proof + description as usual.
 - The card derives the device's guaranteed floor from its condition grade (last segment of `product.variant`): `excellent` 95, `very good` 90, `good` 85, `fair` 85 (no published floor — treated as Good). Time-since-delivery comes from `deliveredOn`.
@@ -173,7 +186,9 @@ How the customer-facing UI surfaces backend state:
 
 **Two-scope picker, not a flat list.** Earlier drafts had a single 19-item list of sub-issues. Splitting into `Device not working as expected` (15) and `I received the wrong device` (4) reduced perceived overwhelm — most customers can predict which scope their issue lives in and only need to scan ~15 items, not 19. It also creates a natural place to attach scope-specific guidance later.
 
-**Per-sub-issue guidance, not a generic ask.** Once a sub-issue is picked, the panel shows what evidence is needed *for that specific issue* (`What we need` line). Generic asks ("Please provide photo evidence") got ignored. Specific asks ("A 30-second video showing the battery draining…") get followed.
+**Per-sub-issue guidance, not a generic ask.** Once a sub-issue is picked, the proof card shows what evidence is needed *for that specific issue* (`need` line + media-type chip). Generic asks ("Please provide photo evidence") got ignored. Specific asks ("A 30-second video showing the battery draining…") get followed.
+
+**Unified proof card with worked examples, not a guidance line + bare uploader.** Earlier drafts surfaced the per-issue ask as a thin brand-tinted box above the upload zone. It told the customer *what* to send but not *what good looks like*. The redesigned `IssueEvidence` card splits proof into two concepts — `For this issue` (per-issue ask + media-type chip + captioned **approved-example** thumbnails) and `For every return` (a universal 4-photo checklist: screen, back & camera, accessories, packed safely) — backed by real customer-proof images and a paging lightbox. The intent is to cut the rejected-evidence rate by showing concrete examples, not just describing them. The standalone warn banner collapsed into the empty drop-zone (one required reinforcement, not two).
 
 **Attachment is required, no submit without it.** Earlier drafts let the customer submit without a file. Ops spent half their time chasing customers for evidence. The requirement is enforced as the `attachment` gate in `stepError` (a Continue click with no file reddens the dropzone + shows *"Attach a photo or video — it's required."*) and reinforced by the warn-tinted banner above the slot.
 
@@ -214,12 +229,19 @@ Same shared components as change of mind. Issue-specific surfaces:
 
 ```
 src/components/ClaimFlow/
-├── Step2IssueDetails.jsx       Two-scope picker + required description + fake attachment slot.
+├── Step2IssueDetails.jsx       Two-scope picker (IssuePicker) + IssueEvidence + required description.
 │                               Private BatteryHealthCheck + BatteryVerdict + BatteryThresholds
 │                               render on the `battery` sub-type (also used by the warranty flow,
 │                               which reuses this component). Receives `order`.
-└── issueSubtypes.js            ISSUE_SCOPES (2) + SUBTYPES (15 + 4); findSubtype(id) resolver
+├── IssueEvidence.jsx           Unified proof card (Group A per-issue `need` + media chip + Approved
+│                               examples; Group B universal 4-photo checklist) + gated uploader +
+│                               paging ProofLightbox. Exported default; private ProofThumb /
+│                               PhysicalConditionNote / AttachedFile / UploadDropzone.
+└── issueSubtypes.js            ISSUE_SCOPES (2) + SUBTYPES (15 + 4); each sub-type carries `mediaType`
+                                + optional `examples`; findSubtype(id) resolver
 ```
+
+Proof images are static assets under `public/proof/<id>/` (per-issue examples) and `public/proof/minimum-required/` (the universal checklist).
 
 `refundBreakdown` (`src/lib/returns.js`) branches on the 4th argument (`claimType`); the issue branch flows through `case 'issue'`. The battery check's logic also lives in `src/lib/returns.js` (`BATTERY_BASELINE_BY_GRADE`, `conditionGradeOf`, `batteryBaselineFor`, `daysSinceDelivery`, `assessBattery`); `ClaimFlow.buildClaim` attaches the result via the private `batteryAssessmentForClaim(state, order)` helper.
 
@@ -228,7 +250,8 @@ src/components/ClaimFlow/
 - **Submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
 - **Attachment slot is fake.** Clicking the drop-zone stubs in a filename. No real file picker, no upload endpoint, no file-type/size validation.
 - **AED 100 bonus is hardcoded** as `ISSUE_WALLET_BONUS` in `src/lib/returns.js`. Production should read from a backend config (per-order or per-category).
-- **Sub-issue guidance copy is hardcoded** in `issueSubtypes.js`. Production should source from a content management system so non-engineers can revise.
+- **Sub-issue guidance copy + media-type chips are hardcoded** in `issueSubtypes.js` (`need`, `mediaType`, `examples`). Production should source from a content management system so non-engineers can revise.
+- **Approved-example + checklist images are static demo assets** under `public/proof/`. Only the `battery` sub-type has worked examples today; production should attach examples per sub-type from a content store, and the universal 4-photo checklist should reference the canonical packing/condition guidance images.
 - **No de-duplication / fraud check.** Production needs to flag repeat claimants and stop submission before it reaches ops.
 - **`Try this first` preflight steps are placeholders.** Real preflight scripts (factory reset, signal-strength check, charge-cycle test) need to be sourced from device-care content.
 - **Battery check is a customer-facing estimate, not a verified reading.** The capacity % is hand-typed (no Battery Health screenshot parsing / OCR), the condition grade is parsed from the `product.variant` string, and `deliveredOn` drives the time window. The verdict is advisory — `assessBattery` runs entirely client-side and the real eligibility is decided by QC. `claim.batteryAssessment` is captured but not surfaced on any tracking card / review screen / ops surface yet. Thresholds (3% / 10% / 20%, 10 days / 6 / 12 months) and grade baselines (95 / 90 / 85, fair→85) are hardcoded in `src/lib/returns.js` — production should source them from the same policy config as §7.2.

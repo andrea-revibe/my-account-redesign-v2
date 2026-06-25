@@ -282,8 +282,10 @@ export function stepError(state) {
     case 'issuedetails': {
       const id = state.issueDetails
       if (!state.issueSubtypeId) return 'subtype'
-      if (id.description.trim().length === 0) return 'description'
+      // Reading order: the uploader sits above the description textarea on
+      // this step, so surface a missing attachment before the description.
       if (!id.attachmentName) return 'attachment'
+      if (id.description.trim().length === 0) return 'description'
       return null
     }
     case 'compsubtype': {

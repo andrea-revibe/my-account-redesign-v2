@@ -16,6 +16,7 @@ import {
   claimPhaseTag,
   claimStatusHeadline,
   claimStatusSubline,
+  claimExplanation,
   claimTypeLabel,
   formatClaimRef,
   refundMethodLabel,
@@ -26,6 +27,7 @@ import ClaimDetailsSheet from './ClaimDetailsSheet'
 import OrderClaimLink from './OrderClaimLink'
 import ClaimActionBanner from './ClaimActionBanner'
 import HistoryThread from './HistoryThread'
+import StatusExplainer from './StatusExplainer'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
 import RefundSplitRows from './RefundSplitRows'
@@ -92,7 +94,10 @@ export default function ClaimCard({
             <ChevronDown size={12} strokeWidth={1.75} />
           </span>
         </div>
-        <StatePill claim={claim} tone={tone} />
+        <StatusExplainer
+          pill={<StatePill claim={claim} tone={tone} />}
+          explanation={claim.actionRequired ? null : claimExplanation(claim)}
+        />
         <ClaimHero order={order} claim={claim} tone={tone} onOpenWallet={onOpenWallet} />
         <ProductSummary order={order} />
       </button>

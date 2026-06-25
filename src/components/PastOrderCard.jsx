@@ -13,8 +13,9 @@ import {
   PackageCheck,
   RotateCcw,
 } from 'lucide-react'
-import { cancellationStepsFor } from '../lib/statuses'
+import { cancellationStepsFor, statusExplanation } from '../lib/statuses'
 import Timeline from './Timeline'
+import StatusExplainer from './StatusExplainer'
 import { getHistoryEvents } from '../lib/events'
 import RefundDetailsSheet from './RefundDetailsSheet'
 import RefundSplitRows from './RefundSplitRows'
@@ -172,7 +173,10 @@ function CancelledOrderCard({ order, onKeep, onOpenWallet }) {
             <ChevronDown size={12} strokeWidth={1.75} />
           </span>
         </div>
-        <StatePill cancellationStatusId={order.cancellationStatusId} />
+        <StatusExplainer
+          pill={<StatePill cancellationStatusId={order.cancellationStatusId} />}
+          explanation={statusExplanation(order)}
+        />
         <RefundHero order={order} onOpenWallet={onOpenWallet} />
         <ProductSummary order={order} />
       </button>

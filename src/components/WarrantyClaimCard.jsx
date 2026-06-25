@@ -15,6 +15,7 @@ import {
   warrantyClaimPhaseTag,
   warrantyClaimStatusHeadline,
   warrantyClaimStatusSubline,
+  warrantyClaimExplanation,
   claimTypeLabel,
   formatClaimRef,
   CLAIM_TRANSIT_SUB_STATUSES,
@@ -24,6 +25,7 @@ import { getHistoryEvents } from '../lib/events'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import OrderClaimLink from './OrderClaimLink'
 import HistoryThread from './HistoryThread'
+import StatusExplainer from './StatusExplainer'
 import { ProductSummary } from './ProductSummary'
 import Timeline from './Timeline'
 import DeliveryAddressPill from './DeliveryAddressPill'
@@ -96,7 +98,10 @@ export default function WarrantyClaimCard({
             <ChevronDown size={12} strokeWidth={1.75} />
           </span>
         </div>
-        <StatePill claim={claim} tone={tone} />
+        <StatusExplainer
+          pill={<StatePill claim={claim} tone={tone} />}
+          explanation={warrantyClaimExplanation(claim)}
+        />
         <WarrantyHero order={order} claim={claim} tone={tone} />
         <ProductSummary order={order} />
       </button>

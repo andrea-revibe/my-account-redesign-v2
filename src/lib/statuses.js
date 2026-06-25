@@ -248,6 +248,41 @@ const STATUS_DESCRIPTIONS = {
   },
 }
 
+// Plain-language stage definitions surfaced by the `StatusExplainer` inline
+// "Learn more" accordion under a card's status chip. Distinct in voice from
+// the condition-flavoured `statusDescription` banner ("On track · …"): these
+// answer "what does this stage mean?" generically. Only the stages that
+// actually route through the explainer are defined: `created` / `quality_check`
+// (InProgressCard) and the `cancellation_<id>` namespace (cancelled
+// PastOrderCard). `shipped` / `delivered` are intentionally absent — those
+// surfaces (OrderCard's banner, the delivered hero) explain themselves, so no
+// explainer renders there. Basic copy — tune freely.
+export const STATUS_EXPLANATIONS = {
+  created:
+    "Your order is confirmed and and soon we will start the quality check process.",
+  quality_check:
+    'Every device passes a 50-point inspection — Your device is being checked by our experts!',
+  cancellation_requested:
+    "We've received your cancellation and are confirming with the supplier that the device hasn't already been packed.",
+  cancellation_refund_pending:
+    "Your cancellation has been accepted - the order won't ship. We're now processing your refund on our end.",
+  cancellation_refunded:
+    'Your cancellation is complete and your refund has been issued. Funds can take up to 10 business days to appear depending on your payment method.',
+}
+
+// Resolves the stage definition for a card's current status: cancelled orders
+// read from the `cancellation_<id>` namespace, everything else by `statusId`.
+// Returns null when no definition exists (e.g. shipped / delivered, which
+// explain themselves elsewhere) — `StatusExplainer` then renders nothing.
+export function statusExplanation(order) {
+  if (order.state === 'cancelled') {
+    return (
+      STATUS_EXPLANATIONS[`cancellation_${order.cancellationStatusId}`] ?? null
+    )
+  }
+  return STATUS_EXPLANATIONS[order.statusId] ?? null
+}
+
 const DELAYED_BODY = {
   quality_check:
     'The inspection process is taking a bit longer than expected. Please hang tight.',

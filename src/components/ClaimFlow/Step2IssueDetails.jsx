@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Paperclip,
   X,
-  AlertTriangle,
-  FileImage,
   ChevronRight,
   ChevronDown,
   Lightbulb,
-  FileCheck,
-  ExternalLink,
   BatteryMedium,
   BatteryCharging,
   CheckCircle2,
@@ -17,13 +12,11 @@ import {
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
+import IssueEvidence from './IssueEvidence'
 import {
   ISSUE_SCOPES,
   NOT_WORKING_SUBTYPES,
   WRONG_DEVICE_SUBTYPES,
-  PROOF_GUIDE_LABEL,
-  DEFAULT_PROOF_GUIDE_URL,
-  scopeForSubtype,
   findSubtype,
 } from './issueSubtypes'
 import { assessBattery, conditionGradeOf } from '../../lib/returns'
@@ -33,21 +26,9 @@ const SUBTYPES_BY_SCOPE = {
   wrong_device: WRONG_DEVICE_SUBTYPES,
 }
 
-// Stub filenames cycled when the user "uploads" — there is no real file
-// picker in the prototype.
-const STUB_FILES = [
-  'IMG_proof_2614.jpg',
-  'video_evidence.mov',
-  'photo_back.heic',
-]
-
 export default function Step2IssueDetails({ state, dispatch, order, error }) {
-  const { description, attachmentName } = state.issueDetails
+  const { description } = state.issueDetails
   const { issueScope, issueSubtypeId } = state
-
-  const [openScope, setOpenScope] = useState(
-    issueScope || (issueSubtypeId ? scopeForSubtype(issueSubtypeId) : null),
-  )
 
   const selectedSubtype = issueSubtypeId ? findSubtype(issueSubtypeId) : null
 
@@ -58,19 +39,8 @@ export default function Step2IssueDetails({ state, dispatch, order, error }) {
     }
   }, [error])
 
-  const clearSelection = () => {
-    // Preserve the scope so the picker reopens on the same list
-    setOpenScope(issueScope || openScope)
+  const clearSelection = () =>
     dispatch({ type: 'SET_ISSUE_SUBTYPE', scope: null, id: null })
-  }
-
-  const pickStub = () => {
-    const idx = Math.floor(Math.random() * STUB_FILES.length)
-    dispatch({
-      type: 'SET_ISSUE_DETAILS',
-      value: { attachmentName: STUB_FILES[idx] },
-    })
-  }
 
   return (
     <>
@@ -86,84 +56,36 @@ export default function Step2IssueDetails({ state, dispatch, order, error }) {
         >
           <SectionLabel>What's the issue?</SectionLabel>
           {selectedSubtype ? (
-            <>
-              <SelectedSubtype sub={selectedSubtype} onRemove={clearSelection} />
-              {issueSubtypeId === 'battery' && order && (
-                <BatteryHealthCheck
-                  order={order}
-                  value={state.batteryCheck}
-                  onChange={(value) =>
-                    dispatch({ type: 'SET_BATTERY_CHECK', value })
-                  }
-                />
-              )}
-            </>
+            <SelectedSubtype sub={selectedSubtype} onRemove={clearSelection} />
           ) : (
-            <div className="flex flex-col gap-2">
-              {ISSUE_SCOPES.map((scope) => {
-                const isOpen = openScope === scope.id
-                const items = SUBTYPES_BY_SCOPE[scope.id]
-                return (
-                  <div key={scope.id} className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOpenScope(isOpen ? null : scope.id)}
-                      aria-expanded={isOpen}
-                      className={`w-full text-left rounded-[12px] border px-3.5 py-3 flex items-center gap-3 transition-colors ${
-                        isOpen
-                          ? 'border-line bg-line-2/40'
-                          : 'border-line bg-surface hover:bg-line-2/40'
-                      }`}
-                    >
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-[13.5px] font-semibold text-ink">
-                          {scope.label}
-                        </span>
-                        <span className="block text-[11.5px] text-muted mt-0.5">
-                          {scope.sub}
-                        </span>
-                      </span>
-                      {isOpen ? (
-                        <ChevronDown
-                          size={14}
-                          strokeWidth={1.75}
-                          className="text-muted shrink-0"
-                        />
-                      ) : (
-                        <ChevronRight
-                          size={14}
-                          strokeWidth={1.75}
-                          className="text-muted shrink-0"
-                        />
-                      )}
-                    </button>
-
-                    {isOpen && (
-                      <div className="pl-3 flex flex-col gap-1.5">
-                        {items.map((sub) => (
-                          <SubIssueRow
-                            key={sub.id}
-                            sub={sub}
-                            onSelect={() =>
-                              dispatch({
-                                type: 'SET_ISSUE_SUBTYPE',
-                                scope: scope.id,
-                                id: sub.id,
-                              })
-                            }
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            <IssuePicker
+              defaultOpen={!!issueScope}
+              onSelect={(scope, id) =>
+                dispatch({ type: 'SET_ISSUE_SUBTYPE', scope, id })
+              }
+            />
           )}
           {error === 'subtype' && (
             <InlineError>Select what's wrong to continue.</InlineError>
           )}
         </section>
+
+        <IssueEvidence
+          sub={selectedSubtype}
+          order={order}
+          state={state}
+          dispatch={dispatch}
+          error={error}
+          uploaderRef={error === 'attachment' ? errorRef : null}
+        />
+
+        {issueSubtypeId === 'battery' && order && (
+          <BatteryHealthCheck
+            order={order}
+            value={state.batteryCheck}
+            onChange={(value) => dispatch({ type: 'SET_BATTERY_CHECK', value })}
+          />
+        )}
 
         <section
           className="flex flex-col gap-2"
@@ -196,78 +118,6 @@ export default function Step2IssueDetails({ state, dispatch, order, error }) {
               {description.length}/500
             </div>
           </div>
-        </section>
-
-        <section
-          className="flex flex-col gap-2"
-          ref={error === 'attachment' ? errorRef : null}
-        >
-          <SectionLabel>Photo or video of the issue</SectionLabel>
-          {selectedSubtype && <ProofGuidance sub={selectedSubtype} />}
-          {issueSubtypeId === 'physical' && (
-            <PhysicalConditionNote order={order} />
-          )}
-          {attachmentName ? (
-            <div className="rounded-[12px] border border-line bg-surface px-3.5 py-3 flex items-center gap-3">
-              <span className="w-9 h-9 rounded-[10px] bg-brand-bg text-brand grid place-items-center shrink-0">
-                <FileImage size={16} strokeWidth={1.75} />
-              </span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[13.5px] font-semibold text-ink truncate">
-                  {attachmentName}
-                </span>
-                <span className="block text-[11.5px] text-muted">
-                  Attached
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: 'SET_ISSUE_DETAILS',
-                    value: { attachmentName: '' },
-                  })
-                }
-                aria-label="Remove attachment"
-                className="w-8 h-8 rounded-full grid place-items-center text-ink-2 hover:bg-line-2"
-              >
-                <X size={16} strokeWidth={1.75} />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={pickStub}
-              className={`w-full rounded-[12px] border-2 border-dashed bg-surface hover:bg-brand-bg/20 px-4 py-5 flex flex-col items-center gap-1.5 transition-colors ${
-                error === 'attachment'
-                  ? 'border-danger'
-                  : 'border-line hover:border-brand'
-              }`}
-            >
-              <span className="w-10 h-10 rounded-full bg-brand-bg text-brand grid place-items-center">
-                <Paperclip size={18} strokeWidth={1.75} />
-              </span>
-              <span className="text-[14px] font-semibold text-ink">
-                Add a photo or video
-              </span>
-              <span className="text-[11.5px] text-muted">
-                Up to 100 MB · JPG, PNG, MOV, MP4
-              </span>
-            </button>
-          )}
-          <div className="flex items-start gap-2 rounded-[12px] border border-warn-bg bg-warn-bg/60 px-3 py-2.5 text-[12px] text-ink leading-[1.4]">
-            <AlertTriangle
-              size={14}
-              strokeWidth={1.75}
-              className="text-warn shrink-0 mt-px"
-            />
-            <span>
-              Required — claims without proof are often rejected or delayed.
-            </span>
-          </div>
-          {error === 'attachment' && (
-            <InlineError>Attach a photo or video — it's required.</InlineError>
-          )}
         </section>
       </div>
     </>
@@ -326,56 +176,56 @@ function SelectedSubtype({ sub, onRemove }) {
   )
 }
 
-function ProofGuidance({ sub }) {
+// Single-row picker: one "Choose what's wrong…" trigger opening a combined,
+// scope-grouped list of every issue (replaces the old two-scope accordion).
+function IssuePicker({ defaultOpen = false, onSelect }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="rounded-[10px] border border-brand/30 bg-brand-bg/30 px-3 py-2.5 flex flex-col gap-2">
-      <div className="flex items-start gap-2">
-        <FileCheck
-          size={13}
-          strokeWidth={1.75}
-          className="text-ink-2 shrink-0 mt-0.5"
-        />
-        <div className="text-[11.5px] leading-[1.45] text-ink-2">
-          <span className="font-semibold text-ink">What we need.</span>{' '}
-          {sub.need}
-        </div>
-      </div>
-      <a
-        href={sub.proofGuideUrl || DEFAULT_PROOF_GUIDE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="self-start inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline"
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full text-left rounded-[12px] border border-line bg-surface hover:bg-line-2/40 px-3.5 py-3 flex items-center gap-3 transition-colors"
       >
-        {PROOF_GUIDE_LABEL}
-        <ExternalLink size={11} strokeWidth={2} />
-      </a>
+        <span className="flex-1 min-w-0 text-[13.5px] font-semibold text-muted">
+          Choose what's wrong…
+        </span>
+        {open ? (
+          <ChevronDown size={14} strokeWidth={1.75} className="text-muted shrink-0" />
+        ) : (
+          <ChevronRight size={14} strokeWidth={1.75} className="text-muted shrink-0" />
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3 rounded-[12px] border border-line bg-surface p-2.5 animate-slideDown">
+          {ISSUE_SCOPES.map((scope) => (
+            <div key={scope.id} className="flex flex-col gap-1.5">
+              <div className="px-1 text-[10px] font-bold uppercase tracking-[0.07em] text-muted">
+                {scope.label}
+              </div>
+              {SUBTYPES_BY_SCOPE[scope.id].map((sub) => (
+                <SubIssueRow
+                  key={sub.id}
+                  sub={sub}
+                  onSelect={() => onSelect(scope.id, sub.id)}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function PhysicalConditionNote({ order }) {
-  const grade = conditionGradeOf(order)
-  if (!grade || grade === 'excellent') return null
-  const gradeLabel = grade.charAt(0).toUpperCase() + grade.slice(1)
-  return (
-    <div className="flex items-start gap-2 rounded-[12px] border border-warn-bg bg-warn-bg/60 px-3 py-2.5 text-[12px] text-ink leading-[1.4]">
-      <AlertTriangle
-        size={14}
-        strokeWidth={1.75}
-        className="text-warn shrink-0 mt-px"
-      />
-      <span>
-        Your device is graded{' '}
-        <span className="font-semibold">{gradeLabel}</span>, so some signs of
-        previous use — light scratches or surface marks — are expected at this
-        grade and aren’t treated as a defect.
-      </span>
-    </div>
-  )
-}
-
+// Optional battery-eligibility helper for the `battery` subtype. Collapsed by
+// default behind a subtle icon-row trigger so it doesn't compete with the proof
+// examples; expands the capacity input + verdict inline (see issue.md §"Battery
+// check"). Toggle pattern mirrors IssuePicker / the guided-reset entry.
 function BatteryHealthCheck({ order, value, onChange }) {
   const { capacity, nonOriginal } = value
+  const [open, setOpen] = useState(false)
   const [showThresholds, setShowThresholds] = useState(false)
   const assessment = assessBattery({ order, capacity, nonOriginal })
   const { baseline, days } = assessment
@@ -384,18 +234,34 @@ function BatteryHealthCheck({ order, value, onChange }) {
   const showResult = nonOriginal || assessment.capacity != null
 
   return (
-    <section className="flex flex-col gap-2 mt-1">
-      <SectionLabel>
-        Battery check{' '}
-        <span className="text-muted font-medium normal-case tracking-normal">
-          · optional
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-3 rounded-[12px] border border-line bg-surface hover:bg-line-2/40 px-3.5 py-3 text-left transition-colors"
+      >
+        <span className="w-8 h-8 rounded-[9px] bg-brand-bg text-brand grid place-items-center shrink-0">
+          <BatteryMedium size={16} strokeWidth={1.75} />
         </span>
-      </SectionLabel>
-      <div className="rounded-[12px] border border-line bg-surface p-3.5 flex flex-col gap-3">
-        <div className="flex items-start gap-2.5">
-          <span className="w-9 h-9 rounded-[10px] bg-brand-bg text-brand grid place-items-center shrink-0">
-            <BatteryMedium size={16} strokeWidth={1.75} />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[13px] font-semibold text-ink">
+            Battery check <span className="text-muted font-medium">· optional</span>
           </span>
+          <span className="block text-[11.5px] text-muted mt-0.5">
+            Check your likely outcome before you submit.
+          </span>
+        </span>
+        <ChevronDown
+          size={16}
+          strokeWidth={2}
+          className="text-muted shrink-0 transition-transform"
+          style={{ transform: open ? 'rotate(180deg)' : 'none' }}
+        />
+      </button>
+
+      {open && (
+        <div className="rounded-[12px] border border-line bg-surface p-3.5 flex flex-col gap-3 animate-slideDown">
           <div className="text-[12px] leading-[1.45] text-ink-2">
             Enter the figure from{' '}
             <span className="font-semibold text-ink">
@@ -419,73 +285,73 @@ function BatteryHealthCheck({ order, value, onChange }) {
               </>
             )}
           </div>
-        </div>
 
-        <label className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 focus-within:border-brand">
-          <span className="text-[13px] text-ink-2 flex-1">
-            Current battery capacity
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={100}
-            value={capacity}
-            onChange={(e) =>
-              onChange({ capacity: e.target.value.replace(/[^0-9]/g, '').slice(0, 3) })
-            }
-            placeholder="—"
-            className="w-14 text-right bg-transparent text-[15px] font-semibold text-ink tabular-nums outline-none placeholder:text-muted"
-          />
-          <span className="text-[14px] font-semibold text-muted">%</span>
-        </label>
-
-        <button
-          type="button"
-          onClick={() => onChange({ nonOriginal: !nonOriginal })}
-          className="flex items-start gap-2.5 text-left"
-        >
-          <span
-            className={`mt-px w-[18px] h-[18px] rounded-[6px] border grid place-items-center shrink-0 transition-colors ${
-              nonOriginal
-                ? 'bg-brand border-brand text-white'
-                : 'border-line bg-surface'
-            }`}
-          >
-            {nonOriginal && <Check size={12} strokeWidth={3} />}
-          </span>
-          <span className="text-[12px] leading-[1.4] text-ink-2">
-            My phone shows a message that the{' '}
-            <span className="font-semibold text-ink">
-              battery or a part isn’t original
+          <label className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 focus-within:border-brand">
+            <span className="text-[13px] text-ink-2 flex-1">
+              Current battery capacity
             </span>
-            .
-          </span>
-        </button>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={100}
+              value={capacity}
+              onChange={(e) =>
+                onChange({ capacity: e.target.value.replace(/[^0-9]/g, '').slice(0, 3) })
+              }
+              placeholder="—"
+              className="w-14 text-right bg-transparent text-[15px] font-semibold text-ink tabular-nums outline-none placeholder:text-muted"
+            />
+            <span className="text-[14px] font-semibold text-muted">%</span>
+          </label>
 
-        {showResult && <BatteryVerdict assessment={assessment} />}
-
-        <div className="border-t border-line -mx-3.5 px-3.5 pt-2.5 -mb-0.5">
           <button
             type="button"
-            onClick={() => setShowThresholds((v) => !v)}
-            aria-expanded={showThresholds}
-            className="w-full flex items-center justify-between gap-2 text-left"
+            onClick={() => onChange({ nonOriginal: !nonOriginal })}
+            className="flex items-start gap-2.5 text-left"
           >
-            <span className="text-[12px] font-semibold text-ink-2">
-              What counts as a battery defect?
+            <span
+              className={`mt-px w-[18px] h-[18px] rounded-[6px] border grid place-items-center shrink-0 transition-colors ${
+                nonOriginal
+                  ? 'bg-brand border-brand text-white'
+                  : 'border-line bg-surface'
+              }`}
+            >
+              {nonOriginal && <Check size={12} strokeWidth={3} />}
             </span>
-            <ChevronDown
-              size={14}
-              strokeWidth={2}
-              className="text-muted shrink-0 transition-transform"
-              style={{ transform: showThresholds ? 'rotate(180deg)' : 'none' }}
-            />
+            <span className="text-[12px] leading-[1.4] text-ink-2">
+              My phone shows a message that the{' '}
+              <span className="font-semibold text-ink">
+                battery or a part isn’t original
+              </span>
+              .
+            </span>
           </button>
-          {showThresholds && <BatteryThresholds />}
+
+          {showResult && <BatteryVerdict assessment={assessment} />}
+
+          <div className="border-t border-line -mx-3.5 px-3.5 pt-2.5 -mb-0.5">
+            <button
+              type="button"
+              onClick={() => setShowThresholds((v) => !v)}
+              aria-expanded={showThresholds}
+              className="w-full flex items-center justify-between gap-2 text-left"
+            >
+              <span className="text-[12px] font-semibold text-ink-2">
+                What counts as a battery defect?
+              </span>
+              <ChevronDown
+                size={14}
+                strokeWidth={2}
+                className="text-muted shrink-0 transition-transform"
+                style={{ transform: showThresholds ? 'rotate(180deg)' : 'none' }}
+              />
+            </button>
+            {showThresholds && <BatteryThresholds />}
+          </div>
         </div>
-      </div>
-    </section>
+      )}
+    </div>
   )
 }
 
