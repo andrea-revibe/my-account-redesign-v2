@@ -169,7 +169,7 @@ export const CLAIM_ISSUE_NODES = [
         submittedAt: '25 May 2026 · 4:02 PM',
         units: 1,
         issueScope: 'not_working',
-        issueSubtypeId: 'battery',
+        issueSubtypeId: 'battery_drain',
         issueDetails: {
           category: 'battery',
           description:
@@ -220,7 +220,7 @@ export const CLAIM_ISSUE_NODES = [
         submittedAt: '25 May 2026 · 4:02 PM',
         units: 1,
         issueScope: 'not_working',
-        issueSubtypeId: 'battery',
+        issueSubtypeId: 'battery_drain',
         issueDetails: {
           category: 'battery',
           description:

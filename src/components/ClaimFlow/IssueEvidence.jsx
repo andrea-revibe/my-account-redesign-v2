@@ -12,7 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import InlineError from './InlineError'
-import { PROOF_GUIDE_LABEL, DEFAULT_PROOF_GUIDE_URL } from './issueSubtypes'
+import { PROOF_GUIDE_LABEL, DEFAULT_PROOF_GUIDE_URL } from './issueTaxonomy'
 import { conditionGradeOf } from '../../lib/returns'
 
 // Stub filenames cycled when the user "uploads" — there is no real file
@@ -126,7 +126,7 @@ export default function IssueEvidence({
               </div>
             )}
 
-            {sub?.id === 'physical' && <PhysicalConditionNote order={order} />}
+            {sub?.id === 'body' && <PhysicalConditionNote order={order} />}
 
             {examples.length > 0 && (
               <div className="flex flex-col gap-2 mt-0.5">

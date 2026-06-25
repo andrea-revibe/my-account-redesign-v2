@@ -17,14 +17,15 @@ import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
 import { expectedCompletionFor } from '../../lib/claims'
-import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
+import { findSpecificIssue } from './issueTaxonomy'
 import { PACKING_LABELS } from './Step4Packing'
 import { findCompensationSubtype } from './compensationSubtypes'
 import { REASON_LABELS } from './Step2Reason'
 
-const SCOPE_LABELS = Object.fromEntries(
-  ISSUE_SCOPES.map((s) => [s.id, s.label]),
-)
+const SCOPE_LABELS = {
+  not_working: 'Device fault',
+  wrong_device: 'Wrong item',
+}
 
 export default function Step6Review({
   state,
@@ -131,7 +132,7 @@ export default function Step6Review({
         </div>
 
         {isCompensation ? (
-          <Section title="What happened" onEdit={() => goTo('compsubtype')}>
+          <Section title="What happened" onEdit={() => goTo('compproblem')}>
             <CompensationSummary
               issueDetails={state.issueDetails}
               subtypeId={state.compensationSubtype}
@@ -140,7 +141,9 @@ export default function Step6Review({
         ) : isIssue || isWarranty ? (
           <Section
             title={isWarranty ? 'Fault' : 'Issue'}
-            onEdit={() => goTo('issuedetails')}
+            onEdit={() =>
+              goTo(state.situation === 'wrong_item' ? 'wrongitem' : 'specific')
+            }
           >
             <IssueSummary
               issueDetails={state.issueDetails}
@@ -495,7 +498,7 @@ function CompensationRefundBody({ refundMethod, order }) {
 
 function IssueSummary({ issueDetails, issueScope, issueSubtypeId }) {
   const { description, attachmentName } = issueDetails
-  const subtype = issueSubtypeId ? findSubtype(issueSubtypeId) : null
+  const subtype = issueSubtypeId ? findSpecificIssue(issueSubtypeId) : null
   const scopeLabel = issueScope ? SCOPE_LABELS[issueScope] : null
   return (
     <div className="flex flex-col gap-2.5">

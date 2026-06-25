@@ -5,6 +5,7 @@ import {
   FileImage,
   ChevronRight,
   FileCheck,
+  Info,
 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import StepHeading from './StepHeading'
@@ -43,8 +44,8 @@ export default function Step2Compensation({ state, dispatch, error }) {
   return (
     <>
       <StepHeading
-        title="What are you claiming for?"
-        subtitle="You keep the device — we'll review your evidence and refund you. Pick what happened and attach proof so our team can confirm the amount."
+        title="What's the problem?"
+        subtitle="You'll keep your device — we'll sort out the rest."
       />
 
       <div className="px-4 flex flex-col gap-4">
@@ -115,6 +116,14 @@ export default function Step2Compensation({ state, dispatch, error }) {
             <InlineError>Pick what happened to continue.</InlineError>
           )}
         </section>
+
+        <div className="flex items-start gap-2.5 rounded-[12px] border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12px] leading-[1.45] text-amber-900">
+          <Info size={15} strokeWidth={2} className="text-amber-600 shrink-0 mt-px" />
+          <span>
+            We'll raise a claim and an agent will review it — usually within 2
+            business days. Your device stays with you.
+          </span>
+        </div>
 
         <section
           className="flex flex-col gap-2"

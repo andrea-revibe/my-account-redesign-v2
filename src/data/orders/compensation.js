@@ -102,7 +102,7 @@ export const COMPENSATION_ORDERS = [
       type: 'compensation',
       submittedAt: '28 Apr 2026 · 9:05 AM',
       units: 1,
-      compensationSubtype: 'charger',
+      compensationSubtype: 'accessory_broken',
       issueDetails: {
         description:
           "The charger that came in the box doesn't charge the phone — tried two outlets and the original cable. Video attached showing it plugged in with no response.",
@@ -159,7 +159,7 @@ export const COMPENSATION_ORDERS = [
       type: 'compensation',
       submittedAt: '10 May 2026 · 11:30 AM',
       units: 1,
-      compensationSubtype: 'charger',
+      compensationSubtype: 'accessory_broken',
       issueDetails: {
         description:
           'The charger feels loose and stops charging when moved. Sending a short clip.',
