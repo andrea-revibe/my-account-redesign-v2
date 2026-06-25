@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 38cdddd
+verified_against: 8fb818a
 covers:
   - src/App.jsx
   - src/lib/claims.js

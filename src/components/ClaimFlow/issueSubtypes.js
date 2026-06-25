@@ -5,6 +5,11 @@
 // Each entry carries the minimum evidence we ask of the customer.
 // `tryFirst` is optional and used only where a quick self-check often
 // resolves the symptom before a return is needed.
+// `examples` is optional: captioned reference images of valid proof from
+// real claims, rendered under "What we need" (battery is seeded today; any
+// subtype can add an entry — drop files in public/proof/<id>/).
+// `mediaType` ('screenshot' | 'video' | 'photo' | 'voice' | 'none') drives the
+// media chip in the evidence card; 'none' (e.g. the catch-all `other`) shows none.
 
 export const PROOF_GUIDE_LABEL = 'How to provide valid proof'
 
@@ -33,18 +38,36 @@ export const NOT_WORKING_SUBTYPES = [
   {
     id: 'battery',
     label: 'Battery draining',
-    need: 'A screenshot of Settings → Battery → Battery Health showing the current capacity %.',
+    mediaType: 'screenshot',
+    need: 'A screenshot of Settings → Battery → Battery Health showing the current capacity %, plus two photos of the battery percentage taken about an hour apart so we can see how fast it drains.',
     proofGuideUrl:
       'https://help.revibe.me/en-US/battery-draining-960854?_gl=1*1m6h8ve*_gcl_au*MTU2NDEzOTE4NC4xNzMzOTgyMTY1*FPAU*MTU2NDEzOTE4NC4xNzMzOTgyMTY1*_ga*MTk2ODQ5NzkxNC4xNzMzOTgyMTY2*_ga_96V2M67WKP*MTczNDUxNDczNS4yLjEuMTczNDUxNjcwMS4wLjAuMTYzOTc5MzY0NA..*_fplc*VGI1bGF5YUI1SWxWcDBOQ3JxSzlnJTJGWFNJUDZYMlc1b0w2aExFTlk5ZFp3VmV4QkJJY3NkJTJGNzhXcHl6dnlJSmZ3U0lHUnpBRU54bWdXWlJOMldrV2I3b0clMkJyeElqMkZURWtGaThYQWJPWTZBcnhWak5lOFJTTnZoayUyQkpPY1ElM0QlM0Q.',
+    examples: [
+      {
+        caption:
+          'Two photos taken about an hour apart, showing how fast the battery % drops.',
+        images: [
+          '/proof/battery-draining/battery-draining-timestamp1.png',
+          '/proof/battery-draining/battery-draining-timstamp2.png',
+        ],
+      },
+      {
+        caption:
+          'The Battery Health screen — capacity %, plus any “battery isn’t genuine” warning.',
+        images: ['/proof/battery-draining/battery-health-report.png'],
+      },
+    ],
   },
   {
     id: 'software',
     label: 'Software issue',
+    mediaType: 'video',
     need: 'A short video of the issue, filmed with another device. If it can’t be filmed, describe when it happens and an agent will follow up.',
   },
   {
     id: 'physical',
     label: 'Physical condition',
+    mediaType: 'photo',
     need: 'A photo or short video of the damage, taken with another device. Show the affected area in good lighting.',
     proofGuideUrl:
       'https://help.revibe.me/en-US/what-are-revibe-device-conditions-352750',
@@ -52,6 +75,7 @@ export const NOT_WORKING_SUBTYPES = [
   {
     id: 'screen',
     label: 'Screen issue',
+    mediaType: 'video',
     tryFirst:
       'If touch feels unresponsive, raise Touch sensitivity in Settings first — this fixes the issue for some screen protectors.',
     need: 'If it persists, a short video of the issue filmed with another device.',
@@ -59,6 +83,7 @@ export const NOT_WORKING_SUBTYPES = [
   {
     id: 'charger',
     label: 'Defective charger',
+    mediaType: 'photo',
     tryFirst:
       'Use the charger that shipped with the device — third-party chargers can cause the same symptoms.',
     need: 'If charging still fails, a short video or photo taken with another device showing what happens.',
@@ -66,35 +91,41 @@ export const NOT_WORKING_SUBTYPES = [
   {
     id: 'overheating',
     label: 'Overheating',
+    mediaType: 'photo',
     need: 'Tell us when it overheats (charging, gaming, idle?). Photos or a short video help if you have them.',
   },
   {
     id: 'camera',
     label: 'Camera issue',
+    mediaType: 'video',
     need: 'A short video showing the camera fault, filmed with another device.',
     proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'microphone',
     label: 'Microphone issue',
+    mediaType: 'voice',
     need: 'A short voice memo or video where the microphone problem is audible.',
     proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'button',
     label: 'Button issue',
+    mediaType: 'video',
     need: 'A short video showing the unresponsive button, filmed with another device.',
     proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'speaker',
     label: 'Speaker issue',
+    mediaType: 'video',
     need: 'A short video where the speaker fault is audible, filmed with another device.',
     proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
   },
   {
     id: 'software_updates',
     label: 'Software updates not available',
+    mediaType: 'screenshot',
     tryFirst:
       'Check Settings → System → Software update first — updates can take a few days to reach every device.',
     need: 'If nothing appears, send a screenshot of that screen so we can check on our side.',
@@ -102,26 +133,31 @@ export const NOT_WORKING_SUBTYPES = [
   {
     id: 'language_not_supported',
     label: 'My language isn’t supported',
+    mediaType: 'screenshot',
     need: 'A screenshot of Settings → Languages showing the options available on the device.',
   },
   {
     id: 'international_version',
     label: 'International version limitation',
+    mediaType: 'screenshot',
     need: 'Tell us which feature is missing (e.g. Arabic input, a regional band). A screenshot of Settings → About or → Languages helps us confirm the variant.',
   },
   {
     id: 's_pen',
     label: 'S Pen not working or not attached',
+    mediaType: 'video',
     need: 'A short video showing the S Pen behaviour (or its absence), filmed with another device.',
   },
   {
     id: 'other_account',
     label: 'Phone is linked to another account',
+    mediaType: 'screenshot',
     need: 'A screenshot of the lock or activation screen showing the account prompt.',
   },
   {
     id: 'other',
     label: 'Something else',
+    mediaType: 'none',
     need: 'Describe what’s going on in your own words on the next step — an agent will pick it up and reach out.',
   },
 ]
@@ -130,21 +166,25 @@ export const WRONG_DEVICE_SUBTYPES = [
   {
     id: 'wrong_language',
     label: 'Wrong language',
+    mediaType: 'photo',
     need: 'A photo of the device showing the system language, taken with another device.',
   },
   {
     id: 'wrong_storage',
     label: 'Wrong storage',
+    mediaType: 'screenshot',
     need: 'A screenshot of Settings → About phone showing total storage capacity.',
   },
   {
     id: 'wrong_specs',
     label: 'Wrong specs',
+    mediaType: 'photo',
     need: 'A photo or screenshot showing the spec that doesn’t match — model number, RAM, region code, etc.',
   },
   {
     id: 'wrong_color',
     label: 'Wrong colour',
+    mediaType: 'photo',
     need: 'A clear photo of the device taken with another device, with the colour visible.',
   },
 ]
