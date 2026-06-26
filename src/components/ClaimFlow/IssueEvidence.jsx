@@ -6,6 +6,9 @@ import {
   FileImage,
   FileCheck,
   ShieldCheck,
+  CheckCircle2,
+  Lightbulb,
+  Info,
   ExternalLink,
   Maximize2,
   ChevronLeft,
@@ -19,14 +22,13 @@ import { conditionGradeOf } from '../../lib/returns'
 // picker in the prototype.
 const STUB_FILES = ['IMG_proof_2614.jpg', 'video_evidence.mov', 'photo_back.heic']
 
-// The per-issue media chip at the head of the "For this issue" group. Resolved
-// from the subtype's `mediaType`; 'none' (e.g. the catch-all `other`) shows none.
-const MEDIA_CHIP_LABELS = {
-  screenshot: 'Screenshot',
-  video: 'Video',
-  photo: 'Photo',
-  voice: 'Voice memo',
-  none: '',
+// The per-issue media chip(s) at the head of the "For this issue" group. Two
+// chip types only — Photo and Video. The catch-all ("Something else") issues
+// use `both` to show both, signalling either format is fine.
+const MEDIA_CHIPS = {
+  photo: ['Photo'],
+  video: ['Video'],
+  both: ['Photo', 'Video'],
 }
 
 // Universal "for every return" checklist — same four items for every issue.
@@ -90,7 +92,7 @@ export default function IssueEvidence({
   const removeAttachment = () =>
     dispatch({ type: 'SET_ISSUE_DETAILS', value: { attachmentName: '' } })
 
-  const chipLabel = sub ? MEDIA_CHIP_LABELS[sub.mediaType] || '' : ''
+  const chips = sub ? MEDIA_CHIPS[sub.mediaType] || [] : []
   const showError = error === 'attachment' && !attachmentName
 
   return (
@@ -111,11 +113,14 @@ export default function IssueEvidence({
               <span className="text-[10px] font-bold uppercase tracking-[0.07em] text-muted">
                 For this issue
               </span>
-              {chipLabel && (
-                <span className="text-[9.5px] font-bold uppercase tracking-[0.05em] text-brand bg-brand-bg2 rounded-full px-[7px] py-0.5 leading-[1.4]">
-                  {chipLabel}
+              {chips.map((c) => (
+                <span
+                  key={c}
+                  className="text-[9.5px] font-bold uppercase tracking-[0.05em] text-brand bg-brand-bg2 rounded-full px-[7px] py-0.5 leading-[1.4]"
+                >
+                  {c}
                 </span>
-              )}
+              ))}
             </div>
 
             {sub ? (
@@ -126,12 +131,49 @@ export default function IssueEvidence({
               </div>
             )}
 
+            {sub?.coverage && (
+              <div className="flex items-start gap-1.5 text-[11.5px] leading-[1.4] text-ink-2">
+                <CheckCircle2
+                  size={13}
+                  strokeWidth={2}
+                  className="text-success shrink-0 mt-px"
+                />
+                <span>
+                  <span className="font-semibold text-ink">When we cover this:</span>{' '}
+                  {sub.coverage}
+                </span>
+              </div>
+            )}
+
+            {sub?.tryFirst && (
+              <div className="flex items-start gap-1.5 rounded-[10px] bg-brand-bg/60 px-2.5 py-1.5 text-[11.5px] leading-[1.4] text-ink-2">
+                <Lightbulb
+                  size={13}
+                  strokeWidth={2}
+                  className="text-brand shrink-0 mt-px"
+                />
+                <span>
+                  <span className="font-semibold text-ink">Try this first:</span>{' '}
+                  {sub.tryFirst}
+                </span>
+              </div>
+            )}
+
             {sub?.id === 'body' && <PhysicalConditionNote order={order} />}
 
             {examples.length > 0 && (
               <div className="flex flex-col gap-2 mt-0.5">
-                <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-muted">
-                  Approved examples
+                <div className="flex items-center gap-2">
+                  <span className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-muted">
+                    {sub?.exampleKind === 'golden'
+                      ? 'Example of good proof'
+                      : 'Approved examples'}
+                  </span>
+                  {sub?.proofOptional && (
+                    <span className="text-[9px] font-bold uppercase tracking-[0.05em] text-muted bg-line-2 rounded-full px-[7px] py-0.5 leading-[1.4]">
+                      Optional
+                    </span>
+                  )}
                 </div>
                 {examples.map((ex, i) => (
                   <div key={i} className="flex items-center gap-2.5">
@@ -189,15 +231,16 @@ export default function IssueEvidence({
           </div>
         </div>
 
-        {/* single guide link */}
+        {/* Secondary, easy-to-skip guide link — inline guidance above is the
+            primary path; this is just a deep-reference for edge cases. */}
         <a
           href={(sub && sub.proofGuideUrl) || DEFAULT_PROOF_GUIDE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="self-start inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline"
+          className="self-start inline-flex items-center gap-1 text-[10.5px] font-medium text-muted hover:text-ink-2 hover:underline"
         >
           {PROOF_GUIDE_LABEL}
-          <ExternalLink size={11} strokeWidth={2} />
+          <ExternalLink size={10} strokeWidth={2} />
         </a>
       </div>
 
@@ -211,7 +254,11 @@ export default function IssueEvidence({
             onRemove={removeAttachment}
           />
         ) : (
-          <UploadDropzone onPick={pickStub} error={showError} />
+          <UploadDropzone
+            onPick={pickStub}
+            error={showError}
+            optional={sub?.proofOptional}
+          />
         )}
       </div>
       {showError && (
@@ -230,7 +277,7 @@ export default function IssueEvidence({
   )
 }
 
-function UploadDropzone({ onPick, error }) {
+function UploadDropzone({ onPick, error, optional }) {
   return (
     <button
       type="button"
@@ -244,11 +291,18 @@ function UploadDropzone({ onPick, error }) {
       </span>
       <span className="text-[14px] font-semibold text-ink">Add photos or video</span>
       <span className="text-[11.5px] text-muted">Up to 100 MB · JPG, PNG, MOV, MP4</span>
-      {!error && (
-        <span className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-semibold text-warn">
-          <AlertTriangle size={13} strokeWidth={1.9} />
-          Required — claims without proof are often rejected or delayed
+      {optional ? (
+        <span className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-semibold text-muted">
+          <Info size={13} strokeWidth={1.9} />
+          Optional for this issue — add proof only if you can capture it
         </span>
+      ) : (
+        !error && (
+          <span className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-semibold text-warn">
+            <AlertTriangle size={13} strokeWidth={1.9} />
+            Required — claims without proof are often rejected or delayed
+          </span>
+        )
       )}
     </button>
   )

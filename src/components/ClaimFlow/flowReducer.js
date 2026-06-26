@@ -1,5 +1,6 @@
 import { ORDERS } from '../../data/orders'
 import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
+import { findSpecificIssue } from './issueTaxonomy'
 
 // Situation-first flow (returns redesign). Screen 1 asks WHAT HAPPENED
 // (`situation`), not which remedy the customer wants. The remedy — and with
@@ -361,7 +362,10 @@ export function stepError(state) {
     // are validated here.
     case 'evidence': {
       const id = state.issueDetails
-      if (!id.attachmentName) return 'attachment'
+      // Some issues are hard to capture (e.g. overheating) — `proofOptional`
+      // lifts the attachment gate. Description stays required.
+      const proofOptional = findSpecificIssue(state.issueSubtypeId)?.proofOptional
+      if (!proofOptional && !id.attachmentName) return 'attachment'
       if (id.description.trim().length === 0) return 'description'
       return null
     }

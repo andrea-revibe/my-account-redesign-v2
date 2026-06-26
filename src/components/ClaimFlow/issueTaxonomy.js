@@ -51,6 +51,65 @@ const BATTERY_EXAMPLES = [
   },
 ]
 
+// Bespoke proof for the previous-owner passcode lock. Placeholder art today —
+// swap in the real lock-screen captures.
+const PASSCODE_EXAMPLES = [
+  {
+    caption:
+      'The login screen asking for the password — clear enough that the prompt and any account name are readable.',
+    images: [
+      '/proof/account-lock/account-lock.png',
+      '/proof/account-lock/account-lock2.png',
+    ],
+  },
+]
+
+// Bespoke proof for overheating — the iOS temperature-warning screen is the
+// clearest capturable symptom. Still optional (see proofOptional on the issue);
+// shown with an "Optional" chip.
+const OVERHEAT_EXAMPLES = [
+  {
+    caption:
+      'A temperature warning screen like this is ideal — but only if one appears. Otherwise just tell us when it overheats.',
+    images: ['/proof/overheating/overheating.png'],
+  },
+]
+
+// One "golden example" per category: the fallback proof shown when a specific
+// issue has no bespoke `examples` of its own (resolved by evidenceSubFor). The
+// caption leads with the one thing that makes proof verifiable for that *kind*
+// of issue (up-close damage, the on-screen error, the lock prompt…). Placeholder
+// art today — swap in real reference photos under public/proof/golden/.
+const GOLDEN_BATTERY = {
+  caption:
+    'A short video filmed with another device showing the symptom — what happens when you plug it in, or a close-up of any swelling. Keep the cable, port and screen in frame.',
+  images: ['/proof/golden/battery.png'],
+}
+const GOLDEN_SCREEN_BODY = {
+  caption:
+    'Up close and well-lit, from a few angles — fill the frame with the crack, scratch or gap so an agent can confirm the exact damage.',
+  images: [
+    '/proof/golden/screen-body.png',
+    '/proof/golden/screen-body2.png',
+    '/proof/golden/screen-body3.png',
+  ],
+}
+const GOLDEN_CAMERA_AUDIO = {
+  caption:
+    'A short video where the fault is visible or audible — e.g. filming a call so we can hear the mic or speaker problem.',
+  images: ['/proof/golden/camera-audio2.png'],
+}
+const GOLDEN_SOFTWARE = {
+  caption:
+    'Capture the symptom on screen — film the feature failing (here, a contactless / NFC scan) or screenshot the actual error message.',
+  images: ['/proof/golden/software.png', '/proof/golden/software2.png'],
+}
+const GOLDEN_ACCOUNT_LOCK = {
+  caption:
+    'A clear photo or screenshot of the exact lock or account prompt the device shows on startup — readable enough to see the account name.',
+  images: ['/proof/account-lock/account-lock2.png'],
+}
+
 // `something_else` is a category, not a list of radios — it's a free-text
 // capture (and, in production, a switch-trigger point). Modelled with
 // `freeText: true` so the specific screen renders a textarea instead.
@@ -59,11 +118,12 @@ export const ISSUE_CATEGORIES = [
     id: 'battery_power',
     label: 'Battery, charging & heat',
     icon: BatteryMedium,
+    goldenExample: GOLDEN_BATTERY,
     issues: [
       {
         id: 'battery_drain',
         label: 'Battery drains too fast',
-        mediaType: 'screenshot',
+        mediaType: 'photo',
         need: 'A screenshot of Settings → Battery → Battery Health showing the current capacity %, plus two photos of the battery percentage taken about an hour apart so we can see how fast it drains.',
         proofGuideUrl: BATTERY_PROOF_GUIDE_URL,
         examples: BATTERY_EXAMPLES,
@@ -80,12 +140,14 @@ export const ISSUE_CATEGORIES = [
         id: 'overheat',
         label: 'Gets too hot in use',
         mediaType: 'photo',
-        need: 'Tell us when it overheats (charging, gaming, idle?). Photos or a short video help if you have them.',
+        proofOptional: true,
+        need: 'Tell us when it overheats (charging, gaming, idle?). This one is hard to capture, so proof isn’t required — but a photo of any error or warning screen, or a short video, helps if you have one.',
+        examples: OVERHEAT_EXAMPLES,
       },
       {
         id: 'power_other',
         label: 'Something else with power',
-        mediaType: 'none',
+        mediaType: 'both',
         need: 'Describe what’s going on in your own words on the next step — an agent will pick it up and reach out.',
       },
     ],
@@ -94,6 +156,7 @@ export const ISSUE_CATEGORIES = [
     id: 'screen_body',
     label: 'Screen & physical condition',
     icon: Smartphone,
+    goldenExample: GOLDEN_SCREEN_BODY,
     issues: [
       {
         id: 'screen',
@@ -127,7 +190,7 @@ export const ISSUE_CATEGORIES = [
       {
         id: 'body_other',
         label: 'Something else with the body',
-        mediaType: 'none',
+        mediaType: 'both',
         need: 'Describe what’s going on in your own words on the next step — an agent will pick it up and reach out.',
       },
     ],
@@ -136,6 +199,7 @@ export const ISSUE_CATEGORIES = [
     id: 'camera_audio',
     label: 'Camera, mic & speaker',
     icon: Camera,
+    goldenExample: GOLDEN_CAMERA_AUDIO,
     issues: [
       {
         id: 'camera',
@@ -147,8 +211,8 @@ export const ISSUE_CATEGORIES = [
       {
         id: 'mic',
         label: 'Microphone issue',
-        mediaType: 'voice',
-        need: 'A short voice memo or video where the microphone problem is audible.',
+        mediaType: 'video',
+        need: 'A short video where the microphone problem is audible — film it so we can hear the fault.',
         proofGuideUrl: HARDWARE_PROOF_GUIDE_URL,
       },
       {
@@ -161,7 +225,7 @@ export const ISSUE_CATEGORIES = [
       {
         id: 'av_other',
         label: 'Something else with audio or camera',
-        mediaType: 'none',
+        mediaType: 'both',
         need: 'Describe what’s going on in your own words on the next step — an agent will pick it up and reach out.',
       },
     ],
@@ -170,6 +234,7 @@ export const ISSUE_CATEGORIES = [
     id: 'software_region',
     label: 'Software & region',
     icon: Cpu,
+    goldenExample: GOLDEN_SOFTWARE,
     issues: [
       {
         id: 'software_bug',
@@ -180,7 +245,7 @@ export const ISSUE_CATEGORIES = [
       {
         id: 'no_updates',
         label: 'Software updates not available',
-        mediaType: 'screenshot',
+        mediaType: 'photo',
         tryFirst:
           'Check Settings → System → Software update first — updates can take a few days to reach every device.',
         need: 'If nothing appears, send a screenshot of that screen so we can check on our side.',
@@ -188,19 +253,19 @@ export const ISSUE_CATEGORIES = [
       {
         id: 'language',
         label: "My language isn't supported",
-        mediaType: 'screenshot',
+        mediaType: 'photo',
         need: 'A screenshot of Settings → Languages showing the options available on the device.',
       },
       {
         id: 'intl_version',
         label: 'International-version limitation',
-        mediaType: 'screenshot',
+        mediaType: 'photo',
         need: 'Tell us which feature is missing (e.g. Arabic input, a regional band). A screenshot of Settings → About or → Languages helps us confirm the variant.',
       },
       {
         id: 'sw_other',
         label: 'Something else with software',
-        mediaType: 'none',
+        mediaType: 'both',
         need: 'Describe what’s going on in your own words on the next step — an agent will pick it up and reach out.',
       },
     ],
@@ -209,25 +274,31 @@ export const ISSUE_CATEGORIES = [
     id: 'account_lock',
     label: 'Account & activation lock',
     icon: Lock,
+    goldenExample: GOLDEN_ACCOUNT_LOCK,
     issues: [
       {
         id: 'linked_account',
         label: 'Linked to another account',
         // Brand-conditional copy resolved in resolveNeed / labelFor below
         // (iCloud on Apple, Google on Android).
-        mediaType: 'screenshot',
+        mediaType: 'photo',
         need: 'A screenshot of the lock or activation screen showing the account prompt.',
       },
       {
         id: 'prev_owner_pw',
         label: "Asks for a previous owner's password",
-        mediaType: 'screenshot',
-        need: 'A screenshot of the screen asking for the password, so we can see exactly what it requests.',
+        mediaType: 'photo',
+        need: 'A photo or screenshot of the screen asking for the password, so we can see exactly what it requests.',
+        coverage:
+          "We cover devices that arrive asking for a previous owner's passcode — as long as the prompt is visible in your proof and there's no physical damage.",
+        tryFirst:
+          "Try the common factory passcodes first — 1111, 0000 or 1234. If none unlock it, continue and we'll take it from here.",
+        examples: PASSCODE_EXAMPLES,
       },
       {
         id: 'lock_other',
         label: 'Something else with the account',
-        mediaType: 'none',
+        mediaType: 'both',
         need: 'Describe what’s going on in your own words on the next step — an agent will pick it up and reach out.',
       },
     ],
@@ -253,7 +324,7 @@ export const WRONG_ITEM_DETAILS = [
   {
     id: 'wrong_storage',
     label: 'Wrong storage',
-    mediaType: 'screenshot',
+    mediaType: 'photo',
     need: 'A screenshot of Settings → About phone showing total storage capacity.',
   },
   {
@@ -277,7 +348,7 @@ export const SOMETHING_ELSE_ID = 'something_else'
 const SOMETHING_ELSE_ENTRY = {
   id: SOMETHING_ELSE_ID,
   label: 'Something else',
-  mediaType: 'none',
+  mediaType: 'both',
   need: 'Describe what’s going on in your own words — an agent will pick it up and reach out. Add a photo or video if you have one.',
 }
 
@@ -293,6 +364,14 @@ export function categoryById(id) {
 
 export function findSpecificIssue(id) {
   return ALL_ISSUES.find((s) => s.id === id) || null
+}
+
+// The category a specific issue belongs to — used to resolve the category
+// "golden example" fallback. Returns null for wrong-item details and the
+// free-text something_else entry, which carry no category golden (they fall
+// through to the universal checklist).
+export function categoryForIssue(id) {
+  return ISSUE_CATEGORIES.find((c) => c.issues.some((i) => i.id === id)) || null
 }
 
 // Scope the issue belongs to — the contract buildClaim + the review summary
@@ -332,16 +411,27 @@ export function resolveNeed(issue, order) {
   if (!issue) return null
   if (issue.id === 'linked_account') {
     return deviceOsForOrder(order) === 'ios'
-      ? 'A screenshot of the Activation Lock screen showing the “iPhone is linked to an Apple Account” prompt.'
-      : 'A screenshot of the Factory Reset Protection screen showing the Google account it’s asking for.'
+      ? 'A photo of the Activation Lock screen showing the “iPhone is linked to an Apple Account” prompt.'
+      : 'A photo of the Factory Reset Protection screen showing the Google account it’s asking for.'
   }
   return issue.need
 }
 
 // The IssueEvidence-ready `sub` object for a chosen specific issue, with copy
-// resolved for the order's device.
+// resolved for the order's device and the proof examples resolved via the
+// tiered fallback: the issue's own bespoke `examples` if it has any, else its
+// category's `goldenExample`, else none (the universal checklist still shows).
+// `exampleKind` lets the card label the strip ('specific' vs 'golden').
 export function evidenceSubFor(issueId, order) {
   const issue = findSpecificIssue(issueId)
   if (!issue) return null
-  return { ...issue, need: resolveNeed(issue, order), label: labelForIssue(issue, order) }
+  const bespoke = issue.examples?.length ? issue.examples : null
+  const golden = bespoke ? null : categoryForIssue(issueId)?.goldenExample || null
+  return {
+    ...issue,
+    need: resolveNeed(issue, order),
+    label: labelForIssue(issue, order),
+    examples: bespoke || (golden ? [golden] : []),
+    exampleKind: bespoke ? 'specific' : golden ? 'golden' : null,
+  }
 }
