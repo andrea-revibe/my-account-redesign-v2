@@ -161,7 +161,7 @@ export const CLAIM_WARRANTY_NODES = [
         submittedAt: '25 May 2026 · 4:02 PM',
         units: 1,
         issueScope: 'not_working',
-        issueSubtypeId: 'battery',
+        issueSubtypeId: 'battery_drain',
         issueDetails: {
           description:
             'Battery drains in under 4 hours of light use, even after a factory reset.',

@@ -1,22 +1,31 @@
-// Sub-cases shown under Step 1 → "Request compensation". The customer
-// keeps the device — the outcome is always a refund, never a return.
-// Each entry carries the evidence we ask for so QC can assess the amount.
-import { Truck, PlugZap } from 'lucide-react'
+// "Keeping the device" branch (RETURNS-FLOW-SPEC §4 D). The customer keeps the
+// device; an agent reviews the claim and the outcome is a refund/credit, never
+// a return. Three triggers: a missing accessory, a broken accessory (the
+// charger that left the device-fault list lands here), and a shipping refund.
+// Each carries the evidence we ask for so QC can assess the amount.
+import { PackageX, PlugZap, Truck } from 'lucide-react'
 
 export const COMPENSATION_SUBTYPES = [
   {
+    id: 'accessory_missing',
+    label: 'An accessory is missing',
+    sub: 'Something that should have been in the box wasn’t',
+    icon: PackageX,
+    need: 'A photo of everything that came in the box, so we can see what’s missing.',
+  },
+  {
+    id: 'accessory_broken',
+    label: 'An accessory is broken',
+    sub: 'e.g. the charger or cable is faulty',
+    icon: PlugZap,
+    need: 'A short video or photo, filmed with another device, showing the accessory failing to work.',
+  },
+  {
     id: 'shipping_refund',
-    label: 'Refund my shipping cost',
+    label: 'I was charged for shipping',
     sub: 'You were charged shipping you shouldn’t have paid',
     icon: Truck,
     need: 'A screenshot or photo of the order confirmation or receipt showing the shipping charge.',
-  },
-  {
-    id: 'charger',
-    label: 'Charger not working',
-    sub: 'The device is fine — the charger is faulty',
-    icon: PlugZap,
-    need: 'A short video or photo, filmed with another device, showing the charger failing to charge.',
   },
 ]
 

@@ -17,14 +17,15 @@ import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
 import { expectedCompletionFor } from '../../lib/claims'
-import { findSubtype, ISSUE_SCOPES } from './issueSubtypes'
+import { findSpecificIssue } from './issueTaxonomy'
 import { PACKING_LABELS } from './Step4Packing'
 import { findCompensationSubtype } from './compensationSubtypes'
 import { REASON_LABELS } from './Step2Reason'
 
-const SCOPE_LABELS = Object.fromEntries(
-  ISSUE_SCOPES.map((s) => [s.id, s.label]),
-)
+const SCOPE_LABELS = {
+  not_working: 'Device fault',
+  wrong_device: 'Wrong item',
+}
 
 export default function Step6Review({
   state,
@@ -37,7 +38,10 @@ export default function Step6Review({
   const isIssue = state.claimType === 'issue'
   const isWarranty = state.claimType === 'warranty'
   const isCompensation = state.claimType === 'compensation'
-  const refund = isWarranty || isCompensation
+  // Wrong-item replacement rides the issue pipeline but returns the correct
+  // device rather than money — no refund method, no refund amount.
+  const isReplacement = state.remedy === 'replacement'
+  const refund = isWarranty || isCompensation || isReplacement
     ? null
     : refundBreakdown(
         order,
@@ -74,7 +78,7 @@ export default function Step6Review({
           subtitle: 'Required before pickup. Unreset devices may delay your refund.',
         }
 
-  const refundMethodLabel = isWarranty
+  const refundMethodLabel = isWarranty || isReplacement
     ? null
     : state.refundMethod === 'wallet'
       ? 'Revibe Wallet'
@@ -96,9 +100,11 @@ export default function Step6Review({
         title={
           isWarranty
             ? 'Review your warranty claim'
-            : isCompensation
-              ? 'Review your compensation request'
-              : 'Review your return'
+            : isReplacement
+              ? 'Review your replacement'
+              : isCompensation
+                ? 'Review your compensation request'
+                : 'Review your return'
         }
         subtitle="Double-check before you submit. You can edit any section."
       />
@@ -131,7 +137,7 @@ export default function Step6Review({
         </div>
 
         {isCompensation ? (
-          <Section title="What happened" onEdit={() => goTo('compsubtype')}>
+          <Section title="What happened" onEdit={() => goTo('compproblem')}>
             <CompensationSummary
               issueDetails={state.issueDetails}
               subtypeId={state.compensationSubtype}
@@ -140,7 +146,9 @@ export default function Step6Review({
         ) : isIssue || isWarranty ? (
           <Section
             title={isWarranty ? 'Fault' : 'Issue'}
-            onEdit={() => goTo('issuedetails')}
+            onEdit={() =>
+              goTo(state.situation === 'wrong_item' ? 'wrongitem' : 'specific')
+            }
           >
             <IssueSummary
               issueDetails={state.issueDetails}
@@ -259,6 +267,27 @@ export default function Step6Review({
                 </div>
                 <div className="text-[14px] font-semibold text-ink leading-[1.2] mt-1">
                   {warrantyEta?.long || '—'}
+                </div>
+              </div>
+            </div>
+          </Section>
+        ) : isReplacement ? (
+          <Section title="What you'll get back">
+            <div className="flex items-start gap-2.5">
+              <Package
+                size={13}
+                strokeWidth={1.75}
+                className="text-ink-2 mt-1 shrink-0"
+              />
+              <div className="min-w-0">
+                <div className="text-[13.5px] text-ink">The correct item</div>
+                <div className="text-[11.5px] text-muted mt-0.5 leading-[1.4]">
+                  No refund — once we receive the item you send back, we'll ship
+                  the correct one to you.
+                </div>
+                <div className="text-[11.5px] text-muted mt-1 leading-[1.4]">
+                  Subject to seller stock — if it's unavailable, we'll refund you
+                  instead.
                 </div>
               </div>
             </div>
@@ -495,7 +524,7 @@ function CompensationRefundBody({ refundMethod, order }) {
 
 function IssueSummary({ issueDetails, issueScope, issueSubtypeId }) {
   const { description, attachmentName } = issueDetails
-  const subtype = issueSubtypeId ? findSubtype(issueSubtypeId) : null
+  const subtype = issueSubtypeId ? findSpecificIssue(issueSubtypeId) : null
   const scopeLabel = issueScope ? SCOPE_LABELS[issueScope] : null
   return (
     <div className="flex flex-col gap-2.5">

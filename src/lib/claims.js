@@ -497,14 +497,15 @@ export function warrantyClaimExplanation(claim) {
 // genuine change-of-mind reasons can reach a submitted claim — the faulty /
 // wrong-item reasons redirect into the issue flow and never persist here.
 export const REASON_LABELS = {
-  no_fit: "Didn't suit my needs",
-  expectations: "Didn't meet my expectations",
-  better_option: 'Found a better option elsewhere',
-  not_needed: 'No longer needed',
+  didnt_suit: "Didn't suit my needs",
+  not_expected: 'Not what I expected',
+  found_better: 'Found a better option',
+  no_longer_needed: 'No longer need it',
+  ordered_mistake: 'Ordered by mistake',
   arrived_late: 'Arrived too late',
-  mistake: 'Ordered by mistake',
+  // Legacy alias for seeded change-of-mind mocks (the picker no longer offers a
+  // generic "changed my mind" reason — see Step2Reason).
   changed_mind: 'Changed my mind',
-  other: 'Other',
 }
 
 export function reasonText(claim) {

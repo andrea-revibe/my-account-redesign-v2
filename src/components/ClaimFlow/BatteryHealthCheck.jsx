@@ -1,229 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
-  X,
-  ChevronRight,
   ChevronDown,
-  Lightbulb,
   BatteryMedium,
   BatteryCharging,
   CheckCircle2,
   Info,
   Check,
 } from 'lucide-react'
-import StepHeading from './StepHeading'
-import InlineError from './InlineError'
-import IssueEvidence from './IssueEvidence'
-import {
-  ISSUE_SCOPES,
-  NOT_WORKING_SUBTYPES,
-  WRONG_DEVICE_SUBTYPES,
-  findSubtype,
-} from './issueSubtypes'
 import { assessBattery, conditionGradeOf } from '../../lib/returns'
 
-const SUBTYPES_BY_SCOPE = {
-  not_working: NOT_WORKING_SUBTYPES,
-  wrong_device: WRONG_DEVICE_SUBTYPES,
-}
-
-export default function Step2IssueDetails({ state, dispatch, order, error }) {
-  const { description } = state.issueDetails
-  const { issueScope, issueSubtypeId } = state
-
-  const selectedSubtype = issueSubtypeId ? findSubtype(issueSubtypeId) : null
-
-  const errorRef = useRef(null)
-  useEffect(() => {
-    if (error && errorRef.current) {
-      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [error])
-
-  const clearSelection = () =>
-    dispatch({ type: 'SET_ISSUE_SUBTYPE', scope: null, id: null })
-
-  return (
-    <>
-      <StepHeading
-        title="Tell us what went wrong"
-        subtitle="Pick what matches your situation, describe it briefly, and attach a photo or short video so quality check knows what to look for."
-      />
-
-      <div className="px-4 flex flex-col gap-4">
-        <section
-          className="flex flex-col gap-2"
-          ref={error === 'subtype' ? errorRef : null}
-        >
-          <SectionLabel>What's the issue?</SectionLabel>
-          {selectedSubtype ? (
-            <SelectedSubtype sub={selectedSubtype} onRemove={clearSelection} />
-          ) : (
-            <IssuePicker
-              defaultOpen={!!issueScope}
-              onSelect={(scope, id) =>
-                dispatch({ type: 'SET_ISSUE_SUBTYPE', scope, id })
-              }
-            />
-          )}
-          {error === 'subtype' && (
-            <InlineError>Select what's wrong to continue.</InlineError>
-          )}
-        </section>
-
-        <IssueEvidence
-          sub={selectedSubtype}
-          order={order}
-          state={state}
-          dispatch={dispatch}
-          error={error}
-          uploaderRef={error === 'attachment' ? errorRef : null}
-        />
-
-        {issueSubtypeId === 'battery' && order && (
-          <BatteryHealthCheck
-            order={order}
-            value={state.batteryCheck}
-            onChange={(value) => dispatch({ type: 'SET_BATTERY_CHECK', value })}
-          />
-        )}
-
-        <section
-          className="flex flex-col gap-2"
-          ref={error === 'description' ? errorRef : null}
-        >
-          <SectionLabel>Describe the issue</SectionLabel>
-          <textarea
-            value={description}
-            maxLength={500}
-            onChange={(e) =>
-              dispatch({
-                type: 'SET_ISSUE_DETAILS',
-                value: { description: e.target.value },
-              })
-            }
-            placeholder="What happens, when it started, anything you've already tried…"
-            className={`w-full rounded-[12px] border bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted resize-none min-h-[112px] outline-none ${
-              error === 'description'
-                ? 'border-danger focus:border-danger'
-                : 'border-line focus:border-brand'
-            }`}
-          />
-          <div className="flex items-center justify-between gap-2">
-            {error === 'description' ? (
-              <InlineError>Add a short description so quality check knows what to look for.</InlineError>
-            ) : (
-              <span />
-            )}
-            <div className="text-right text-[11px] text-muted tabular-nums shrink-0">
-              {description.length}/500
-            </div>
-          </div>
-        </section>
-      </div>
-    </>
-  )
-}
-
-function SubIssueRow({ sub, onSelect }) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="w-full text-left rounded-[10px] border border-line bg-surface hover:bg-line-2/40 px-3 py-2.5 flex items-center gap-2 transition-colors"
-    >
-      <span className="block flex-1 min-w-0 text-[13px] text-ink-2">
-        {sub.label}
-      </span>
-      <ChevronRight
-        size={12}
-        strokeWidth={1.75}
-        className="text-muted shrink-0"
-      />
-    </button>
-  )
-}
-
-function SelectedSubtype({ sub, onRemove }) {
-  return (
-    <div className="flex flex-col">
-      <div className="w-full rounded-[12px] border border-brand bg-brand-bg/50 px-3.5 py-3 flex items-center gap-2">
-        <span className="block flex-1 min-w-0 text-[13.5px] font-semibold text-ink">
-          {sub.label}
-        </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Change selection"
-          className="w-7 h-7 rounded-full grid place-items-center text-ink-2 hover:bg-line-2 shrink-0"
-        >
-          <X size={15} strokeWidth={1.75} />
-        </button>
-      </div>
-      {sub.tryFirst && (
-        <div className="mt-1.5 rounded-[10px] border border-brand/30 bg-brand-bg/30 px-3 py-2.5 flex items-start gap-2">
-          <Lightbulb
-            size={13}
-            strokeWidth={1.75}
-            className="text-ink-2 shrink-0 mt-0.5"
-          />
-          <div className="text-[11.5px] leading-[1.45] text-ink-2">
-            <span className="font-semibold text-ink">Try this first.</span>{' '}
-            {sub.tryFirst}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Single-row picker: one "Choose what's wrong…" trigger opening a combined,
-// scope-grouped list of every issue (replaces the old two-scope accordion).
-function IssuePicker({ defaultOpen = false, onSelect }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="w-full text-left rounded-[12px] border border-line bg-surface hover:bg-line-2/40 px-3.5 py-3 flex items-center gap-3 transition-colors"
-      >
-        <span className="flex-1 min-w-0 text-[13.5px] font-semibold text-muted">
-          Choose what's wrong…
-        </span>
-        {open ? (
-          <ChevronDown size={14} strokeWidth={1.75} className="text-muted shrink-0" />
-        ) : (
-          <ChevronRight size={14} strokeWidth={1.75} className="text-muted shrink-0" />
-        )}
-      </button>
-      {open && (
-        <div className="flex flex-col gap-3 rounded-[12px] border border-line bg-surface p-2.5 animate-slideDown">
-          {ISSUE_SCOPES.map((scope) => (
-            <div key={scope.id} className="flex flex-col gap-1.5">
-              <div className="px-1 text-[10px] font-bold uppercase tracking-[0.07em] text-muted">
-                {scope.label}
-              </div>
-              {SUBTYPES_BY_SCOPE[scope.id].map((sub) => (
-                <SubIssueRow
-                  key={sub.id}
-                  sub={sub}
-                  onSelect={() => onSelect(scope.id, sub.id)}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Optional battery-eligibility helper for the `battery` subtype. Collapsed by
-// default behind a subtle icon-row trigger so it doesn't compete with the proof
-// examples; expands the capacity input + verdict inline (see issue.md §"Battery
-// check"). Toggle pattern mirrors IssuePicker / the guided-reset entry.
-function BatteryHealthCheck({ order, value, onChange }) {
+// Optional battery-eligibility helper for the battery-drain issue. Collapsed by
+// default behind a subtle icon-row trigger; expands the capacity input + verdict
+// inline (see issue.md §"Battery check"). Never gates progression. Extracted
+// from the old combined issue-details screen for reuse on the evidence step.
+export default function BatteryHealthCheck({ order, value, onChange }) {
   const { capacity, nonOriginal } = value
   const [open, setOpen] = useState(false)
   const [showThresholds, setShowThresholds] = useState(false)
@@ -464,14 +254,6 @@ function BatteryVerdict({ assessment }) {
       <div className="text-[10.5px] text-muted leading-[1.4] pl-[23px]">
         Estimate only — final eligibility is confirmed by quality check after inspection.
       </div>
-    </div>
-  )
-}
-
-function SectionLabel({ children }) {
-  return (
-    <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
-      {children}
     </div>
   )
 }

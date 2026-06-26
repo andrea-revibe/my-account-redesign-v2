@@ -196,7 +196,7 @@ export const CLAIM_COMPENSATION_NODES = [
         type: 'compensation',
         submittedAt: '25 May 2026 · 4:02 PM',
         units: 1,
-        compensationSubtype: 'charger',
+        compensationSubtype: 'accessory_broken',
         issueDetails: {
           description:
             "The charger that came in the box doesn't charge the phone — tried two outlets and the original cable. Video attached showing it plugged in with no response.",

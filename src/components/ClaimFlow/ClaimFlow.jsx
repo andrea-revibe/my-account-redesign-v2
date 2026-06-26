@@ -6,14 +6,14 @@ import { generateClaimRef, refundBreakdown, assessBattery } from '../../lib/retu
 import { expectedCompletionFor } from '../../lib/claims'
 import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
-import Step1ClaimType from './Step1ClaimType'
-import Step2Reason, {
-  routeForReason,
-  scopeForReason,
-  isRemedyChoice,
-} from './Step2Reason'
+import Step1Situation from './Step1Situation'
+import Step2Reason, { tripwireFor } from './Step2Reason'
+import StepIssueCategory, { CATEGORY_COM_TRIP } from './StepIssueCategory'
+import StepIssueSpecific from './StepIssueSpecific'
+import StepRemedy from './StepRemedy'
+import StepWrongItem, { WRONG_ITEM_FAULT_TRIP } from './StepWrongItem'
+import StepEvidence from './StepEvidence'
 import SwitchFlowSheet from './SwitchFlowSheet'
-import Step2IssueDetails from './Step2IssueDetails'
 import Step2Compensation from './Step2Compensation'
 import Step3DevicePrep from './Step3DevicePrep'
 import Step4Packing from './Step4Packing'
@@ -38,7 +38,7 @@ export default function ClaimFlow({
   // every step-changing action clears it in the same dispatch — so the next
   // step never flashes its errors before the user tries to advance.
 
-  // Tracks the redirect sheet so Escape closes the sheet (its own handler)
+  // Tracks the switch sheet so Escape closes the sheet (its own handler)
   // without also tearing down the whole flow here.
   const switchOpenRef = useRef(false)
 
@@ -63,49 +63,31 @@ export default function ClaimFlow({
 
   const isConfirmation = state.step === 'confirm' && state.claimRef
   const isReview = state.step === 'review'
-  const onReasonStep = state.step === 'reason'
 
-  // The reason picker is the router: each reason resolves to a track. When
-  // that track differs from the flow the customer is in, a confirm sheet
-  // intercepts Continue and offers to switch; when it matches, Continue
-  // advances within the current flow. ROUTE_FROM_REASON carries the target +
-  // any pre-filled issue scope either way.
+  // A tripwire selection signals the customer is in the wrong branch — Continue
+  // opens the smart "switch?" sheet to the target situation instead of
+  // advancing. Branch A (a fault/wrong-item reason) and branch C (a fault-like
+  // wrong-item description) both feed it.
   const [switchOpen, setSwitchOpen] = useState(false)
   switchOpenRef.current = switchOpen
-  const reasonTarget = onReasonStep && state.reason.value
-    ? routeForReason(state.reason.value, state.claimType, order)
-    : null
-  const reasonIsSwitch = Boolean(reasonTarget && reasonTarget !== state.claimType)
-  // A fault reason caught in the change-of-mind flow doesn't pick a track for
-  // the customer — the sheet opens in choice mode (refund vs replacement).
-  const reasonIsChoice =
-    onReasonStep && state.reason.value
-      ? isRemedyChoice(state.reason.value, state.claimType)
-      : false
-
-  const routeTo = (target) =>
-    dispatch({
-      type: 'ROUTE_FROM_REASON',
-      target,
-      scope: scopeForReason(state.reason.value),
-    })
+  const pendingSwitch = (() => {
+    if (state.step === 'reason' && state.reason.value) {
+      const t = tripwireFor(state.reason.value)
+      return t ? { situation: t.situation, scope: t.scope } : null
+    }
+    if (
+      state.step === 'wrongitem' &&
+      state.issueSubtypeId === WRONG_ITEM_FAULT_TRIP
+    ) {
+      return { situation: 'device_fault', scope: 'not_working' }
+    }
+    if (state.step === 'category' && state.issueCategory === CATEGORY_COM_TRIP) {
+      return { situation: 'change_of_mind' }
+    }
+    return null
+  })()
 
   const handlePrimary = () => {
-    if (onReasonStep) {
-      if (stepError(state)) {
-        dispatch({ type: 'ATTEMPT' })
-        return
-      }
-      // Mismatched reason → confirm the redirect in a sheet before leaving the
-      // step (choice mode forks refund vs replacement; single mode confirms one
-      // switch). Matching reason → advance straight away.
-      if (reasonIsChoice || reasonIsSwitch) {
-        setSwitchOpen(true)
-        return
-      }
-      routeTo(reasonTarget)
-      return
-    }
     if (isReview) {
       // Compensation keeps the device — no factory-reset / packing acks to
       // gate on. Refund + warranty flows still require both.
@@ -130,13 +112,18 @@ export default function ClaimFlow({
       dispatch({ type: 'ATTEMPT' })
       return
     }
+    // A tripwire selection opens the switch sheet rather than advancing.
+    if (pendingSwitch) {
+      setSwitchOpen(true)
+      return
+    }
     dispatch({ type: 'NEXT' })
   }
 
   const errorKey = state.attempted ? stepError(state) : null
 
   const handleBack = () => {
-    if (state.step === 'type' || isConfirmation) {
+    if (state.step === 'situation' || isConfirmation) {
       onClose()
       return
     }
@@ -148,7 +135,9 @@ export default function ClaimFlow({
       ? 'Submit warranty claim'
       : state.claimType === 'compensation'
         ? 'Submit compensation request'
-        : 'Submit return request'
+        : state.remedy === 'replacement'
+          ? 'Submit replacement request'
+          : 'Submit return request'
     : 'Continue'
   const primaryVariant = isReview ? 'success' : 'brand'
 
@@ -165,7 +154,7 @@ export default function ClaimFlow({
             <div className="flex items-center px-2 pt-3 pb-2">
               <button
                 type="button"
-                aria-label={state.step === 'type' ? 'Close' : 'Back'}
+                aria-label={state.step === 'situation' ? 'Close' : 'Back'}
                 onClick={handleBack}
                 className="w-9 h-9 rounded-full grid place-items-center text-ink hover:bg-line-2"
               >
@@ -181,26 +170,43 @@ export default function ClaimFlow({
                 <X size={18} strokeWidth={1.75} />
               </button>
             </div>
-            <ProgressBar step={state.step} claimType={state.claimType} />
+            <ProgressBar state={state} />
           </header>
         )}
 
         <main className="flex-1 overflow-y-auto pb-4">
-          {state.step === 'type' && (
-            <Step1ClaimType state={state} dispatch={dispatch} error={errorKey} />
+          {state.step === 'situation' && (
+            <Step1Situation state={state} dispatch={dispatch} error={errorKey} />
           )}
           {state.step === 'reason' && (
             <Step2Reason state={state} dispatch={dispatch} error={errorKey} />
           )}
-          {state.step === 'issuedetails' && (
-            <Step2IssueDetails
+          {state.step === 'category' && (
+            <StepIssueCategory state={state} dispatch={dispatch} error={errorKey} />
+          )}
+          {state.step === 'specific' && (
+            <StepIssueSpecific
               state={state}
               dispatch={dispatch}
               order={order}
               error={errorKey}
             />
           )}
-          {state.step === 'compsubtype' && (
+          {state.step === 'wrongitem' && (
+            <StepWrongItem state={state} dispatch={dispatch} error={errorKey} />
+          )}
+          {state.step === 'remedy' && (
+            <StepRemedy state={state} dispatch={dispatch} error={errorKey} />
+          )}
+          {state.step === 'evidence' && (
+            <StepEvidence
+              state={state}
+              dispatch={dispatch}
+              order={order}
+              error={errorKey}
+            />
+          )}
+          {state.step === 'compproblem' && (
             <Step2Compensation state={state} dispatch={dispatch} error={errorKey} />
           )}
           {state.step === 'deviceprep' && (
@@ -257,18 +263,34 @@ export default function ClaimFlow({
 
       <SwitchFlowSheet
         open={switchOpen}
-        target={reasonTarget}
+        situation={pendingSwitch?.situation}
         order={order}
-        choice={reasonIsChoice}
+        dismissLabel={
+          state.step === 'wrongitem'
+            ? "No, it's the wrong item"
+            : state.step === 'category'
+              ? "No, something's wrong with it"
+              : "No, it's just a change of mind"
+        }
         onConfirm={() => {
           setSwitchOpen(false)
-          routeTo(reasonTarget)
+          dispatch({
+            type: 'SWITCH_SITUATION',
+            value: pendingSwitch.situation,
+            scope: pendingSwitch.scope,
+          })
         }}
-        onChoose={(target) => {
+        onClose={() => {
           setSwitchOpen(false)
-          routeTo(target)
+          // Declining clears the tripwire selection and stays (AC4).
+          if (state.step === 'reason') {
+            dispatch({ type: 'SET_REASON', value: { value: null } })
+          } else if (state.step === 'wrongitem') {
+            dispatch({ type: 'SET_ISSUE_SUBTYPE', scope: 'wrong_device', id: null })
+          } else if (state.step === 'category') {
+            dispatch({ type: 'SET_CATEGORY', value: null })
+          }
         }}
-        onClose={() => setSwitchOpen(false)}
       />
     </div>
   )
@@ -314,7 +336,7 @@ function formatScheduledPickup(today = new Date()) {
 // filled in for a battery sub-type. Data only — no tracking-card surface
 // reads it yet (see docs/output/returns/issue.md §battery check).
 function batteryAssessmentForClaim(state, order) {
-  if (state.issueSubtypeId !== 'battery') return null
+  if (state.issueSubtypeId !== 'battery_drain') return null
   const { capacity, nonOriginal } = state.batteryCheck
   const filled = nonOriginal || (capacity !== '' && capacity != null)
   if (!filled) return null
@@ -385,12 +407,19 @@ function buildClaim({ state, order, claimRef }) {
   }
 
   if (state.claimType === 'issue') {
-    return {
+    const issueBase = {
       ...base,
       issueDetails: { ...state.issueDetails },
       issueScope: state.issueScope,
       issueSubtypeId: state.issueSubtypeId,
+      remedy: state.remedy,
       ...(batteryAssessment ? { batteryAssessment } : {}),
+    }
+    // Wrong-item replacement returns the correct device — no money moves, so no
+    // refund method or expected-refund block.
+    if (state.remedy === 'replacement') return issueBase
+    return {
+      ...issueBase,
       refundMethod: state.refundMethod,
       expectedRefund: refundBreakdown(
         order,
@@ -410,6 +439,7 @@ function buildClaim({ state, order, claimRef }) {
     issueDetails: { ...state.issueDetails },
     issueScope: state.issueScope,
     issueSubtypeId: state.issueSubtypeId,
+    remedy: state.remedy,
     ...(batteryAssessment ? { batteryAssessment } : {}),
     repairWindow: {
       expectedComplete: eta.short,
