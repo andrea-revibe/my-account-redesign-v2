@@ -229,9 +229,10 @@ function Callout() {
       </span>
       <p className="text-[12.5px] text-ink leading-[1.45]">
         <span className="font-semibold text-ink">
-          Unlock the device before we can refund you.
+          Reset the device before we can refund you.
         </span>{' '}
-        We can't access its data — this lets it be reset and resold.
+        If it reaches us still locked, your refund may be delayed and a fee
+        deducted.
       </p>
     </div>
   )

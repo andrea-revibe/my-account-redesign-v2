@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: edad8a0
+verified_against: f424e5e
 covers:
   - src/lib/devices.js
   - src/components/ClaimFlow/Step3DevicePrep.jsx
@@ -79,7 +79,7 @@ This is the **only** manual device input in the whole flow.
 
 ## 4. The Step 3 surface — `Step3DevicePrep.jsx`
 
-Layout, top to bottom: a warn **`Callout`** (unlock before refund), the **`TabletPicker`** (ambiguous only), the **`HeroLauncher`**, the **`ResetOffRamps`** disclosure, a **`SafetyNote`** (your iCloud/Google backup stays safe — the screen's emotional crux), and the **`ConfirmGate`**.
+Layout, top to bottom: a warn **`Callout`** (reset before refund — also warns that a device arriving still locked may have its refund delayed and a fee deducted), the **`TabletPicker`** (ambiguous only), the **`HeroLauncher`**, the **`ResetOffRamps`** disclosure, a **`SafetyNote`** (your iCloud/Google backup stays safe — the screen's emotional crux), and the **`ConfirmGate`**.
 
 - **`HeroLauncher`** has three tones: `default` (brand purple, meta chips `~10 min` · `{stepCount} simple steps`, where `stepCount` is 4 for Android else 3), `done` (green, "Guided reset completed", tap to re-run), and `error` (red + `animate-shakeX`). It also dims (`opacity-55 grayscale`) when the never-set-up skip is checked.
 - **`ResetOffRamps`** — a single collapsed-by-default **"Can't run the guided reset?"** disclosure (bordered button row, `HelpCircle` + chevron) that folds away the two off-ramps from the normal on-device reset, replacing what used to be two always-on text blocks (see §5). Expanding reveals, in order:
@@ -96,6 +96,7 @@ A device that was never set up has no account linked and nothing to erase, so th
 - **Gate** — `stepError`'s `deviceprep` case short-circuits to `null` (step satisfied) at the top when `claimType === 'change_of_mind' && dp.neverSetUp`, before the `resetGuide` / `resetConfirm` checks. No new error key: if the box is left unticked the normal reset error still applies, since reset stays the default expectation.
 - **UI when checked** — the `HeroLauncher` dims, and the `SafetyNote` + reset `ConfirmGate` are hidden (the attestation is now the gate). The disclosure stays force-expanded so the ticked attestation is visible. Unticking restores the reset path.
 - **Downstream** — `neverSetUp` rides into the seeded claim (`devicePrep` is spread in `ClaimFlow.jsx`). It's checked **before** the `option === 'reset'` branch in `devicePrepText` (`lib/claims.js`, → "Not set up — no reset needed"), `Step6Review` (summary + ack card), and `Step7Confirmation`.
+- **Charge caveat on the Review acks** — the Step 6 device-prep ack subtitles carry an amber (`text-warn`) warning that a device arriving still locked may be delayed and charged a fee, on **both** the factory-reset ack and this never-set-up ack (the latter's neutral "no account is linked…" lead-in was dropped, leaving only the amber line). The seeded unlink/passcode ack stays neutral. Mirrors the Step 3 `Callout` (§4).
 
 ## Mocked vs production
 

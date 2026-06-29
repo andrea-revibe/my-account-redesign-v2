@@ -66,7 +66,13 @@ export default function Step6Review({
   const devicePrepAck = isNeverSetUp
     ? {
         title: 'This device was never set up.',
-        subtitle: 'No account is linked, so no reset is needed before pickup.',
+        subtitle: (
+          <span className="text-warn">
+            If it reaches us still locked, your claim{' '}
+            <span className="font-semibold">may be delayed and charged a fee</span>
+            .
+          </span>
+        ),
       }
     : isUnlinkPath
       ? {
@@ -75,7 +81,13 @@ export default function Step6Review({
         }
       : {
           title: 'I have factory reset my device.',
-          subtitle: 'Required before pickup. Unreset devices may delay your refund.',
+          subtitle: (
+            <span className="text-warn">
+              Required before pickup. Unreset devices{' '}
+              <span className="font-semibold">may be delayed and charged a fee</span>
+              .
+            </span>
+          ),
         }
 
   const refundMethodLabel = isWarranty || isReplacement
