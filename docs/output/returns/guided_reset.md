@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: f424e5e
+verified_against: cc39517
 covers:
   - src/lib/devices.js
   - src/components/ClaimFlow/Step3DevicePrep.jsx

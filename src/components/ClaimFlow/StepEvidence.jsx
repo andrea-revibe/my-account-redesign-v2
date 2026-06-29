@@ -28,14 +28,7 @@ export default function StepEvidence({ state, dispatch, order, error }) {
       />
 
       <div className="px-4 flex flex-col gap-4">
-        <IssueEvidence
-          sub={sub}
-          order={order}
-          state={state}
-          dispatch={dispatch}
-          error={error}
-          uploaderRef={error === 'attachment' ? errorRef : null}
-        />
+        <IssueEvidence sub={sub} order={order} state={state} dispatch={dispatch} />
 
         {state.issueSubtypeId === 'battery_drain' && order && (
           <BatteryHealthCheck

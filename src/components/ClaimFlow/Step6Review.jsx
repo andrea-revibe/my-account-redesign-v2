@@ -535,17 +535,15 @@ function CompensationRefundBody({ refundMethod, order }) {
 }
 
 function IssueSummary({ issueDetails, issueScope, issueSubtypeId }) {
-  const { description, attachmentName } = issueDetails
+  const { description, proofSlots = {} } = issueDetails
+  const proofList = Object.values(proofSlots)
   const subtype = issueSubtypeId ? findSpecificIssue(issueSubtypeId) : null
   const scopeLabel = issueScope ? SCOPE_LABELS[issueScope] : null
   return (
     <div className="flex flex-col gap-2.5">
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
-          Issue
-        </div>
         <div
-          className={`mt-0.5 text-[13.5px] leading-[1.4] ${
+          className={`text-[13.5px] leading-[1.4] ${
             subtype ? 'text-ink' : 'text-muted italic'
           }`}
         >
@@ -569,18 +567,25 @@ function IssueSummary({ issueDetails, issueScope, issueSubtypeId }) {
       </div>
       <div>
         <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
-          Attachment
+          Proof
         </div>
-        {attachmentName ? (
-          <div className="mt-1 inline-flex items-center gap-2 rounded-[10px] border border-line bg-line-2/40 px-2.5 py-1.5 max-w-full">
-            <FileImage
-              size={12}
-              strokeWidth={1.75}
-              className="text-brand shrink-0"
-            />
-            <span className="text-[12.5px] text-ink truncate">
-              {attachmentName}
-            </span>
+        {proofList.length ? (
+          <div className="mt-1 flex flex-col gap-1.5">
+            {proofList.map((p, i) => (
+              <div
+                key={i}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-line bg-line-2/40 px-2.5 py-1.5 max-w-full"
+              >
+                <FileImage
+                  size={12}
+                  strokeWidth={1.75}
+                  className="text-brand shrink-0"
+                />
+                <span className="text-[12px] text-ink truncate">
+                  <span className="font-semibold">{p.label}</span> · {p.filename}
+                </span>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="mt-0.5 text-[13.5px] text-muted italic">
