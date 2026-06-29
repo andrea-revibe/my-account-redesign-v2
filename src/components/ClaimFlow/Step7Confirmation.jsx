@@ -13,6 +13,7 @@ import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
 import { claimTypeLabel, expectedCompletionFor, formatClaimRef } from '../../lib/claims'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
+import NpsSurvey from '../NpsSurvey'
 
 export default function Step7Confirmation({ state, order, onClose, onTrack }) {
   const [copied, setCopied] = useState(false)
@@ -190,6 +191,10 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
             </Row>
           )}
         </div>
+      </div>
+
+      <div className="px-4 pb-4">
+        <NpsSurvey />
       </div>
 
       <div className="mt-auto sticky bottom-0 bg-surface border-t border-line px-4 py-3 flex gap-2">

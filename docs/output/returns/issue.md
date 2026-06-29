@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: e000edd
+verified_against: cc39517
 covers:
   - src/components/ClaimFlow
   - src/components/RefundSplitRows.jsx
@@ -22,7 +22,7 @@ The issue branch is the entry point used when something is wrong with the delive
 
 Distinguishing characteristics vs change of mind:
 
-- The customer arrives by picking a fault/wrong-item **situation** on Screen 1, then describes it: `device_fault` → `category` → `specific` → `remedy`; `wrong_item` → `wrongitem` → `remedy`. The `remedy` fork is where the downstream `claimType` resolves (`device_fault`: refund→issue / repair→warranty; `wrong_item`: refund→issue / replacement→issue). After the fork, an `evidence` step collects the required structured proof (the specific issue is already chosen, so it gates only attachment + description).
+- The customer arrives by picking a fault/wrong-item **situation** on Screen 1, then describes it: `device_fault` → `category` → `specific` → `remedy`; `wrong_item` → `wrongitem` → `remedy`. The `remedy` fork is where the downstream `claimType` resolves (`device_fault`: refund→issue / repair→warranty; `wrong_item`: refund→issue / replacement→issue). After the fork, an `evidence` step collects structured proof via guided slotted capture (the specific issue is already chosen, so it gates only the description — proof is advisory, warned not gated).
 - No restocking fee on the original-payment path.
 - A flat AED 100 Wallet bonus (`ISSUE_WALLET_BONUS`) is added on the Wallet path — the implicit framing is "we owe you because something went wrong, and we'd like you to stay in the ecosystem".
 - The operational flow has a single repair-supplier route (Original supplier) regardless of country, vs change-of-mind's three-way country split.
@@ -43,7 +43,7 @@ flowchart TD
   rem -->|repair → warranty| warranty[/Warranty branch — warranties_compensations.md §2/]
   rem -->|refund → issue| ev[evidence]
   rem2 -->|refund or replacement → issue| ev
-  ev -->|Attachment + description| prep[Device prep → packing → pickup]
+  ev -->|Proof + description| prep[Device prep → packing → pickup]
   prep --> refund[Refund method · skipped on replacement/repair]
   refund --> review[Review & submit]
   review --> done[Confirmation]
@@ -79,15 +79,20 @@ A charger is an accessory, not a device fault, so it's **not** in this taxonomy 
 
 ### 2.3 `evidence` — Show us the issue (issue / warranty)
 
-After the remedy fork, both refund-issue and warranty-repair walk an `evidence` step (`StepEvidence`). The specific issue is **already chosen** upstream, so this step only gates the proof + description — `stepError` order `attachment` → `description` (the uploader sits above the textarea, so the error lights the first unmet field in reading order). **The `attachment` gate is lifted for a `proofOptional` issue** (hard to capture, e.g. `overheat`) — `stepError` reads `findSpecificIssue(issueSubtypeId)?.proofOptional` and skips it; the description stays required. Continue never grays (§2.1.1 in [change_of_mind.md](./change_of_mind.md)). Contents, top to bottom:
+After the remedy fork, both refund-issue and warranty-repair walk an `evidence` step (`StepEvidence`). The specific issue is **already chosen** upstream, so this step gates only the **description** (`stepError` returns `description`); proof is now **advisory** — the guided slotted capture surfaces a soft "missing proof" warning but never blocks Continue (the old `attachment` gate, and the `proofOptional` lift, are gone). Continue never grays (§2.1.1 in [change_of_mind.md](./change_of_mind.md)). Contents, top to bottom:
 
 - The **`What good proof looks like`** evidence block (`IssueEvidence`) — the `sub` it renders is resolved via `evidenceSubFor(issueSubtypeId, order)`, which folds in the OS-adapted account-lock copy **and resolves the example set (bespoke `examples` else the category `goldenExample`, tagged `exampleKind`)**. See §2.3.1.
 - The optional `BatteryHealthCheck` card — rendered only on the `battery_drain` issue (it now lives in its own file, extracted from the old issue-details screen). Unchanged behaviour, see below.
 - A required free-text description (500-char max).
 
-### 2.3.1 Evidence block (`IssueEvidence`)
+### 2.3.1 Evidence block (`IssueEvidence`) — guided slotted capture
 
-One reusable proof component rendered for every issue/wrong-device sub-type. A single white **proof card** holds two labelled groups above the gated uploader:
+One reusable proof component rendered for every issue/wrong-device sub-type, with **two modes that share the area**, toggled in component-local state (the files themselves live in reducer state, so toggling never loses them):
+
+- **Collapsed (default) — the examples/guidance view.** A white **proof card** holding the two labelled groups below, with a primary brand **`Add your proof`** CTA beneath it that carries live progress (`Add your proof` → `Edit your proof · N of M` once anything is added, plus an amber "`X more to add — missing proof can delay your claim`" line when incomplete). This is the reference the customer collapses back to.
+- **Expanded — the slotted capture** (opened from the CTA). Per-item upload slots (see below), with an `‹ Examples` control to collapse back.
+
+The collapsed card's two groups:
 
 - **Group A — `For this issue`** (per-issue, data-driven). The sub-type's `need` ask, prefixed by **media-type chip(s)** resolved from `sub.mediaType` — **two chip types only, `Photo` / `Video`** (`MEDIA_CHIPS` in `IssueEvidence.jsx`); the catch-all "Something else" issues use `mediaType: 'both'` → **both** chips. Below the ask, two optional rows when the issue defines them: a success-toned **`When we cover this`** line (`coverage`) and a brand-tinted **`Try this first`** tip (`tryFirst`). When examples resolve, an example strip renders captioned thumbnails — heading **`Approved examples`** for the issue's own bespoke proof (`exampleKind: 'specific'`) or **`Example of good proof`** for the category `goldenExample` fallback (`exampleKind: 'golden'`), plus an **`Optional`** chip when the issue is `proofOptional`. The `body` sub-type's amber `PhysicalConditionNote` (grade disclaimer) renders inside this group. Before a sub-type is picked, the group shows a placeholder ("Pick your issue above…").
 - **Group B — `For every return`** (universal, identical for every issue). A four-item photo checklist — Screen · Back & camera · Accessories · Packed safely — each with a thumbnail and one-line description (`MINIMUM_PROOF_ITEMS` in `IssueEvidence.jsx`, images under `public/proof/minimum-required/`).
@@ -97,7 +102,7 @@ One reusable proof component rendered for every issue/wrong-device sub-type. A s
 
 Every proof thumbnail is tappable → opens a **paging lightbox** (`ProofLightbox`) that cycles across all images in the card (Group A examples first, then the Group B checklist), with keyboard arrows / Escape.
 
-Below the card sits the single gated **`Add photos or video`** uploader: a dashed drop-zone with an inline `Required — claims without proof are often rejected or delayed` warn line (the standalone warn banner is gone — the reinforcement folds into the empty drop-zone). **For a `proofOptional` issue** the warn line is replaced by a muted `Optional for this issue — add proof only if you can capture it`, and the gate is lifted (§2.3) so the customer can submit with no file. It's a **fake** slot — clicking stubs in a cycled filename; the prototype has no real file picker. Once attached it shows the filename + an `Add another` action; the `attachment` validation error reddens the drop-zone and shows *"Attach a photo or video — it's required."*
+**The slotted capture (expanded view).** Replaces the old single drop-zone with per-item slots, grouped: one **issue slot** driven by `sub.mediaType` (label `Photo of the issue` / `Video of the issue` / `Photo or video of the issue` for `both`; marked **`Optional`** and excluded from the count when the issue is `proofOptional`, e.g. `overheat`) above the **four universal slots** (Screen · Back & camera · Accessories · Packed safely, from `MINIMUM_PROOF_ITEMS`). Each slot (`ProofSlot`) is **single-file**: an empty dashed tile (icon + label + `Add photo`/`Add video`) → tap to add → a placeholder thumbnail + the filename + a remove ✕. Still a **fake** picker — adding cycles a photo/video stub filename (`PHOTO_STUBS` / `VIDEO_STUBS`); the prototype has no real file picker. A live **`N of M added`** footer shows progress: a success line when complete, else an amber soft warning — *"You can continue, but missing proof can delay your claim."* Proof **never gates** the step (§2.3); the warning is advisory only. Files are stored as `issueDetails.proofSlots` (a `slotId → { label, filename }` map), so collapsing to re-read the examples and re-expanding keeps every upload.
 
 **Real proof-guide links.** `How to provide valid proof` is a live (but now secondary) `<a target="_blank">`. It resolves per issue via `sub.proofGuideUrl`, falling back to `DEFAULT_PROOF_GUIDE_URL` ("how-to-show-us-your-issue") for any issue without its own article. Specific articles today: `battery_drain` → battery-draining guide; `body` → device-conditions guide; the hardware faults (`button` / `camera` / `mic` / `speaker`) share one `HARDWARE_PROOF_GUIDE_URL`. All defined in `issueTaxonomy.js`.
 
@@ -132,7 +137,7 @@ Two stacked refund cards built off `refundBreakdown(order, units, method, 'issue
 
 Sectioned summary. Issue-specific section:
 
-- **Issue** (refund) / **Fault** (warranty) — specific-issue label (resolved via `findSpecificIssue(id)` against `issueTaxonomy.js`) + a scope chip (`Device fault` / `Wrong item`) + description + attachment chip. The section's Edit link jumps to `wrongitem` when `situation === 'wrong_item'`, else `specific`.
+- **Issue** (refund) / **Fault** (warranty) — specific-issue label (resolved via `findSpecificIssue(id)` against `issueTaxonomy.js`) sitting directly under the section header (the redundant inner "Issue" field label was removed) + a scope chip (`Device fault` / `Wrong item`) + description + a **`Proof`** list rendering each filled slot as a `label · filename` chip (`Not provided` when empty). The section's Edit link jumps to `wrongitem` when `situation === 'wrong_item'`, else `specific`.
 
 Shared sections: Device prep (shows `Factory reset confirmed` — the single guided-reset path; `Unlinked + passcode shared` survives only for seeded credentials mocks), Packing summary (with the chosen method label), Pickup, Refund.
 
@@ -197,7 +202,7 @@ How the customer-facing UI surfaces backend state:
 
 **Unified proof card with worked examples, not a guidance line + bare uploader.** Earlier drafts surfaced the per-issue ask as a thin brand-tinted box above the upload zone. It told the customer *what* to send but not *what good looks like*. The redesigned `IssueEvidence` card splits proof into two concepts — `For this issue` (per-issue ask + media-type chip + captioned **approved-example** thumbnails) and `For every return` (a universal 4-photo checklist: screen, back & camera, accessories, packed safely) — backed by real customer-proof images and a paging lightbox. The intent is to cut the rejected-evidence rate by showing concrete examples, not just describing them. The standalone warn banner collapsed into the empty drop-zone (one required reinforcement, not two).
 
-**Attachment is required, no submit without it.** Earlier drafts let the customer submit without a file. Ops spent half their time chasing customers for evidence. The requirement is enforced as the `attachment` gate in `stepError` (a Continue click with no file reddens the dropzone + shows *"Attach a photo or video — it's required."*) and reinforced by the warn-tinted banner above the slot.
+**Proof is guided into per-item slots, warned-not-gated.** Earlier drafts had a single required attachment that hard-gated Continue; before that, no requirement at all (ops spent half their time chasing evidence). The current design splits proof into per-item slots (one per universal photo + one issue-specific) so the customer sees exactly what's expected and how much is left, but **lets them continue with gaps** behind a soft "missing proof can delay your claim" warning rather than a hard gate — collecting more complete evidence without trapping customers who genuinely can't capture a shot.
 
 **No restocking fee on the original-payment path.** The customer didn't choose to return — the seller messed up. Charging a fee felt like punishing the customer for a Revibe-side problem.
 
@@ -223,7 +228,7 @@ The full claim-object reference (including takeover-card extensions) lives in [c
 |---|---|---|
 | `claim.type` | `'issue'` | Derived (`claimTypeFor`) — both `device_fault` + refund and `wrong_item` + refund/replacement land on `issue`. |
 | `claim.remedy` | `'refund' | 'replacement'` | The remedy fork. `replacement` (wrong-item → correct item) carries **no** `refundMethod` / `expectedRefund` block — no money moves. `refund` carries both. |
-| `claim.issueDetails` | `{ description, attachmentName }` | `description` is the customer's free-text; `attachmentName` is a stub filename today. The specific-issue id and scope are **separate** top-level fields (below), not nested here. |
+| `claim.issueDetails` | `{ description, attachmentName, proofSlots }` | `description` is the customer's free-text; `proofSlots` is the slotted-capture map (`slotId → { label, filename }`, stub filenames today). `attachmentName` stays `''` on the issue path (it's retained for the compensation uploader + seeded mocks). The specific-issue id and scope are **separate** top-level fields (below), not nested here. |
 | `claim.issueSubtypeId` | string | One of the specific-issue ids from `issueTaxonomy.js` (`battery_drain` / `wont_charge` / `screen` / `body` / `camera` / `linked_account` / `wrong_colour` / `something_else` / …), resolved via `findSpecificIssue(id)`. |
 | `claim.issueScope` | `'not_working' | 'wrong_device'` | Derived from the issue via `scopeForIssue` (wrong-item details → `wrong_device`, everything else → `not_working`); also pre-filled by an accepted tripwire (`SWITCH_SITUATION` carries the scope). |
 | `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Written **only** when the `battery_drain` issue's optional check was filled in (a capacity entered or the non-original toggle ticked). `remedy` is `'refund'` / `'replacement'` / `'none'` / `null`; `reason` is `'non_original'` / `'refund_10d'` / `'replacement_6m'` / `'replacement_12m'` / `'normal_wear'` / `null`. Computed by `assessBattery(...)`. Data only. |
@@ -251,10 +256,12 @@ src/components/ClaimFlow/
 │                               + optional BatteryHealthCheck (on `battery_drain`) + description.
 ├── BatteryHealthCheck.jsx      The optional battery self-check card (extracted from the old issue-
 │                               details screen) + BatteryVerdict + BatteryThresholds. Receives `order`.
-├── IssueEvidence.jsx           Unified proof card (Group A per-issue `need` + media chip + Approved
-│                               examples; Group B universal 4-photo checklist) + gated uploader +
-│                               paging ProofLightbox. Exported default; private ProofThumb /
-│                               PhysicalConditionNote / AttachedFile / UploadDropzone.
+├── IssueEvidence.jsx           Guided slotted proof capture. Collapsed: examples card (Group A per-issue
+│                               `need` + media chip + Approved examples; Group B universal 4-photo
+│                               checklist) + `Add your proof` CTA. Expanded: per-item slots (issue slot
+│                               by mediaType + 4 universal) + live counter / soft warning. Paging
+│                               ProofLightbox. Exported default; private ProofSlot / ProofThumb /
+│                               PhysicalConditionNote.
 └── issueTaxonomy.js            ISSUE_CATEGORIES (6, ≤5 issues each) + WRONG_ITEM_DETAILS (4); each
                                 issue carries `mediaType` + optional `examples`/`tryFirst`/`proofGuideUrl`.
                                 findSpecificIssue / scopeForIssue / visibleIssuesFor (Samsung S Pen) /
@@ -268,7 +275,7 @@ Proof images are static assets under `public/proof/<id>/` (per-issue examples) a
 ## 8. Mocked vs production
 
 - **Submit seeds an in-session claim.** Same as change of mind — see [change_of_mind.md](./change_of_mind.md) §8. The seeded claim carries `type: 'issue'`, `issueDetails` / `issueScope` / `issueSubtypeId` from the flow state, and the computed `expectedRefund`.
-- **Attachment slot is fake.** Clicking the drop-zone stubs in a filename. No real file picker, no upload endpoint, no file-type/size validation.
+- **Proof slots are fake.** Tapping a slot stubs in a cycled photo/video filename (`proofSlots` map). No real file picker, no upload endpoint, no thumbnail of the actual file, no file-type/size validation.
 - **AED 100 bonus is hardcoded** as `ISSUE_WALLET_BONUS` in `src/lib/returns.js`. Production should read from a backend config (per-order or per-category).
 - **Issue guidance copy + media-type chips are hardcoded** in `issueTaxonomy.js` (`need`, `mediaType`, `coverage`, `tryFirst`, `examples`, `goldenExample`, `proofOptional`). Production should source from a content management system so non-engineers can revise.
 - **Example + checklist images are static demo assets** under `public/proof/`. Seeded today: three **bespoke** sets (`battery_drain`, `prev_owner_pw`, `overheat`) + one **category golden** each for five categories — real customer-style photos. Production should attach examples per sub-type and category goldens from a content store, source the `coverage` / `tryFirst` / `proofOptional` flags from policy config, and point the universal 4-photo checklist at the canonical packing/condition guidance images.
@@ -278,7 +285,7 @@ Proof images are static assets under `public/proof/<id>/` (per-issue examples) a
 
 ## 9. Open questions
 
-- **Multi-attachment.** The slot today accepts a single fake file. Real evidence often needs photo + video. Likely a small picker carousel with up to N attachments.
+- **Multi-file per slot + real uploads.** The slotted capture now collects multiple files (one per slot — issue + the four universal), but each slot is still single-file and stubbed, and the `both` issue slot collapses photo-or-video into one. Real evidence sometimes needs more than one shot per item — a real picker with multi-file slots and genuine thumbnails/previews is the next step.
 - **Live-chat hand-off from issue details.** Some sub-issues (e.g. screen unresponsive at boot) would be better handled by support before the customer commits to a return. A `Talk to support` exit ramp on the sub-issue guidance panel is a natural addition.
 - **Wrong device flow.** The `I received the wrong device` scope today flows through the same device-prep / packing / pickup steps as a normal issue claim. In practice the device prep step is moot (the customer doesn't own the wrong device's iCloud account). Worth gating device prep off when `issueScope === 'wrong_device'`.
 - **Bonus tuning.** AED 100 is a fixed placeholder. Production may want to scale by item price, by historical claim rate, or A/B test against alternative incentives (instant replacement, expedited shipping).

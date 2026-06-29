@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: e000edd
+verified_against: cc39517
 covers:
   - src/components/ClaimFlow
   - src/components/RefundSplitRows.jsx
@@ -243,6 +243,8 @@ The sticky bar swaps `Continue` for a success-tone `Submit return request`.
 - `Check your inbox` — email instructions stub (copy keyed by path: return / warranty claim / replacement / compensation).
 - `Expected refund` — amount + destination + method-keyed timeline. On a **replacement** path this becomes a `What you'll get back` row — *"The correct item"* + a no-refund explainer + the seller-stock disclaimer; the type badge reads `Replacement` and the track button `Track this replacement`.
 - `Device preparation` — reinforcement of the reset commitment from the `deviceprep` step.
+
+**Feedback survey (`NpsSurvey`).** Below the next-steps list, above the footer, sits an inline experience survey — a mock standing in for a future Typeform embed (no network). A soft brand-tinted card (`bg-brand-bg` / `border-brand/30`) asks *"How was your experience in raising a claim with Revibe?"* over a 1–5 scale (Poor → Excellent); tapping a score flips the card to a local *"Thanks for the feedback — you rated us N/5"* success state. It renders for **every** claim type (mounted outside the `!isCompensation` guard) and is purely client-side. The swap-in point for the real Typeform `<Widget id=… hidden={{ claim_ref, claim_type }} />` is marked in `src/components/NpsSurvey.jsx`.
 
 Two footer buttons:
 

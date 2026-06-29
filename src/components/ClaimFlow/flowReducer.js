@@ -1,6 +1,5 @@
 import { ORDERS } from '../../data/orders'
 import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
-import { findSpecificIssue } from './issueTaxonomy'
 
 // Situation-first flow (returns redesign). Screen 1 asks WHAT HAPPENED
 // (`situation`), not which remedy the customer wants. The remedy — and with
@@ -162,6 +161,11 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     issueDetails: {
       description: '',
       attachmentName: '',
+      // Guided slotted proof capture for the issue/warranty/wrong-item evidence
+      // step: a map of slotId -> { label, filename }. `attachmentName` is kept
+      // for the compensation uploader + seeded mocks, which still use the
+      // single-file model.
+      proofSlots: {},
     },
     // Optional battery-health self-check (§7.2). Only surfaced on the
     // `battery` sub-type; never gates progression — the customer can skip
@@ -357,16 +361,11 @@ export function stepError(state) {
       if (!id.attachmentName) return 'attachment'
       return null
     }
-    // Evidence step (extracted from the old issue-details screen): the subtype
-    // is already chosen on specific/wrongitem, so only the proof + description
-    // are validated here.
+    // Evidence step: proof is now guided slotted capture (IssueEvidence) and is
+    // advisory — it never gates the step (the slot UI shows a soft "missing
+    // proof" warning instead). Only the description is still required here.
     case 'evidence': {
-      const id = state.issueDetails
-      // Some issues are hard to capture (e.g. overheating) — `proofOptional`
-      // lifts the attachment gate. Description stays required.
-      const proofOptional = findSpecificIssue(state.issueSubtypeId)?.proofOptional
-      if (!proofOptional && !id.attachmentName) return 'attachment'
-      if (id.description.trim().length === 0) return 'description'
+      if (state.issueDetails.description.trim().length === 0) return 'description'
       return null
     }
     case 'deviceprep': {
