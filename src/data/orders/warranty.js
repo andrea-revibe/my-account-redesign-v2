@@ -170,4 +170,102 @@ export const WARRANTY_ORDERS = [
       },
     },
   },
+  // ----- Layered mock: delivered → warranty claim → repaired → device back
+  // with the customer. Exercises the WarrantyClaimCard's terminal
+  // `device_returned` hero (ReturnedStrip) and — the point of this mock —
+  // the "Verified by NSYS" chip re-appearing under the product row for the
+  // returned/repaired unit (fresh claim.shipBack.conditionReport). Mirrors
+  // the journey's claim_device_returned terminal shape (last transit
+  // sub-status + deliveredOn). Lands in Past via isWarrantyDelivered.
+  {
+    id: '89568',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '02/04/2026 11:20 AM',
+    placedAtFull: '2 Apr 2026 · 11:20 AM',
+    deliveredOn: '2026-04-10',
+    deliveredOnLong: 'Friday, 10 April',
+    quantity: 1,
+    unitPrice: 999,
+    subtotal: 999,
+    warranty: 90,
+    total: 1089,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193568',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '2 Apr · 11:20 AM',
+      quality_check: '4 Apr · 10:02 AM',
+      shipped: '7 Apr · 3:30 PM',
+      delivered: '10 Apr · 12:15 PM',
+    },
+    product: {
+      name: 'iPhone 13',
+      variant: 'Blue · 128 GB · Excellent',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Wr5tGh',
+      claimStatusId: 'device_returned',
+      type: 'warranty',
+      submittedAt: '25 May 2026 · 4:02 PM',
+      units: 1,
+      issueDetails: {
+        category: 'battery',
+        description:
+          'Battery drained unusually fast and the phone ran hot during calls — replaced under warranty.',
+        attachmentName: 'IMG_0733.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Wednesday, 27 May',
+        slot: '10 AM – 12 PM',
+        awb: '25193560',
+        awbUrl: '/awb-document.pdf',
+      },
+      timeline: {
+        initiated: '25 May · 4:02 PM',
+        pickup: '28 May · 10:14 AM',
+        qc: '1 Jun · 9:30 AM',
+        under_repair: '1 Jun · 2:12 PM',
+        ship_back: '10 Jun · 11:05 AM',
+        device_returned: '12 Jun · 3:14 PM',
+      },
+      shipBack: {
+        courier: 'DHL Express',
+        awb: '25193620',
+        estimatedDelivery: 'Jun 12',
+        estimatedDeliveryLong: 'Friday, 12 June',
+        deliveredOn: '2026-06-12',
+        deliveredOnLong: 'Friday, 12 June',
+        subStatusId: 'out_for_delivery',
+        subTimeline: {
+          arrived_destination: '10 Jun · 8:30 AM',
+          cleared_customs: '11 Jun · 11:15 AM',
+          forwarded_to_agent: '11 Jun · 4:45 PM',
+          out_for_delivery: '12 Jun · 7:30 AM',
+        },
+        // Fresh NSYS condition report for the repaired unit we sent back.
+        conditionReport: {
+          url: 'https://www.nsys.com/',
+          reportId: 'NSYS-WAR-89568-R1',
+        },
+      },
+    },
+  },
 ]

@@ -17,7 +17,7 @@ const PRODUCT_WELL =
 // `tone`. Owns thumbnail, name, variant, the Revibe Care callout, and the
 // price breakdown — but no chevron / expand state (the card owns the tap
 // target). Design: docs/handoff/product-summary/design.md (Direction C).
-export function ProductSummary({ order, tone = 'light', className = '' }) {
+export function ProductSummary({ order, tone = 'light', className = '', afterRow = null }) {
   const hero = tone === 'hero'
   const hasWarranty = order.warranty != null
   const fmt = (n) => `${order.currency} ${n.toLocaleString()}`
@@ -81,6 +81,8 @@ export function ProductSummary({ order, tone = 'light', className = '' }) {
           </div>
         </div>
       </div>
+
+      {afterRow && <div className="mt-2.5">{afterRow}</div>}
 
       {hasWarranty && (
         <>

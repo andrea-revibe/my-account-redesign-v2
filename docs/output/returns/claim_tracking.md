@@ -1,15 +1,19 @@
 ---
 status: live
-verified_against: 8fb818a
+verified_against: ecdda19
 covers:
   - src/components/ClaimCard.jsx
   - src/components/ClaimActionBanner.jsx
   - src/components/ClaimDetailsSheet.jsx
   - src/components/DocsRejectedCard.jsx
+  - src/components/AwbFailedCard.jsx
+  - src/components/EditableContactCard.jsx
   - src/components/PickupFailedCard.jsx
   - src/components/ResetFailedCard.jsx
   - src/components/InvalidClaimCard.jsx
   - src/components/ClosedClaimCard.jsx
+  - src/components/AwbLink.jsx
+  - src/components/ConditionReportChip.jsx
   - src/components/OrderClaimLink.jsx
   - src/lib/claims.js
   - src/lib/events.js
@@ -62,9 +66,9 @@ flowchart TD
   q9 -->|yes| closed[ClosedClaimCard — Past orders]
 ```
 
-`isClaimClosed` (`claim.closure` set) is a sixth terminal beyond the refund pipeline — Revibe **rejected** the claim at review (see §3.6); it ranks below `isClaimRefunded` and above the cancellation branches.
+`isClaimClosed` (`claim.closure` set) is a sixth terminal beyond the refund pipeline — Revibe **rejected** the claim at review (see §3.7); it ranks below `isClaimRefunded` and above the cancellation branches.
 
-The four takeover cards replace the baseline card's surface while the claim is blocked on a single customer action and auto-cancel (or auto-close) if ignored. They share a structural pattern (danger-toned hero with an ops/courier/quality message → action gate → customer commits → card flips to a warn-toned "submitted" state with an undo affordance). `WarrantyClaimCard` is a sibling card type for `claim.type === 'warranty'` — same chrome family as `ClaimCard`, different post-QC tail (repair-and-ship-back instead of refund). Spec at [`../warranties_compensations.md`](../warranties_compensations.md) §2.
+The five takeover cards replace the baseline card's surface while the claim is blocked on a single customer action and auto-cancel (or auto-close) if ignored. They share a structural pattern (danger-toned hero with an ops/courier/quality message → action gate → customer commits → card flips to a warn-toned "submitted" state with an undo affordance). `WarrantyClaimCard` is a sibling card type for `claim.type === 'warranty'` — same chrome family as `ClaimCard`, different post-QC tail (repair-and-ship-back instead of refund). Spec at [`../warranties_compensations.md`](../warranties_compensations.md) §2.
 
 ## 2. ClaimCard (baseline)
 
@@ -92,14 +96,14 @@ This piggybacks the existing `warn` / `brand` / `success` tokens — no new colo
   - Tone-coloured phase tag on the right — icon + label (`Submitted` / `On the way` / `In review` / `Processing` / `Complete`).
   - Status headline as a `text-[22px]` headline in the tone colour.
   - Sub-line with the most recent timeline timestamp. (The `claimRef` was dropped from the hero sub-line once it became the card eyebrow.)
-  - **Scheduled pickup strip** (only when `claim.claimStatusId === 'initiated'` and `claim.scheduledPickup` is set): a faint-divider-separated block carrying a `SCHEDULED PICKUP` eyebrow, a CalendarClock-iconed `{date} · {slot}` row in tone colour, and a MapPin-iconed truncated `{pickupDetails.address}` row beneath. Surfaces the courier date/slot Revibe assigned + the address the customer submitted, in one place, while the claim is still pre-collection. Hidden once the claim advances past `initiated`.
+  - **Scheduled pickup strip** (only when `claim.claimStatusId === 'initiated'` and `claim.scheduledPickup.awb` is set — i.e. once the airway bill exists): a faint-divider-separated block carrying a `SCHEDULED PICKUP` eyebrow, a CalendarClock-iconed `{date} · {slot}` row in tone colour, a MapPin-iconed truncated `{pickupDetails.address}` row, and the shared **`AwbLink`** (`src/components/AwbLink.jsx`) airway-bill row. When `scheduledPickup.awbUrl` is set `AwbLink` renders a neutral `View airway bill · AWB {awb}` CTA button (FileText + ExternalLink glyphs, `stopPropagation` so the tap doesn't toggle the card header) that opens the AWB PDF (`/awb-document.pdf`) in a new tab; with no `awbUrl` it falls back to the plain `AWB {awb}` text row (so an AWB with no document still reads correctly, e.g. a fresh clone where the gitignored PDF is absent). Shared with `WarrantyClaimCard`'s strip so the two can't drift. Surfaces the courier date/slot Revibe assigned + the address the customer submitted, in one place, while the claim is still pre-collection. Hidden once the claim advances past `initiated`. **Before the AWB lands** (`initiated` with no `scheduledPickup.awb`), an `ArrangingPickupStrip` placeholder shows instead ("Arranging your pickup — your collection window will appear here once your shipping label is ready"); an AWB that *couldn't* be generated routes to `AwbFailedCard` (§3.5), never here.
   - Separated by a faint divider: `Expected refund` (or `Refunded` once terminal) eyebrow + destination chip on the left and the net refund amount in `text-[22px]` tabular-nums on the right. The destination chip reuses the brand→accent gradient when wallet-bound (echoes the `GreetRow` credits pill) and a neutral chip when card-bound. When the original payment method is BNPL (`paymentMethod.type === 'bnpl'`) **and** `claim.refundMethod === 'original'`, the chip label collapses to just the provider brand (`Tabby` / `Tamara`) and a `BnplDisclaimerTooltip` Info-icon is appended inside the chip — `stopPropagation` so it doesn't toggle the card header. Same tooltip is rendered next to the refund destination row in `ClaimDetailsSheet`.
   - **Split-paid orders** (`order.paymentSplit`, see [../orders.md](../orders.md) §7.1) with `claim.refundMethod === 'original'`: a `RefundSplitRows` block is appended below the amount row, splitting the net proportionally across the card and gift-card sources (`ClaimDetailsSheet` shows the same under its Refund card). The net stays the hero figure; the split is the breakdown. The gift-card portion credits the Wallet once `refund_credited` ([wallet.md](../wallet.md) §3).
 - A compact product row (image / name / variant / `Revibe Care +{currency} {amount}` line / total / chevron).
 
 #### 2.2.1 Status explainer ("Learn more")
 
-The state pill is routed through the shared `StatusExplainer` (`src/components/StatusExplainer.jsx`, see [../orders.md](../orders.md) §4.6), which adds an inline `ⓘ Learn more` link beside the pill; tapping reveals a full-width plain-language definition of the current claim stage below the chip row (`stopPropagation`, so the card header doesn't toggle). Copy is data-driven from `lib/claims.js` — `CLAIM_EXPLANATIONS` (refund) / `COMPENSATION_EXPLANATIONS` resolved by `claimExplanation(claim)` (keyed on `claim.type` × `claimStatusId`). Suppressed when `claim.actionRequired` is set (the expanded `ClaimActionBanner` then owns the explanation; see §3.5).
+The state pill is routed through the shared `StatusExplainer` (`src/components/StatusExplainer.jsx`, see [../orders.md](../orders.md) §4.6), which adds an inline `ⓘ Learn more` link beside the pill; tapping reveals a full-width plain-language definition of the current claim stage below the chip row (`stopPropagation`, so the card header doesn't toggle). Copy is data-driven from `lib/claims.js` — `CLAIM_EXPLANATIONS` (refund) / `COMPENSATION_EXPLANATIONS` resolved by `claimExplanation(claim)` (keyed on `claim.type` × `claimStatusId`). Suppressed when `claim.actionRequired` is set (the expanded `ClaimActionBanner` then owns the explanation; see §3.6).
 
 ### 2.3 Expanded view
 
@@ -192,13 +196,13 @@ Confirm overlays `claim.invalidClaim = cancelReturnGate(order)` (`reason: 'cance
 Cancellation is modelled as real terminal nodes:
 
 - **`claim_cancelled`** (clean) — wired into the `claim_submitted_*` nodes across all four journeys + compensation's `claim_under_review`. `apply()` strips the claim → delivered.
-- **`claim_cancelled_shipback`** (device journeys only — CoM / issue / warranty) — wired into the QC-phase nodes (`claim_qc_started`, `claim_reset_failed`). Sets the `reason: 'cancelled'` gate (clearing takeover flags) and points into the **existing** `claim_return_shipping_paid → return sub-statuses → delivered` chain — near-total reuse. `Keep claim` here calls `journey.back()`.
+- **`claim_cancelled_shipback`** (device journeys only — CoM / issue / warranty) — reachable across the whole post-collection window: the pickup node (`claim_picked_up`), the three in-transit nodes (`claim_transit_arrived_origin_hub` / `_in_transit` / `_arrived_revibe_hub`), and the QC-phase nodes (`claim_qc_started`, `claim_reset_failed`) all list it in `next`. So a cancel any time after collection skips the intermediate transit/QC steps straight to the gate. Sets the `reason: 'cancelled'` gate (clearing takeover flags) and points into the **existing** `claim_return_shipping_paid → return sub-statuses → delivered` chain — near-total reuse. `Keep claim` here calls `journey.back()`.
 
-Confirming the sheet advances whichever node is in `validNext` (also a dev-panel button). Post-collection nodes that aren't wired (pickup/transit, reset-retry) fall back to the in-session `shipBackCancels` overlay, cleared on the next node change so the flow stays repeatable. See [journey_backend_spec.md](../journey_backend_spec.md).
+Confirming the sheet advances whichever node is in `validNext` (also a dev-panel button). The few post-collection nodes still not wired (e.g. reset-retry) fall back to the in-session `shipBackCancels` overlay, cleared on the next node change so the flow stays repeatable. See [journey_backend_spec.md](../journey_backend_spec.md).
 
 ## 3. Takeover cards
 
-When the claim is blocked on a single customer action, the card flips out of `ClaimCard` chrome into a dedicated takeover. All four follow the same structural pattern:
+When the claim is blocked on a single customer action, the card flips out of `ClaimCard` chrome into a dedicated takeover. All five follow the same structural pattern:
 
 | Aspect | Pattern |
 |---|---|
@@ -252,7 +256,7 @@ stateDiagram-v2
 
 **Expanded (failed state).** Same hero but the courier message expands into a full attributed block (avatar with `opsName` initial — typically the courier's first name). Below the header:
 
-1. **`Pickup address` card** — address + phone + email block carrying the saved values from `claim.pickupDetails`. Read-only by default; when the customer taps the `Change pickup address` button below it, the card flips into an inline edit mode (three input fields stacked with Save / Cancel beneath). Save commits the next values back to local component state and exits edit mode; Cancel discards the draft. Local state only — the change does not propagate back to the order data. Mirrors `InvalidClaimCard`'s `Delivery details` card.
+1. **`Pickup address` card** — the shared **`EditableContactCard`** (`src/components/EditableContactCard.jsx`) carrying the saved values from `claim.pickupDetails` (address shown read-only via `formatAddress`). Read-only by default; when the customer taps the `Change pickup address` button below it, the card flips into an inline edit mode — the address is the shared **`AddressForm`** (structured per-country fields; see `country_split.md` §4b) above Phone / Email inputs, with Save / Cancel beneath. Save commits the next values back to local component state and exits edit mode; Cancel discards the draft. Local state only — the change does not propagate back to the order data. `EditableContactCard` is now shared by `PickupFailedCard`, `AwbFailedCard` (§3.5), **and** `InvalidClaimCard` (§3.3 — its private `DeliveryDetailsCard` copy was migrated in, so no third copy remains).
 2. **`Change pickup address` button** — solid border-brand outline, Settings2 glyph. Hidden while the pickup-address card is in edit mode.
 3. **Confirm summary line** — single sentence preview of what confirming creates: courier + scheduled slot (driven by `claim.pickupFailure.nextPickup`).
 4. **Footer** — `Cancel claim` (visual stub) + `Confirm new pickup` (solid danger-red primary action). Confirm is always enabled; the confirmation step itself is the gate.
@@ -285,7 +289,7 @@ stateDiagram-v2
 **Expanded (action_needed).** Same hero but the quality message expands into a full attributed block. Below the header:
 
 1. **Return shipping fee card** — single-row read-only summary showing the fee amount (`{currency} {amount}`) on the right and the `Return shipping fee` eyebrow on the left. Intentionally minimal — the address moved out of this card so each block has one job.
-2. **Delivery details card** — address + phone + email block carrying the saved values from `claim.pickupDetails`. Read-only by default; when the customer taps the `Change delivery details` button below it, the card flips into an inline edit mode (three input fields stacked with Save / Cancel beneath). Save commits the next values back to local component state and exits edit mode; Cancel discards the draft. Local state only — the change does not propagate back to the order data.
+2. **Delivery details card** — the shared **`EditableContactCard`** (`title="Delivery details"`) carrying the saved values from `claim.pickupDetails`. Read-only by default; when the customer taps the `Change delivery details` button below it, the card flips into an inline edit mode — the address is the shared **`AddressForm`** (structured per-country fields; `country_split.md` §4b) above Phone / Email, with Save / Cancel beneath. Save commits the next values back to local component state and exits edit mode; Cancel discards the draft. Local state only — the change does not propagate back to the order data. (The private `DeliveryDetailsCard`/`EditableField` clone was retired in favour of the shared card.)
 3. **`Change delivery details` button** — solid border-brand outline, Settings2 glyph, copy and chrome borrowed from `InProgressCard`'s "Change details". Hidden while the delivery-details card is in edit mode.
 4. **Footer** — `Decline` (secondary outline) + `Pay {currency} {amount}` (solid danger-red primary action with CreditCard glyph). The two actions are mutually exclusive; both advance the journey to a different state (see **Journey-driven** above).
 
@@ -294,6 +298,7 @@ stateDiagram-v2
 - Eyebrow rewrites to `Order · #{id} · Return from Claim RET-{ref}` so lineage stays visible.
 - State pill: brand-toned `Return shipment` (Truck glyph) in transit; success-toned `Delivered` (Check glyph) once delivered.
 - Hero (in transit): gradient brand-bg / brand-bg2 block carrying `Back with you by` + the estimated delivery date + an `On track` phase tag, a `DeliveryAddressPill` (`Delivering to` + the order's actual address; `Home` only when `order.address` is unset), and a `{claimRef} · Claim · {type}` subline. **At delivered** the future-tense ETA hero is replaced by a green hero — `Delivered` headline, `Complete` phase tag (Check), and a `Delivered on {date}` strip (`returnShipment.deliveredOnLong || deliveredOn`, then the date part of `timeline.delivered`, then `estimatedDeliveryLong || estimatedDelivery`) — mirroring warranty's `device_returned` hero.
+- **NSYS condition-report chip (delivered only).** Once the paid return leg is delivered, the shared **`ConditionReportChip`** ("Verified by NSYS" link, `src/components/ConditionReportChip.jsx`) re-appears under the product row (passed as `ProductSummary`'s `afterRow`) for the un-refunded unit sent back. It resolves the return-leg report first (`claim.invalidClaim.returnShipment.conditionReport`), falling back to `order.conditionReport`, and renders nothing until `currentStatusId === 'delivered'`. Same chip the delivered `PastOrderCard` (`orders.md`) and `WarrantyClaimCard`'s `device_returned` hero use — extracted out of `PastOrderCard`; the card decides *when* and *which report*.
 - Expanded body renders the **5-step claim-progress dot timeline** `Initiated · Pickup · Quality Check · Shipped · Delivered` via the shared **`Timeline`** component (`src/components/Timeline.jsx`, horizontal) over the shared `RETURN_CLAIM_STATUSES` list — the claim's own head (`initiated`/`pickup`/`qc` from `claim.timeline`) with the refund tail (`refund_issued`/`refund_credited`) swapped for the return shipment's `shipped`/`delivered` (from `returnShipment.timeline`); current step from `returnClaimProgressIndex(returnShipment)`. This keeps the claim context instead of reading as a fresh order, and shares its `Shipped · Delivered` tail verbatim with the warranty card. While `currentStatusId === 'shipped'` the shared **`ReturnShipmentTracking`** adapter (`src/components/ReturnShipmentTracking.jsx`, a thin wrapper over the shared `TrackingDropdown`) renders beneath it — the 4-stop outbound `SHIPPING_SUB_STATUSES` sub-timeline followed by a Track package / Get Help action row. A small brand-tinted heads-up strip names the claim ref and reminds the customer no refund will be issued.
 - **Section placement:** once delivered, the claim drops to **Past orders** and counts toward the `delivered` filter (see §2.5), parity with a delivered warranty.
 
@@ -345,11 +350,38 @@ The card opens the same `ResetGuideSheet` Step 3 uses, via two props that adapt 
 
 The guide `device` is resolved with `deviceTypeForOrder(order)` (→ `iphone` for the current iOS mock; the sheet falls back to the iPhone guide for the OS-ambiguous `tablet`). This is the one place the takeover is device-typed — the rest of the card chrome stays iOS-worded (see §3.4).
 
-### 3.5 Relationship to `ClaimActionBanner`
+### 3.5 AwbFailedCard — courier couldn't validate the pickup address → confirm address
+
+Trigger: `claim.awbFailure` is set. The airway bill (shipping label) couldn't be generated because the courier couldn't validate the pickup address, so the claim is stuck **before** a pickup can be booked. This gate sits between claim submission (change-of-mind) / proof acceptance (issue **and warranty** — the warranty journey now runs the same AWB step, see `warranties_compensations.md` §2) and the pickup step — the AWB must exist before a courier collection can be scheduled. Same takeover shape as the others — claim auto-cancels if the customer doesn't confirm before `autoCancelAt`. Routed in `App.jsx` **ahead of `PickupFailedCard`** (an AWB that couldn't be generated never reaches the pickup gate). The hero label is **type-aware** — `Warranty claim` when `claim.type === 'warranty'`, else `Return claim` — on both the danger and warn (confirmed) states.
+
+```mermaid
+stateDiagram-v2
+    [*] --> awb_failed: courier can't validate address → no AWB
+    awb_failed --> confirmed: customer confirms address (via UI → claim_need_address)
+    awb_failed --> [*]: customer ignored → auto-cancel
+    confirmed --> generating: system re-runs claim_awb_generated → AWB stamped, ClaimCard resumes
+```
+
+**Collapsed (awb_failed state).** Danger-toned left accent strip; eyebrow `Claim {formatClaimRef(claim)}`; `Action needed` pill; tinted hero with `Return claim` label, `Address needed` right-align tag (MapPin glyph), headline `We couldn't book a pickup`, one-line truncated courier quote, countdown strip (`3 days, 22 hours left to confirm your address · Claim auto-cancels {autoCancelAt}`); compact product row; `Tap to fix` CTA button (solid danger, shared `TapToFixCta`).
+
+**Expanded (awb_failed state).** Same hero but the courier message expands into a full attributed block (avatar with `opsName` initial — the courier's first name). Below the header:
+
+1. **`Pickup address` card** — the shared **`EditableContactCard`** (`src/components/EditableContactCard.jsx`) carrying `claim.pickupDetails`. Read-only by default; the `Change pickup address` button below flips it into inline edit mode (Address / Phone / Email inputs + Save / Cancel). Save commits to local component state only — the change does not propagate to the order data. This is the same component `PickupFailedCard` now uses (§3.2 — the two former private `PickupAddressCard`/`EditableField` copies were extracted into `EditableContactCard`).
+2. **`Change pickup address` button** — border-brand outline, Settings2 glyph. Hidden while the address card is in edit mode.
+3. **Confirm summary line** — a sentence explaining that confirming submits the address so the airway bill can be created and the pickup booked.
+4. **Footer** — `Cancel claim` + `Confirm pickup address` (solid danger-red primary, MapPin glyph). Always enabled; the confirmation step is the gate.
+
+**Confirmed (generating-label) state.** Tapping `Confirm pickup address` flips the card to a warn-toned variant: amber accent strip, pulsing `Address confirmed` pill, `Generating label` phase tag (FileText glyph), `We're creating your shipping label` headline, body noting the scheduled pickup will appear once the airway bill is ready. Expanded shows a `Confirmed pickup address` summary card. This state is **journey-driven** — the button calls `onConfirmAddress` (`App.jsx`'s `validNext`-gated `handleConfirmAddress`, which advances `claim_need_address`), and the card reads `claim.awbFailure.submittedAt` live so the dev panel and the card stay in lockstep (mirrors `PickupFailedCard`'s `rescheduledAt`). Crucially it does **not** create the AWB — `awbFailure` stays set (tagged with `submittedAt`), so the card holds this state until the system step below. A local-state fallback (`localConfirmed`) covers the standalone mock, where there's no journey to advance.
+
+**After the claim moves on.** AWB creation is a separate `system` step — `claim_awb_generated` ("Airway bill created") clears `claim.awbFailure` and stamps `scheduledPickup.awb`, so the order leaves `AwbFailedCard` and returns to the regular `ClaimCard`. That card's scheduled-pickup strip only surfaces once `scheduledPickup.awb` exists (see below); before it, `ClaimCard` shows a calm `ArrangingPickupStrip` placeholder. `claim_awb_generated` then hands off to the pickup gate (`claim_picked_up` / `claim_pickup_failed`) — it is both the happy-path AWB step (fired straight after submission) and the re-merge target for the need-address detour.
+
+**`ClaimCard` pickup strip now gates on the AWB.** The Initiated-state scheduled-pickup strip (`ScheduledPickupStrip`) previously showed whenever `claim.scheduledPickup` was set; it now requires `claim.scheduledPickup.awb` and renders the airway-bill row via the shared `AwbLink` (a `View airway bill · AWB {number}` CTA opening the AWB PDF when `scheduledPickup.awbUrl` is set, else a plain `AWB {number}` text row). Before the AWB lands, `ClaimCard` shows `ArrangingPickupStrip` — a calm "Arranging your pickup — your collection window will appear here once your shipping label is ready" placeholder — instead of an empty hero. An AWB that *couldn't* be generated routes to `AwbFailedCard`, never to this placeholder.
+
+### 3.6 Relationship to `ClaimActionBanner`
 
 Phase 30 (PickupFailedCard) and phase 32 (InvalidClaimCard) migrated their gates onto dedicated takeover cards. The inline `ClaimActionBanner` code path remains wired and is still the surface for `awaiting_documents` (Issue flow only) and any future claim that sets `actionRequired` without a dedicated takeover card. The `collection_failed`, `awaiting_payment`, and `reset_failed` branches in `actionGateCopy()` are retained for completeness but effectively dormant — no current mock claim exercises them through the inline banner.
 
-### 3.6 ClosedClaimCard — Revibe rejected the claim (terminal, Past orders)
+### 3.7 ClosedClaimCard — Revibe rejected the claim (terminal, Past orders)
 
 Trigger: `claim.closure` is set (`isClaimClosed(order)`, `lib/claims.js`). Distinct from the takeovers above — it is **not** a blocked-on-customer takeover but a **terminal Past-orders card**: Revibe reviewed the claim and could not accept it, so the customer keeps the device and no refund is issued. `claim.closure` is terminal regardless of the underlying `claimStatusId` — `hasActiveClaim` short-circuits to `false` when it is present, so the order falls out of "In progress" into Past orders. The card mirrors `InvalidClaimCard`'s muted `CompensationClosedCard` chrome (muted left accent, `Claim closed` pill, `No refund issued` tag) but is **reason-driven** and carries a forward path rather than a payment gate.
 
@@ -401,11 +433,12 @@ All copy is customer-facing — internal (IS) labels never appear in the UI.
 
 ### 4.3 Action gates (`actionGateCopy`)
 
-Four gates total. Each fires a promoted banner above the dot strip (inline) or routes to a dedicated takeover card.
+Five gates total. Each fires a promoted banner above the dot strip (inline) or routes to a dedicated takeover card.
 
 | Gate (`kind`) | Surface | Banner headline | Body | Deadline | Primary CTA | Secondary |
 |---|---|---|---|---|---|---|
 | `awaiting_documents` | Inline `ClaimActionBanner` | Action needed — documents requested | "Revibe Quality has asked for a clearer photo or longer video before we can pick up your device." | "Reply by {deadline} or the claim will close automatically." | Reply with documents | Close claim |
+| `awb_generation_failed` | `AwbFailedCard` takeover | Action needed — confirm your pickup address | "We couldn't create your shipping label because the courier couldn't validate the pickup address. Confirm or update it so we can generate the airway bill and book your pickup." | "Confirm by {deadline} or the claim will close automatically." | Confirm pickup address | Cancel claim |
 | `collection_failed` | Inline banner (dormant) **or** `PickupFailedCard` takeover | Action needed — pickup didn't go through | "Our courier couldn't pick up your device on {failedAt}." | "Confirm by {deadline} or the claim will close automatically." | Schedule new pickup | Cancel claim |
 | `reset_failed` | Inline banner (dormant) **or** `ResetFailedCard` takeover | Action needed — device still linked to iCloud | "Activation Lock is still on, so we can't wipe the device. Remove it from your iCloud account and share your passcode so we can complete the reset." | "Submit by {deadline} or the claim will close automatically." | Unlock device | Cancel claim |
 | `awaiting_payment` | Inline banner (dormant) **or** `InvalidClaimCard` takeover | Action needed — return shipping payment | "Your claim couldn't be approved after inspection. Cover the return shipping fee to get your device sent back." | "Pay by {deadline} or your device will not be returned." | Pay return shipping | Discuss with support |
@@ -454,7 +487,7 @@ Optional object populated on a delivered order to drive `ClaimCard` and its take
 | `claim.batteryAssessment` *(issue / warranty, optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | The optional Step-2 battery self-check result (§7.2 Battery Standards), set only when the `battery` sub-type's check was filled in. `remedy` ∈ `refund` / `replacement` / `none` / `null`; `reason` ∈ `non_original` / `refund_10d` / `replacement_6m` / `replacement_12m` / `normal_wear` / `null`. Computed by `assessBattery()` in `src/lib/returns.js`. Captured but not yet rendered by any card / sheet. See [issue.md](./issue.md) §2.2 + §6.2. |
 | `claim.devicePrep` | `{ option, os }` | `option` is `'reset'` or `'credentials'` and `os` is `'ios'` or `'android'`. Surfaced as masked `Factory reset confirmed` / `Unlinked + passcode shared`; raw credentials intentionally not persisted. |
 | `claim.pickupDetails` | `{ address, email, phone }` | Three contact fields captured at Step 4. Customer-submitted; the values flow through unchanged into the Initiated-state hero strip and the details sheet. |
-| `claim.scheduledPickup` *(optional)* | `{ courier, date, slot }` | Revibe-assigned pickup window. `date` is human-readable (`'Tomorrow, 20 May'`, `'Friday, 15 May'`); `slot` is a time range (`'10 AM – 12 PM'`); `courier` is the carrier name. Surfaced in the Initiated-state hero strip together with `pickupDetails.address`. Kept on the claim past `initiated` for the details sheet to reference, but the hero strip only renders while `claimStatusId === 'initiated'`. |
+| `claim.scheduledPickup` *(optional)* | `{ courier, date, slot, awb?, awbUrl? }` | Revibe-assigned pickup window. `date` is human-readable (`'Tomorrow, 20 May'`, `'Friday, 15 May'`); `slot` is a time range (`'10 AM – 12 PM'`); `courier` is the carrier name; `awb` is the airway-bill number, stamped once the shipping label is generated; `awbUrl` (optional) is the AWB PDF link (`/awb-document.pdf`) — when set, `AwbLink` renders a `View airway bill` CTA button instead of the plain text row. Surfaced in the Initiated-state hero strip together with `pickupDetails.address` — but **only once `awb` is set** (before that the hero shows the `ArrangingPickupStrip` placeholder). Kept on the claim past `initiated` for the details sheet to reference, but the hero strip only renders while `claimStatusId === 'initiated'`. |
 | `claim.refundMethod` | `'wallet' | 'original'` | Drives the destination chip and the `Includes 10% restocking fee` sub-copy when `original`. |
 | `claim.expectedRefund` | `{ gross, fee, bonus, net, rate }` | Pre-computed at submission so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. `bonus` is the optional Wallet bonus on issue claims (AED 100); `0` elsewhere. |
 | `claim.timeline` | map keyed by `claimStatusId` | Timestamp at which the claim entered each phase. Populated progressively. |
@@ -476,6 +509,7 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 | Field | Type | Routes to |
 |---|---|---|
 | `claim.docsRejection` | `{ rejectedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, previous }` | `DocsRejectedCard` |
+| `claim.awbFailure` | `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, submittedAt? }` | `AwbFailedCard` (pre-pickup — set with no `scheduledPickup`) |
 | `claim.pickupFailure` | `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, nextPickup: { awb, slot, courier } }` | `PickupFailedCard` |
 | `claim.resetFailed` | `{ failedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, attempt? }` | `ResetFailedCard` (iOS only) |
 | `claim.invalidClaim` | `{ determinedAt, autoCancelAt, timeLeftLabel, opsName, opsRole, opsMessage, returnShipping: { amount, currency }, returnShipment: { courier, estimatedDelivery, estimatedDeliveryLong, currentStatusId, timeline } }` | `InvalidClaimCard` |
@@ -494,18 +528,20 @@ Each of these, when set, routes the order to its dedicated takeover card. They m
 | Subfield | Used by | Notes |
 |---|---|---|
 | `docsRejection.previous` | DocsRejectedCard | Array of `{ name, size, kind, duration?, tag? }` — `tag` is the per-file ops reason ("Glare" / "Too short") that renders as a red ribbon. |
+| `awbFailure.submittedAt` | AwbFailedCard | Set when the customer confirms the pickup address (journey `claim_need_address`). Its presence flips the card to the warn "generating label" state; the claim hasn't moved (`awbFailure` stays set) until the system re-runs `claim_awb_generated`. Mirrors `pickupFailure.rescheduledAt`. |
 | `pickupFailure.nextPickup.{awb, slot, courier}` | PickupFailedCard | Hand-written; echoed back on the confirmation state. |
 | `resetFailed.attempt` | ResetFailedCard | Optional integer marking which retry round this is. `1` (or undefined) on the initial gate; `2` on the journey-mode retry takeover. Lets the card switch to retry-specific copy if needed in future iterations. |
 | `invalidClaim.returnShipping.{amount, currency}` | InvalidClaimCard | Carried on the fee card + primary CTA label. |
 | `invalidClaim.returnShipment.{currentStatusId, timeline}` | InvalidClaimCard (paid state) | `currentStatusId` is one of the `STATUSES` ids (`created` / `quality_check` / `shipped` / `delivered`). Drives `returnClaimProgressIndex` for the 5-step claim dot timeline (`shipped` from `timeline.shipped`, `delivered` from `timeline.delivered`; the head reads `claim.timeline`). `currentStatusId === 'delivered'` also flips the card to its green delivered surface + drops it to Past (`isReturnDelivered`). |
 | `invalidClaim.returnShipment.{deliveredOn, deliveredOnLong}` | InvalidClaimCard (delivered state) | Optional long/short delivered date for the green `Delivered on {date}` hero strip; falls back to the date part of `timeline.delivered`, then `estimatedDeliveryLong || estimatedDelivery`. |
+| `invalidClaim.returnShipment.conditionReport` *(optional)* | InvalidClaimCard (delivered state) | `{ url, reportId }` — the fresh NSYS report for the returned unit. Once delivered, `ConditionReportChip` re-appears under the product row; resolved before `order.conditionReport`. |
 | `invalidClaim.returnShipment.{estimatedDelivery, estimatedDeliveryLong}` | InvalidClaimCard (paid state) | Populates the brand-tone ETA hero. |
 
 `order.country` *(optional, default `'AE'`)* sits at the top level of the order, not inside `claim`. It now drives the **country split**: `countryConfig(order).detailedTracking` (from `lib/countries.js`) gates the claim inbound-pickup and return-leg `See detailed tracking` dropdowns — hidden for `SA` / `Others`, shown for `AE` / `ZA`. Full model + the recipe for adding further country differences: `docs/output/country_split.md`.
 
 ## 6. UX decisions
 
-**Tone shift from danger to warn/brand on commit is the same across all four takeovers.** The danger red while blocked → warn amber once the customer's action is in flight (DocsRejected: resubmitted, PickupFailed: rescheduled, ResetFailed: details received) or brand purple once the return is committed and forward-moving (InvalidClaim: paid). Same convention `ClaimCard` uses (warn = active processing, brand = the system is doing the work).
+**Tone shift from danger to warn/brand on commit is the same across all five takeovers.** The danger red while blocked → warn amber once the customer's action is in flight (DocsRejected: resubmitted, AwbFailed: address confirmed, PickupFailed: rescheduled, ResetFailed: details received) or brand purple once the return is committed and forward-moving (InvalidClaim: paid). Same convention `ClaimCard` uses (warn = active processing, brand = the system is doing the work).
 
 **Takeover cards instead of an ever-longer status enum.** Earlier drafts considered adding `evidence_rejected`, `pickup_failed`, `invalid_paid`, etc. to `CLAIM_STATUSES`. That would have stretched the dot strip beyond what fits on 430px and conflated "happy-path progress" with "we need you to do something". Takeover cards keep the dot strip stable and put the action-required state on its own card surface.
 
@@ -545,10 +581,14 @@ src/
     ├── ClaimActionBanner.jsx             Inline warn banner above the dot strip when `claim.actionRequired` is set
     ├── ClaimDetailsSheet.jsx             Bottom sheet opened by ClaimCard's `View claim details` — Summary + Refund cards
     ├── DocsRejectedCard.jsx              Takeover: customer must re-upload faulty-product evidence
+    ├── AwbFailedCard.jsx                 Takeover: customer must confirm the pickup address so the airway bill can be generated (pre-pickup gate)
     ├── PickupFailedCard.jsx              Takeover: customer must confirm a new pickup
+    ├── EditableContactCard.jsx           Shared address·phone·email block (read-only ⇄ inline edit); used by AwbFailedCard + PickupFailedCard
     ├── ResetFailedCard.jsx               Takeover: customer must unlink iCloud + share passcode after QC hit Activation Lock
     ├── InvalidClaimCard.jsx              Takeover: customer must pay return shipping after invalid inspection
-    ├── ClosedClaimCard.jsx               Terminal (Past orders): Revibe rejected the claim — reason hero + ops note + raise-new-claim (§3.6)
+    ├── ClosedClaimCard.jsx               Terminal (Past orders): Revibe rejected the claim — reason hero + ops note + raise-new-claim (§3.7)
+    ├── AwbLink.jsx                       Shared airway-bill row (View-AWB-PDF CTA when `awbUrl` set, else text); used by ClaimCard + WarrantyClaimCard pickup strips
+    ├── ConditionReportChip.jsx           Shared "Verified by NSYS" link; used by PastOrderCard + WarrantyClaimCard (device_returned) + InvalidClaimCard (delivered)
     └── HistoryThread.jsx                 Compact chip thread for past events on layered cards
 ```
 
@@ -561,9 +601,11 @@ src/
 - **`Cancel claim`** is wired (§2.8) with two paths. **Clean revert** (pre-pickup device claims + compensation): drops the claim from the in-session projection so the order reverts to delivered (undoable via `UndoSnackbar`). **Ship-back** (device already at Revibe — e.g. `ResetFailedCard` at `qc`): overlays the `reason: 'cancelled'` gate so the order routes to `InvalidClaimCard`'s pay-return-shipping surface, reusing the invalid-verdict machinery + journey return chain. No backend — `cancelledClaims` / `shipBackCancels` are in-session only, cleared on refresh; the pay/paid/return-tracking states are `InvalidClaimCard`'s component-local demo states, and `cancelReturnGate`'s return-shipping amount/dates are hand-written placeholders.
 - **Webhook / polling for state progression.** Production needs a mechanism to move the claim through the 5 states as the warehouse handles the unit; today `claim.claimStatusId` is a static field on the mock data.
 - **DocsRejectedCard.** File picker is a fake-files cycle, countdown label is hand-written, `Resubmit` doesn't persist (warn state is local component state only), no notification + email trigger.
+- **AwbFailedCard.** Hand-seeded mock 89944 (delivered iPhone 12 mini → change-of-mind claim `initiated`, `awbFailure` set, no `scheduledPickup` — the AWB never generated). Also reachable in journey mode via the `claim_awb_failed → claim_need_address` detour. The courier ops note + countdown are hand-written; confirming submits nothing (journey mode advances the dev panel; the standalone mock flips to the warn "generating label" state via local `localConfirmed`). AWB generation (`claim_awb_generated`) is journey-only — outside a journey the card holds the confirmed state.
 - **PickupFailedCard.** `Edit` link on the pickup-address card is decorative, new AWB / slot are hand-written rather than generated, `Confirm` doesn't persist.
+- **InvalidClaimCard delivered.** Hand-seeded mock 89928 (delivered iPhone 12 → issue claim, invalid verdict, customer paid return shipping, device shipped back and `returnShipment.currentStatusId: 'delivered'`) exercises the terminal green paid-return surface + the re-appearing "Verified by NSYS" chip (fresh `returnShipment.conditionReport`); submit-time seeding can't reach a delivered ship-back. Lands in Past via `isReturnDelivered`. The condition report + return-shipment tracking are hand-written placeholders.
 - **ResetFailedCard.** Submit is local component state only — the guide-completed flag, unlink confirmation, and passcode are never transmitted, never persisted, and the warn-toned "received" view is a visual stub. The unlink walkthrough reuses the device-typed `ResetGuideSheet` remote route (§3.4.1), but the card chrome (confirm toggle + summary) is still iOS-worded — see the Android-branch open question. Auto-cancel countdown is hand-written. Production must encrypt the passcode in transit + at rest, scope visibility to the named technician, and delete it on a short timer once the wipe succeeds.
-- **ClosedClaimCard (§3.6).** Hand-seeded mock 89705 (delivered iPhone XR → issue claim closed `not_reproduced`); submit-time seeding can't reach a closed terminal. The closure ops note + timestamp are hand-written, `Contact support` is a placeholder, and only `Raise a new claim` is wired. Production needs a real ops-driven close action that sets `claim.closure` (reason + attributed note) and the notification/email it triggers.
+- **ClosedClaimCard (§3.7).** Hand-seeded mock 89705 (delivered iPhone XR → issue claim closed `not_reproduced`); submit-time seeding can't reach a closed terminal. The closure ops note + timestamp are hand-written, `Contact support` is a placeholder, and only `Raise a new claim` is wired. Production needs a real ops-driven close action that sets `claim.closure` (reason + attributed note) and the notification/email it triggers.
 - **SLA placeholders.** `CLAIM_SLAS` values are hand-guessed; ops to revise.
 - **`order.country` drives the country split (partial).** It now gates the inbound-pickup + return-leg detailed-tracking dropdowns via `countryConfig` (`SA`/`Others` → hidden). Other country-aware behaviour (repair-partner routing, country-varying SLAs) is still future work. See `docs/output/country_split.md`.
 
@@ -581,7 +623,7 @@ src/
 
 ## 10. Order↔claim linkage (`OrderClaimLink`)
 
-A submitted claim **replaces** the delivered order card in the list, so the original order has no standalone card to navigate to. `OrderClaimLink` (`src/components/OrderClaimLink.jsx`) restores the link by rendering a **linked pair of real cards in a one-open accordion** — the order half on top, the claim half below — joined by the connector thread. It wraps the entire claim-card family (`ClaimCard`, `ClosedClaimCard`, `WarrantyClaimCard`, and all four takeover cards `DocsRejected` / `PickupFailed` / `ResetFailed` / `InvalidClaim`) **and the cancelled-order refund-hero card** (`CancelledOrderCard`, [cancellations.md](../cancellations.md) §3): a cancellation is the order's linked entity when there's no claim, so its bottom half is the cancellation card. It is the single source of truth for the linkage chrome; the wrapped card is passed as `children` and stays otherwise untouched.
+A submitted claim **replaces** the delivered order card in the list, so the original order has no standalone card to navigate to. `OrderClaimLink` (`src/components/OrderClaimLink.jsx`) restores the link by rendering a **linked pair of real cards in a one-open accordion** — the order half on top, the claim half below — joined by the connector thread. It wraps the entire claim-card family (`ClaimCard`, `ClosedClaimCard`, `WarrantyClaimCard`, and all five takeover cards `DocsRejected` / `AwbFailed` / `PickupFailed` / `ResetFailed` / `InvalidClaim`) **and the cancelled-order refund-hero card** (`CancelledOrderCard`, [cancellations.md](../cancellations.md) §3): a cancellation is the order's linked entity when there's no claim, so its bottom half is the cancellation card. It is the single source of truth for the linkage chrome; the wrapped card is passed as `children` and stays otherwise untouched.
 
 **Props:** `{ order, defaultOpen, children }`. `defaultOpen` overrides which half opens first (defaults to the live bottom half — `claim`, or `cancellation` for a cancelled order). The old `onReveal` callback is no longer read — the wrapper owns expand/collapse via its shared `openHalf` state — but callers still pass it harmlessly.
 

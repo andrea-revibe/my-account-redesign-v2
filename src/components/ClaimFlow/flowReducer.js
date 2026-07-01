@@ -1,5 +1,7 @@
 import { ORDERS } from '../../data/orders'
 import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
+import { DEFAULT_COUNTRY } from '../../lib/countries'
+import { emptyAddress, addressError } from '../../lib/address'
 
 // Situation-first flow (returns redesign). Screen 1 asks WHAT HAPPENED
 // (`situation`), not which remedy the customer wants. The remedy — and with
@@ -190,8 +192,13 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       // the change_of_mind flow (see stepError + Step3DevicePrep).
       neverSetUp: false,
     },
+    // Country selects the structured address schema (lib/address.js). It never
+    // changes mid-flow, so it lives at the top of the draft beside the seed.
+    country: order?.country ?? DEFAULT_COUNTRY,
     pickupDetails: {
-      address: order?.address || '',
+      // Structured, country-shaped address (object keyed by schema field id).
+      // Seeded from the order's saved fields when present, else a blank set.
+      address: order?.addressFields ?? emptyAddress(order?.country),
       email: order?.email || '',
       phone: order?.phone || '',
     },
@@ -381,7 +388,7 @@ export function stepError(state) {
       return state.packingMethod !== null ? null : 'packing'
     case 'pickup': {
       const pd = state.pickupDetails
-      if (pd.address.trim().length === 0) return 'address'
+      if (addressError(pd.address, state.country)) return 'address'
       if (pd.email.trim().length === 0) return 'email'
       if (pd.phone.trim().length === 0) return 'phone'
       if (state.pickupConfirmed !== true) return 'pickupConfirm'

@@ -14,6 +14,7 @@ These live under [`handoff/backend-mapping/`](./handoff/backend-mapping/) — th
 
 | Doc | Purpose |
 |---|---|
+| [handoff/dev-implementation/README.md](./handoff/dev-implementation/README.md) | **Build-oriented** dev-team handoff: prerequisites, backend **tables to build**, workflows/jobs, and a client-side telemetry plan. The inverse of the backend-mapping brief (which maps to *existing* tables) — this says what to *build*. Cross-links context.md for data-shape detail |
 | [handoff/backend-mapping/context.md](./handoff/backend-mapping/context.md) | Self-contained brief: glossary, system map, per-feature requirements (Orders / Cancellations / Returns / Warranties), cross-cutting concerns, validation checklist, consolidated open decisions |
 | [handoff/backend-mapping/system_prompt.md](./handoff/backend-mapping/system_prompt.md) | System prompt for the mapping agent — task framing, inputs, process, output format, rules (read-only DB, conflict resolution, iteration cadence) |
 

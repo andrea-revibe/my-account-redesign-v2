@@ -714,6 +714,14 @@ export function actionGateCopy(actionRequired) {
         primaryCta: 'Reply with documents',
         secondaryCta: 'Close claim',
       }
+    case 'awb_generation_failed':
+      return {
+        ...base,
+        headline: 'Action needed — confirm your pickup address',
+        body: 'We couldn’t create your shipping label because the courier couldn’t validate the pickup address. Confirm or update it so we can generate the airway bill and book your pickup.',
+        primaryCta: 'Confirm pickup address',
+        secondaryCta: 'Cancel claim',
+      }
     case 'collection_failed':
       return {
         ...base,

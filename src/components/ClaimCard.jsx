@@ -23,6 +23,7 @@ import {
   transitSubProgressIndex,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
+import { formatAddress } from '../lib/address'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import OrderClaimLink from './OrderClaimLink'
 import ClaimActionBanner from './ClaimActionBanner'
@@ -30,6 +31,7 @@ import HistoryThread from './HistoryThread'
 import StatusExplainer from './StatusExplainer'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
+import { AwbLink } from './AwbLink'
 import RefundSplitRows from './RefundSplitRows'
 import { isSplitPaid } from '../lib/returns'
 import Timeline from './Timeline'
@@ -197,8 +199,15 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
   const isWallet = claim.refundMethod === 'wallet'
   const headline = claimStatusHeadline(claim)
   const subline = claimStatusSubline(claim)
+  // The pickup strip (courier date/slot + address) only surfaces once the
+  // airway bill has been generated — its number rides on scheduledPickup.awb.
+  // Before that, the claim sits at `initiated` with no bookable pickup, so we
+  // show a calm "arranging your pickup" placeholder instead. (An AWB that
+  // *couldn't* be generated routes to AwbFailedCard, never here.)
   const showScheduledPickup =
-    claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup)
+    claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup?.awb)
+  const showArrangingPickup =
+    claim.claimStatusId === 'initiated' && !claim.scheduledPickup?.awb
   // When the refund is split across the original payment, the split rows below
   // name each destination (with the BNPL note on its own line) — so the single
   // "Going to <chip>" summary is redundant and is replaced by a captioned split.
@@ -236,8 +245,11 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
           scheduledPickup={claim.scheduledPickup}
           pickupDetails={claim.pickupDetails}
           toneText={t.text}
+          country={order.country}
         />
       )}
+
+      {showArrangingPickup && <ArrangingPickupStrip toneText={t.text} />}
 
       <div className="mt-3 pt-3 border-t border-line-2/70 flex items-end justify-between gap-3">
         <div className="min-w-0">
@@ -278,9 +290,9 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
   )
 }
 
-function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText }) {
-  const { date, slot } = scheduledPickup || {}
-  const address = pickupDetails?.address
+function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText, country }) {
+  const { date, slot, awb, awbUrl } = scheduledPickup || {}
+  const address = formatAddress(pickupDetails?.address, country)
   return (
     <div className="mt-3 pt-3 border-t border-line-2/70 flex flex-col gap-1.5">
       <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">
@@ -312,6 +324,26 @@ function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText }) {
           <span className="truncate">{address}</span>
         </div>
       )}
+      <AwbLink awb={awb} awbUrl={awbUrl} />
+    </div>
+  )
+}
+
+// Pre-AWB window: the claim is `initiated` but the shipping label hasn't been
+// generated yet, so there's no bookable pickup to show. A calm placeholder
+// keeps the hero from reading as empty until scheduledPickup.awb lands.
+function ArrangingPickupStrip({ toneText }) {
+  return (
+    <div className="mt-3 pt-3 border-t border-line-2/70 flex items-start gap-1.5 text-[11.5px] text-ink-2/90">
+      <CalendarClock
+        size={13}
+        strokeWidth={2}
+        className={`${toneText} shrink-0 mt-px opacity-70`}
+      />
+      <span className="leading-[1.35]">
+        Arranging your pickup — your collection window will appear here once your
+        shipping label is ready.
+      </span>
     </div>
   )
 }

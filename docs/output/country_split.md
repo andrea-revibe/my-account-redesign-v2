@@ -12,6 +12,10 @@ covers:
   - src/components/InvalidClaimCard.jsx
   - src/components/JourneyDevPanel.jsx
   - src/components/EddSandboxPanel.jsx
+  - src/lib/address.js
+  - src/components/AddressForm.jsx
+  - src/components/EditableContactCard.jsx
+  - src/components/ClaimFlow/Step4PickupDetails.jsx
 ---
 
 # Country split
@@ -23,11 +27,12 @@ covers:
 Country is an **orthogonal dimension**, not a multiplier on journeys. The same journey replays under any country; one data-driven capability layer (`src/lib/countries.js`) is the single source of truth; the cards read flags off it; `order.country` carries the active code. We deliberately did **not** fork a journey (or a component) per country — most flows are identical, so forking would 4× the maintenance surface and drift.
 
 - **Canonical codes:** `AE` / `ZA` / `SA` / `Others`, default `AE`. These are the values written on `order.country` (already present on every mock order in `data/orders/*`).
-- **Two axes of difference, two mechanisms:**
+- **Axes of difference & their mechanisms:**
 
 | Difference | Mechanism | Where |
 |---|---|---|
 | **Card look** (a feature is shown/hidden/altered per country) | Capability **flag** in `lib/countries.js`, read by the shared card | §5 |
+| **Form structure** (which address fields a market collects) | Per-country **schema** in `lib/address.js`, rendered by the shared `AddressForm` | §4b |
 | **Journey sequence** (a step exists only in some countries) | Per-edge **country tag** on a node's `next`, filtered in `validNext` | §6 |
 
 - **Don't confuse country with the EDD market.** `lib/edd.js` `MARKETS` (`UAE/ZA/SA`) drives the Dynamic-EDD sandbox's *timing* math and is a separate axis. The two overlap on the country but are not unified yet; `COUNTRIES[code].eddMarket` is the bridge field, read by nothing today. See §8.
@@ -80,6 +85,34 @@ export function countryConfig(country) { /* code string OR order → config, saf
 `OrderCard`'s "Shipping progress" block is the **only always-on** sub-timeline (not behind a dropdown); the rest are `See detailed tracking` toggles. Off → the milestone view is removed but the top-level courier "Track" card / claim-progress dots / status remain. `ReturnShipmentTracking.jsx` stays **country-agnostic** (pure presentational); gating happens at its two call sites, where `order` is in scope. **Matrix:** AE ✓, ZA ✓, SA ✗, Others ✗.
 
 The same flag also collapses the **journey shipment sequence** to a single "Shipped" step for these markets (so the sequence and the card agree — no granular steps in either) — that's the §6 worked example below. The banner collapse here is the belt-and-suspenders that additionally covers data-driven (non-journey) orders, since for journey replays `SA`/`Others` never set a shipping `subStatusId` in the first place.
+
+## 4b. Shipped difference #2 — structured per-country address fields
+
+Address is **structured per market**, not one free-text line. This is a third mechanism alongside the capability flag (§2) and the journey tag (§6): a per-country **field schema** in `src/lib/address.js`, rendered by one shared component.
+
+- **Schema — `ADDRESS_SCHEMAS[country]`**, an ordered `{ id, label, required, full?, type?, options?, inputMode? }` list. Field `id` is the storage key; `full` spans both grid columns; `type` is `text` (default) / `select` / `textarea`.
+
+| Market | Fields (in order) |
+|---|---|
+| **AE** | Area · Building · Flat/Office no. · Street · City · Emirate (select) — all required, no postal code |
+| **SA** | Building no. · Street · District · City · Postal code · Additional code (the only optional field) |
+| **ZA** | Street address · Suburb · City/Town · Province (select) · Postal code |
+| **Others** | single `Full address` free-text (fallback for a market with no schema) |
+
+- **Value shape.** The editable address (`pickupDetails.address`, `claim.pickupDetails.address`, `order.addressFields`) is an **object keyed by field id**. `order.address` stays a plain display string (read by `DeliveryAddressPill` / heroes) — untouched.
+- **Helpers, all string-tolerant** (a legacy string passes through, so un-migrated mocks still render): `addressSchema(country|order)` (safe default `DEFAULT_COUNTRY`), `emptyAddress(country)`, `formatAddress(addr, country)` (→ one line, schema order, blanks dropped, consecutive duplicates collapsed; `DeliveryAddressPill` splits it on `,`), `addressError(addr, country)` (first unmet required id, topmost-first — mirrors `stepError`), `isAddressComplete`.
+- **Shared component — `AddressForm`** (`{ address, country, onChange, errorField? }`): a two-column grid built from the schema; `onChange` returns the whole next object. It is the single body used by:
+
+| Surface | How |
+|---|---|
+| `EditableContactCard` → `PickupFailedCard`, `AwbFailedCard` | `AddressForm` + phone/email; `country={order.country}` |
+| `InvalidClaimCard` | private `DeliveryDetailsCard` clone retired → shared `EditableContactCard` |
+| Returns flow Step 4 (`Step4PickupDetails` → `EditFieldSheet`) | the address row opens a sheet rendering `AddressForm`; the row shows `formatAddress` |
+
+- **Flow plumbing.** `flowReducer` carries `country` in state (from `order.country`) and seeds `pickupDetails.address = order.addressFields ?? emptyAddress(country)`; pickup validation is `addressError(pd.address, state.country)`. Read-only displays (`ClaimCard` / `WarrantyClaimCard` scheduled-pickup strips, `ClaimDetailsSheet`, `Step6Review`) route the address through `formatAddress`.
+- **Mocked vs prod.** Demo orders are `AE`; the three takeover claim mocks carry a structured UAE `pickupDetails.address`, the rest keep legacy strings (display-safe via `formatAddress`). No order seeds `addressFields` yet, so a flow raised on a delivered order starts with an **empty** country-shaped form — prefill lands once upstream order addresses are structured.
+
+**To add / change a market's fields:** edit `ADDRESS_SCHEMAS[code]` in `lib/address.js` (give a new market a full list, or let it fall back to `Others`); every surface picks it up with no component change.
 
 ## 5. Recipe — add a CARD-design country difference
 

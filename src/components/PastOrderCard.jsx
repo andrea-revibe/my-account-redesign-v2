@@ -24,6 +24,7 @@ import KeepOrderSheet from './KeepOrderSheet'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
+import { ConditionReportChip } from './ConditionReportChip'
 import DeliveryAddressPill from './DeliveryAddressPill'
 import OrderClaimLink from './OrderClaimLink'
 
@@ -50,7 +51,14 @@ function DeliveredOrderCard({ order, onRaiseClaim }) {
         <OrderEyebrow id={order.id} />
         <DeliveredStatePill />
         <DeliveredHero order={order} />
-        <ProductSummary order={order} />
+        <ProductSummary
+          order={order}
+          afterRow={
+            order.conditionReport?.url ? (
+              <ConditionReportChip report={order.conditionReport} />
+            ) : null
+          }
+        />
         {history.length > 0 && <HistoryThread events={history} />}
         <div className="flex flex-col gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
           <PastButton
@@ -100,6 +108,7 @@ function DeliveredHero({ order }) {
     </div>
   )
 }
+
 function PastButton({ icon: Icon, label, onClick, tone = 'muted', full }) {
   const styles = {
     brand:

@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
+import AddressForm from '../AddressForm'
+import { formatAddress, isAddressComplete } from '../../lib/address'
 import {
   CLAIM_STATUSES,
   CLAIM_SLAS,
@@ -21,9 +23,9 @@ import {
 const FIELDS = [
   {
     key: 'address',
-    label: 'Delivery address',
+    label: 'Pickup address',
     Icon: MapPin,
-    inputType: 'textarea',
+    inputType: 'address',
     placeholder: 'Street, building, city',
     inputMode: 'text',
     autoComplete: 'street-address',
@@ -52,6 +54,7 @@ const FIELDS = [
 
 export default function Step4PickupDetails({ state, dispatch, error }) {
   const { pickupDetails } = state
+  const country = state.country
   const [editingKey, setEditingKey] = useState(null)
   const editingField = FIELDS.find((f) => f.key === editingKey) || null
   const isWarranty = state.claimType === 'warranty'
@@ -81,7 +84,10 @@ export default function Step4PickupDetails({ state, dispatch, error }) {
       <div className="px-4 flex flex-col gap-3">
         <div className="rounded-[14px] border border-line bg-surface overflow-hidden">
           {FIELDS.map((field, i) => {
-            const value = pickupDetails[field.key]
+            const value =
+              field.key === 'address'
+                ? formatAddress(pickupDetails.address, country)
+                : pickupDetails[field.key]
             const Icon = field.Icon
             const rowError = fieldError === field.key
             return (
@@ -153,6 +159,7 @@ export default function Step4PickupDetails({ state, dispatch, error }) {
         <EditFieldSheet
           field={editingField}
           value={pickupDetails[editingField.key]}
+          country={country}
           onSave={(value) => {
             dispatch({
               type: 'SET_PICKUP_DETAILS',
@@ -325,8 +332,11 @@ function ConfirmationCheckbox({ checked, error, confirmRef, onChange }) {
   )
 }
 
-function EditFieldSheet({ field, value, onSave, onClose }) {
-  const [draft, setDraft] = useState(value || '')
+function EditFieldSheet({ field, value, country, onSave, onClose }) {
+  const isAddress = field.inputType === 'address'
+  const [draft, setDraft] = useState(
+    isAddress ? (value && typeof value === 'object' ? value : {}) : value || '',
+  )
 
   useEffect(() => {
     const onKey = (e) => {
@@ -341,7 +351,12 @@ function EditFieldSheet({ field, value, onSave, onClose }) {
     }
   }, [onClose])
 
-  const canSave = draft.trim().length > 0
+  const canSave = isAddress
+    ? isAddressComplete(draft, country)
+    : draft.trim().length > 0
+  const commit = () => {
+    if (canSave) onSave(isAddress ? draft : draft.trim())
+  }
 
   return (
     <div
@@ -373,40 +388,44 @@ function EditFieldSheet({ field, value, onSave, onClose }) {
           </button>
         </div>
 
-        <div className="px-4 py-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11.5px] font-semibold text-ink-2 uppercase tracking-[0.04em]">
-              {field.label}
-            </span>
-            {field.inputType === 'textarea' ? (
-              <textarea
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={field.placeholder}
-                inputMode={field.inputMode}
-                autoComplete={field.autoComplete}
-                className="w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[14px] text-ink placeholder:text-muted resize-none min-h-[88px] outline-none focus:border-brand"
-              />
-            ) : (
-              <input
-                autoFocus
-                type={field.type || 'text'}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={field.placeholder}
-                inputMode={field.inputMode}
-                autoComplete={field.autoComplete}
-                className="w-full h-[44px] rounded-[10px] border border-line bg-surface px-3 text-[14px] text-ink placeholder:text-muted outline-none focus:border-brand"
-              />
-            )}
-          </label>
+        <div className="px-4 py-4 flex-1 overflow-y-auto">
+          {isAddress ? (
+            <AddressForm address={draft} country={country} onChange={setDraft} />
+          ) : (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11.5px] font-semibold text-ink-2 uppercase tracking-[0.04em]">
+                {field.label}
+              </span>
+              {field.inputType === 'textarea' ? (
+                <textarea
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={field.placeholder}
+                  inputMode={field.inputMode}
+                  autoComplete={field.autoComplete}
+                  className="w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[14px] text-ink placeholder:text-muted resize-none min-h-[88px] outline-none focus:border-brand"
+                />
+              ) : (
+                <input
+                  autoFocus
+                  type={field.type || 'text'}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={field.placeholder}
+                  inputMode={field.inputMode}
+                  autoComplete={field.autoComplete}
+                  className="w-full h-[44px] rounded-[10px] border border-line bg-surface px-3 text-[14px] text-ink placeholder:text-muted outline-none focus:border-brand"
+                />
+              )}
+            </label>
+          )}
         </div>
 
         <div className="px-4 pb-4 pt-1 flex flex-col gap-2 border-t border-line/60">
           <button
             type="button"
-            onClick={() => canSave && onSave(draft.trim())}
+            onClick={commit}
             disabled={!canSave}
             className="w-full h-12 rounded-[12px] bg-brand text-white text-[14.5px] font-semibold disabled:bg-line disabled:text-muted transition-colors"
           >

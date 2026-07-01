@@ -4,8 +4,9 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  FileText,
+  MapPin,
   Settings2,
-  Truck,
 } from 'lucide-react'
 
 import { ProductSummary } from './ProductSummary'
@@ -15,25 +16,29 @@ import EditableContactCard from './EditableContactCard'
 import { formatClaimRef } from '../lib/claims'
 import { formatAddress } from '../lib/address'
 
-// Routed in App.jsx when `claim.pickupFailure` is set on a claim. Mirrors
-// the DocsRejectedCard pattern: a full danger-tone takeover for a claim
-// that's blocked on a single customer action (here: confirm pickup address
-// so the courier can re-dispatch), then flips to a warn-tone confirmation
-// after the customer taps "Confirm new pickup".
-export default function PickupFailedCard({
+// Routed in App.jsx when `claim.awbFailure` is set on a claim — the airway
+// bill (shipping label) couldn't be generated because the courier couldn't
+// validate the pickup address, so the claim is stuck before pickup. Mirrors
+// the PickupFailedCard pattern: a full danger-tone takeover blocked on a
+// single customer action (here: confirm/correct the pickup address so the
+// AWB can be created), then flips to a warn-tone "generating label" state
+// after the customer taps "Confirm pickup address". The scheduled-pickup
+// strip on ClaimCard only appears once the AWB exists (scheduledPickup.awb),
+// so this gate always precedes it.
+export default function AwbFailedCard({
   order,
   defaultExpanded = false,
   onRequestCancelClaim,
-  onConfirmReschedule,
+  onConfirmAddress,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  // The rescheduled "new pickup on the way" view is driven by the order data
-  // when journey mode advances claim_pickup_rescheduled (pickupFailure.rescheduledAt),
-  // read live so dev-panel Back/Next stay in sync (mirrors InvalidClaimCard's
-  // paidAt/declinedAt). localConfirmed is the fallback for the standalone mock,
-  // where there's no journey to advance.
+  // The warn "generating label" view is driven by the order data when journey
+  // mode advances claim_need_address (awbFailure.submittedAt), read live so
+  // dev-panel Back/Next stay in sync (mirrors PickupFailedCard's rescheduledAt).
+  // localConfirmed is the fallback for the standalone mock, where there's no
+  // journey to advance.
   const [localConfirmed, setLocalConfirmed] = useState(false)
-  const confirmed = !!order.claim.pickupFailure?.rescheduledAt || localConfirmed
+  const confirmed = !!order.claim.awbFailure?.submittedAt || localConfirmed
   const [details, setDetails] = useState(order.claim.pickupDetails)
   const [editing, setEditing] = useState(false)
 
@@ -44,7 +49,7 @@ export default function PickupFailedCard({
   if (confirmed) {
     return (
       <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
-        <PickupRescheduledCard
+        <AddressConfirmedCard
           order={order}
           details={details}
           expanded={expanded}
@@ -55,7 +60,7 @@ export default function PickupFailedCard({
   }
 
   const claim = order.claim
-  const f = claim.pickupFailure
+  const f = claim.awbFailure
 
   return (
     <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
@@ -89,15 +94,15 @@ export default function PickupFailedCard({
         <div className="rounded-[14px] border border-[#f6c5cc] bg-danger-bg p-3.5 flex flex-col gap-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {claim.type === 'warranty' ? 'Warranty claim' : 'Return claim'}
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-danger whitespace-nowrap shrink-0">
-              <AlertTriangle size={11} strokeWidth={2.2} />
-              Pickup failed
+              <MapPin size={11} strokeWidth={2.2} />
+              Address needed
             </span>
           </div>
           <div className="text-[18px] font-bold leading-[1.15] tracking-[-0.01em] text-danger">
-            Pickup didn't go through
+            We couldn’t book a pickup
           </div>
 
           {expanded ? (
@@ -153,9 +158,9 @@ export default function PickupFailedCard({
           )}
 
           <div className="rounded-[10px] bg-surface border border-line px-3 py-2.5 text-[11.5px] text-ink-2 leading-snug">
-            Confirming creates a new AWB with{' '}
-            <span className="font-semibold text-ink">{f.nextPickup.courier}</span>, scheduled
-            for <span className="font-semibold text-ink">{f.nextPickup.slot}</span>.
+            Confirming submits your address so we can create the{' '}
+            <span className="font-semibold text-ink">airway bill</span> and book your
+            pickup.
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -171,17 +176,18 @@ export default function PickupFailedCard({
               onClick={() => {
                 // Journey mode wins (advances the dev panel in lockstep);
                 // falls back to local state for the standalone mock.
-                if (!onConfirmReschedule?.(order.id)) setLocalConfirmed(true)
+                if (!onConfirmAddress?.(order.id)) setLocalConfirmed(true)
               }}
               className="flex-[2] h-[46px] rounded-[10px] border font-semibold text-[13.5px] inline-flex items-center justify-center gap-1.5 bg-danger text-white border-danger hover:brightness-95 active:scale-[0.99] transition"
             >
-              <Truck size={14} strokeWidth={2} />
-              Confirm new pickup
+              <MapPin size={14} strokeWidth={2} />
+              Confirm pickup address
             </button>
           </div>
 
           <div className="text-[10.5px] text-center text-muted -mt-0.5">
-            You'll get a confirmation email and SMS once the new AWB is created.
+            You’ll get a confirmation once the airway bill is created and your pickup is
+            booked.
           </div>
         </div>
       )}
@@ -190,10 +196,8 @@ export default function PickupFailedCard({
   )
 }
 
-function PickupRescheduledCard({ order, details, expanded, onToggle }) {
+function AddressConfirmedCard({ order, details, expanded, onToggle }) {
   const claim = order.claim
-  const f = claim.pickupFailure
-  const next = f.nextPickup
   const pickupDetails = details || claim.pickupDetails
 
   return (
@@ -221,26 +225,24 @@ function PickupRescheduledCard({ order, details, expanded, onToggle }) {
 
         <span className="self-start inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-[0.06em] h-6 px-2.5 text-[10.5px] bg-warn-bg text-warn">
           <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse" />
-          Pickup rescheduled
+          Address confirmed
         </span>
 
         <div className="rounded-[14px] border border-[#ffe3b8] bg-warn-bg p-3.5 flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {claim.type === 'warranty' ? 'Warranty claim' : 'Return claim'}
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-warn whitespace-nowrap shrink-0">
-              <CheckCircle2 size={11} strokeWidth={2.2} />
-              New AWB created
+              <FileText size={11} strokeWidth={2.2} />
+              Generating label
             </span>
           </div>
           <div className="text-[18px] font-bold leading-[1.15] tracking-[-0.01em] text-warn">
-            Your new pickup is on the way
+            We’re creating your shipping label
           </div>
           <div className="text-[11.5px] text-ink-2 leading-snug">
-            <span className="font-semibold text-ink">{next.courier}</span> will collect on{' '}
-            <span className="font-semibold text-ink">{next.slot}</span>. AWB{' '}
-            <span className="font-semibold text-ink tabular-nums">{next.awb}</span>.
+            Your scheduled pickup will appear here once the airway bill is ready.
           </div>
         </div>
 
@@ -249,7 +251,22 @@ function PickupRescheduledCard({ order, details, expanded, onToggle }) {
 
       {expanded && (
         <div className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3 animate-slideDown">
-          <NewPickupSummary next={next} pickupDetails={pickupDetails} country={order.country} />
+          <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
+            <div className="px-3.5 py-2.5 flex items-center gap-2 bg-line-2/30 border-b border-line">
+              <CheckCircle2 size={13} strokeWidth={2} className="text-warn" />
+              <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink">
+                Confirmed pickup address
+              </span>
+            </div>
+            <div className="px-3.5 py-3 flex flex-col gap-1">
+              <div className="text-[13px] font-semibold text-ink leading-snug">
+                {formatAddress(pickupDetails.address, order.country)}
+              </div>
+              <div className="text-[11.5px] text-muted">
+                {pickupDetails.phone} · {pickupDetails.email}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </article>
@@ -289,47 +306,12 @@ function CountdownStrip({ failure }) {
       <div className="flex-1 min-w-0">
         <div className="text-[11.5px] text-ink leading-tight">
           <span className="font-bold text-danger">{failure.timeLeftLabel}</span>
-          <span className="text-ink-2"> to reschedule</span>
+          <span className="text-ink-2"> to confirm your address</span>
         </div>
         <div className="text-[10.5px] text-muted leading-tight mt-0.5">
           Claim auto-cancels {failure.autoCancelAt}
         </div>
       </div>
-    </div>
-  )
-}
-
-function NewPickupSummary({ next, pickupDetails, country }) {
-  return (
-    <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
-      <div className="px-3.5 py-2.5 bg-line-2/30 border-b border-line">
-        <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink">
-          Your new pickup
-        </span>
-      </div>
-      <dl className="px-3.5 py-3 flex flex-col gap-2 text-[12.5px]">
-        <SummaryRow label="Courier" value={next.courier} />
-        <SummaryRow label="AWB" value={next.awb} mono />
-        <SummaryRow label="Slot" value={next.slot} />
-        <SummaryRow label="Pickup from" value={formatAddress(pickupDetails.address, country)} />
-      </dl>
-    </div>
-  )
-}
-
-function SummaryRow({ label, value, mono = false }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <dt className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted shrink-0 pt-0.5">
-        {label}
-      </dt>
-      <dd
-        className={`text-[12.5px] font-semibold text-ink text-right leading-snug ${
-          mono ? 'tabular-nums' : ''
-        }`}
-      >
-        {value}
-      </dd>
     </div>
   )
 }
