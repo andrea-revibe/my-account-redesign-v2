@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
 import { MapPin } from 'lucide-react'
+import AddressForm from './AddressForm'
+import { formatAddress } from '../lib/address'
 
 // Read-only contact block (address · phone · email) that flips to an inline
-// edit form when `editing` is true (Address / Phone / Email inputs + Save /
-// Cancel beneath). Local draft state only — Save commits the next values back
-// to the parent via `onSave`. Shared by PickupFailedCard (pickup address) and
-// AwbFailedCard (address the AWB couldn't be generated for); InvalidClaimCard's
-// DeliveryDetailsCard is a third copy left to migrate later.
+// edit form when `editing` is true: the address is the shared, country-aware
+// AddressForm (structured per-country fields) above Phone / Email inputs + Save
+// / Cancel. Local draft state only — Save commits the next values back to the
+// parent via `onSave`; the read-only address renders via `formatAddress`.
+// Shared by PickupFailedCard, AwbFailedCard, and InvalidClaimCard
+// (title="Delivery details" — its private DeliveryDetailsCard clone was retired).
 export default function EditableContactCard({
   title = 'Pickup address',
   details,
   editing,
   onSave,
   onCancel,
+  country,
 }) {
   const [draft, setDraft] = useState(details)
 
@@ -35,11 +39,10 @@ export default function EditableContactCard({
           className="px-3.5 py-3 flex flex-col gap-3"
           onClick={(e) => e.stopPropagation()}
         >
-          <EditableField
-            label="Address"
-            value={draft.address}
-            onChange={(v) => updateField('address', v)}
-            multiline
+          <AddressForm
+            address={draft.address}
+            country={country}
+            onChange={(a) => updateField('address', a)}
           />
           <EditableField
             label="Phone number"
@@ -71,7 +74,7 @@ export default function EditableContactCard({
         </div>
       ) : (
         <div className="px-3.5 py-3 flex flex-col gap-1">
-          <div className="text-[13px] font-semibold text-ink leading-snug">{details.address}</div>
+          <div className="text-[13px] font-semibold text-ink leading-snug">{formatAddress(details.address, country)}</div>
           <div className="text-[11.5px] text-muted">
             {details.phone} · {details.email}
           </div>

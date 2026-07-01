@@ -14,6 +14,7 @@ import TapToFixCta from './TapToFixCta'
 import OrderClaimLink from './OrderClaimLink'
 import EditableContactCard from './EditableContactCard'
 import { formatClaimRef } from '../lib/claims'
+import { formatAddress } from '../lib/address'
 
 // Routed in App.jsx when `claim.awbFailure` is set on a claim — the airway
 // bill (shipping label) couldn't be generated because the courier couldn't
@@ -139,6 +140,7 @@ export default function AwbFailedCard({
               setEditing(false)
             }}
             onCancel={() => setEditing(false)}
+            country={order.country}
           />
 
           {!editing && (
@@ -258,7 +260,7 @@ function AddressConfirmedCard({ order, details, expanded, onToggle }) {
             </div>
             <div className="px-3.5 py-3 flex flex-col gap-1">
               <div className="text-[13px] font-semibold text-ink leading-snug">
-                {pickupDetails.address}
+                {formatAddress(pickupDetails.address, order.country)}
               </div>
               <div className="text-[11.5px] text-muted">
                 {pickupDetails.phone} · {pickupDetails.email}

@@ -11,6 +11,7 @@ import { COMPENSATION_SUBTYPE_LABELS } from './ClaimFlow/compensationSubtypes'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import RefundSplitRows from './RefundSplitRows'
 import { isSplitPaid } from '../lib/returns'
+import { formatAddress } from '../lib/address'
 
 // Bottom sheet surfacing the full set of choices captured during the
 // raise-a-claim flow: reason, device prep, pickup details (address +
@@ -92,7 +93,7 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
               <>
                 <Row label="Reason" value={reasonText(claim)} />
                 <Row label="Device preparation" value={devicePrepText(claim)} />
-                <Row label="Pickup address" value={pickup.address || '—'} />
+                <Row label="Pickup address" value={formatAddress(pickup.address, order.country) || '—'} />
                 <Row label="Pickup email" value={pickup.email || '—'} />
                 <Row label="Pickup phone" value={pickup.phone || '—'} />
               </>

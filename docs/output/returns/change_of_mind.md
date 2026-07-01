@@ -193,11 +193,11 @@ The reducer stores `packingMethod: 'original_box' | 'post_box'`. The chosen labe
 
 Returns are always picked up by courier today, so the step skips the method selector and surfaces the three contact fields needed for the pickup:
 
-- **Pickup address** — seeded from `order.address`.
+- **Pickup address** — a structured, per-country address (shared `AddressForm`), seeded from `order.addressFields` when present else an empty country-shaped set; shown collapsed via `formatAddress`. See `country_split.md` §4b.
 - **Pickup email** — seeded from `order.email`.
 - **Pickup phone** — seeded from `order.phone`.
 
-State is pre-seeded so the user typically just confirms; tapping any row opens a single-field bottom sheet for editing.
+State is pre-seeded so the user typically just confirms; tapping the email or phone row opens a single-field bottom sheet, and the address row opens a sheet with the structured `AddressForm` (country-shaped fields, `Save` gated on the required ones).
 
 Below the rows, a `What happens next` block surfaces an **`ExpectedByCard`**: CalendarClock-iconed eyebrow ("Expected refund by"), a bold long-form date computed by `expectedCompletionFor(claimType)` in `lib/claims.js` (sums `CLAIM_SLAS.expectedHours` across `CLAIM_STATUSES` and adds to `new Date()`), and a one-line subtitle ("Typical for return claims — exact dates confirmed at each step."). A brand-toned **`See detailed claim timeline`** button below it expands a pipeline-aware step list on tap — same `ProcessRow` chrome as the old always-open list (step headline + `expectedHours`-derived duration suffix `within 24h` / `same day` / `~7 days`, plus the "may take longer if expert inspection is needed" subline on QC). The step source switches automatically to `WARRANTY_CLAIM_STATUSES` on the warranty branch so the dropdown reads with the warranty pipeline (6 steps) — see [warranties_compensations.md](../warranties_compensations.md) §2.4.
 

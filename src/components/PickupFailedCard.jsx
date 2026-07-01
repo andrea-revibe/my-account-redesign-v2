@@ -13,6 +13,7 @@ import TapToFixCta from './TapToFixCta'
 import OrderClaimLink from './OrderClaimLink'
 import EditableContactCard from './EditableContactCard'
 import { formatClaimRef } from '../lib/claims'
+import { formatAddress } from '../lib/address'
 
 // Routed in App.jsx when `claim.pickupFailure` is set on a claim. Mirrors
 // the DocsRejectedCard pattern: a full danger-tone takeover for a claim
@@ -134,6 +135,7 @@ export default function PickupFailedCard({
               setEditing(false)
             }}
             onCancel={() => setEditing(false)}
+            country={order.country}
           />
 
           {!editing && (
@@ -247,7 +249,7 @@ function PickupRescheduledCard({ order, details, expanded, onToggle }) {
 
       {expanded && (
         <div className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3 animate-slideDown">
-          <NewPickupSummary next={next} pickupDetails={pickupDetails} />
+          <NewPickupSummary next={next} pickupDetails={pickupDetails} country={order.country} />
         </div>
       )}
     </article>
@@ -297,7 +299,7 @@ function CountdownStrip({ failure }) {
   )
 }
 
-function NewPickupSummary({ next, pickupDetails }) {
+function NewPickupSummary({ next, pickupDetails, country }) {
   return (
     <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
       <div className="px-3.5 py-2.5 bg-line-2/30 border-b border-line">
@@ -309,7 +311,7 @@ function NewPickupSummary({ next, pickupDetails }) {
         <SummaryRow label="Courier" value={next.courier} />
         <SummaryRow label="AWB" value={next.awb} mono />
         <SummaryRow label="Slot" value={next.slot} />
-        <SummaryRow label="Pickup from" value={pickupDetails.address} />
+        <SummaryRow label="Pickup from" value={formatAddress(pickupDetails.address, country)} />
       </dl>
     </div>
   )

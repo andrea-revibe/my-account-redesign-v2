@@ -22,6 +22,7 @@ import {
   transitSubProgressIndex,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
+import { formatAddress } from '../lib/address'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import OrderClaimLink from './OrderClaimLink'
 import HistoryThread from './HistoryThread'
@@ -246,6 +247,7 @@ function WarrantyHero({ order, claim, tone }) {
           scheduledPickup={claim.scheduledPickup}
           pickupDetails={claim.pickupDetails}
           toneText={t.text}
+          country={order.country}
         />
       )}
 
@@ -260,9 +262,9 @@ function WarrantyHero({ order, claim, tone }) {
   )
 }
 
-function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText }) {
+function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText, country }) {
   const { date, slot } = scheduledPickup || {}
-  const address = pickupDetails?.address
+  const address = formatAddress(pickupDetails?.address, country)
   return (
     <div className="mt-3 pt-3 border-t border-line-2/70 flex flex-col gap-1.5">
       <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2">

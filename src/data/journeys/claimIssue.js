@@ -356,9 +356,13 @@ export const CLAIM_ISSUE_NODES = [
     // Also the re-merge point for the pickup-failed detour
     // (claim_pickup_rescheduled → here): clears any pickupFailure / actionRequired
     // left by that branch (no-op on the happy path).
+    // Post-collection cancel (`claim_cancelled_shipback`) branches from here
+    // through the transit nodes + QC — the device is collected, so a cancel
+    // ships it back (pay-return-shipping) rather than reverting to delivered.
     next: [
       { id: 'claim_transit_arrived_origin_hub', countries: ['AE', 'ZA'] },
       { id: 'claim_qc_started', countries: ['SA', 'Others'] },
+      'claim_cancelled_shipback',
     ],
     apply: (o) => ({
       ...o,
@@ -381,6 +385,7 @@ export const CLAIM_ISSUE_NODES = [
     label: 'Arrived at origin hub',
     trigger: 'system',
     event: 'claim.transit.arrived_origin_hub',
+    next: ['claim_transit_in_transit', 'claim_cancelled_shipback'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -398,6 +403,7 @@ export const CLAIM_ISSUE_NODES = [
     label: 'In transit',
     trigger: 'system',
     event: 'claim.transit.in_transit',
+    next: ['claim_transit_arrived_revibe_hub', 'claim_cancelled_shipback'],
     apply: (o) => ({
       ...o,
       claim: {
@@ -415,6 +421,7 @@ export const CLAIM_ISSUE_NODES = [
     label: 'Arrived at Revibe hub',
     trigger: 'system',
     event: 'claim.transit.arrived_revibe_hub',
+    next: ['claim_qc_started', 'claim_cancelled_shipback'],
     apply: (o) => ({
       ...o,
       claim: {

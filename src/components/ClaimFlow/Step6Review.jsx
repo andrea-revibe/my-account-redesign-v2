@@ -12,6 +12,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
+import { formatAddress } from '../../lib/address'
 import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
@@ -239,7 +240,7 @@ export default function Step6Review({
             <PickupRow
               Icon={MapPin}
               label="Address"
-              value={state.pickupDetails.address}
+              value={formatAddress(state.pickupDetails.address, state.country)}
               multiline
             />
             <PickupRow
