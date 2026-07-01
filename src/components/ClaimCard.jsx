@@ -7,7 +7,6 @@ import {
   CreditCard,
   CalendarClock,
   MapPin,
-  FileText,
 } from 'lucide-react'
 import {
   CLAIM_TRANSIT_SUB_STATUSES,
@@ -32,6 +31,7 @@ import HistoryThread from './HistoryThread'
 import StatusExplainer from './StatusExplainer'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import { ProductSummary } from './ProductSummary'
+import { AwbLink } from './AwbLink'
 import RefundSplitRows from './RefundSplitRows'
 import { isSplitPaid } from '../lib/returns'
 import Timeline from './Timeline'
@@ -291,7 +291,7 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
 }
 
 function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText, country }) {
-  const { date, slot, awb } = scheduledPickup || {}
+  const { date, slot, awb, awbUrl } = scheduledPickup || {}
   const address = formatAddress(pickupDetails?.address, country)
   return (
     <div className="mt-3 pt-3 border-t border-line-2/70 flex flex-col gap-1.5">
@@ -324,16 +324,7 @@ function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText, countr
           <span className="truncate">{address}</span>
         </div>
       )}
-      {awb && (
-        <div className="flex items-start gap-1.5 text-[11.5px] text-ink-2/90">
-          <FileText
-            size={12}
-            strokeWidth={2}
-            className="text-ink-2/70 shrink-0 mt-px"
-          />
-          <span className="tabular-nums">AWB {awb}</span>
-        </div>
-      )}
+      <AwbLink awb={awb} awbUrl={awbUrl} />
     </div>
   )
 }

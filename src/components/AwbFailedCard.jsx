@@ -94,7 +94,7 @@ export default function AwbFailedCard({
         <div className="rounded-[14px] border border-[#f6c5cc] bg-danger-bg p-3.5 flex flex-col gap-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {claim.type === 'warranty' ? 'Warranty claim' : 'Return claim'}
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-danger whitespace-nowrap shrink-0">
               <MapPin size={11} strokeWidth={2.2} />
@@ -231,7 +231,7 @@ function AddressConfirmedCard({ order, details, expanded, onToggle }) {
         <div className="rounded-[14px] border border-[#ffe3b8] bg-warn-bg p-3.5 flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {claim.type === 'warranty' ? 'Warranty claim' : 'Return claim'}
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-warn whitespace-nowrap shrink-0">
               <FileText size={11} strokeWidth={2.2} />

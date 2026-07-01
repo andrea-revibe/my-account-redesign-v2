@@ -1,8 +1,9 @@
 ---
 status: live
-verified_against: cb8ef77
+verified_against: ecdda19
 covers:
   - src/App.jsx
+  - src/components/ConditionReportChip.jsx
   - src/lib/statuses.js
   - src/lib/edd.js
   - src/lib/events.js
@@ -157,7 +158,7 @@ The delivered card is **not expandable** — there is no chevron and no expanded
 - Success-tinted `Delivered` state pill (`PackageCheck` icon).
 - Success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (falls back to the date part of `order.timeline.delivered`); a `Delivered to [📍 …]` address pill below (shared `DeliveryAddressPill`, §3.0.1).
 - The shared `ProductSummary` row (§3.0). The cancelled refund-hero card (§3.4) also uses `ProductSummary` — the `RefundHero` carries the refund amount, the row carries the device + Revibe Care + Total paid.
-- **NSYS condition-report link** — when `order.conditionReport?.url` is present, a quiet, borderless inline link ("Verified by NSYS" with the NSYS mark + an external-link glyph) renders in `ProductSummary`'s `afterRow` slot, directly under the product row. It's a `text-muted → text-ink` hover link, deliberately subordinate to the Revibe Care block and the `I need help` CTA, and opens the third-party NSYS-hosted device condition report in a new tab. The chip is a local `ConditionReportChip` in `PastOrderCard.jsx` (the card owns the affordance, not the shared row). The URL is a decorative placeholder today (like the DHL tracking link — see §10). Field shape: §7.5.
+- **NSYS condition-report link** — when `order.conditionReport?.url` is present, a quiet, borderless inline link ("Verified by NSYS" with the NSYS mark + an external-link glyph) renders in `ProductSummary`'s `afterRow` slot, directly under the product row. It's a `text-muted → text-ink` hover link, deliberately subordinate to the Revibe Care block and the `I need help` CTA, and opens the third-party NSYS-hosted device condition report in a new tab. The chip is the shared **`ConditionReportChip`** (`src/components/ConditionReportChip.jsx`) — extracted out of `PastOrderCard` so the returned-device surfaces can re-show it (`WarrantyClaimCard`'s `device_returned` hero + `InvalidClaimCard`'s delivered paid-return, resolving a fresh return-leg report first; see [returns/claim_tracking.md](./returns/claim_tracking.md) §3.3, [warranties_compensations.md](./warranties_compensations.md) §2.3.2). The card decides *when* to show it and *which* report to pass. The URL is a decorative placeholder today (like the DHL tracking link — see §10). Field shape: §7.5.
 - Stacked footer separated by a top border: a full-width brand-tinted `I need help with this device` button (the relabelled `Raise a claim` CTA — entry point to the returns flow, see [returns/change_of_mind.md](./returns/change_of_mind.md) / [returns/issue.md](./returns/issue.md)) above a right-aligned, quiet `Download receipt`. `PastButton` takes a `tone` (`brand` / `muted` / `quiet`) + `full` to drive this.
 
 A single-row `HistoryThread` (mode `'delivered'`) carrying just the `Order placed` event sits between the product row and the footer buttons, collapsed by default. Delivery is the active hero so it is intentionally absent from the thread.

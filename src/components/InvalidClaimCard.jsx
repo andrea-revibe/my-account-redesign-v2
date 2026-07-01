@@ -21,6 +21,7 @@ import {
 } from '../lib/claims'
 
 import { ProductSummary } from './ProductSummary'
+import { ConditionReportChip } from './ConditionReportChip'
 import OrderClaimLink from './OrderClaimLink'
 import Timeline from './Timeline'
 import { ReturnShipmentTracking } from './ReturnShipmentTracking'
@@ -406,7 +407,17 @@ function PaidShipBackCard({ order, expanded, onToggle }) {
           </div>
         )}
 
-        <ProductSummary order={order} />
+        <ProductSummary
+          order={order}
+          afterRow={
+            delivered &&
+            (ship.conditionReport?.url || order.conditionReport?.url) ? (
+              <ConditionReportChip
+                report={ship.conditionReport ?? order.conditionReport}
+              />
+            ) : null
+          }
+        />
       </button>
 
       {expanded && (

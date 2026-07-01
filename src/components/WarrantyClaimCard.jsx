@@ -28,7 +28,9 @@ import OrderClaimLink from './OrderClaimLink'
 import HistoryThread from './HistoryThread'
 import StatusExplainer from './StatusExplainer'
 import { ProductSummary } from './ProductSummary'
+import { AwbLink } from './AwbLink'
 import Timeline from './Timeline'
+import { ConditionReportChip } from './ConditionReportChip'
 import DeliveryAddressPill from './DeliveryAddressPill'
 import {
   ReturnShipmentTracking,
@@ -104,7 +106,17 @@ export default function WarrantyClaimCard({
           explanation={warrantyClaimExplanation(claim)}
         />
         <WarrantyHero order={order} claim={claim} tone={tone} />
-        <ProductSummary order={order} />
+        <ProductSummary
+          order={order}
+          afterRow={
+            claim.claimStatusId === 'device_returned' &&
+            (claim.shipBack?.conditionReport?.url || order.conditionReport?.url) ? (
+              <ConditionReportChip
+                report={claim.shipBack?.conditionReport ?? order.conditionReport}
+              />
+            ) : null
+          }
+        />
       </button>
 
       {expanded && (
@@ -210,8 +222,15 @@ function WarrantyHero({ order, claim, tone }) {
   const phase = warrantyClaimPhaseTag(claim.claimStatusId)
   const headline = warrantyClaimStatusHeadline(claim)
   const subline = warrantyClaimStatusSubline(claim)
+  // The pickup strip only surfaces once the airway bill exists (its number
+  // rides on scheduledPickup.awb) — matching ClaimCard. Before that the claim
+  // sits at `initiated` with no bookable pickup, so we show a calm "arranging
+  // your pickup" placeholder. (An AWB that *couldn't* be generated routes to
+  // AwbFailedCard, never here.)
   const showScheduledPickup =
-    claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup)
+    claim.claimStatusId === 'initiated' && Boolean(claim.scheduledPickup?.awb)
+  const showArrangingPickup =
+    claim.claimStatusId === 'initiated' && !claim.scheduledPickup?.awb
   const showRepairWindow =
     claim.claimStatusId === 'under_repair' && Boolean(claim.repairWindow)
   const showReturnedOn =
@@ -251,6 +270,8 @@ function WarrantyHero({ order, claim, tone }) {
         />
       )}
 
+      {showArrangingPickup && <ArrangingPickupStrip toneText={t.text} />}
+
       {showRepairWindow && (
         <RepairWindowStrip repair={claim.repairWindow} toneText={t.text} />
       )}
@@ -263,7 +284,7 @@ function WarrantyHero({ order, claim, tone }) {
 }
 
 function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText, country }) {
-  const { date, slot } = scheduledPickup || {}
+  const { date, slot, awb, awbUrl } = scheduledPickup || {}
   const address = formatAddress(pickupDetails?.address, country)
   return (
     <div className="mt-3 pt-3 border-t border-line-2/70 flex flex-col gap-1.5">
@@ -296,6 +317,27 @@ function ScheduledPickupStrip({ scheduledPickup, pickupDetails, toneText, countr
           <span className="truncate">{address}</span>
         </div>
       )}
+      <AwbLink awb={awb} awbUrl={awbUrl} />
+    </div>
+  )
+}
+
+// Pre-AWB window: the claim is `initiated` but the shipping label hasn't been
+// generated yet, so there's no bookable pickup to show. A calm placeholder
+// keeps the hero from reading as empty until scheduledPickup.awb lands.
+// Mirrors ClaimCard's ArrangingPickupStrip.
+function ArrangingPickupStrip({ toneText }) {
+  return (
+    <div className="mt-3 pt-3 border-t border-line-2/70 flex items-start gap-1.5 text-[11.5px] text-ink-2/90">
+      <CalendarClock
+        size={13}
+        strokeWidth={2}
+        className={`${toneText} shrink-0 mt-px opacity-70`}
+      />
+      <span className="leading-[1.35]">
+        Arranging your pickup — your collection window will appear here once your
+        shipping label is ready.
+      </span>
     </div>
   )
 }

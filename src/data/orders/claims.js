@@ -867,6 +867,138 @@ export const CLAIM_ORDERS = [
       },
     },
   },
+  // ----- Layered mock: delivered → issue claim → inspection invalid →
+  // customer paid return shipping → device shipped back and DELIVERED.
+  // Exercises InvalidClaimCard's terminal PaidShipBackCard `delivered`
+  // state (success hero) and — the point of this mock — the "Verified by
+  // NSYS" chip re-appearing under the product row for the returned unit
+  // (fresh returnShipment.conditionReport). `invalidClaim.paidAt` puts the
+  // card in `paid` mode; `returnShipment.currentStatusId: 'delivered'`
+  // completes the leg. Lands in Past via isReturnDelivered.
+  {
+    id: '89928',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '30/03/2026 09:05 AM',
+    placedAtFull: '30 Mar 2026 · 9:05 AM',
+    deliveredOn: '2026-04-06',
+    deliveredOnLong: 'Monday, 6 April',
+    quantity: 1,
+    unitPrice: 629,
+    subtotal: 629,
+    warranty: 55,
+    total: 684,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193428',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '30 Mar · 9:05 AM',
+      quality_check: '1 Apr · 10:12 AM',
+      shipped: '3 Apr · 4:35 PM',
+      delivered: '6 Apr · 11:50 AM',
+    },
+    product: {
+      name: 'iPhone 12',
+      variant: 'Black · 128 GB · Good',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Iv9pRt',
+      claimStatusId: 'qc',
+      subStatusId: 'awaiting_payment',
+      type: 'issue',
+      submittedAt: '02 May 2026 · 8:45 AM',
+      units: 1,
+      issueDetails: {
+        category: 'battery',
+        description:
+          'Battery seemed to drain faster than expected — phone at 30% after a few hours of light use.',
+        attachmentName: 'IMG_0612.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: {
+          area: 'Business Bay',
+          building: 'Ontario Tower',
+          unit: 'Office 103',
+          street: 'Marasi Drive',
+          city: 'Dubai',
+          emirate: 'Dubai',
+        },
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Monday, 4 May',
+        slot: '10 AM – 12 PM',
+        awb: '25193540',
+        awbUrl: '/awb-document.pdf',
+      },
+      refundMethod: 'original',
+      expectedRefund: { itemTotal: 629, warranty: 55, gross: 684, fee: 0, net: 684, rate: 0 },
+      timeline: {
+        initiated: '2 May · 8:45 AM',
+        pickup: '4 May · 10:30 AM',
+        qc: '7 May · 11:20 AM',
+      },
+      detailedTimeline: {
+        qc: { startedAt: '7 May · 11:20 AM' },
+        invalid_confirmed: { startedAt: '14 May · 4:18 PM' },
+        awaiting_payment: { startedAt: '14 May · 4:20 PM' },
+      },
+      invalidClaim: {
+        determinedAt: '14 May · 4:18 PM',
+        autoCancelAt: '21 May · 4:18 PM',
+        timeLeftLabel: '3 days, 8 hours left',
+        paidAt: '17 May · 10:05 AM',
+        opsName: 'Marwa',
+        opsRole: 'Revibe Quality',
+        opsMessage:
+          "Hi Andrea — our technicians ran a full battery diagnostic and the cell health came back at 93%, within the spec we ship at. We weren't able to reproduce the issue you described, so we can't approve the claim. To get the device back we'll need you to cover return shipping — otherwise the unit returns to circulation.",
+        returnShipping: {
+          amount: 35,
+          currency: 'AED',
+        },
+        returnShipment: {
+          courier: 'DHL Express',
+          awb: '25193622',
+          estimatedDelivery: 'May 25',
+          estimatedDeliveryLong: 'Monday, 25 May',
+          currentStatusId: 'delivered',
+          deliveredOn: '2026-05-25',
+          deliveredOnLong: 'Monday, 25 May',
+          subStatusId: 'out_for_delivery',
+          subTimeline: {
+            arrived_destination: '22 May · 7:40 AM',
+            cleared_customs: '23 May · 11:15 AM',
+            forwarded_to_agent: '24 May · 9:30 AM',
+            out_for_delivery: '25 May · 8:10 AM',
+          },
+          timeline: {
+            created: '19 May · 11:00 AM',
+            quality_check: '19 May · 2:30 PM',
+            shipped: '20 May · 9:15 AM',
+            delivered: '25 May · 2:45 PM',
+          },
+          // Fresh NSYS condition report for the un-refunded unit we sent back.
+          conditionReport: {
+            url: 'https://www.nsys.com/',
+            reportId: 'NSYS-RET-89928-A1',
+          },
+        },
+      },
+    },
+  },
   // ----- Closed-by-Revibe mock: delivered → issue claim that QC reviewed and
   // could not reproduce, so Revibe closed it without accepting (no refund, the
   // customer keeps the device). `claim.closure` routes it to ClosedClaimCard

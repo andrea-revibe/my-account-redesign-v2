@@ -1,8 +1,10 @@
 ---
 status: live
-verified_against: 8fb818a
+verified_against: ecdda19
 covers:
   - src/components/WarrantyClaimCard.jsx
+  - src/components/AwbLink.jsx
+  - src/components/ConditionReportChip.jsx
   - src/components/ClaimFlow/Step2Compensation.jsx
   - src/components/ClaimFlow/compensationSubtypes.js
   - src/components/ClaimFlow/Step5RefundMethod.jsx
@@ -67,10 +69,10 @@ Lives at `src/components/WarrantyClaimCard.jsx`. Wrapped in shared `OrderClaimLi
 
 Most states reuse a generic claim hero (headline + optional subline). The claim ref now lives only in the card header eyebrow (`formatClaimRef`), not in the hero. Three states layer state-specific content inside or in place of that hero:
 
-- **`initiated`** — `ScheduledPickupStrip` (CalendarClock + scheduled date/slot, MapPin + pickup address). Same shape as `ClaimCard`'s initiated strip.
+- **`initiated`** — `ScheduledPickupStrip` (CalendarClock + scheduled date/slot, MapPin + pickup address). Same shape as `ClaimCard`'s initiated strip, and now with **AWB parity**: the strip only surfaces once `claim.scheduledPickup.awb` is set, and renders the airway-bill row via the shared **`AwbLink`** (`View airway bill · AWB {awb}` CTA opening the AWB PDF when `scheduledPickup.awbUrl` is set, else a plain text row). Before the AWB lands (`initiated` with no `scheduledPickup.awb`), an `ArrangingPickupStrip` placeholder shows instead ("Arranging your pickup — your collection window will appear here once your shipping label is ready") — mirroring `ClaimCard`. An AWB that *couldn't* be generated routes to `AwbFailedCard` (type-aware `Warranty claim` label; see [returns/claim_tracking.md](./returns/claim_tracking.md) §3.5) — the `claim_warranty` journey now runs the same three-node AWB block (`claim_awb_generated` / `claim_awb_failed` / `claim_need_address`) the refund journeys use, inserted between proof-accepted and pickup (see [journey_backend_spec.md](./journey_backend_spec.md)).
 - **`under_repair`** — `RepairWindowStrip`: Wrench-iconed "Estimated repair complete" date + optional one-line note ("Charging-port assembly swap — typically wraps up within 7–10 days").
 - **`ship_back`** — **replaces** the generic hero with a brand-gradient ETA hero borrowed from `InProgressCard`: "Back with you by {date}" headline, a `DeliveryAddressPill` ("Delivering to" + the order's actual address, falling back to "Home" only when `order.address` is unset), "Claim · {type}" subline. Once the device is on its way back the leg should read as a forward shipment, not a continuation of claim chrome — same rationale as `InvalidClaimCard`'s paid state.
-- **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Delivered on {date}" (headline + state pill read "Delivered").
+- **`device_returned`** — `ReturnedStrip`: success-toned CheckCircle2 + "Delivered on {date}" (headline + state pill read "Delivered"). Also re-shows the shared **`ConditionReportChip`** ("Verified by NSYS" link) under the product row (as `ProductSummary`'s `afterRow`) for the repaired unit sent back — resolving the fresh return-leg report (`claim.shipBack.conditionReport`) first, falling back to `order.conditionReport`. Same chip the delivered `PastOrderCard` and `InvalidClaimCard`'s delivered surface use.
 
 #### 2.3.3 Detailed tracking dropdowns
 
@@ -180,7 +182,7 @@ On top of the standard claim shape (`claimRef`, `claimStatusId`, `type`, `submit
 |---|---|---|
 | `claim.type` | `'warranty'` | Routing in `App.jsx`; hero copy; sheet branching |
 | `claim.repairWindow` *(optional)* | `{ expectedComplete, expectedCompleteLong, note? }` | `under_repair` hero strip |
-| `claim.shipBack` *(optional)* | `{ courier, awb, estimatedDelivery, estimatedDeliveryLong, subStatusId, subTimeline, deliveredOn?, deliveredOnLong? }` | `ship_back` hero + detailed-tracking dropdown; `device_returned` hero strip |
+| `claim.shipBack` *(optional)* | `{ courier, awb, estimatedDelivery, estimatedDeliveryLong, subStatusId, subTimeline, deliveredOn?, deliveredOnLong?, conditionReport? }` | `ship_back` hero + detailed-tracking dropdown; `device_returned` hero strip. `conditionReport` (`{ url, reportId }`) is the fresh NSYS report for the returned unit — surfaced via `ConditionReportChip` at `device_returned`, resolved before `order.conditionReport`. |
 | `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Set when the optional Step-2 battery check (§7.2) was filled in on the `battery` sub-type — same shape and helper (`assessBattery`) as the issue branch (see [returns/issue.md](./returns/issue.md) §6.2). Data only; no warranty-card surface reads it yet. |
 
 `claim.shipBack.subStatusId` is one of the four `SHIPPING_SUB_STATUSES` ids (`arrived_destination`, `cleared_customs`, `forwarded_to_agent`, `out_for_delivery`). `claim.shipBack.subTimeline` is a map keyed by the same ids with human-readable timestamps (e.g. `'19 May · 4:45 PM'`).
@@ -190,8 +192,8 @@ No `refundMethod` / `expectedRefund` fields are needed — the warranty branch h
 ### 2.8 Mocked vs production
 
 - **In-session submit only.** A submitted warranty claim is stored in `App.jsx`'s `submittedClaims` state and projected over `ORDERS`. There's no backend; the claim is cleared on refresh and can be reverted mid-demo via the `UndoSnackbar`.
-- **Pipeline progression isn't simulated.** Submitted claims always land on `claimStatusId: 'initiated'`. The post-pickup heroes (`under_repair` `RepairWindowStrip`, `ship_back` brand-gradient ETA, `device_returned` `ReturnedStrip`, the `See detailed tracking` dropdown) only render on the two hand-seeded mocks **89610** (`under_repair`) and **89580** (`ship_back`). Production needs the same webhook / polling mechanism as the refund flow to move the claim through the 6 states.
-- **`scheduledPickup`, `repairWindow`, `shipBack.*`** are either hand-written (mocks) or filled with placeholders by `buildClaim` (`'DHL Express'`, "10 AM – 12 PM", tomorrow's date for the scheduled pickup; SLA-summed estimated complete date for the repair window). Production needs the supplier + courier integrations that today feed the refund flow.
+- **Pipeline progression isn't simulated.** Submitted claims always land on `claimStatusId: 'initiated'`. The post-pickup heroes (`under_repair` `RepairWindowStrip`, `ship_back` brand-gradient ETA, `device_returned` `ReturnedStrip`, the `See detailed tracking` dropdown) only render on the three hand-seeded mocks **89610** (`under_repair`), **89580** (`ship_back`), and **89568** (`device_returned` — the terminal `ReturnedStrip` + the re-appearing "Verified by NSYS" chip, lands in Past via `isWarrantyDelivered`). Production needs the same webhook / polling mechanism as the refund flow to move the claim through the 6 states.
+- **`scheduledPickup`, `repairWindow`, `shipBack.*`** are either hand-written (mocks) or filled with placeholders by `buildClaim` (`'DHL Express'`, "10 AM – 12 PM", tomorrow's date for the scheduled pickup; SLA-summed estimated complete date for the repair window). Production needs the supplier + courier integrations that today feed the refund flow. `scheduledPickup.awbUrl` + `shipBack.conditionReport` are hand-written placeholders (the AWB PDF and NSYS report are demo links).
 - **Seller-vs-LAB routing not surfaced.** A neutral "Under repair" state is shown regardless of which actor is doing the work; per the §2 design decision the customer doesn't need to see the distinction.
 - **Invalid-warranty path not wired.** The `Inspector decision = Invalid → customer pays return shipping` branch from the operational diagram is structurally identical to today's Issue-flow invalid path (`InvalidClaimCard`) and would route there. Today's mocks don't exercise it.
 - **Auto-expand.** Warranty claims do not currently participate in `pickActiveOrderId` — same posture as `ClaimCard`.
@@ -199,7 +201,7 @@ No `refundMethod` / `expectedRefund` fields are needed — the warranty branch h
 ### 2.9 Open questions
 
 - **Warranty-specific Step 2.** Today the warranty branch reuses the Issue scope picker (battery / screen / wrong device / etc.). Production may want a warranty-specific intake block (proof of warranty / serial / purchase date) — particularly if extended-warranty vs manufacturer's-warranty distinction needs to route differently downstream.
-- **Takeover copy on warranty claims.** `DocsRejectedCard` (now wired into the `claim_warranty` journey), `PickupFailedCard`, and `ResetFailedCard` route ahead of `WarrantyClaimCard` when their fields are set, but all three render the shared "Return claim" eyebrow + refund-flow ops copy. Consistent across takeovers by choice today; a warranty variant ("Warranty claim", warranty-flavoured ops message) is deferred.
+- **Takeover copy on warranty claims.** `AwbFailedCard` is now **type-aware** — its hero label reads `Warranty claim` on a warranty claim (see [returns/claim_tracking.md](./returns/claim_tracking.md) §3.5). `DocsRejectedCard` (wired into the `claim_warranty` journey), `PickupFailedCard`, and `ResetFailedCard` route ahead of `WarrantyClaimCard` when their fields are set but still render the shared "Return claim" eyebrow + refund-flow ops copy; a full warranty variant (warranty-flavoured ops message across all takeovers) is deferred.
 - **Auto-expand for active warranty claims.** Same question as `ClaimCard` ([returns/claim_tracking.md §9](./returns/claim_tracking.md)). Worth revisiting now that customers can routinely have an active warranty claim.
 - **Repair-window source.** Today `claim.repairWindow.expectedComplete` is either hand-written (mocks) or computed from `expectedCompletionFor('warranty')` (in-session submit). Production needs either a per-supplier SLA-driven estimate or a seller-input field at intake.
 - **Single warranty branch or sub-branched intake?** Warranty coverage varies (manufacturer's warranty / Revibe Care add-on / extended warranty). The current intake collapses to one branch; production may want to split at Step 2 with the source determined backend-side.

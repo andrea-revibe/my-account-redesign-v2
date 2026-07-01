@@ -204,8 +204,89 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Proof accepted',
     trigger: 'system',
     event: 'claim.documents.accepted',
-    next: ['claim_picked_up', 'claim_pickup_failed', 'claim_cancelled'],
+    next: ['claim_awb_generated', 'claim_awb_failed', 'claim_cancelled'],
     apply: (o) => o,
+  },
+  // ----- Airway-bill (shipping label) generation — same three-node block the
+  //       refund/issue journeys use (claimIssue.js), inserted here so warranty
+  //       pickups go through the AWB step too. The AWB must exist before a
+  //       courier collection can be booked, so it sits between proof acceptance
+  //       and pickup. Happy path: claim_awb_generated stamps the AWB onto
+  //       scheduledPickup (which surfaces the WarrantyClaimCard pickup strip).
+  //       Failure path: claim_awb_failed → claim_need_address (AwbFailedCard,
+  //       type-aware) → back through claim_awb_generated once the customer
+  //       confirms the address. Events are shared with the refund journeys, so
+  //       the notification copy already exists. -----------------------------
+  {
+    id: 'claim_awb_generated',
+    label: 'Airway bill created',
+    trigger: 'system',
+    event: 'claim.awb.generated',
+    // Also the re-merge target for the need-address detour: clears the failure
+    // and stamps the AWB, then hands off to the pickup gate (success / failed).
+    next: ['claim_picked_up', 'claim_pickup_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'initiated',
+        awbFailure: undefined,
+        actionRequired: undefined,
+        subStatusId: undefined,
+        scheduledPickup: {
+          courier: 'DHL Express',
+          date: 'Wednesday, 27 May',
+          slot: '10 AM – 12 PM',
+          awb: '25193560',
+          awbUrl: '/awb-document.pdf',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_awb_failed',
+    label: 'Airway bill couldn’t be created',
+    trigger: 'system',
+    event: 'claim.awb.failed',
+    next: ['claim_need_address'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        // No AWB → no bookable pickup; drop any pre-set pickup window.
+        scheduledPickup: undefined,
+        awbFailure: {
+          failedAt: '26 May · 9:05 AM',
+          autoCancelAt: '30 May · 9:05 AM',
+          timeLeftLabel: '3 days, 22 hours left',
+          opsName: 'Rashid',
+          opsRole: 'DHL Express',
+          opsMessage:
+            "Hi Andrea — we tried to create your pickup label but the courier couldn't validate the address we have on file (it's missing a building/office the driver can route to). Please confirm or update the pickup address and we'll generate the airway bill and book your collection.",
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_need_address',
+    label: 'Pickup address confirmed',
+    trigger: 'customer',
+    event: 'claim.awb.address_submitted',
+    // Customer confirmed the address (via UI) — the card flips to its
+    // "generating label" state but the claim hasn't moved (awbFailure stays
+    // set, tagged with submittedAt). The system re-runs claim_awb_generated
+    // to actually create the AWB and resume the happy chain.
+    next: ['claim_awb_generated'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        awbFailure: {
+          ...o.claim.awbFailure,
+          submittedAt: '26 May · 9:40 AM',
+        },
+      },
+    }),
   },
   // ----- Happy pickup → transit → QC → repair → ship-back → returned ---
   {
@@ -464,6 +545,12 @@ export const CLAIM_WARRANTY_NODES = [
           ...o.claim.shipBack,
           deliveredOn: '2026-06-12',
           deliveredOnLong: 'Friday, 12 June',
+          // Fresh NSYS condition report for the repaired unit we sent back —
+          // the "Verified by NSYS" chip re-appears on the returned device.
+          conditionReport: {
+            url: 'https://www.nsys.com/',
+            reportId: 'NSYS-WAR-89610-R2',
+          },
         },
       },
     }),

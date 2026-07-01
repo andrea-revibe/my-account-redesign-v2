@@ -294,6 +294,7 @@ export const CLAIM_ISSUE_NODES = [
           date: 'Wednesday, 27 May',
           slot: '10 AM – 12 PM',
           awb: '25193540',
+          awbUrl: '/awb-document.pdf',
         },
       },
     }),

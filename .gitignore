@@ -28,3 +28,8 @@ _*.mjs
 
 # Regenerated each `npm run freshness` run — a snapshot, not a source artifact
 docs/process/freshness-report.md
+
+# Real airway-bill PDF wired into the AWB step — served from public/ locally,
+# but a real document we don't commit. The button falls back to a text row
+# when the asset is absent (e.g. a fresh clone).
+public/awb-document.pdf
