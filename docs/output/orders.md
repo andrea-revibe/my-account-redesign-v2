@@ -78,7 +78,7 @@ flowchart TD
   p4 -->|no| past[PastOrderCard]
 ```
 
-The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard`) share the same chrome family: left accent strip, `Order · #{id}` eyebrow, state pill, tinted hero block, and the shared `ProductSummary` line-item (§3.0). They differ in what the hero leads with and which actions hang off the bottom. The four claim takeover cards (`DocsRejectedCard`, `PickupFailedCard`, `ResetFailedCard`, `InvalidClaimCard`) replace `ClaimCard`'s surface while the claim is blocked on a single customer action; `WarrantyClaimCard` is a sibling card for warranty claims and `RevibeCancellationCard` covers Revibe-initiated cancellations in the Past section. Full specs in [returns/claim_tracking.md](./returns/claim_tracking.md) and [cancellations.md](./cancellations.md).
+The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimCard`) share the same chrome family: left accent strip, `Order · #{id}` eyebrow, state pill, tinted hero block, and the shared `ProductSummary` line-item (§3.0). They differ in what the hero leads with and which actions hang off the bottom. The five claim takeover cards (`DocsRejectedCard`, `AwbFailedCard`, `PickupFailedCard`, `ResetFailedCard`, `InvalidClaimCard`) replace `ClaimCard`'s surface while the claim is blocked on a single customer action; `WarrantyClaimCard` is a sibling card for warranty claims and `RevibeCancellationCard` covers Revibe-initiated cancellations in the Past section. Full specs in [returns/claim_tracking.md](./returns/claim_tracking.md) and [cancellations.md](./cancellations.md).
 
 | Card | Used for | Hero leads with | Expandable? |
 |---|---|---|---|

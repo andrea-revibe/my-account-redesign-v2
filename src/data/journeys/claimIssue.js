@@ -263,8 +263,85 @@ export const CLAIM_ISSUE_NODES = [
     label: 'Proof accepted',
     trigger: 'system',
     event: 'claim.documents.accepted',
-    next: ['claim_picked_up', 'claim_pickup_failed', 'claim_cancelled'],
+    next: ['claim_awb_generated', 'claim_awb_failed', 'claim_cancelled'],
     apply: (o) => o,
+  },
+  // ----- Airway-bill (shipping label) generation. The AWB must be created
+  //       before a courier pickup can be booked, so it sits between proof
+  //       acceptance and pickup. Happy path: claim_awb_generated stamps the
+  //       AWB onto scheduledPickup (which is what surfaces the ClaimCard
+  //       pickup strip). Failure path: claim_awb_failed → claim_need_address
+  //       (AwbFailedCard) → back through claim_awb_generated once the customer
+  //       confirms the address. ---------------------------------------------
+  {
+    id: 'claim_awb_generated',
+    label: 'Airway bill created',
+    trigger: 'system',
+    event: 'claim.awb.generated',
+    // Also the re-merge target for the need-address detour: clears the failure
+    // and stamps the AWB, then hands off to the pickup gate (success / failed).
+    next: ['claim_picked_up', 'claim_pickup_failed'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        claimStatusId: 'initiated',
+        awbFailure: undefined,
+        actionRequired: undefined,
+        subStatusId: undefined,
+        scheduledPickup: {
+          courier: 'DHL Express',
+          date: 'Wednesday, 27 May',
+          slot: '10 AM – 12 PM',
+          awb: '25193540',
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_awb_failed',
+    label: 'Airway bill couldn’t be created',
+    trigger: 'system',
+    event: 'claim.awb.failed',
+    next: ['claim_need_address'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        // No AWB → no bookable pickup; drop any pre-set pickup window.
+        scheduledPickup: undefined,
+        awbFailure: {
+          failedAt: '26 May · 9:05 AM',
+          autoCancelAt: '30 May · 9:05 AM',
+          timeLeftLabel: '3 days, 22 hours left',
+          opsName: 'Rashid',
+          opsRole: 'DHL Express',
+          opsMessage:
+            "Hi Andrea — we tried to create your pickup label but the courier couldn't validate the address we have on file (it's missing a building/office the driver can route to). Please confirm or update the pickup address and we'll generate the airway bill and book your collection.",
+        },
+      },
+    }),
+  },
+  {
+    id: 'claim_need_address',
+    label: 'Pickup address confirmed',
+    trigger: 'customer',
+    event: 'claim.awb.address_submitted',
+    // Customer confirmed the address (via UI) — the card flips to its
+    // "generating label" state but the claim hasn't moved (awbFailure stays
+    // set, tagged with submittedAt). The system re-runs claim_awb_generated
+    // to actually create the AWB and resume the happy chain.
+    next: ['claim_awb_generated'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        awbFailure: {
+          ...o.claim.awbFailure,
+          submittedAt: '26 May · 9:40 AM',
+        },
+      },
+    }),
   },
   // ----- Happy pickup → transit → QC chain (shared with the docs-resubmitted
   //       and pickup-rescheduled re-merge targets). ----------------------

@@ -10,6 +10,7 @@ import ClaimCard from './components/ClaimCard'
 import WarrantyClaimCard from './components/WarrantyClaimCard'
 import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
+import AwbFailedCard from './components/AwbFailedCard'
 import ResetFailedCard from './components/ResetFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
 import ClosedClaimCard from './components/ClosedClaimCard'
@@ -353,6 +354,23 @@ export default function App() {
     return false
   }
 
+  // "Confirm pickup address" on AwbFailedCard. Mirrors handleConfirmReschedule:
+  // in journey mode it advances the customer-triggered `claim_need_address` node
+  // (so the card flips to its "generating label" state and the dev panel moves
+  // in lockstep) — the claim itself hasn't moved yet (awbFailure stays set,
+  // tagged with submittedAt). The separate system `claim_awb_generated` step
+  // creates the airway bill, clears the failure and resumes the happy chain.
+  // Returns true when it advances; outside journey mode it returns false and the
+  // card falls back to local state (the standalone awb-failure mock).
+  const handleConfirmAddress = (orderId) => {
+    if (!journeyMode || isSandbox) return false
+    if (journey.validNext().some((n) => n.id === 'claim_need_address')) {
+      journey.advance('claim_need_address')
+      return true
+    }
+    return false
+  }
+
   // "Submit details" on ResetFailedCard. Mirrors handleConfirmReschedule: in
   // journey mode it advances the customer-triggered unlock-details node so the
   // card flips to its "details received" state and the dev panel moves in
@@ -439,6 +457,7 @@ export default function App() {
           claim: {
             ...o.claim,
             docsRejection: undefined,
+            awbFailure: undefined,
             pickupFailure: undefined,
             resetFailed: undefined,
             actionRequired: undefined,
@@ -590,6 +609,16 @@ export default function App() {
                           key={o.id}
                           order={o}
                           onRequestCancelClaim={onRequestCancelClaim}
+                        />
+                      )
+                    }
+                    if (hasActiveClaim(o) && o.claim?.awbFailure) {
+                      return (
+                        <AwbFailedCard
+                          key={o.id}
+                          order={o}
+                          onRequestCancelClaim={onRequestCancelClaim}
+                          onConfirmAddress={handleConfirmAddress}
                         />
                       )
                     }

@@ -59,11 +59,82 @@ export const CLAIM_ORDERS = [
         courier: 'DHL Express',
         date: 'Tomorrow, 20 May',
         slot: '10 AM – 12 PM',
+        awb: '25193512',
       },
       refundMethod: 'wallet',
       expectedRefund: { itemTotal: 829, warranty: 80, gross: 909, fee: 0, net: 909, rate: 0 },
       timeline: {
         initiated: '19 May · 9:12 AM',
+      },
+    },
+  },
+  // ----- Layered mock (AWB failed → address needed): delivered → change-of-mind
+  // claim just submitted, but the courier couldn't validate the pickup address
+  // so the airway bill couldn't be generated — no pickup can be scheduled until
+  // the customer confirms the address. Routes via `claim.awbFailure` to
+  // AwbFailedCard (the action gate that precedes the pickup gate). There's no
+  // `scheduledPickup` here on purpose — it only appears once the AWB exists.
+  {
+    id: '89944',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '05/05/2026 11:02 AM',
+    placedAtFull: '5 May 2026 · 11:02 AM',
+    deliveredOn: '2026-05-18',
+    deliveredOnLong: 'Monday, 18 May',
+    quantity: 1,
+    unitPrice: 749,
+    subtotal: 749,
+    warranty: 70,
+    total: 819,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193544',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '5 May · 11:02 AM',
+      quality_check: '7 May · 10:15 AM',
+      shipped: '9 May · 4:20 PM',
+      delivered: '18 May · 1:36 PM',
+    },
+    product: {
+      name: 'iPhone 12 mini',
+      variant: 'Purple · 128 GB · Good',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Aw7bXq',
+      claimStatusId: 'initiated',
+      type: 'change_of_mind',
+      submittedAt: '20 May 2026 · 8:40 AM',
+      units: 1,
+      reason: { value: 'changed_mind', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      refundMethod: 'wallet',
+      expectedRefund: { itemTotal: 749, warranty: 70, gross: 819, fee: 0, net: 819, rate: 0 },
+      timeline: {
+        initiated: '20 May · 8:40 AM',
+      },
+      awbFailure: {
+        failedAt: '20 May · 9:05 AM',
+        autoCancelAt: '24 May · 9:05 AM',
+        timeLeftLabel: '3 days, 22 hours left',
+        opsName: 'Rashid',
+        opsRole: 'DHL Express',
+        opsMessage:
+          "Hi Andrea — we tried to create your pickup label but the courier couldn't validate the address we have on file (it's missing a building/office the driver can route to). Please confirm or update the pickup address and we'll generate the airway bill and book your collection.",
       },
     },
   },

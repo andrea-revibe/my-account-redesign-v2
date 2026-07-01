@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8fb818a
+verified_against: 8e46514
 covers:
   - src/App.jsx
   - src/lib/claims.js
@@ -30,7 +30,9 @@ flowchart TD
 
   IP --> ip1{"claim.docsRejection?"}
   ip1 -- yes --> DocsRejectedCard
-  ip1 -- no --> ip2{"claim.pickupFailure?"}
+  ip1 -- no --> ip1a{"claim.awbFailure?"}
+  ip1a -- yes --> AwbFailedCard
+  ip1a -- no --> ip2{"claim.pickupFailure?"}
   ip2 -- yes --> PickupFailedCard
   ip2 -- no --> ip3{"claim.resetFailed?"}
   ip3 -- yes --> ResetFailedCard
@@ -59,7 +61,7 @@ flowchart TD
   p3 -- no --> POC["PastOrderCard (onRaiseClaim)"]
 ```
 
-The first four in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline. (The `invalidClaim` branch is also reached via the post-collection cancel projection — see [returns/claim_tracking.md](./returns/claim_tracking.md) §2.8.) In the past ladder, a Revibe-closed claim (`isClaimClosed` — `claim.closure` set, no refund) routes to `ClosedClaimCard` ahead of the cancellation check, and a Revibe-initiated cancellation (`cancellationInitiator === 'revibe'`) routes to `RevibeCancellationCard` ahead of the customer `PastOrderCard` fallback. Full prose tree: [orders.md](./orders.md) §2.
+The first five in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline (`awbFailure` sits pre-pickup: no airway bill → no bookable pickup). (The `invalidClaim` branch is also reached via the post-collection cancel projection — see [returns/claim_tracking.md](./returns/claim_tracking.md) §2.8.) In the past ladder, a Revibe-closed claim (`isClaimClosed` — `claim.closure` set, no refund) routes to `ClosedClaimCard` ahead of the cancellation check, and a Revibe-initiated cancellation (`cancellationInitiator === 'revibe'`) routes to `RevibeCancellationCard` ahead of the customer `PastOrderCard` fallback. Full prose tree: [orders.md](./orders.md) §2.
 
 ---
 
@@ -67,7 +69,7 @@ The first four in-progress branches are the **takeover cards** — they supersed
 
 **Read before:** changing a claim pipeline, adding a claim state, or wiring a new takeover. **Source:** `src/lib/claims.js` — `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `WARRANTY_CLAIM_STATUSES`·284, terminal predicates `hasActiveClaim`·160 / `isClaimRefunded`·168 / `isWarrantyDelivered`·225. Takeover seeded states: `src/data/orders/claims.js`.
 
-All four pipelines on one canvas, tone-classed **warn → brand → success** (matching the card tone helpers), with the four takeover detours annotated by trigger flag + the claim state they're seeded at.
+All four pipelines on one canvas, tone-classed **warn → brand → success** (matching the card tone helpers), with the five takeover detours annotated by trigger flag + the claim state they're seeded at.
 
 ```mermaid
 flowchart LR
@@ -90,6 +92,7 @@ flowchart LR
   end
 
   r1 -. "docsRejection (@initiated)" .-> T1["DocsRejectedCard"]:::takeover
+  r1 -. "awbFailure (@initiated, pre-pickup)" .-> T1b["AwbFailedCard"]:::takeover
   r1 -. "pickupFailure (@initiated)" .-> T2["PickupFailedCard"]:::takeover
   r3 -. "resetFailed (@qc)" .-> T3["ResetFailedCard"]:::takeover
   r3 -. "invalidClaim (@qc)" .-> T4["InvalidClaimCard"]:::takeover
@@ -99,7 +102,7 @@ flowchart LR
 Notes:
 - **In progress vs Past.** `hasActiveClaim` keeps a claim in the *In progress* section until its terminal state — `refund_credited` (refund/compensation) or `device_returned` (warranty) — which flips it to *Past* via `isClaimRefunded` / `isWarrantyDelivered`. A `claim.closure` flag (Revibe closed the claim, no refund) is terminal regardless of `claimStatusId`: `hasActiveClaim` returns false and the order routes to *Past* via `isClaimClosed` → `ClosedClaimCard`.
 - **Compensation reuses the refund status ids** (`initiated` / `qc` / `refund_issued` / `refund_credited`) minus the pickup leg, so the tone/phase helpers apply unchanged.
-- **Projection invariant.** A freshly-submitted claim always lands on `initiated` (see [Returns data-flow](#returns-data-flow)). Every post-`initiated` state and all four takeovers are reachable only via hand-seeded mocks in `data/orders/*` — see each `docs/output/*.md` "Mocked vs production" list. Spec: [returns/claim_tracking.md](./returns/claim_tracking.md), [warranties_compensations.md](./warranties_compensations.md).
+- **Projection invariant.** A freshly-submitted claim always lands on `initiated` (see [Returns data-flow](#returns-data-flow)). Every post-`initiated` state and all five takeovers are reachable only via hand-seeded mocks in `data/orders/*` (or the journey-mode replay) — see each `docs/output/*.md` "Mocked vs production" list. Spec: [returns/claim_tracking.md](./returns/claim_tracking.md), [warranties_compensations.md](./warranties_compensations.md).
 
 ---
 
