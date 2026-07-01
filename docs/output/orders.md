@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8fb818a
+verified_against: cb8ef77
 covers:
   - src/App.jsx
   - src/lib/statuses.js
@@ -94,7 +94,7 @@ The four baseline cards (`InProgressCard`, `OrderCard`, `PastOrderCard`, `ClaimC
 
 Every order/claim card renders the "what you bought + what you paid" row through one shared component, `src/components/ProductSummary.jsx` (design: `docs/handoff/product-summary/design.md`, "Direction C — Elevated Care"). It replaced ten near-identical inline copies and exports the single `REVIBE_CARE_ICON` constant (mirroring `WalletInfoTooltip`'s `REVIBE_WALLET_ICON`); the cancellation/refund breakdown surfaces (`CancelOrderSheet`, `Step5RefundMethod`) import that constant rather than re-declaring it.
 
-API: `<ProductSummary order={order} tone="light" | "hero" />`. The component owns the thumbnail, name, variant, the Revibe Care callout, and the price breakdown — but **not** the expand chevron (the card owns the tap target + chevron).
+API: `<ProductSummary order={order} tone="light" | "hero" afterRow={node} />`. The component owns the thumbnail, name, variant, the Revibe Care callout, and the price breakdown — but **not** the expand chevron (the card owns the tap target + chevron). `afterRow` (optional) slots caller-supplied content in a `mt-2.5` block under the top row and above the Care callout — the card owns what goes there; the delivered card uses it for the NSYS condition-report link (§3.3).
 
 Layout (with warranty):
 
@@ -157,6 +157,7 @@ The delivered card is **not expandable** — there is no chevron and no expanded
 - Success-tinted `Delivered` state pill (`PackageCheck` icon).
 - Success gradient hero block (`from-success-bg to-[#d4f0e3]`) carrying `Delivered on` eyebrow + `Complete` tag with checkmark; a `text-[26px]` headline using `order.deliveredOnLong` (falls back to the date part of `order.timeline.delivered`); a `Delivered to [📍 …]` address pill below (shared `DeliveryAddressPill`, §3.0.1).
 - The shared `ProductSummary` row (§3.0). The cancelled refund-hero card (§3.4) also uses `ProductSummary` — the `RefundHero` carries the refund amount, the row carries the device + Revibe Care + Total paid.
+- **NSYS condition-report link** — when `order.conditionReport?.url` is present, a quiet, borderless inline link ("Verified by NSYS" with the NSYS mark + an external-link glyph) renders in `ProductSummary`'s `afterRow` slot, directly under the product row. It's a `text-muted → text-ink` hover link, deliberately subordinate to the Revibe Care block and the `I need help` CTA, and opens the third-party NSYS-hosted device condition report in a new tab. The chip is a local `ConditionReportChip` in `PastOrderCard.jsx` (the card owns the affordance, not the shared row). The URL is a decorative placeholder today (like the DHL tracking link — see §10). Field shape: §7.5.
 - Stacked footer separated by a top border: a full-width brand-tinted `I need help with this device` button (the relabelled `Raise a claim` CTA — entry point to the returns flow, see [returns/change_of_mind.md](./returns/change_of_mind.md) / [returns/issue.md](./returns/issue.md)) above a right-aligned, quiet `Download receipt`. `PastButton` takes a `tone` (`brand` / `muted` / `quiet`) + `full` to drive this.
 
 A single-row `HistoryThread` (mode `'delivered'`) carrying just the `Order placed` event sits between the product row and the footer buttons, collapsed by default. Delivery is the active hero so it is intentionally absent from the thread.
@@ -344,6 +345,12 @@ Today an order has one product. The `product` object carries:
 
 Multi-item orders are out of scope for the prototype (see §11).
 
+One related **order-level** (not `product`-nested) field carries device provenance:
+
+| Field | Type | Notes |
+|---|---|---|
+| `conditionReport` *(optional)* | `{ url, reportId }` | Third-party (NSYS) device condition report. When `url` is present, the delivered `PastOrderCard` renders the quiet "Verified by NSYS" link under the product row (§3.3). `reportId` is the NSYS report reference (e.g. `NSYS-89657-A7C3`). `url` is a decorative placeholder today (§10). Only seeded on delivered orders. |
+
 ## 8. UX decisions
 
 These decisions came out of phase-2 review and inform later phases; future contributors should know why the prototype looks the way it does.
@@ -406,6 +413,7 @@ When the backend lands, the swap is small: `App.jsx` currently imports the stati
 - **Order data.** Eight hand-written orders in `src/data/orders.js`. Production needs a fetch endpoint returning the same shape.
 - **Authentication.** No login, no session, no per-customer scoping.
 - **DHL integration.** "Track order" hardcodes `tracking-id=3392654392` so the demo always lands on a real tracking page. Production should template on `order.trackingNumber`. "Need help with delivery?" links to DHL's generic customer-service page.
+- **NSYS condition report.** The delivered card's "Verified by NSYS" link (`order.conditionReport.url`) points at the NSYS marketing site as a placeholder. Production should link to the actual NSYS-hosted per-device report keyed off `conditionReport.reportId`.
 - **`delayed` is a static flag.** Hand-set in `orders.js` today. Production should derive lateness from comparing `estimatedDelivery` (or step ETAs) against current time / SLA. `statusMessage` is the production hook for ad-hoc backend-injected updates.
 - **`estimatedDelivery` format.** Currently a freeform string (`"Wed, 29 Apr 2026"`). DHL's real shape may include time windows and structured data — revisit when integrating.
 - **Single carrier.** Code is generalised but mock data uses DHL only. Adding a second carrier requires no code change.

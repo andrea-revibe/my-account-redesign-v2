@@ -27,6 +27,10 @@ export const INITIAL_ORDER = {
   timeline: {
     created: '19 May · 10:30 AM',
   },
+  conditionReport: {
+    url: 'https://www.nsysgroup.com',
+    reportId: 'NSYS-89610-C8B5',
+  },
   product: {
     name: 'iPhone 13',
     variant: 'Midnight · 128 GB · Good',

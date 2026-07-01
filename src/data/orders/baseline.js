@@ -178,6 +178,10 @@ export const BASELINE_ORDERS = [
       shipped: '6 May · 11:02 AM',
       delivered: '8 May · 3:14 PM',
     },
+    conditionReport: {
+      url: 'https://www.nsysgroup.com',
+      reportId: 'NSYS-89657-A7C3',
+    },
     product: {
       name: 'iPhone 13',
       variant: 'Midnight · 128 GB · Good',
@@ -212,6 +216,10 @@ export const BASELINE_ORDERS = [
       quality_check: '26 May · 10:05 AM',
       shipped: '27 May · 9:12 AM',
       delivered: '28 May · 1:40 PM',
+    },
+    conditionReport: {
+      url: 'https://www.nsysgroup.com',
+      reportId: 'NSYS-89701-B2E9',
     },
     product: {
       name: 'iPad Pro 11″',
@@ -251,6 +259,10 @@ export const BASELINE_ORDERS = [
       quality_check: '25 May · 11:20 AM',
       shipped: '27 May · 8:40 AM',
       delivered: '29 May · 2:05 PM',
+    },
+    conditionReport: {
+      url: 'https://www.nsysgroup.com',
+      reportId: 'NSYS-89702-F4D1',
     },
     product: {
       name: 'MacBook Air 13″',
