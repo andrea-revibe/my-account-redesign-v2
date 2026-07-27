@@ -20,6 +20,7 @@
 import { INITIAL_ORDER } from './journeys/initialOrder'
 import { HAPPY_PATH_NODES } from './journeys/happyPath'
 import { CANCELLATION_NODES } from './journeys/cancellation'
+import { SHIPPED_CANCELLATION_NODES } from './journeys/shippedCancellation'
 import { CLAIM_COM_NODES } from './journeys/claimChangeOfMind'
 import { CLAIM_WARRANTY_NODES } from './journeys/claimWarranty'
 import { CLAIM_ISSUE_NODES } from './journeys/claimIssue'
@@ -70,6 +71,17 @@ export const JOURNEYS = [
     // the refund surfaces + lib/wallet, so the existing nodes need no changes.
     initialOrder: { ...INITIAL_ORDER, paymentSplit: { card: 343, giftCard: 686 } },
     nodes: CANCELLATION_NODES,
+  },
+  // Shipped order that stalls in transit. The cancel affordance on the delivery
+  // hero is country-gated (`shippedCancellation` — off in AE), so replay this
+  // with `?country=ZA` to reach it; AE is the deliberate no-cancel contrast.
+  // Single-payment on purpose: the split-refund rows are already exercised by
+  // the `cancellation` journey.
+  {
+    id: 'shipped_cancellation',
+    label: 'Stuck-in-transit cancellation',
+    initialOrder: INITIAL_ORDER,
+    nodes: SHIPPED_CANCELLATION_NODES,
   },
   {
     id: 'claim_change_of_mind',

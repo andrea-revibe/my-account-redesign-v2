@@ -6,9 +6,12 @@ import RefundSplitRows from './RefundSplitRows'
 import { CANCELLATION_FEE_RATE, isSplitPaid } from '../lib/returns'
 
 // Statuses where the dissuade screen fires on the original-payment path.
-// At these stages the order hasn't shipped yet, so the ship-deadline fee
-// waiver still has meaning; shipped/delivered cancellations skip it.
-const DISSUADE_STATUSES = new Set(['created', 'quality_check'])
+// `created` / `quality_check` get the ship-deadline fee-waiver pitch; `shipped`
+// only ever reaches this sheet via the stuck-in-transit route (HeroCard +
+// canCancelShipped), which is always `promiseBreached`, so it lands on the
+// apology variant of the step rather than the waiver pitch. Delivered orders
+// never open the sheet — returns take over.
+const DISSUADE_STATUSES = new Set(['created', 'quality_check', 'shipped'])
 
 // Flat Wallet bonus paid when the customer cancels an order that has blown
 // its SLA and is past the initial delivery promise (`order.promiseBreached`).
@@ -326,6 +329,9 @@ function ConfirmStep({
 }) {
   const isStoreCredit = method === 'store_credit'
   const isSplit = !isStoreCredit && isSplitPaid(order)
+  // Stuck-in-transit cancellation: the parcel is already with the courier, so
+  // the one thing the customer will ask is what happens to it.
+  const isShipped = order.statusId === 'shipped'
   const amount = isStoreCredit ? (breached ? walletTotal : total) : refundOriginal
   const destination = isStoreCredit
     ? 'Revibe Wallet'
@@ -421,7 +427,16 @@ function ConfirmStep({
             strokeWidth={1.75}
             className="text-muted shrink-0 mt-px"
           />
-          <span>{message}</span>
+          <span>
+            {message}
+            {isShipped && (
+              <>
+                {' '}
+                We'll recall the parcel from the courier — you don't need to do
+                anything.
+              </>
+            )}
+          </span>
         </div>
       </div>
       <SheetFooter>

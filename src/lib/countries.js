@@ -12,13 +12,17 @@
 //     delivery + claim inbound/return legs). Off → the dropdown is omitted.
 //   expertReview — claim gets an expert-revision step before it can be marked
 //     invalid (journey-sequence difference; scaffolded, not yet wired).
+//   shippedCancellation — customer can self-cancel a *shipped* order that has
+//     been in transit past SHIPPED_CANCEL_WINDOW_DAYS (lib/returns.js). Off in
+//     AE, where a shipped order can only be cancelled through support. Gated on
+//     the delivery hero (HeroCard) via canCancelShipped.
 export const DEFAULT_COUNTRY = 'AE'
 
 export const COUNTRIES = {
-  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  eddMarket: 'UAE' },
-  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, eddMarket: 'ZA'  },
-  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  eddMarket: 'SA'  },
-  Others: { label: 'Others',       detailedTracking: false, expertReview: false, eddMarket: null  },
+  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  shippedCancellation: false, eddMarket: 'UAE' },
+  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, shippedCancellation: true,  eddMarket: 'ZA'  },
+  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  shippedCancellation: true,  eddMarket: 'SA'  },
+  Others: { label: 'Others',       detailedTracking: false, expertReview: false, shippedCancellation: true,  eddMarket: null  },
 }
 
 export const COUNTRY_CODES = ['AE', 'ZA', 'SA', 'Others']

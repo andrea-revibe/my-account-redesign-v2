@@ -200,9 +200,12 @@ export default function App() {
     if (!journeyMode || isSandbox) return
     const branch = method === 'store_credit' ? 'wallet' : 'card'
     // Late + past-promise variants take precedence: they're only ever in
-    // validNext from the `order_late` / `qc_late` nodes, so listing them
-    // first is harmless on the normal path (only one is ever reachable).
+    // validNext from the `order_late` / `qc_late` / `shipped_stuck` nodes, so
+    // listing them first is harmless on the normal path (only one is ever
+    // reachable). `cancel_shipped_*` is the stuck-in-transit route, raised from
+    // the delivery hero rather than InProgressCard / OrderCard.
     const candidates = [
+      `cancel_shipped_${branch}`,
       `cancel_late_before_qc_${branch}`,
       `cancellation_late_requested_${branch}`,
       `cancel_before_qc_${branch}`,
@@ -585,7 +588,11 @@ export default function App() {
         />
 
         {showHero && (
-          <HeroCard order={activeOrder} onRaiseClaim={setClaimFlowOrderId} />
+          <HeroCard
+            order={activeOrder}
+            onRaiseClaim={setClaimFlowOrderId}
+            onCancelOrder={handleCancelOrder}
+          />
         )}
 
         {filtered.length === 0 ? (
