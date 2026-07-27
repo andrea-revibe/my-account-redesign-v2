@@ -53,6 +53,8 @@ Live-UI wiring: the card's `Cancel claim` CTA opens `CancelClaimSheet`; on confi
 
 ## Customer notifications
 
+> **Channel policy lives in [`notifications-flow.md`](../artifact/notifications-flow.md).** That doc owns *which channels notify at each event and why* (push / email / WhatsApp roles, selection rules, per-event trigger matrix, deliberate silences). This section owns only the **mechanism** below.
+
 `JourneyNotificationPanel` (stacked above `JourneyDevPanel`, replay journeys only) previews the WhatsApp / Email message the customer receives at the **current node**, looked up by the node's backend `event` name via `notificationFor(event, order)` → `{ status, whatsapp, email }` (`whatsapp`/`email` null → panel shows an empty state). Keying by `event` (not node id) means one event reuses the same copy across journeys.
 
 **Coverage metadata (`status`).** Every notification carries a `status` flagging how it relates to our existing comms, surfaced as a badge in the panel header and rolled up across the journey in `JourneyDevPanel`'s "Comms" strip:
