@@ -1,17 +1,21 @@
 ---
 status: live
-verified_against: 8fb818a
+verified_against: c2cd56d
 covers:
   - src/components/CancelOrderSheet.jsx
   - src/components/RefundSplitRows.jsx
   - src/components/KeepOrderSheet.jsx
+  - src/components/HeroCard.jsx
   - src/components/Timeline.jsx
   - src/components/UndoSnackbar.jsx
   - src/components/RefundDetailsSheet.jsx
   - src/components/PastOrderCard.jsx
   - src/components/RevibeCancellationCard.jsx
   - src/lib/statuses.js
+  - src/lib/returns.js
+  - src/lib/countries.js
   - src/data/orders/baseline.js
+  - src/data/journeys/shippedCancellation.js
 ---
 
 # Cancellations
@@ -20,24 +24,24 @@ covers:
 
 ## 1. Overview
 
-Customers can cancel orders themselves from the `created` and `quality_check` states; once an order is `shipped` they have to contact support. Cancellation has two surfaces:
+Customers can cancel orders themselves from the `created` and `quality_check` states. A `shipped` order normally needs support — with one exception: outside AE, a shipment that has **stalled in transit past the cancellation window** becomes self-cancellable from the delivery hero (§2.6). Cancellation has two surfaces:
 
-- A **forward** flow — the `Cancel order` bottom sheet (`CancelOrderSheet`) opened from `InProgressCard`. Two- or three-step depending on refund method.
+- A **forward** flow — the `Cancel order` bottom sheet (`CancelOrderSheet`) opened from `InProgressCard`, or from `HeroCard` on the stuck-in-transit path. Two- or three-step depending on refund method.
 - A **reverse** flow — the `I want to keep my order` button on the refund-hero variant of `PastOrderCard`, shown only while the cancellation is still at `requested` (before the refund is accepted). Opens a single-step `KeepOrderSheet` confirm.
 
 Cancelled orders flip the order's `state` to `cancelled` and add a parallel `cancellationStatusId` / `cancellationTimeline` chain. The `statusId` is **not** changed — a cancelled order keeps the `statusId` it had at cancellation, so the timeline still renders where the order was when the customer pulled the plug.
 
 There are **two cancellation worlds**, discriminated by `cancellationInitiator`. **Customer-initiated** (default / absent / `'customer'`) is everything in §2–§5 below — the refund-hero `CancelledOrderCard`. **Revibe-initiated** (`'revibe'`) is the inverse case: Revibe had to cancel and the customer never asked. It renders a separate sibling card (`RevibeCancellationCard`, §11) that leads with an apology + a re-buy discount instead of a refund receipt.
 
-The **stage at cancellation changes the refund path** (modelled in the `cancellation` journey, `src/data/journey.js`). Cancelling **before QC** (`created`) skips supplier review entirely: nothing is packed yet, so the request lands straight on `refund_pending` — a `requested` timestamp is still stamped so the stepper reads Requested ✓ → Pending. Cancelling **at QC** (`quality_check`) waits on an ops review that can be accepted or declined, since the unit may already be packed.
+The **stage at cancellation changes the refund path** (modelled in the `cancellation` journey, `src/data/journey.js`). Cancelling **before QC** (`created`) skips supplier review entirely: nothing is packed yet, so the request lands straight on `refund_pending` — a `requested` timestamp is still stamped so the stepper reads Requested ✓ → Pending. Cancelling **at QC** (`quality_check`) waits on an ops review that can be accepted or declined, since the unit may already be packed. Cancelling a **stalled `shipped`** order (§2.6) waits on a review too, for a different reason — the courier has to agree to recall the parcel.
 
 Refund math + the 5% processing fee + the success-tone wallet recommendation are prototype-only; production will read the eligibility window, fee rate, recommendation policy, and per-line-item amounts from the backend.
 
 ## 2. Cancel order flow (`CancelOrderSheet`)
 
-`Cancel order` on a `created` or `quality_check` order opens a bottom sheet with a `max-height: 92vh`, a `black/45` scrim, and a slide-up entrance. Dismissible by tapping the scrim, the X icon, or pressing `Escape`.
+`Cancel order` on a `created` or `quality_check` order (or a stuck-in-transit `shipped` one, §2.6) opens a bottom sheet with a `max-height: 92vh`, a `black/45` scrim, and a slide-up entrance. Dismissible by tapping the scrim, the X icon, or pressing `Escape`.
 
-The flow is two steps for the wallet path and three steps for the original-payment path. The extra middle step is a take-rate-protection "dissuade" screen that fires only when both conditions hold: `method === 'original'` **and** `statusId ∈ DISSUADE_STATUSES` (currently `created`, `quality_check`).
+The flow is two steps for the wallet path and three steps for the original-payment path. The extra middle step is a take-rate-protection "dissuade" screen that fires only when both conditions hold: `method === 'original'` **and** `statusId ∈ DISSUADE_STATUSES` (`created`, `quality_check`, `shipped`). `created` / `quality_check` get the ship-deadline fee-waiver pitch; `shipped` only ever reaches the sheet via the stuck-in-transit route, which is always `promiseBreached`, so it lands on the §2.5 apology variant of the step rather than the waiver pitch. Delivered orders never open the sheet — returns take over.
 
 ### 2.1 Branching
 
@@ -106,9 +110,58 @@ When an order has **blown its SLA at the current stage and is past the initial d
 
 The bonus is **Wallet-only** — the card path is a full refund with no bonus, exactly like the issue claim.
 
+### 2.6 Stuck-in-transit cancellation (`shipped`, outside AE)
+
+A parcel that stops moving is the one shipped case where the customer shouldn't have to call support. Once a shipment has been in transit longer than `SHIPPED_CANCEL_WINDOW_DAYS` (7, `src/lib/returns.js`), markets outside AE let the customer cancel it themselves; in AE the button stays the decorative tooltip stub and support does it.
+
+**The gate** — `canCancelShipped(order)` (`lib/returns.js`), three conditions, all required:
+
+1. `order.statusId === 'shipped'` and `order.state !== 'cancelled'`.
+2. `countryConfig(order).shippedCancellation` — a new capability flag: `false` for `AE`, `true` for `ZA` / `SA` / `Others` (see [country_split.md](./country_split.md) §2).
+3. `order.promiseBreached === true` — stands in for the transit-window check. The prototype has no ISO shipped timestamp (`timeline.shipped` is display copy) and the flag already carries exactly the terms this flow needs; production computes the window from the EDD model (`orderStatus` in `lib/edd.js`) and drops the flag (§9).
+
+**The surface** — `HeroCard` (the delivery hero at the top of the list, which is the only place a shipped order shows a `Cancel order` affordance). When the gate passes, the decorative `CancelOrderButton` stub is replaced by a live button of identical styling (same `bg-white/[.12]` glass treatment, `X` icon) that opens `CancelOrderSheet`; the hero hosts the sheet itself, so the cancellation is initiated and completed without leaving the hero. When the gate fails, nothing changes — the stub with its "contact support" tooltip renders as before.
+
+**The terms are the §2.5 late + past-promise terms**, unchanged: card path = full refund, 5% processing fee waived; Wallet path = full refund + the flat AED 100 `LATE_PROMISE_WALLET_BONUS`; original-payment path routes through the apology variant of the dissuade step. That's deliberate — a stalled parcel and a blown delivery promise are the same broken promise, so they get the same remedy rather than a third fee/bonus policy.
+
+**The request is reviewed, not auto-accepted.** The parcel is already with the courier, so the cancellation lands on `cancellationStatusId: 'requested'` — the same review shape as the at-QC cancellation, with a different reason for it: we're waiting on a **courier recall**, not on a supplier packing check. The promise is **48 hours**. Three outcomes, all reachable from `requested`:
+
+| Outcome | Order state | Surface |
+|---|---|---|
+| **Accepted** — courier confirmed the parcel is coming back | stays `cancelled`, → `refund_pending` → `refunded` | refund-hero card, brand → success (§3.1) |
+| **Declined** — parcel was too far along to pull back | back to `open`, `cancellationStatusId` cleared, `delayed` restored, `cancellationRejection` + `cancellationTimeline.rejected` stamped | delivery hero again with a *"Cancellation not possible"* `statusBanner`; `Cancel order` is **live again** (`canCancelShipped` only reads stage + country + `promiseBreached`, so a still-stalled parcel can be re-requested). Once the parcel lands, the `Cancel rejected` chip surfaces in the delivered card's `HistoryThread` (§5) |
+| **Reversed** — customer used *I want to keep my order* (§4) | back to `open`, stall banner restored, `cancellationReversal` stamped | delivery hero, then `Cancel reversed` on the delivered card |
+
+There is no return leg to model on any path — the recall happens server-side, the customer never handles the box.
+
+**Copy deltas vs the created/QC sheet**, all gated on `order.statusId === 'shipped'` so the other stages are untouched: (a) the Confirm info strip appends *"We'll ask the courier to send the parcel back and confirm within 48 hours — if it can't be stopped, your order stays on its way."*; (b) the Confirm destination ETA drops the instant promise (*"Paid to your Wallet once the cancellation is confirmed"* / *"Refunded to your card 5–10 business days after the cancellation is confirmed"*); (c) Step 1's Wallet detail line reads *"Full refund + bonus · once the recall is confirmed"* instead of *"available instantly"*. Nothing can promise a clock from the moment of tapping, because the recall verdict gates the money.
+
+**Where the 48h promise lives on the cancelled card.** The refund-hero card renders no status banner (`statusDescription` is only read by `HeroCard` / `OrderCard` / `InProgressCard`), so it surfaces in two places instead: a warn-tone `Truck` caveat row inside the requested hero (*"Subject to the courier stopping your parcel — we'll confirm within 48 hours"*, §3) and the ⓘ **Learn more** explainer, which resolves a stage-specific key — `statusExplanation` now prefers `cancellation_{phase}_{statusId}` over the stage-agnostic `cancellation_{phase}` (`STATUS_EXPLANATIONS` in `lib/statuses.js`), so `cancellation_requested_shipped` talks about the courier recall and `cancellation_refund_pending_shipped` says the parcel is coming back rather than "the order won't ship". Every other cancellation stage falls through to the existing copy.
+
+**Journey wiring** — `shipped_cancellation` ("Stuck-in-transit cancellation"), `src/data/journeys/shippedCancellation.js`. `placed → qc_started → shipped (country fork) → shipped_stuck`, which stamps `delayed` + `promiseBreached`, drops `estimatedDelivery` (a stalled parcel has no honest ETA left), and sets a **country-neutral** amber `statusBanner` — the banner must not offer a cancellation AE can't take, so the `Cancel order` button is the only thing that speaks to eligibility. From there:
+
+```
+shipped_stuck
+ ├─ cancel_shipped_wallet   (requested — refund carries the AED 100 bonus)
+ │    ├─ cancel_shipped_accepted_wallet → refunded_shipped_wallet
+ │    ├─ cancel_shipped_declined ─┐
+ │    └─ cancellation_kept ───────┤
+ ├─ cancel_shipped_card     (requested — no fee, promise already breached)
+ │    ├─ cancel_shipped_accepted_card   → refunded_shipped_card
+ │    ├─ cancel_shipped_declined ─┤
+ │    └─ cancellation_kept ───────┤
+ └─ delivered  ←──────────────────┘   (the courier finally lands it, late)
+```
+
+`cancel_shipped_declined` is shared by both refund branches — the decline outcome is identical whichever method was picked, because no refund was ever issued. Both hand-back nodes (`declined` / `kept`) terminate at the same `delivered` node, so the late delivery is one step away and the rejection / reversal trace lands on the delivered card. The stall banner is restored on the kept path from a module-level `STUCK_BANNER` const shared with `shipped_stuck`; the declined path sets its own. `delivered` remains reachable directly from `shipped_stuck`, which keeps the stall from reading as an automatic cancellation.
+
+The reversal node is deliberately named `cancellation_kept` — the same id the at-QC journey uses. Node ids are journey-scoped, and `App.jsx`'s `handleKeepOrder` advances that id by name, so reusing it wires the card's *I want to keep my order* CTA (which is gated purely on `cancellationStatusId === 'requested'`) with no `App.jsx` change. Replay with `?journey=shipped_cancellation&country=ZA` for the live path; `country=AE` is the deliberate no-cancel contrast. `App.jsx`'s `handleCancelOrder` gains `cancel_shipped_${branch}` at the head of its `validNext`-gated candidate list.
+
+**Notification coverage gap.** `order.cancellation.requested` in `src/data/notifications/orders.js` uses `variantBy: 'statusId'` with `created` / `quality_check` variants only, so a shipped request misses the axis and `notificationFor` returns status `live` with null copy. A `shipped` variant is owner-authored copy (see [journey_backend_spec.md](./journey_backend_spec.md)). `order.cancellation.declined`'s existing single copy ("Your order is on the way! … we couldn't cancel the order as our seller already shipped it") reads correctly on this path; `.accepted` / `.reverted` are unauthored ⇒ silent.
+
 ## 3. Refund-hero card (`PastOrderCard` — cancelled branch)
 
-The refund-hero card leads with the **refund** as the visual hero rather than the fulfilment journey. The whole card is wrapped in `OrderClaimLink` (§10 of [claim_tracking.md](./returns/claim_tracking.md)) so a cancelled order, like a claim, gets the paired order half (a neutral `PreCancellationOrderCard`, since the order never arrived) + connector rail; tapping either compact row flips the accordion between the order and the cancellation half. A `w-1` left accent strip carries the phase tone (warn amber for `requested`, brand purple for `refund_pending`, success green for `refunded`). The top eyebrow now reads `#{cancellationRef}` (the cancellation ref — `Cancellation` when absent), since the wrapper's strip already owns the `Order #{id}`; the phase pill sits on its own row below, wrapped in a `StatusExplainer` that shows an inline "ⓘ Learn more" accordion with a plain-language stage definition (copy from `STATUS_EXPLANATIONS` in `lib/statuses.js` under the `cancellation_<cancellationStatusId>` namespace — one entry per phase); then a tinted hero block whose internal eyebrow reads simply `Cancellation` (the ref moved up to the card eyebrow) — parallel to `ClaimCard`'s `Claim · {type}` eyebrow. Below that, a smaller `Refund of` / `Refunded` label sits above the refund amount (`text-[28px]` tabular-nums) and a destination chip — wallet destinations get a brand→accent gradient chip (echoes the `GreetRow` credits pill) that, when an `onOpenWallet` handler is threaded, is a tappable button (chevron, `stopPropagation`) opening the `WalletSheet` ledger (see [wallet.md](./wallet.md)); card destinations get a neutral chip. BNPL destinations (`refund.destination.kind === 'bnpl'`) render the same neutral chip but with just the provider brand as the label (no `•• last4`), and an inline `BnplDisclaimerTooltip` Info-icon (`stopPropagation` because the header is the tap target) opens a popover: "{provider} may charge additional fees on refunded purchases. Check your {provider} account for details." Refunded orders surface a `fundsAvailable` sub-copy line ("Available now in your wallet"); the two earlier phases make no ETA promise. When the refund carries a late-promise Wallet bonus (`refund.bonus > 0`, see §2.5), a success-tone *"Includes AED 100 Wallet bonus"* line (`Sparkles`) renders under the hero amount on every phase. `RefundDetailsSheet` shows the bonus as a `Subtotal` → `Revibe Wallet bonus +AED 100` (success tone) block parallel to the card-refund fee block, with `Total refund` = `subtotal + bonus`.
+The refund-hero card leads with the **refund** as the visual hero rather than the fulfilment journey. The whole card is wrapped in `OrderClaimLink` (§10 of [claim_tracking.md](./returns/claim_tracking.md)) so a cancelled order, like a claim, gets the paired order half (a neutral `PreCancellationOrderCard`, since the order never arrived) + connector rail; tapping either compact row flips the accordion between the order and the cancellation half. A `w-1` left accent strip carries the phase tone (warn amber for `requested`, brand purple for `refund_pending`, success green for `refunded`). The top eyebrow now reads `#{cancellationRef}` (the cancellation ref — `Cancellation` when absent), since the wrapper's strip already owns the `Order #{id}`; the phase pill sits on its own row below, wrapped in a `StatusExplainer` that shows an inline "ⓘ Learn more" accordion with a plain-language stage definition (copy from `STATUS_EXPLANATIONS` in `lib/statuses.js` under the `cancellation_<cancellationStatusId>` namespace — one entry per phase); then a tinted hero block whose internal eyebrow reads simply `Cancellation` (the ref moved up to the card eyebrow) — parallel to `ClaimCard`'s `Claim · {type}` eyebrow. Below that, a smaller `Refund of` / `Refunded` label sits above the refund amount (`text-[28px]` tabular-nums) and a destination chip — wallet destinations get a brand→accent gradient chip (echoes the `GreetRow` credits pill) that, when an `onOpenWallet` handler is threaded, is a tappable button (chevron, `stopPropagation`) opening the `WalletSheet` ledger (see [wallet.md](./wallet.md)); card destinations get a neutral chip. BNPL destinations (`refund.destination.kind === 'bnpl'`) render the same neutral chip but with just the provider brand as the label (no `•• last4`), and an inline `BnplDisclaimerTooltip` Info-icon (`stopPropagation` because the header is the tap target) opens a popover: "{provider} may charge additional fees on refunded purchases. Check your {provider} account for details." Refunded orders surface a `fundsAvailable` sub-copy line ("Available now in your wallet"); the two earlier phases make no ETA promise. A `requested` cancellation on a stalled **`shipped`** order (§2.6) closes the hero with a dashed-divided warn-tone `Truck` caveat row — *"Subject to the courier stopping your parcel — we'll confirm within 48 hours"* — because on that path the refund is conditional on the recall succeeding; it's gated on `requested && statusId === 'shipped'`, so created/QC cancellations are unchanged. When the refund carries a late-promise Wallet bonus (`refund.bonus > 0`, see §2.5), a success-tone *"Includes AED 100 Wallet bonus"* line (`Sparkles`) renders under the hero amount on every phase. `RefundDetailsSheet` shows the bonus as a `Subtotal` → `Revibe Wallet bonus +AED 100` (success tone) block parallel to the card-refund fee block, with `Total refund` = `subtotal + bonus`.
 
 **Split-paid cancellations** (`order.paymentSplit`, see [orders.md](./orders.md) §7.1) refunded to the original payment (`refund.destination.kind !== 'wallet'`): the single destination chip is replaced by a `RefundSplitRows` block listing the card and gift-card portions of `refund.amount` (kept proportional to the original split), and `RefundDetailsSheet` appends the same split under its `Total refund`. The gift-card portion also lands in the Wallet ledger ([wallet.md](./wallet.md) §3). Wallet-destination cancellations are unaffected.
 
@@ -150,21 +203,21 @@ Tapping it opens `KeepOrderSheet` (`src/components/KeepOrderSheet.jsx`), a singl
 
 (The sheet still carries a `refund_pending` info strip — *"Your pending refund of {amount} will be cancelled…"* — but with the window narrowed to `requested` it no longer renders; it's retained as defensive copy in case the window widens.)
 
-**Behaviour.** `Yes, keep my order` calls the `onKeep` prop threaded from `App.jsx` (`PastOrderCard` → `CancelledOrderCard` → `KeepOrderSheet`). In **journey mode** `handleKeepOrder` advances the `cancellation_kept` node, which flips `state` back to `open`, voids the in-flight `refund`, clears `cancellationStatusId`, and leaves `statusId` (`quality_check`) untouched so the order resumes fulfilment exactly where it paused — then re-merges into the shipping chain through to delivery. A `cancellationTimeline.reverted` timestamp + `cancellationReversal` marker survive (see §7.3), so a neutral `Cancellation reversed` chip surfaces in the `HistoryThread` once the order is delivered. Outside journey mode `onKeep` is absent, so confirm just closes the sheet (no static state transition exists).
+**Behaviour.** `Yes, keep my order` calls the `onKeep` prop threaded from `App.jsx` (`PastOrderCard` → `CancelledOrderCard` → `KeepOrderSheet`). In **journey mode** `handleKeepOrder` advances the `cancellation_kept` node, which flips `state` back to `open`, voids the in-flight `refund`, clears `cancellationStatusId`, and leaves `statusId` untouched so the order resumes fulfilment exactly where it paused — then re-merges into the shipping chain through to delivery. Both cancellation journeys define a node under that id (ids are journey-scoped, and the handler advances it by name): at QC the order resumes at `quality_check`; on the stuck-in-transit path (§2.6) it resumes at `shipped` with the stall banner restored, since nothing about the stalled parcel changed. A `cancellationTimeline.reverted` timestamp + `cancellationReversal` marker survive (see §7.3), so a neutral `Cancellation reversed` chip surfaces in the `HistoryThread` once the order is delivered. Outside journey mode `onKeep` is absent, so confirm just closes the sheet (no static state transition exists).
 
 ## 5. Rejected cancellations
 
-When an order's cancellation request is rejected (the order had already shipped, for example), the rejection survives as a past event on whatever card the order eventually routes to — most commonly a `ClaimCard` once the customer raised a post-delivery return. The rejection is represented inside the expanded body's `HistoryThread` as a neutral `Cancel rejected` row in the vertical timeline; tapping it expands a detail panel that names the rejection ref and the reason copy from `order.cancellationRejection`.
+A cancellation can be rejected at QC (the supplier had already packed the unit) or in transit (the courier couldn't recall the parcel, §2.6). Either way the rejection survives as a past event on whatever card the order eventually routes to — most commonly a `ClaimCard` once the customer raised a post-delivery return. The rejection is represented inside the expanded body's `HistoryThread` as a neutral `Cancel rejected` row in the vertical timeline; tapping it expands a detail panel that names the rejection ref and the reason copy from `order.cancellationRejection`.
 
 History thread on cancelled refund cards: all three cancelled phases (`requested`, `refund_pending`, `refunded`) render the `HistoryThread` in the expanded body. In `requested` the cancellation itself is the active hero, so the thread carries just `Order placed`. Once the order moves past `requested`, the thread also carries `Cancellation requested` as a second past event. Driven by `getHistoryEvents(order, 'cancellation')` in `src/lib/events.js`.
 
-A **reversed** cancellation (the customer used *Keep my order*) leaves the same kind of trace: `cancellationTimeline.reverted` flips `buildCancellationEvent` to emit a neutral `Cancellation reversed` chip (ref + reason from `order.cancellationReversal`). Because the kept order resumes to delivery, the `delivered` mode of `getHistoryEvents` now also surfaces this cancellation trace (it previously returned only `Order placed`) — so both reversed and declined cancellations read honestly on the eventual `DeliveredOrderCard`.
+A **reversed** cancellation (the customer used *Keep my order*) leaves the same kind of trace: `cancellationTimeline.reverted` flips `buildCancellationEvent` to emit a neutral reversal chip, labelled `Cancel reversed` by `HistoryThread`'s `chipLabel` (ref + reason from `order.cancellationReversal`). That label case was missing until the stuck-in-transit review landed, so a kept-and-delivered order used to read `Cancelled` — actively wrong on an order that was never cancelled. Because the kept order resumes to delivery, the `delivered` mode of `getHistoryEvents` now also surfaces this cancellation trace (it previously returned only `Order placed`) — so both reversed and declined cancellations read honestly on the eventual `DeliveredOrderCard`.
 
 ## 6. UX decisions
 
 **Wallet recommendation lives in detail copy, not a "Recommended" pill.** Earlier drafts pinned a `Recommended` pill to the wallet card. Removed because the success-toned `Full refund · available instantly` detail line carries the concrete benefit; a generic recommendation pill on top duplicated the message and reduced trust.
 
-**Dissuade only fires at `created` + `quality_check`.** Once the order is `shipped` the cancel sheet doesn't open at all (no `Cancel order` button). Once it's `delivered` cancellation isn't a concept — returns take over.
+**Dissuade fires at `created` + `quality_check` + `shipped`.** A `shipped` order only ever reaches the sheet via the stuck-in-transit route (§2.6), which is always `promiseBreached` — so it lands on the §2.5 apology variant rather than the fee-waiver pitch. Everywhere else `shipped` has no `Cancel order` affordance at all, and once the order is `delivered` cancellation isn't a concept — returns take over.
 
 **Original-payment path is the only one with three steps.** The wallet path is two screens. Adding the dissuade step felt symmetric at first but it creates an information dead-zone for the wallet path (no fee to argue about, no reason to dissuade). The asymmetry is intentional.
 
@@ -184,7 +237,7 @@ Cancellation- and refund-specific fields. Top-level order fields, status fields,
 |---|---|---|
 | `state` | enum | Set to `cancelled` when the cancellation is committed. `statusId` is **not** changed — a cancelled order keeps the `statusId` it had at cancellation. |
 | `cancellationRef` *(optional)* | string | Customer-facing cancellation reference (e.g. `CXL-7P4w2x`). Surfaced in the hero eyebrow (`Cancellation · #{cancellationRef}`). |
-| `cancellationStatusId` *(optional)* | enum | One of `requested`, `refund_pending`, `refunded`. Drives the refund-hero card's phase tone, section routing (In progress vs Past orders), and the 3-step Cancellation progress stepper. |
+| `cancellationStatusId` *(optional)* | enum | One of `requested`, `refund_pending`, `refunded`. Drives the refund-hero card's phase tone, section routing (In progress vs Past orders), the 3-step Cancellation progress stepper, and the *keep my order* window (`requested` only). Combined with `statusId` it also selects the stage-specific explainer copy (`cancellation_{phase}_{statusId}` → falls back to `cancellation_{phase}`) — see §2.6. |
 | `cancellationTimeline` *(optional)* | map | Keyed by `cancellationStatusId` (`requested`, `refund_pending`, `refunded`), each entry is a human-readable timestamp at which the cancellation entered that phase. Populated progressively. Also accepts optional `rejected` / `reverted` keys — see §7.3. |
 
 ### 7.2 Refund object (cancelled past orders only)
@@ -209,14 +262,14 @@ Set only when an earlier cancellation request was rejected (see §5) or reversed
 |---|---|---|
 | `cancellationTimeline.rejected` *(optional)* | string | Human-readable timestamp at which the cancellation was rejected. Presence of this key changes the `HistoryThread` chip's label from `Cancel requested` to `Cancel rejected` (tone stays neutral). |
 | `cancellationRejection` *(optional)* | `{ ref, reason }` | `ref` is the rejection reference (e.g. `CXL-4BTb2x`) shown in the chip's expanded detail eyebrow; `reason` is the customer-facing explanation rendered inside the detail panel's tinted message bubble. |
-| `cancellationTimeline.reverted` *(optional)* | string | Human-readable timestamp at which the customer reversed the cancellation via *Keep my order*. Presence of this key makes `buildCancellationEvent` emit a `Cancellation reversed` chip (tone neutral). Takes precedence over `rejected` / `requested` in the builder. |
+| `cancellationTimeline.reverted` *(optional)* | string | Human-readable timestamp at which the customer reversed the cancellation via *Keep my order*. Presence of this key makes `buildCancellationEvent` emit a reversal chip (tone neutral, labelled `Cancel reversed`). Takes precedence over `rejected` / `requested` in the builder. |
 | `cancellationReversal` *(optional)* | `{ ref, reason }` | Parallel to `cancellationRejection`: `ref` shown in the chip's expanded eyebrow, `reason` in the detail bubble. Set when the order is reverted; `state` returns to `open`, `cancellationStatusId` clears, and `refund` is voided. |
 
 ### 7.4 Late + past-promise flag
 
 | Field | Type | Notes |
 |---|---|---|
-| `promiseBreached` *(optional)* | boolean | When `true` on a `created` / `quality_check` order, the cancel sheet waives the card processing fee and adds the `LATE_PROMISE_WALLET_BONUS` (AED 100) on the Wallet path (see §2.5). In the prototype it's a stamped flag (journey nodes `order_late` / `qc_late`; static mocks `89720` / `89205`). **Production** derives it from the EDD model — current-stage SLA is late **and** `today > initialPromise` (`src/lib/edd.js` → `orderStatus`). Usually paired with `delayed: true` + a `statusBanner` so `InProgressCard` shows the amber "Taking longer than usual" treatment (same as the Dynamic EDD sandbox's `order_late` / `qc_late`). |
+| `promiseBreached` *(optional)* | boolean | When `true` on a `created` / `quality_check` order, the cancel sheet waives the card processing fee and adds the `LATE_PROMISE_WALLET_BONUS` (AED 100) on the Wallet path (see §2.5). On a `shipped` order it does double duty: same terms, **plus** it is the transit-window condition inside `canCancelShipped`, so it also decides whether the hero's `Cancel order` is live at all (§2.6). In the prototype it's a stamped flag (journey nodes `order_late` / `qc_late` / `shipped_stuck`; static mocks `89720` / `89205`). **Production** derives it from the EDD model — current-stage SLA is late **and** `today > initialPromise` (`src/lib/edd.js` → `orderStatus`). Usually paired with `delayed: true` + a `statusBanner` so `InProgressCard` / `HeroCard` shows the amber "Taking longer than usual" treatment (same as the Dynamic EDD sandbox's `order_late` / `qc_late`). |
 
 ### 7.5 Revibe-initiated cancellation fields (optional)
 
@@ -245,22 +298,29 @@ src/
 ├── components/
 │   ├── CancelOrderSheet.jsx          Two- or three-step bottom sheet (Select → Dissuade? → Confirm)
 │   ├── KeepOrderSheet.jsx            Single-step confirm sheet for reversing an in-flight cancellation
+│   ├── HeroCard.jsx                  Delivery hero — live `Cancel order` + hosts the sheet on the stuck-in-transit path (§2.6)
 │   ├── PastOrderCard.jsx             Branches on order.state — cancelled-past variant is the refund-hero card; exports DestinationChip
 │   ├── RevibeCancellationCard.jsx    Revibe-initiated cancelled card (§11) — apology + re-buy offer + no-fee refund strip
 │   ├── RefundDetailsSheet.jsx        Bottom sheet for the past cancelled card's `View refund details` action
 │   ├── Timeline.jsx                  Unified timeline (in-flight cancellation sub-timeline + past refund strip)
-│   ├── HistoryThread.jsx             Drives the Cancel rejected chip on layered cards
+│   ├── HistoryThread.jsx             Drives the Cancel requested / rejected / reversed chips on layered cards
+│   ├── StatusExplainer.jsx           ⓘ Learn more accordion beside the phase pill (stage-specific copy, §2.6)
 │   └── WalletInfoTooltip.jsx         Shared anywhere "Revibe Wallet" is named
 └── lib/
-    └── events.js                     getHistoryEvents(order, 'cancellation' | 'delivered') — builds the refund-hero + delivered history thread (incl. Cancellation reversed / rejected chips)
+    ├── events.js                     getHistoryEvents(order, 'cancellation' | 'delivered') — builds the refund-hero + delivered history thread (incl. Cancellation reversed / rejected chips)
+    ├── returns.js                    SHIPPED_CANCEL_WINDOW_DAYS (7) + canCancelShipped(order) — the §2.6 gate
+    ├── statuses.js                   CANCELLATION_STATUSES + statusExplanation (stage-specific cancellation copy)
+    └── countries.js                  shippedCancellation capability flag (false in AE)
 ```
 
-`CancelOrderSheet` carries the constant `DISSUADE_STATUSES = new Set(['created', 'quality_check'])` that decides whether the middle step renders, plus `LATE_PROMISE_WALLET_BONUS = 100` (the §2.5 Wallet bonus, hardcoded in the sheet; the 5% fee rate is imported as `CANCELLATION_FEE_RATE` from `src/lib/returns.js`). Both in-flight demo orders (`89712`, `89510`) carry `subtotal`, `warranty`, `estimatedDeliveryLong`, and `paymentMethod`, so the full flow exercises end-to-end on either. Static order `89720` (late-at-QC, `promiseBreached: true`) exercises the breached sheet copy; `89205` (settled wallet refund with `refund.bonus`) exercises the refund-hero + `RefundDetailsSheet` bonus rendering that a static cancel-sheet stub can't reach.
+`CancelOrderSheet` carries the constant `DISSUADE_STATUSES = new Set(['created', 'quality_check', 'shipped'])` that decides whether the middle step renders, plus `LATE_PROMISE_WALLET_BONUS = 100` (the §2.5 Wallet bonus, hardcoded in the sheet; the 5% fee rate is imported as `CANCELLATION_FEE_RATE` from `src/lib/returns.js`). Both in-flight demo orders (`89712`, `89510`) carry `subtotal`, `warranty`, `estimatedDeliveryLong`, and `paymentMethod`, so the full flow exercises end-to-end on either. Static order `89720` (late-at-QC, `promiseBreached: true`) exercises the breached sheet copy; `89205` (settled wallet refund with `refund.bonus`) exercises the refund-hero + `RefundDetailsSheet` bonus rendering that a static cancel-sheet stub can't reach.
 
 ## 9. Mocked vs production
 
-- **Cancellation is a stub outside journey mode.** In the static showcase, tapping the final `Cancel order` just closes the sheet — the order keeps its state. In **journey mode** it's wired: `handleCancelOrder` advances the cancellation request node, picking `cancel_before_qc_*` before QC (straight to refund pending) or `cancellation_requested_*` at QC, by refund method — and the late-promise variants `cancel_late_before_qc_*` / `cancellation_late_requested_*` when the journey is on the `order_late` / `qc_late` node (§2.5). `validNext()` gates which one fires, so the candidate list is order-insensitive. Production should flip `state` to `cancelled` and vary the cancelled-state banner copy by chosen refund method.
-- **`I want to keep my order` is a stub outside journey mode.** In the static showcase confirm just closes the sheet. In **journey mode** `onKeep` → `handleKeepOrder` advances the `cancellation_kept` node (reverts to open, voids the refund, resumes fulfilment, leaves a reversed trace). The window is `requested`-only — production still needs a reverse-cancellation endpoint and the rule for the wider window (e.g. whether `refund_pending` is ever reversible, irreversible the moment funds are released to the processor).
+- **Cancellation is a stub outside journey mode.** In the static showcase, tapping the final `Cancel order` just closes the sheet — the order keeps its state. In **journey mode** it's wired: `handleCancelOrder` advances the cancellation request node, picking `cancel_before_qc_*` before QC (straight to refund pending) or `cancellation_requested_*` at QC, by refund method — and the late-promise variants `cancel_late_before_qc_*` / `cancellation_late_requested_*` when the journey is on the `order_late` / `qc_late` node (§2.5), or `cancel_shipped_*` on `shipped_stuck` (§2.6). `validNext()` gates which one fires, so the candidate list is order-insensitive. Production should flip `state` to `cancelled` and vary the cancelled-state banner copy by chosen refund method.
+- **Stuck-in-transit cancellation is journey-mode only.** There is no static mock for it — the showcase orders are all `AE` (where the flag is off) and none carry `promiseBreached` on `shipped`, so §2.6 is reachable only via `?journey=shipped_cancellation&country=ZA|SA|Others`. The window itself is faked: production must compute "in transit longer than `SHIPPED_CANCEL_WINDOW_DAYS`" from a real shipped timestamp / the EDD model rather than reading the stamped `promiseBreached` flag, and read the 7-day window from backend config. The parcel recall promised on the Confirm step is copy only — no recall is issued, and the accept/decline verdict is a dev-panel branch rather than an ops decision. The **48 hours** in the sheet, the hero caveat row, and the explainer are hardcoded copy in three places; production should read one SLA value from config.
+- **Re-requesting after a decline is unbounded.** A declined cancellation returns the order to `open` with `promiseBreached` intact, so `canCancelShipped` shows `Cancel order` again immediately and the customer can ask as many times as they like. Deliberate for the prototype (a parcel still stuck a week later should be cancellable), but production needs the real policy — a cool-off, an attempt cap, or a courier-side "already refused" flag.
+- **`I want to keep my order` is a stub outside journey mode.** In the static showcase confirm just closes the sheet. In **journey mode** `onKeep` → `handleKeepOrder` advances the `cancellation_kept` node (reverts to open, voids the refund, resumes fulfilment, leaves a reversed trace) — defined in both the `cancellation` and `shipped_cancellation` journeys. Because the CTA is gated purely on `cancellationStatusId === 'requested'`, any future journey that reaches `requested` **must** define a `cancellation_kept` node or the button renders and does nothing. The window is `requested`-only — production still needs a reverse-cancellation endpoint and the rule for the wider window (e.g. whether `refund_pending` is ever reversible, irreversible the moment funds are released to the processor).
 - **5% fee is a hardcoded constant.** `CANCELLATION_FEE_RATE = 0.05` lives in `src/lib/returns.js`, imported by `CancelOrderSheet`. Production should read it from a backend config per order.
 - **Late + past-promise terms are flag-driven, AED 100 bonus is hardcoded.** The §2.5 fee waiver + Wallet bonus key off a stamped `order.promiseBreached` boolean and the local `LATE_PROMISE_WALLET_BONUS` constant. Production should (a) compute `promiseBreached` from the EDD model (`orderStatus`: current-stage late **and** `today > initialPromise`) rather than stamping it, and (b) read the bonus amount + the waiver policy from backend config (same as the issue-claim `ISSUE_WALLET_BONUS`). The bonus is wired into the journey nodes (`order_late` / `qc_late` and their `cancel_late_*` branches) and two static mocks (`89720` / `89205`).
 - **Wallet recommendation styling is hardcoded.** The success-tone detail line is statically positioned on the wallet card. Production should accept a per-order policy flag.

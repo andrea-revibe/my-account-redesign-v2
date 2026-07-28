@@ -1,12 +1,14 @@
 ---
 status: live
-verified_against: 8fb818a
+verified_against: c2cd56d
 covers:
   - src/lib/countries.js
   - src/components/CountryPicker.jsx
   - src/lib/journey.js
+  - src/lib/returns.js
   - src/App.jsx
   - src/components/HeroCard.jsx
+  - src/components/CancelOrderSheet.jsx
   - src/components/ClaimCard.jsx
   - src/components/WarrantyClaimCard.jsx
   - src/components/InvalidClaimCard.jsx
@@ -16,6 +18,7 @@ covers:
   - src/components/AddressForm.jsx
   - src/components/EditableContactCard.jsx
   - src/components/ClaimFlow/Step4PickupDetails.jsx
+  - src/data/journeys/shippedCancellation.js
 ---
 
 # Country split
@@ -44,10 +47,10 @@ The single source of truth. Add a flag here, gate on it in the card; add a marke
 ```js
 export const DEFAULT_COUNTRY = 'AE'
 export const COUNTRIES = {
-  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  eddMarket: 'UAE' },
-  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, eddMarket: 'ZA'  },
-  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  eddMarket: 'SA'  },
-  Others: { label: 'Others',       detailedTracking: false, expertReview: false, eddMarket: null  },
+  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  shippedCancellation: false, eddMarket: 'UAE' },
+  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, shippedCancellation: true,  eddMarket: 'ZA'  },
+  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  shippedCancellation: true,  eddMarket: 'SA'  },
+  Others: { label: 'Others',       detailedTracking: false, expertReview: false, shippedCancellation: true,  eddMarket: null  },
 }
 export const COUNTRY_CODES = ['AE', 'ZA', 'SA', 'Others']
 export function countryConfig(country) { /* code string OR order → config, safe default */ }
@@ -56,6 +59,7 @@ export function countryConfig(country) { /* code string OR order → config, saf
 | Flag | Meaning | Status |
 |---|---|---|
 | `detailedTracking` | Show the `See detailed tracking` dropdowns (order delivery + claim inbound/return legs). `false` → the dropdown is omitted entirely. | **live** (§4) |
+| `shippedCancellation` | Customer can self-cancel a **shipped** order stuck in transit past `SHIPPED_CANCEL_WINDOW_DAYS` (`lib/returns.js`). `false` (AE) → the hero's `Cancel order` stays the decorative "contact support" stub. | **live** (§4c) |
 | `expertReview` | Claim gets an expert-revision step before it can be marked invalid (a journey-sequence difference). | **scaffolded — flag exists, nothing reads it yet** (§6 worked example) |
 | `eddMarket` | Bridge to `lib/edd.js` `MARKETS` keys. | reserved, unread (§8) |
 
@@ -114,6 +118,15 @@ Address is **structured per market**, not one free-text line. This is a third me
 
 **To add / change a market's fields:** edit `ADDRESS_SCHEMAS[code]` in `lib/address.js` (give a new market a full list, or let it fall back to `Others`); every surface picks it up with no component change.
 
+## 4c. Shipped difference #3 — self-cancel a stalled shipment (non-AE)
+
+The second live flag, and the first one that is **off** in AE rather than on. A shipment that has stopped moving for longer than `SHIPPED_CANCEL_WINDOW_DAYS` (7, `lib/returns.js`) can be cancelled by the customer in `ZA` / `SA` / `Others`; in AE the affordance stays a stub and support handles it.
+
+- **Read at one call site:** `canCancelShipped(order)` in `lib/returns.js` folds the flag into the gate (`statusId === 'shipped'` + not already cancelled + `countryConfig(order).shippedCancellation` + `order.promiseBreached`), and `HeroCard` reads that single predicate. This keeps the country check next to the *other* two conditions instead of scattering three guards through the card — the §5 step-2 idiom, hoisted into `lib/` because the rule is more than a render toggle.
+- **Surface:** `HeroCard`'s `Cancel order` button — live (opens `CancelOrderSheet`, hosted by the hero) when the gate passes, the decorative `CancelOrderButton` tooltip stub when it doesn't. Terms and copy live in [cancellations.md](./cancellations.md) §2.6.
+- **The journey is shared, not forked.** `shipped_cancellation` (`data/journeys/shippedCancellation.js`) replays under every country — its `shipped_stuck` node stamps `promiseBreached` and a **country-neutral** amber banner, deliberately promising nothing about cancellation, so AE sees the identical stall with no cancel affordance. That's the intended contrast demo (`?journey=shipped_cancellation&country=AE` vs `…&country=ZA`), and the reason the `cancel_shipped_*` edges need no `countries:` tag — the card gate already decides reachability for the customer, and the dev panel deliberately keeps the node walkable for demo purposes.
+- **Verify:** `?journey=shipped_cancellation&country=ZA` (live) vs `&country=AE` (stub) at 430px, advancing to `shipped_stuck`.
+
 ## 5. Recipe — add a CARD-design country difference
 
 Use this whenever a market should *show / hide / alter a piece of a card*. This is the §4 pattern generalised.
@@ -171,7 +184,7 @@ The skipped nodes stay in each journey's array — they're simply unreached for 
 
 ## 7. Mocked vs production
 
-- **Country picker is a demo control**, journey-mode only; production reads `order.country` from the order. The showcase mocks are all `AE`.
+- **Country picker is a demo control**, journey-mode only; production reads `order.country` from the order. The showcase mocks are all `AE` — so the non-AE-only surfaces (`shippedCancellation`, §4c) are reachable only in journey mode.
 - **`?country=` is in-session** — flipping it re-derives the cards immediately but persists nothing.
 - **EDD sandbox shows two market controls** right now (the Country chips + the EDD `Market` dropdown) — different axes (capabilities vs timing), not yet unified. See §8.
 - **The journey-flow path is live; `expertReview` is still scaffolded.** The per-edge country tags are now used in earnest by the shipment-step collapse (§6) across all six journeys. The `expertReview` flag itself is still unread — reserved for the future AE expert-revision step (same mechanism, not yet built).

@@ -264,8 +264,14 @@ export const STATUS_EXPLANATIONS = {
     'Every device passes a 50-point inspection — Your device is being checked by our experts!',
   cancellation_requested:
     "We've received your cancellation and are confirming with the supplier that the device hasn't already been packed.",
+  // Stage-specific override: a cancellation raised on a stalled `shipped`
+  // order is waiting on a courier recall, not on the supplier's packing desk.
+  cancellation_requested_shipped:
+    "Your parcel is already with the courier, so we've asked them to send it back to us. We'll confirm within 48 hours — if it can't be stopped we'll let you know and your order stays on its way.",
   cancellation_refund_pending:
     "Your cancellation has been accepted - the order won't ship. We're now processing your refund on our end.",
+  cancellation_refund_pending_shipped:
+    "The courier confirmed your parcel is coming back to us, so your cancellation is accepted. We're now processing your refund on our end.",
   cancellation_refunded:
     'Your cancellation is complete and your refund has been issued. Funds can take up to 10 business days to appear depending on your payment method.',
 }
@@ -276,8 +282,15 @@ export const STATUS_EXPLANATIONS = {
 // explain themselves elsewhere) — `StatusExplainer` then renders nothing.
 export function statusExplanation(order) {
   if (order.state === 'cancelled') {
+    const phase = order.cancellationStatusId
+    // A `cancellation_<phase>_<statusId>` key wins when present: the same
+    // phase means something different depending on where the order was
+    // cancelled (a stalled `shipped` order is waiting on a courier recall, not
+    // on supplier packing). Falls back to the stage-agnostic copy.
     return (
-      STATUS_EXPLANATIONS[`cancellation_${order.cancellationStatusId}`] ?? null
+      STATUS_EXPLANATIONS[`cancellation_${phase}_${order.statusId}`] ??
+      STATUS_EXPLANATIONS[`cancellation_${phase}`] ??
+      null
     )
   }
   return STATUS_EXPLANATIONS[order.statusId] ?? null

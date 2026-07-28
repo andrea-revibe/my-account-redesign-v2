@@ -12,6 +12,7 @@ import {
   Sparkles,
   PackageCheck,
   RotateCcw,
+  Truck,
 } from 'lucide-react'
 import { cancellationStepsFor, statusExplanation } from '../lib/statuses'
 import Timeline from './Timeline'
@@ -285,6 +286,7 @@ function RefundHero({ order, onOpenWallet }) {
   const tone = toneFor(order.cancellationStatusId)
   const t = TONE[tone]
   const isRefunded = order.cancellationStatusId === 'refunded'
+  const isRequested = order.cancellationStatusId === 'requested'
   const dest = order.refund.destination
   const isWallet = dest.kind === 'wallet'
   const showSplit = isSplitPaid(order) && !isWallet
@@ -352,6 +354,18 @@ function RefundHero({ order, onOpenWallet }) {
         <div className="mt-2 text-[11.5px] text-success inline-flex items-center gap-1">
           <Sparkles size={11} strokeWidth={2} />
           {order.refund.fundsAvailable}
+        </div>
+      )}
+      {/* Stuck-in-transit cancellation: the refund is conditional on the
+          courier actually stopping the parcel, so the requested hero says so
+          up front rather than leaving it to the ⓘ explainer. */}
+      {isRequested && order.statusId === 'shipped' && (
+        <div className="mt-2.5 pt-2.5 border-t border-dashed border-warn/30 flex items-start gap-1.5 text-[11.5px] text-ink-2 leading-[1.4]">
+          <Truck size={12} strokeWidth={2} className="text-warn shrink-0 mt-px" />
+          <span>
+            Subject to the courier stopping your parcel — we'll confirm within 48
+            hours.
+          </span>
         </div>
       )}
     </div>

@@ -53,6 +53,9 @@ function chipLabel(ev) {
   if (ev.kind === 'cancellation') {
     if (ev.status === 'rejected') return 'Cancel rejected'
     if (ev.status === 'requested') return 'Cancel requested'
+    // A reversed cancellation is the one case where the order was NOT
+    // cancelled — labelling it 'Cancelled' misreads the delivered card.
+    if (ev.status === 'reverted') return 'Cancel reversed'
     return 'Cancelled'
   }
   if (ev.kind === 'delivery') return 'Delivered'

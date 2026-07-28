@@ -17,7 +17,9 @@ import {
 } from '../lib/statuses'
 import { ProductSummary } from './ProductSummary'
 import Timeline from './Timeline'
+import CancelOrderSheet from './CancelOrderSheet'
 import { countryConfig } from '../lib/countries'
+import { canCancelShipped } from '../lib/returns'
 
 // Hardcoded to a known-good DHL Express shipment so the demo lands on a real
 // tracking page even though the mock orders use placeholder tracking numbers.
@@ -27,16 +29,21 @@ const DHL_TRACKING_URL =
 // Hero card pulls the most-active order to the very top of the list with a
 // dark gradient background. Inside-out structure: eyebrow → headline →
 // product strip → dot timeline → optional detailed-tracking expand → CTAs.
-export default function HeroCard({ order, onRaiseClaim }) {
+export default function HeroCard({ order, onRaiseClaim, onCancelOrder }) {
   const [showDetail, setShowDetail] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
   if (!order) return null
 
   const desc = statusDescription(order)
   const cur = progressIndex(order.statusId)
   const subCur = subProgressIndex(order.subStatusId)
   const isShipped = order.statusId === 'shipped'
+  // Outside AE a shipment stuck in transit past the cancellation window can be
+  // cancelled from here; everywhere else the button stays the tooltip stub.
+  const canCancel = canCancelShipped(order)
 
   return (
+    <>
     <section className="relative overflow-hidden mx-4 mt-1 mb-4 rounded-[22px] text-white shadow-lg2 bg-hero-gradient p-[18px] pb-4">
       <div
         aria-hidden
@@ -130,10 +137,30 @@ export default function HeroCard({ order, onRaiseClaim }) {
         </button>
 
         <div className="mt-2">
-          <CancelOrderButton />
+          {canCancel ? (
+            <button
+              type="button"
+              onClick={() => setCancelOpen(true)}
+              className="w-full h-10 rounded-[10px] inline-flex items-center justify-center gap-1.5 bg-white/[.12] border border-white/[.22] text-white font-semibold text-[13.5px]"
+            >
+              <X size={16} strokeWidth={1.75} />
+              Cancel order
+            </button>
+          ) : (
+            <CancelOrderButton />
+          )}
         </div>
       </div>
     </section>
+    {canCancel && (
+      <CancelOrderSheet
+        order={order}
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        onSubmit={onCancelOrder}
+      />
+    )}
+    </>
   )
 }
 

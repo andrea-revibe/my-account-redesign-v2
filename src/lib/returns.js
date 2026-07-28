@@ -1,5 +1,6 @@
 // Single source of truth for the change-of-mind returns flow.
 // Eligibility rules, refund math, formatting helpers.
+import { countryConfig } from './countries'
 
 export const RETURN_WINDOW_DAYS = 10
 export const RESTOCKING_FEE_RATE = 0.10
@@ -12,6 +13,9 @@ export const CANCELLATION_FEE_RATE = 0.05
 // issue (faulty product) claim. Acts as the equivalent of the
 // change-of-mind "fee waived on Wallet" — incentivises store credit.
 export const ISSUE_WALLET_BONUS = 100
+// How long a shipment may sit in transit before the customer may cancel it
+// themselves. Outside AE only (`shippedCancellation` in lib/countries.js).
+export const SHIPPED_CANCEL_WINDOW_DAYS = 7
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -46,6 +50,24 @@ export function startOfDay(date) {
   const d = new Date(date)
   d.setHours(0, 0, 0, 0)
   return d
+}
+
+// Can the customer self-cancel this *shipped* order? Three conditions, all
+// required: the order is in transit, the market allows it (everywhere but AE),
+// and the shipment has been in transit longer than
+// SHIPPED_CANCEL_WINDOW_DAYS.
+//
+// The window condition is represented by the stamped `promiseBreached` flag
+// rather than computed from a shipped date — the prototype has no ISO shipped
+// timestamp (`timeline.shipped` is display copy) and the flag already carries
+// exactly the terms this flow needs: fee waived + Wallet bonus, read by
+// CancelOrderSheet. Production computes it from the EDD model instead
+// (`orderStatus` in lib/edd.js) and drops the flag.
+export function canCancelShipped(order) {
+  if (!order || order.statusId !== 'shipped') return false
+  if (order.state === 'cancelled') return false
+  if (!countryConfig(order).shippedCancellation) return false
+  return order.promiseBreached === true
 }
 
 export function eligibilityFor(order, today = new Date()) {
