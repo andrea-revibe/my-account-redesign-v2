@@ -25,7 +25,8 @@
 | Journey replay mode | `lib/journey.js` + `data/journey.js` + `JourneyDevPanel.jsx` | `output/journey_backend_spec.md` |
 | Card routing (which card renders) | `App.jsx` (routing block ≈ L285–375) | `output/orders.md` §2 |
 | Cancellation sheet / keep-order undo | `CancelOrderSheet.jsx`, `KeepOrderSheet.jsx` | `output/cancellations.md` |
-| Stuck-in-transit self-cancellation (cancel a `shipped` order) | `lib/returns.js` (`SHIPPED_CANCEL_WINDOW_DAYS`·18, `canCancelShipped`·66), `lib/countries.js` (`shippedCancellation` flag), `components/HeroCard.jsx` (live `Cancel order` + hosts the sheet), `components/CancelOrderSheet.jsx` (`DISSUADE_STATUSES` incl. `shipped` + parcel-recall copy), `data/journeys/shippedCancellation.js`, `App.jsx` (`cancel_shipped_*` candidates) | `output/cancellations.md` §2.6 |
+| Stuck-in-transit self-cancellation (cancel a `shipped` order) | `lib/returns.js` (`SHIPPED_CANCEL_WINDOW_DAYS`·18, `canCancelShipped`·66), `lib/countries.js` (`shippedCancellation` flag), `components/HeroCard.jsx` (live `Cancel order` + hosts the sheet), `components/CancelOrderSheet.jsx` (`DISSUADE_STATUSES` incl. `shipped` + 48h recall-review copy, all `isShipped`-gated), `data/journeys/shippedCancellation.js`, `App.jsx` (`cancel_shipped_*` candidates) | `output/cancellations.md` §2.6 |
+| Cancellation review outcomes (accepted / declined / reversed) | `data/journeys/shippedCancellation.js` (`cancel_shipped_accepted_*`, shared `cancel_shipped_declined`, `cancellation_kept`) + `data/journeys/cancellation.js` (at-QC equivalents), `lib/statuses.js` (`statusExplanation` stage-specific `cancellation_{phase}_{statusId}` key), `lib/events.js` (`buildCancellationEvent` rejected/reverted), `components/HistoryThread.jsx` (`chipLabel`), `components/PastOrderCard.jsx` (`canKeep` = `requested` only) | `output/cancellations.md` §2.6/§4/§5 |
 | Mock orders / field shapes | `data/orders.js` | `output/orders.md` §7 |
 | Product line-item (thumbnail · name · variant · Revibe Care callout · price breakdown), shared across all cards | `components/ProductSummary.jsx` (exports `REVIBE_CARE_ICON`; `afterRow` slots extra content under the row) | `output/orders.md` §3.0 |
 | NSYS third-party condition-report link ("Verified by NSYS") — delivered card + returned-device surfaces | shared `components/ConditionReportChip.jsx` (extracted out of `PastOrderCard`), rendered via `ProductSummary`'s `afterRow` by `PastOrderCard` (`order.conditionReport`), `WarrantyClaimCard` `device_returned` (`claim.shipBack.conditionReport` → `order.conditionReport`), `InvalidClaimCard` delivered (`claim.invalidClaim.returnShipment.conditionReport` → `order.conditionReport`); report shape `{ url, reportId }`; icon `public/nsys-icon.svg` | `output/orders.md` §3.3, §7.5; `output/returns/claim_tracking.md` §3.3; `output/warranties_compensations.md` §2.3.2 |
@@ -81,7 +82,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/AwbLink.jsx` | 40 | 2 | `AwbLink`·11 |
 | `components/BnplDisclaimerTooltip.jsx` | 86 | 7 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
 | `components/CancelClaimSheet.jsx` | 155 | 1 | `CancelClaimSheet`·15 |
-| `components/CancelOrderSheet.jsx` | 757 | 3 | `CancelOrderSheet`·24 |
+| `components/CancelOrderSheet.jsx` | 769 | 3 | `CancelOrderSheet`·24 |
 | `components/ChatFab.jsx` | 14 | 1 | `ChatFab`·3 |
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
 | `components/ClaimCard.jsx` | 398 | 1 | `ClaimCard`·51 |
@@ -124,7 +125,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/GreetRow.jsx` | 41 | 1 | `GreetRow`·3 |
 | `components/Header.jsx` | 50 | 1 | `Header`·6 |
 | `components/HeroCard.jsx` | 249 | 1 | `HeroCard`·32 |
-| `components/HistoryThread.jsx` | 218 | 3 | `HistoryThread`·86 |
+| `components/HistoryThread.jsx` | 221 | 3 | `HistoryThread`·89 |
 | `components/InProgressCard.jsx` | 222 | 1 | `InProgressCard`·30 |
 | `components/InvalidClaimCard.jsx` | 705 | 1 | `InvalidClaimCard`·44 |
 | `components/JourneyDevPanel.jsx` | 257 | 1 | `JourneyDevPanel`·16 |
@@ -134,7 +135,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/OrderCard.jsx` | 430 | 1 | `OrderCard`·38 |
 | `components/OrderClaimLink.jsx` | 248 | 9 | `OrderClaimLink`·182 |
 | `components/OrderFilters.jsx` | 75 | 1 | `STATUS_CHIPS`·3, `OrderFilters`·13 |
-| `components/PastOrderCard.jsx` | 413 | 3 | `PastOrderCard`·36, `DestinationChip`·361 |
+| `components/PastOrderCard.jsx` | 427 | 3 | `PastOrderCard`·37, `DestinationChip`·375 |
 | `components/PickupFailedCard.jsx` | 335 | 1 | `PickupFailedCard`·23 |
 | `components/ProductSummary.jsx` | 154 | 18 | `REVIBE_CARE_ICON`·1, `ProductSummary`·20 |
 | `components/RefundDetailsSheet.jsx` | 177 | 2 | `RefundDetailsSheet`·9 |
@@ -159,7 +160,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/journeys/happyPath.js` | 128 | 1 | `HAPPY_PATH_NODES`·5 |
 | `data/journeys/inTransitClaim.js` | 97 | 1 | `IN_TRANSIT_ENTRY_STAGES`·32, `withInTransitClaim`·44 |
 | `data/journeys/initialOrder.js` | 41 | 1 | `INITIAL_ORDER`·2 |
-| `data/journeys/shippedCancellation.js` | 266 | 1 | `SHIPPED_CANCELLATION_NODES`·31 |
+| `data/journeys/shippedCancellation.js` | 384 | 1 | `SHIPPED_CANCELLATION_NODES`·51 |
 | `data/notifications/claims.js` | 263 | 1 | `CLAIM_NOTIFICATIONS`·26 |
 | `data/notifications/index.js` | 16 | 1 | `NOTIFICATIONS`·11 |
 | `data/notifications/orders.js` | 122 | 1 | `ORDER_NOTIFICATIONS`·19 |
@@ -180,7 +181,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `lib/journey.js` | 112 | 1 | `useJourney`·25 |
 | `lib/notifications.js` | 93 | 2 | `NOTIFICATIONS`·14, `NOTIFICATION_STATUSES`·26, `notificationStatus`·39, `notificationFor`·53, `journeyNotificationCoverage`·83 |
 | `lib/returns.js` | 321 | 15 | `RETURN_WINDOW_DAYS`·5, `RESTOCKING_FEE_RATE`·6, `CANCELLATION_FEE_RATE`·11, `ISSUE_WALLET_BONUS`·15, `SHIPPED_CANCEL_WINDOW_DAYS`·18, `addDays`·45, `startOfDay`·49, `canCancelShipped`·66, `eligibilityFor`·73, `groupOrdersByEligibility`·98, `refundBreakdown`·116, `isSplitPaid`·166, `refundDestinations`·177, `formatMoney`·186, `formatLongDate`·191, `formatShortDate`·200, `generateClaimRef`·212, `BATTERY_BASELINE_BY_GRADE`·220, `conditionGradeOf`·229, `batteryBaselineFor`·236, `daysSinceDelivery`·247, `assessBattery`·264 |
-| `lib/statuses.js` | 384 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·105, `cancellationStepsFor`·116, `statusDescription`·126, `STATUS_EXPLANATIONS`·260, `statusExplanation`·277, `pickActiveOrderId`·299, `statusHeadline`·312, `statusSubline`·331, `statusIconFor`·360 |
+| `lib/statuses.js` | 397 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·105, `cancellationStepsFor`·116, `statusDescription`·126, `STATUS_EXPLANATIONS`·260, `statusExplanation`·283, `pickActiveOrderId`·312, `statusHeadline`·325, `statusSubline`·344, `statusIconFor`·373 |
 | `lib/wallet.js` | 303 | 2 | `walletLedger`·92, `walletBalance`·214, `walletCurrency`·222, `latestSwitchableCredit`·231, `cardEquivalentFor`·244 |
 | `main.jsx` | 11 | 0 | _(none)_ |
 
@@ -290,6 +291,6 @@ graph LR
   lib_wallet_js --> data_wallet_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 108 modules, 29052 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 108 modules, 29212 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

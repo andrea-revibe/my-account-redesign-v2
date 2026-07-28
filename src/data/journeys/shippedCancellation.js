@@ -14,9 +14,15 @@
 // Shape of the flow:
 //
 //   placed → qc_started → shipped (country fork) → shipped_stuck
-//     ├─ cancel_shipped_wallet → refunded_shipped_wallet
-//     ├─ cancel_shipped_card   → refunded_shipped_card
-//     └─ delivered                              (the parcel finally lands)
+//     ├─ cancel_shipped_wallet   (requested)
+//     │    ├─ cancel_shipped_accepted_wallet → refunded_shipped_wallet
+//     │    ├─ cancel_shipped_declined ─┐
+//     │    └─ cancellation_kept ───────┤
+//     ├─ cancel_shipped_card     (requested)
+//     │    ├─ cancel_shipped_accepted_card   → refunded_shipped_card
+//     │    ├─ cancel_shipped_declined ─┤
+//     │    └─ cancellation_kept ───────┤
+//     └─ delivered  ←──────────────────┘       (the parcel finally lands)
 //
 // `shipped_stuck` stamps `promiseBreached`, which is the single flag both the
 // cancel gate (`canCancelShipped`) and the cancel terms (`CancelOrderSheet`)
@@ -25,9 +31,23 @@
 // (cancellations.md §2.5). It also drops `estimatedDelivery`, because a stalled
 // parcel has no honest ETA left to show.
 //
-// The refund lands on `refund_pending` immediately — no supplier review, no
-// customer action. The parcel is recalled from the courier in the background
-// (the sheet's confirm step says so), so there's no return leg to model here.
+// The request lands on `requested`, not `refund_pending`: the parcel is already
+// with the courier, so the recall has to be confirmed before any money moves —
+// the same review shape as the at-QC cancellation, with a different reason for
+// it (courier recall, not supplier packing). Accepted → `refund_pending`;
+// declined → the order returns to `open` and continues to a late delivery, with
+// the rejection surviving as a HistoryThread chip. There's still no return leg:
+// the recall happens server-side, the customer never handles the box.
+//
+// The stall banner is restored on every path that hands the order back (declined
+// / kept), so a reopened order never sits on the hero with no explanation.
+const STUCK_BANNER = {
+  tone: 'warn',
+  lead: 'Delayed in transit',
+  body:
+    "Your parcel has been with the courier for 8 days without moving. We're chasing them for an update and will let you know as soon as it does.",
+}
+
 export const SHIPPED_CANCELLATION_NODES = [
   {
     id: 'placed',
@@ -133,37 +153,33 @@ export const SHIPPED_CANCELLATION_NODES = [
       // this node is not, so the banner must not offer a cancellation that AE
       // can't take. The `Cancel order` button is the only thing that speaks to
       // eligibility.
-      statusBanner: {
-        tone: 'warn',
-        lead: 'Delayed in transit',
-        body:
-          "Your parcel has been with the courier for 8 days without moving. We're chasing them for an update and will let you know as soon as it does.",
-      },
+      statusBanner: STUCK_BANNER,
     }),
   },
-  // ----- Cancellation (wallet) ------------------------------------------
-  // Nothing to review and nothing for the customer to do: the request lands
-  // straight on `refund_pending` and the parcel is recalled in the background.
-  // `statusBanner` is cleared because statusDescription() checks it *before*
-  // the cancelled branch — leaving it would keep the amber in-transit banner
-  // on a cancelled order.
+  // ----- Cancellation request (wallet) ----------------------------------
+  // Lands on `requested`, awaiting the courier recall verdict. `statusBanner`
+  // is cleared because statusDescription() checks it *before* the cancelled
+  // branch — leaving it would keep the amber in-transit banner on a cancelled
+  // order. (The requested card renders no banner at all; the 48h promise lives
+  // in the StatusExplainer copy + the requested refund hero's caveat row.)
   {
     id: 'cancel_shipped_wallet',
-    label: 'Cancellation in transit — wallet refund',
+    label: 'Cancellation requested in transit — wallet refund + bonus',
     trigger: 'customer',
     event: 'order.cancellation.requested',
-    next: ['refunded_shipped_wallet'],
+    next: [
+      'cancel_shipped_accepted_wallet',
+      'cancel_shipped_declined',
+      'cancellation_kept',
+    ],
     apply: (o) => ({
       ...o,
       state: 'cancelled',
       delayed: false,
       statusBanner: null,
-      cancellationStatusId: 'refund_pending',
+      cancellationStatusId: 'requested',
       cancellationRef: 'J0urN2',
-      cancellationTimeline: {
-        requested: '31 May · 2:12 PM',
-        refund_pending: '31 May · 2:12 PM',
-      },
+      cancellationTimeline: { requested: '31 May · 2:12 PM' },
       refund: {
         subtotal: 1029,
         bonus: 100,
@@ -173,6 +189,23 @@ export const SHIPPED_CANCELLATION_NODES = [
           { label: 'iPhone 13', amount: 939 },
           { label: 'Revibe Care', amount: 90 },
         ],
+      },
+    }),
+  },
+  // The courier confirmed the parcel is coming back — inside the 48h the sheet
+  // and the explainer promise.
+  {
+    id: 'cancel_shipped_accepted_wallet',
+    label: 'Cancellation accepted — parcel recalled',
+    trigger: 'system',
+    event: 'order.cancellation.accepted',
+    next: ['refunded_shipped_wallet'],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refund_pending',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refund_pending: '31 May · 4:40 PM',
       },
     }),
   },
@@ -195,27 +228,28 @@ export const SHIPPED_CANCELLATION_NODES = [
       },
     }),
   },
-  // ----- Cancellation (original payment) --------------------------------
+  // ----- Cancellation request (original payment) -------------------------
   // Full total back to the card: the 5% processing fee is waived because the
   // delivery promise is already broken (`promiseBreached`), so `refund` carries
   // no `fee` object.
   {
     id: 'cancel_shipped_card',
-    label: 'Cancellation in transit — card refund',
+    label: 'Cancellation requested in transit — card refund',
     trigger: 'customer',
     event: 'order.cancellation.requested',
-    next: ['refunded_shipped_card'],
+    next: [
+      'cancel_shipped_accepted_card',
+      'cancel_shipped_declined',
+      'cancellation_kept',
+    ],
     apply: (o) => ({
       ...o,
       state: 'cancelled',
       delayed: false,
       statusBanner: null,
-      cancellationStatusId: 'refund_pending',
+      cancellationStatusId: 'requested',
       cancellationRef: 'J0urN2',
-      cancellationTimeline: {
-        requested: '31 May · 2:12 PM',
-        refund_pending: '31 May · 2:12 PM',
-      },
+      cancellationTimeline: { requested: '31 May · 2:12 PM' },
       refund: {
         subtotal: 1029,
         amount: 1029,
@@ -224,6 +258,21 @@ export const SHIPPED_CANCELLATION_NODES = [
           { label: 'iPhone 13', amount: 939 },
           { label: 'Revibe Care', amount: 90 },
         ],
+      },
+    }),
+  },
+  {
+    id: 'cancel_shipped_accepted_card',
+    label: 'Cancellation accepted — parcel recalled',
+    trigger: 'system',
+    event: 'order.cancellation.accepted',
+    next: ['refunded_shipped_card'],
+    apply: (o) => ({
+      ...o,
+      cancellationStatusId: 'refund_pending',
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        refund_pending: '31 May · 4:40 PM',
       },
     }),
   },
@@ -242,8 +291,77 @@ export const SHIPPED_CANCELLATION_NODES = [
       },
     }),
   },
+  // ----- Declined (shared by both refund branches) -----------------------
+  // The recall failed — the decline outcome is identical whichever refund
+  // method was picked, because no refund was ever issued. The order returns to
+  // `open` at the stage it paused at (still `shipped`, still stalled), so the
+  // delivery hero takes over again; `promiseBreached` survives, which means
+  // `canCancelShipped` lets the customer ask again if it stays stuck.
+  // `cancellationRejection` + the `rejected` stamp survive as the history chip
+  // that shows up once the parcel finally lands (lib/events.js).
+  {
+    id: 'cancel_shipped_declined',
+    label: 'Cancellation declined — parcel could not be recalled',
+    trigger: 'system',
+    event: 'order.cancellation.declined',
+    next: ['delivered'],
+    apply: (o) => ({
+      ...o,
+      state: 'open',
+      delayed: true,
+      cancellationStatusId: undefined,
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        rejected: '1 Jun · 10:15 AM',
+      },
+      cancellationRejection: {
+        ref: 'CXL-J0urN2',
+        reason:
+          "The parcel was already too far along its route for the courier to pull it back, so we couldn't cancel the order.",
+      },
+      // Refund was never issued — clear the in-flight refund object.
+      refund: undefined,
+      statusBanner: {
+        tone: 'warn',
+        lead: 'Cancellation not possible',
+        body:
+          "The courier couldn't stop your parcel, so your order is still on its way. Once it arrives you have 10 days to return it.",
+      },
+    }),
+  },
+  // ----- Reversed by the customer ----------------------------------------
+  // The `I want to keep my order` undo on the requested refund-hero card. The
+  // id is deliberately the same as the at-QC journey's node: ids are
+  // journey-scoped, and App.jsx's `handleKeepOrder` advances `cancellation_kept`
+  // by name, so reusing it wires the CTA with no App change. Restores the stall
+  // banner — the parcel is still stuck, nothing about that changed.
+  {
+    id: 'cancellation_kept',
+    label: 'Cancellation reversed — order kept',
+    trigger: 'customer',
+    event: 'order.cancellation.reverted',
+    next: ['delivered'],
+    apply: (o) => ({
+      ...o,
+      state: 'open',
+      delayed: true,
+      cancellationStatusId: undefined,
+      cancellationTimeline: {
+        ...o.cancellationTimeline,
+        reverted: '31 May · 3:05 PM',
+      },
+      cancellationReversal: {
+        ref: 'CXL-J0urN2',
+        reason:
+          'You reversed the cancellation — we told the courier to keep the parcel moving to you.',
+      },
+      refund: undefined,
+      statusBanner: STUCK_BANNER,
+    }),
+  },
   // The non-cancel outcome: the courier finally delivers, late. Keeps the
-  // journey honest — the stall isn't automatically a cancellation.
+  // journey honest — the stall isn't automatically a cancellation. Also the
+  // terminal for both hand-back paths above.
   {
     id: 'delivered',
     label: 'Delivered (late)',

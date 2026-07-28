@@ -267,9 +267,15 @@ function SelectStep({
                   : null
               }
               detailLine={
-                breached
-                  ? 'Full refund + bonus · available instantly'
-                  : 'Full refund · available instantly'
+                // "instantly" only holds while nothing has shipped — a stuck
+                // parcel has to be recalled before the credit is issued.
+                order.statusId === 'shipped'
+                  ? breached
+                    ? 'Full refund + bonus · once the recall is confirmed'
+                    : 'Full refund · once the recall is confirmed'
+                  : breached
+                    ? 'Full refund + bonus · available instantly'
+                    : 'Full refund · available instantly'
               }
               detailHighlight
             />
@@ -338,9 +344,15 @@ function ConfirmStep({
     : isSplit
       ? 'original payment'
       : cardLabel
+  // A shipped cancellation waits on the courier recall before any money moves,
+  // so neither destination can promise a clock from the moment of confirming.
   const eta = isStoreCredit
-    ? 'Available instantly after cancellation.'
-    : 'Refunded to your card in 5–10 business days.'
+    ? isShipped
+      ? 'Paid to your Wallet once the cancellation is confirmed.'
+      : 'Available instantly after cancellation.'
+    : isShipped
+      ? 'Refunded to your card 5–10 business days after the cancellation is confirmed.'
+      : 'Refunded to your card in 5–10 business days.'
   const message = isStoreCredit ? (
     breached ? (
       <>
@@ -432,8 +444,8 @@ function ConfirmStep({
             {isShipped && (
               <>
                 {' '}
-                We'll recall the parcel from the courier — you don't need to do
-                anything.
+                We'll ask the courier to send the parcel back and confirm within
+                48 hours — if it can't be stopped, your order stays on its way.
               </>
             )}
           </span>
