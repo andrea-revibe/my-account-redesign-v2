@@ -21,6 +21,7 @@ import { INITIAL_ORDER } from './journeys/initialOrder'
 import { HAPPY_PATH_NODES } from './journeys/happyPath'
 import { CANCELLATION_NODES } from './journeys/cancellation'
 import { SHIPPED_CANCELLATION_NODES } from './journeys/shippedCancellation'
+import { REFUSED_DELIVERY_NODES } from './journeys/refusedDelivery'
 import { CLAIM_COM_NODES } from './journeys/claimChangeOfMind'
 import { CLAIM_WARRANTY_NODES } from './journeys/claimWarranty'
 import { CLAIM_ISSUE_NODES } from './journeys/claimIssue'
@@ -82,6 +83,16 @@ export const JOURNEYS = [
     label: 'Stuck-in-transit cancellation',
     initialOrder: INITIAL_ORDER,
     nodes: SHIPPED_CANCELLATION_NODES,
+  },
+  // Happy path plus one extra outcome at the door: the customer refuses the
+  // parcel, which drops the order into the same self-cancellation flow as a
+  // stuck shipment (reused `cancel_shipped_*` nodes). Also country-gated on the
+  // hero — replay with `?country=ZA` to reach the live cancel path.
+  {
+    id: 'refused_delivery',
+    label: 'Refused delivery',
+    initialOrder: INITIAL_ORDER,
+    nodes: REFUSED_DELIVERY_NODES,
   },
   {
     id: 'claim_change_of_mind',

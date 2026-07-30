@@ -52,20 +52,28 @@ export function startOfDay(date) {
   return d
 }
 
-// Can the customer self-cancel this *shipped* order? Three conditions, all
-// required: the order is in transit, the market allows it (everywhere but AE),
-// and the shipment has been in transit longer than
-// SHIPPED_CANCEL_WINDOW_DAYS.
+// Can the customer self-cancel this *shipped* order? Two ways in, both
+// requiring the order to be in transit and not already cancelled:
+//
+//   1. Refused at the door (`deliveryRefused`) — allowed in **every** market,
+//      including AE. There's no courier recall to arrange: the parcel is
+//      already travelling back to us, so the market's recall capability (the
+//      `shippedCancellation` flag) has nothing to say about it.
+//   2. Stalled in transit past SHIPPED_CANCEL_WINDOW_DAYS (`promiseBreached`)
+//      — country-gated, because this one *does* need the courier to pull a
+//      moving parcel back. Off in AE, where support has to do it.
 //
 // The window condition is represented by the stamped `promiseBreached` flag
 // rather than computed from a shipped date — the prototype has no ISO shipped
 // timestamp (`timeline.shipped` is display copy) and the flag already carries
 // exactly the terms this flow needs: fee waived + Wallet bonus, read by
 // CancelOrderSheet. Production computes it from the EDD model instead
-// (`orderStatus` in lib/edd.js) and drops the flag.
+// (`orderStatus` in lib/edd.js) and drops the flag. `deliveryRefused` stays a
+// real courier event either way, and waives the fee without the bonus.
 export function canCancelShipped(order) {
   if (!order || order.statusId !== 'shipped') return false
   if (order.state === 'cancelled') return false
+  if (order.deliveryRefused === true) return true
   if (!countryConfig(order).shippedCancellation) return false
   return order.promiseBreached === true
 }

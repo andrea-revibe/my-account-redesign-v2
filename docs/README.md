@@ -15,6 +15,7 @@ These live under [`handoff/backend-mapping/`](./handoff/backend-mapping/) — th
 | Doc | Purpose |
 |---|---|
 | [handoff/dev-implementation/README.md](./handoff/dev-implementation/README.md) | **Build-oriented** dev-team handoff: prerequisites, backend **tables to build**, workflows/jobs, and a client-side telemetry plan. The inverse of the backend-mapping brief (which maps to *existing* tables) — this says what to *build*. Cross-links context.md for data-shape detail |
+| [handoff/dev-implementation/telemetry.md](./handoff/dev-implementation/telemetry.md) | The **event catalogue** for My Account — single source of truth for event names, properties, enums, metric definitions and build order. Tiered by value-per-effort (Tier 1 = 7 events, ≈3 dev-days); records what to JOIN instead of log, and what the server already knows. Referenced from `dev-implementation/README.md` §6 |
 | [handoff/backend-mapping/context.md](./handoff/backend-mapping/context.md) | Self-contained brief: glossary, system map, per-feature requirements (Orders / Cancellations / Returns / Warranties), cross-cutting concerns, validation checklist, consolidated open decisions |
 | [handoff/backend-mapping/system_prompt.md](./handoff/backend-mapping/system_prompt.md) | System prompt for the mapping agent — task framing, inputs, process, output format, rules (read-only DB, conflict resolution, iteration cadence) |
 

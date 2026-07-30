@@ -358,13 +358,16 @@ function RefundHero({ order, onOpenWallet }) {
       )}
       {/* Stuck-in-transit cancellation: the refund is conditional on the
           courier actually stopping the parcel, so the requested hero says so
-          up front rather than leaving it to the ⓘ explainer. */}
+          up front rather than leaving it to the ⓘ explainer. A refused delivery
+          has nothing to stop — the parcel is already coming back — so it states
+          the 48h confirmation without the condition. */}
       {isRequested && order.statusId === 'shipped' && (
         <div className="mt-2.5 pt-2.5 border-t border-dashed border-warn/30 flex items-start gap-1.5 text-[11.5px] text-ink-2 leading-[1.4]">
           <Truck size={12} strokeWidth={2} className="text-warn shrink-0 mt-px" />
           <span>
-            Subject to the courier stopping your parcel — we'll confirm within 48
-            hours.
+            {order.deliveryRefused
+              ? "The refused parcel is on its way back to us — we'll confirm within 48 hours."
+              : "Subject to the courier stopping your parcel — we'll confirm within 48 hours."}
           </span>
         </div>
       )}

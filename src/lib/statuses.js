@@ -268,10 +268,16 @@ export const STATUS_EXPLANATIONS = {
   // order is waiting on a courier recall, not on the supplier's packing desk.
   cancellation_requested_shipped:
     "Your parcel is already with the courier, so we've asked them to send it back to us. We'll confirm within 48 hours — if it can't be stopped we'll let you know and your order stays on its way.",
+  // Refusal variant: nothing has to be recalled, the parcel turned around at
+  // the door, so the 48h is ours to confirm rather than the courier's to try.
+  cancellation_requested_refused:
+    "You refused the delivery, so the parcel is already on its way back to us. We'll confirm your cancellation within 48 hours and start your refund from there.",
   cancellation_refund_pending:
     "Your cancellation has been accepted - the order won't ship. We're now processing your refund on our end.",
   cancellation_refund_pending_shipped:
     "The courier confirmed your parcel is coming back to us, so your cancellation is accepted. We're now processing your refund on our end.",
+  cancellation_refund_pending_refused:
+    "Your cancellation is accepted and the refused parcel is on its way back to us. We're now processing your refund on our end.",
   cancellation_refunded:
     'Your cancellation is complete and your refund has been issued. Funds can take up to 10 business days to appear depending on your payment method.',
 }
@@ -286,8 +292,13 @@ export function statusExplanation(order) {
     // A `cancellation_<phase>_<statusId>` key wins when present: the same
     // phase means something different depending on where the order was
     // cancelled (a stalled `shipped` order is waiting on a courier recall, not
-    // on supplier packing). Falls back to the stage-agnostic copy.
+    // on supplier packing). A refused delivery is `shipped` too but needs no
+    // recall, so `_refused` is checked ahead of the stage key. Both fall back
+    // to the stage-agnostic copy.
     return (
+      (order.deliveryRefused === true
+        ? STATUS_EXPLANATIONS[`cancellation_${phase}_refused`]
+        : null) ??
       STATUS_EXPLANATIONS[`cancellation_${phase}_${order.statusId}`] ??
       STATUS_EXPLANATIONS[`cancellation_${phase}`] ??
       null
@@ -322,6 +333,12 @@ export function pickActiveOrderId(orders) {
 
 // Headline shown in the collapsed-card header. Sub-status takes precedence
 // while shipping so the customer sees "Out for delivery" instead of "Shipped".
+//
+// A `statusBanner` may carry an optional `headline` to override it: some events
+// contradict the last courier scan rather than continuing it (a refused
+// delivery is still `out_for_delivery`, but "Out for delivery" over "you turned
+// the parcel away" reads as a bug). Banner-less orders and banners without a
+// headline are unaffected.
 export function statusHeadline(order) {
   if (order.state === 'cancelled') {
     const phase = CANCELLATION_STATUSES.find(
@@ -329,6 +346,7 @@ export function statusHeadline(order) {
     )
     return phase ? phase.headline : 'Cancelled'
   }
+  if (order.statusBanner?.headline) return order.statusBanner.headline
   if (order.statusId === 'delivered') return 'Delivered'
   if (order.statusId === 'shipped') {
     const sub = SHIPPING_SUB_STATUSES.find((s) => s.id === order.subStatusId)
