@@ -363,29 +363,20 @@ On authored events, resolve copy (event-keyed, token-interpolated, variant-selec
 1. **Card impression** — fire when a routed card mounts/becomes visible. The prototype already centralises the decision of *which* card renders (the `App.jsx` card-routing precedence), so instrument at that choke-point: emit `card_viewed` with the resolved card type. This is the "cards the customer would see for a specific journey" signal.
 2. **Interaction** — autocapture for generic clicks, plus explicit `cta_clicked` on the handful of decision CTAs where the *intent* matters (raise a claim, continue, submit, pay return shipping, move-to-card, copy discount code).
 
-### 6.3 Event taxonomy
+### 6.3 Event taxonomy → [`telemetry.md`](./telemetry.md)
 
-| Event | When | Key props |
-|---|---|---|
-| `card_viewed` | A routed card renders | `card_type`, `order_id`, `state`, `status_id`, `claim_type?`, `claim_status?`, `country` |
-| `card_expanded` / `card_collapsed` | Customer expands a card / section | `card_type`, `order_id`, `section` |
-| `cta_clicked` | A tracked CTA | `cta_id`, `card_type`, `order_id` |
-| `return_flow_started` | Returns overlay opens | `order_id`, `entry_point` (`past_order` / `hero`) |
-| `return_step_viewed` | Each flow step renders | `step`, `situation?`, `remedy?`, `claim_type?` |
-| `return_step_completed` | Continue advances a step | `step`, + derived selections |
-| `return_validation_blocked` | Soft-validation stops Continue | `step`, `field` |
-| `return_flow_submitted` | Claim submitted | `claim_type`, `refund_method?`, `situation`, `remedy` |
-| `proof_slot_filled` / `proof_skipped` | Evidence step interactions | `slot`, `issue_id`, `media_type` |
-| `tracking_expanded` | "See detailed tracking" opens | `leg_kind`, `claim_id` |
-| `wallet_opened` / `move_to_card_clicked` | Wallet surfaces | `source` |
-| `csat_submitted` | CSAT score tapped | `score`, `claim_ref`, `claim_type` |
+**The event catalogue lives in [`telemetry.md`](./telemetry.md)** — that file is the single source of truth for event names, properties, enums, metric definitions and build order. Deliberately not duplicated here: two taxonomies drift.
 
-**`card_type` vocabulary** (mirror the routing taxonomy): `in_progress` · `order` · `past_order` · `claim` · `warranty_claim` · `docs_rejected` · `pickup_failed` · `reset_failed` · `invalid_claim` · `closed_claim` · `revibe_cancellation` · `hero`.
+What it settles, in short:
 
-**`step` vocabulary** (returns flow): `situation` · `reason` · `issue_category` · `issue_specific` · `wrong_item` · `remedy` · `device_prep` · `pickup_details` · `evidence` · `refund_method` · `review` · `confirmation`.
+- **Scope** — three questions: which states customers land in, whether self-serve deflects support contact, and what customers choose at each decision fork. Per-step drop-off is explicitly deferred.
+- **Design rule** — events carry identity + what happened; everything about the order/claim is a **JOIN** on `order_id` / `claim_ref`. The one exception is `card_state` on `card_viewed` (a JOIN gives current state, not state-at-view).
+- **Tier 1 = 7 events** — `account_viewed`, `card_viewed`, `card_expanded`, `cta_clicked`, `decision_resolved`, `claim_flow_started`, `claim_flow_ended`. One generic tap event with a `cta` slug replaces ~35 named events; one `decision_resolved` replaces 8. ≈3 dev-days.
+- **Biggest scope cut** — the claim's own answers (`situation`, reason, issue category, remedy, packing, refund method) should be **persisted as columns on the claim record**, not logged as events. Action-gate resolution is already `fact_claim_action_gate` (§4.8).
+- **Corrections to earlier drafts** — the `card_type` list was missing `awb_failed` (the fifth takeover surface, so a whole failure mode was invisible); the returns `step` list was missing `packing` and `compproblem` and renamed four steps away from the reducer's own values.
 
 ### 6.4 Journey / session model
-Identify by `customer_id` (logged-in) + PostHog session. Tag each session with the entry context (order, country, claim type) so a "journey" can be reconstructed as the ordered event stream — matching how the prototype's journey mode replays one lifecycle. A funnel over `return_step_viewed`/`_completed` gives per-step drop-off; a `card_viewed` sequence gives the "what did they see" reconstruction.
+Identify by `customer_id` (logged-in) + the analytics session. Tag each session with the entry context (order, country, claim type) so a "journey" can be reconstructed as the ordered event stream — matching how the prototype's journey mode replays one lifecycle. A `card_viewed` sequence gives the "what did they see" reconstruction; `claim_flow_ended.last_step` gives the cheap drop-off histogram (a true per-step funnel is Tier 3 in `telemetry.md` §4).
 
 ### 6.5 Privacy / PII (D11)
 No raw PII in event props — send `order_id`/`claim_ref` (opaque), never email/phone/address/payment. Gate replay + capture on consent per market, and mask input fields in session replay (addresses, refund destinations). Redact in the `analytics` choke-point so no call site can leak.
@@ -406,7 +397,7 @@ Pulled from `context.md` §8, re-framed as "decide before/while building." Full 
 | D8 | State-vs-event-log authority for every timeline-shaped field. | §4.3, `context.md` §6.2 |
 | D9 | Order promise — persist snapshots at each transition, or recompute per read? | §4.4 |
 | D10 | Claim SLA config — table vs code (`CLAIM_SLAS` is hardcoded, values are placeholders). | §4.5 |
-| D11 | Telemetry PII/consent posture + which analytics destinations. | §6.5 |
+| D11 | Telemetry PII/consent posture + which analytics destinations. | §6.5, [`telemetry.md`](./telemetry.md) §7/§10 |
 | D12 | Action gates — column on claim, separate table, or derived from sub-status? (operational store) | §4.7, `context.md` §8.5 |
 | D13 | Money representation (decimal vs minor units); enum vocab translation layer. | `context.md` §6.1/§6.4 |
 | D14 | **Separate app OLTP store from the analytics warehouse** (recommended), with CDC/ELT between — the app stays lean, the warehouse owns SCD history. | §4.8 |
@@ -424,7 +415,7 @@ Pulled from `context.md` §8, re-framed as "decide before/while building." Full 
 | 4 · Order SLAs | `src/lib/edd.js` | `context.md` §2/§6.8; `docs/output/journey_backend_spec.md` |
 | 5 · Claim SLAs | `src/lib/claims.js` (`CLAIM_SLAS`, `expectedCompletionFor`) | `context.md` §4.5; `docs/output/returns/claim_tracking.md` |
 | 6 · Proof catalogue | `src/components/ClaimFlow/issueTaxonomy.js`, `IssueEvidence.jsx`, `public/proof/*` | `docs/handoff/claim-review-agent/guidelines.md` |
-| 7 · Telemetry | `src/App.jsx` (card routing), `src/components/ClaimFlow/*` (flow steps), `src/components/NpsSurvey.jsx` | — |
+| 7 · Telemetry | `src/App.jsx` (card routing + fork handlers), `src/components/ClaimFlow/*` (flow steps), `src/components/NpsSurvey.jsx` | [`telemetry.md`](./telemetry.md) — event catalogue, enums, metrics, build order |
 | + Claims / warranty / wallet / gates / cancellation | `src/lib/claims.js`, `src/lib/wallet.js`, `src/components/ClaimFlow/flowReducer.js` | `context.md` §3–§6; `docs/output/returns/*`, `warranties_compensations.md`, `wallet.md` |
 
 **Cross-reference:** the read-only backend-mapping brief this doc complements — [`../backend-mapping/context.md`](../backend-mapping/context.md) (data shapes, validation checklist, full decision list) and its [`system_prompt.md`](../backend-mapping/system_prompt.md).
