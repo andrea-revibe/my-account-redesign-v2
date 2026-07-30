@@ -14,8 +14,11 @@
 //     invalid (journey-sequence difference; scaffolded, not yet wired).
 //   shippedCancellation — customer can self-cancel a *shipped* order that has
 //     been in transit past SHIPPED_CANCEL_WINDOW_DAYS (lib/returns.js). Off in
-//     AE, where a shipped order can only be cancelled through support. Gated on
-//     the delivery hero (HeroCard) via canCancelShipped.
+//     AE, where a stalled shipment can only be cancelled through support. Gated
+//     on the delivery hero (HeroCard) via canCancelShipped. Scope note: this
+//     covers the *stalled-parcel* path only — a refused delivery is
+//     self-cancellable everywhere (no courier recall to arrange), so it
+//     bypasses this flag.
 export const DEFAULT_COUNTRY = 'AE'
 
 export const COUNTRIES = {

@@ -232,6 +232,18 @@ A past cancelled order whose `cancellationInitiator === 'revibe'` routes instead
 3. otherwise → `STATUS_DESCRIPTIONS[statusId]` (or `shipped:{subStatusId}` — **but only when `countryConfig(order).detailedTracking` is true**; `SA`/`Others` collapse to the single `shipped` message so no destination-country / customs copy shows, see `country_split.md` §4)
 4. `statusMessage` overrides body only
 
+**`HeroCard` expresses the resolved tone, and the two alert tones say different things.** Before this the hero read `desc.body` and ignored `desc.tone`, so a stuck parcel looked exactly as healthy as an on-track one — green `Active order` pulse and all. Both alert tones now swap that pulse for an `AlertTriangle` and lift the body copy into a tinted block; the split matches what the tones already mean elsewhere (delay banners `warn`; the action-needed takeover cards `danger`):
+
+| Tone | Eyebrow | Body block | Says | Reached by |
+|---|---|---|---|---|
+| `warn` | amber triangle + **`Active order · #{id}`** in `chip-warn` — it *is* still an active order, just flagged | `chip-warn/15` tint, amber border + icon | "something's wrong, we're on it" — no customer action implied | stuck-in-transit stall (`cancellations.md` §2.6), Dynamic-EDD late messages |
+| `danger` | solid `chip-danger` pill reading **`⚠ Action needed`**, then `· #{id}` | `chip-danger/25` tint, red border, white icon | "you have to decide something" | refused delivery (§2.7) |
+| `brand` / `success` | unchanged — green pulse dot | none — plain body text | business as usual | every healthy state |
+
+The map is `ALERT_TONES` at the top of `HeroCard.jsx`; a new alarming state picks its treatment by choosing a tone, not by adding a branch. Inks are the light `chip-warn` / white-on-`chip-danger` rather than the base `warn` / `danger` tokens, which are too dark to read on the purple gradient.
+
+A journey-injected `statusBanner` (`{ tone, lead, body }`) short-circuits all four — and may carry an optional **`headline`**, which `statusHeadline(order)` uses in place of the sub-status / status label (it still loses to the cancellation phase headline). That exists for events which *contradict* the last courier scan rather than continue it: a refused delivery is still `out_for_delivery`, so without the override the hero would read "Out for delivery" above copy saying the parcel is coming back (`cancellations.md` §2.7). Banners without a `headline` are unaffected.
+
 ### 4.6 Status explainer ("Learn more")
 
 A `StatusExplainer` (`src/components/StatusExplainer.jsx`) renders an inline `ⓘ Learn more` link **on the same row as the status pill**; tapping reveals a full-width plain-language *stage definition* below the chip, then taps shut (it `stopPropagation`s so it never toggles the card header). This is distinct in voice from the §4.5 condition banner — the banner says "On track · your device is undergoing inspection"; the explainer answers "what does Quality check mean?". Copy is data-driven: `STATUS_EXPLANATIONS` + `statusExplanation(order)` in `lib/statuses.js`, defined only for the stages that route through the explainer — `created` / `quality_check` (keyed by `statusId`) and `cancellation_{id}`. `shipped` / `delivered` are deliberately absent (those surfaces explain themselves), so the resolver returns null and nothing renders there.
@@ -312,6 +324,7 @@ The orders array (`src/data/orders.js`) is mock data today. Production will swap
 | `state` | enum | Parallel header state for chips/filters. Values: `open` (default), `close`, `cancelled`. Independent of progression — a cancelled order keeps the `statusId` it had at cancellation. |
 | `delayed` *(optional)* | boolean | When true, the status banner switches to warn (orange) tone with delay-flavoured body keyed by `statusId`. |
 | `statusMessage` *(optional)* | string | Overrides the status banner's body text. Leading phrase and tone still computed from `state` / `delayed` / `statusId`. Production hook for ad-hoc backend-injected notes. |
+| `statusBanner` *(optional)* | `{ tone, lead, body, headline? }` | Whole-banner override (journey / EDD-sandbox injected), bypassing the §4.5 resolution. Optional `headline` also replaces the card headline — see §4.5. |
 
 ### 7.3 Tracking & courier fields (only once shipped)
 

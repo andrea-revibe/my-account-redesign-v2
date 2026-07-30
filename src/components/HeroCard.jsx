@@ -26,6 +26,37 @@ import { canCancelShipped } from '../lib/returns'
 const DHL_TRACKING_URL =
   'https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=3392654392'
 
+// The hero used to render `statusDescription`'s body and ignore its `tone`, so a
+// stalled or refused delivery looked exactly as healthy as an on-track one —
+// green "active" pulse and all. Both alert tones swap the pulse for a warning
+// triangle and lift the body copy into a tinted block; `brand` / `success` keep
+// the original treatment.
+//
+// The two tones say different things, matching what they already mean elsewhere
+// in the app (delay banners warn; the action-needed takeover cards go danger):
+//
+//   warn   — something's wrong and we're on it. Nothing for the customer to do,
+//            so the eyebrow still reads `Active order` (it is one) in amber.
+//            Covers the stuck-in-transit stall + the Dynamic-EDD late messages.
+//   danger — the customer has to decide something. Eyebrow becomes a solid red
+//            `Action needed` pill. Covers the refused delivery.
+//
+// Inks are the light `chip-warn` / white-on-`chip-danger`, not the base `warn` /
+// `danger` tokens, which are too dark to read on the purple gradient.
+const ALERT_TONES = {
+  warn: {
+    label: 'Active order',
+    ink: 'text-chip-warn',
+    block: 'bg-chip-warn/15 border-chip-warn/40',
+  },
+  danger: {
+    label: 'Action needed',
+    pill: true,
+    ink: 'text-white',
+    block: 'bg-chip-danger/25 border-chip-danger/60',
+  },
+}
+
 // Hero card pulls the most-active order to the very top of the list with a
 // dark gradient background. Inside-out structure: eyebrow → headline →
 // product strip → dot timeline → optional detailed-tracking expand → CTAs.
@@ -35,6 +66,7 @@ export default function HeroCard({ order, onRaiseClaim, onCancelOrder }) {
   if (!order) return null
 
   const desc = statusDescription(order)
+  const alert = ALERT_TONES[desc.tone] ?? null
   const cur = progressIndex(order.statusId)
   const subCur = subProgressIndex(order.subStatusId)
   const isShipped = order.statusId === 'shipped'
@@ -54,9 +86,30 @@ export default function HeroCard({ order, onRaiseClaim, onCancelOrder }) {
         }}
       />
       <div className="relative flex flex-col gap-2">
-        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] opacity-85">
-          <span className="w-2 h-2 rounded-full bg-[#6dffb8] animate-heroPulse" />
-          Active order · #{order.id}
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]">
+          {alert?.pill ? (
+            <>
+              <span className="inline-flex items-center gap-1 rounded-full bg-chip-danger px-2 py-[3px] text-white">
+                <AlertTriangle size={11} strokeWidth={2.5} />
+                {alert.label}
+              </span>
+              <span className="opacity-85">· #{order.id}</span>
+            </>
+          ) : (
+            <span
+              className={
+                'inline-flex items-center gap-1.5 ' +
+                (alert ? alert.ink : 'opacity-85')
+              }
+            >
+              {alert ? (
+                <AlertTriangle size={13} strokeWidth={2.5} />
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-[#6dffb8] animate-heroPulse" />
+              )}
+              {alert ? alert.label : 'Active order'} · #{order.id}
+            </span>
+          )}
         </div>
         <h2 className="mt-2 mb-0 text-[22px] font-bold tracking-[-0.02em] leading-[1.2]">
           {statusHeadline(order)}
@@ -66,9 +119,25 @@ export default function HeroCard({ order, onRaiseClaim, onCancelOrder }) {
             Delivery by {order.estimatedDelivery}
           </div>
         )}
-        <div className="text-[13.5px] opacity-85 leading-[1.4]">
-          {desc.body}
-        </div>
+        {alert ? (
+          <div
+            className={
+              'mt-1 flex items-start gap-2 rounded-[12px] border px-3 py-2.5 ' +
+              alert.block
+            }
+          >
+            <AlertTriangle
+              size={15}
+              strokeWidth={2}
+              className={'shrink-0 mt-px ' + alert.ink}
+            />
+            <span className="text-[13px] leading-[1.45]">{desc.body}</span>
+          </div>
+        ) : (
+          <div className="text-[13.5px] opacity-85 leading-[1.4]">
+            {desc.body}
+          </div>
+        )}
 
         <ProductSummary order={order} tone="hero" className="mt-3" />
 
