@@ -5,6 +5,7 @@ covers:
   - src/components/ClaimFlow
   - src/components/RefundSplitRows.jsx
   - src/lib/returns.js
+  - src/lib/coverage.js
 ---
 
 # Returns — Issue & Wrong device
@@ -22,7 +23,7 @@ The issue branch is the entry point used when something is wrong with the delive
 
 Distinguishing characteristics vs change of mind:
 
-- The customer arrives by picking a fault/wrong-item **situation** on Screen 1, then describes it: `device_fault` → `category` → `specific` → `remedy`; `wrong_item` → `wrongitem` → `remedy`. The `remedy` fork is where the downstream `claimType` resolves (`device_fault`: refund→issue / repair→warranty; `wrong_item`: refund→issue / replacement→issue). After the fork, an `evidence` step collects structured proof via guided slotted capture (the specific issue is already chosen, so it gates only the description — proof is advisory, warned not gated).
+- The customer arrives by picking a fault/wrong-item **situation** on Screen 1, then describes it: `device_fault` → `category` → `specific` → `remedy`; `wrong_item` → `wrongitem` → `remedy`. The `remedy` fork is where the downstream `claimType` resolves (`device_fault`: refund→issue / repair→warranty / **accidental→warranty**; `wrong_item`: refund→issue / replacement→issue). After the fork, an `evidence` step collects structured proof via guided slotted capture (the specific issue is already chosen, so it gates only the description — proof is advisory, warned not gated).
 - No restocking fee on the original-payment path.
 - A flat AED 100 Wallet bonus (`ISSUE_WALLET_BONUS`) is added on the Wallet path — the implicit framing is "we owe you because something went wrong, and we'd like you to stay in the ecosystem".
 - The operational flow has a single repair-supplier route (Original supplier) regardless of country, vs change-of-mind's three-way country split.
@@ -212,7 +213,7 @@ How the customer-facing UI surfaces backend state:
 
 **`category` field was replaced by `issueSubtypeId` + `issueScope`.** The pre-redesign flat `category` field couldn't differentiate "wrong device" from "battery issue" cleanly. Review now consumes the structured pair via `findSpecificIssue(id)`.
 
-**Remedy is chosen after the issue, and shows only eligible outcomes.** Earlier the customer picked refund vs warranty up front (outcome-first). The redesign asks what's wrong first, then offers the remedy menu — for `device_fault`, refund or repair; for `wrong_item`, refund or get-the-correct-item. This keeps the refund/replacement/repair fork off the customer's plate until they've described the problem, and lets the menu hide outcomes that don't apply. See [change_of_mind.md](./change_of_mind.md) §5.
+**Remedy is chosen after the issue, and shows only eligible outcomes.** Earlier the customer picked refund vs warranty up front (outcome-first). The redesign asks what's wrong first, then offers the remedy menu — for `device_fault`, refund / repair under standard warranty / repair accidental damage; for `wrong_item`, refund or get-the-correct-item. On `device_fault` the menu is now **coverage-aware** (which options appear depends on the device's age and whether Revibe Care was bought — including whether `Return for a refund` is still inside the 10-day window): full model in [warranties_compensations.md](../warranties_compensations.md) §4.2. This keeps the refund/replacement/repair fork off the customer's plate until they've described the problem, and lets the menu hide outcomes that don't apply. See [change_of_mind.md](./change_of_mind.md) §5.
 
 ## 6. Data model
 
@@ -227,7 +228,7 @@ The full claim-object reference (including takeover-card extensions) lives in [c
 | Field | Type | Notes |
 |---|---|---|
 | `claim.type` | `'issue'` | Derived (`claimTypeFor`) — both `device_fault` + refund and `wrong_item` + refund/replacement land on `issue`. |
-| `claim.remedy` | `'refund' | 'replacement'` | The remedy fork. `replacement` (wrong-item → correct item) carries **no** `refundMethod` / `expectedRefund` block — no money moves. `refund` carries both. |
+| `claim.remedy` | `'refund' | 'replacement' | 'repair' | 'accidental'` | The remedy fork. `replacement` (wrong-item → correct item) carries **no** `refundMethod` / `expectedRefund` block — no money moves. `refund` carries both. |
 | `claim.issueDetails` | `{ description, attachmentName, proofSlots }` | `description` is the customer's free-text; `proofSlots` is the slotted-capture map (`slotId → { label, filename }`, stub filenames today). `attachmentName` stays `''` on the issue path (it's retained for the compensation uploader + seeded mocks). The specific-issue id and scope are **separate** top-level fields (below), not nested here. |
 | `claim.issueSubtypeId` | string | One of the specific-issue ids from `issueTaxonomy.js` (`battery_drain` / `wont_charge` / `screen` / `body` / `camera` / `linked_account` / `wrong_colour` / `something_else` / …), resolved via `findSpecificIssue(id)`. |
 | `claim.issueScope` | `'not_working' | 'wrong_device'` | Derived from the issue via `scopeForIssue` (wrong-item details → `wrong_device`, everything else → `not_working`); also pre-filled by an accepted tripwire (`SWITCH_SITUATION` carries the scope). |

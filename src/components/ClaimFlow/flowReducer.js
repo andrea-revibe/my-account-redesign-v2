@@ -8,13 +8,13 @@ import { emptyAddress, addressError } from '../../lib/address'
 // it the downstream `claimType` the rest of the app keys off — is derived
 // later:
 //   changed_mind      → change_of_mind            (auto-refund, no remedy screen)
-//   device_fault      → issue (refund) | warranty (repair)   [remedy screen]
+//   device_fault      → issue (refund) | warranty (repair | accidental) [remedy screen]
 //   wrong_item        → issue (refund | replacement)         [remedy screen]
 //   keep_compensation → compensation              (standalone, agent-reviewed)
 // `claimType` stays the canonical contract for STEP_SEQUENCES tails, App.jsx
-// routing and buildClaim; `remedy` ('refund' | 'repair' | 'replacement') only
-// forks the tail (repair/replacement skip the refund step) and the
-// confirmation copy.
+// routing and buildClaim; `remedy` ('refund' | 'repair' | 'replacement' |
+// 'accidental') only forks the tail (everything but refund skips the refund
+// step) and the confirmation copy.
 
 // The decision-screen portion of each branch (everything before the shared
 // out-of-scope steps 4–9). The reason / category / specific / remedy /
@@ -40,7 +40,8 @@ function tailSteps(situation, remedy) {
   if (situation === 'keep_compensation') return ['refund', 'review', 'confirm']
   if (situation === 'changed_mind')
     return ['deviceprep', 'packing', 'pickup', 'refund', 'review', 'confirm']
-  const noRefund = remedy === 'repair' || remedy === 'replacement'
+  const noRefund =
+    remedy === 'repair' || remedy === 'replacement' || remedy === 'accidental'
   const tail = ['evidence', 'deviceprep', 'packing', 'pickup']
   if (!noRefund) tail.push('refund')
   tail.push('review', 'confirm')
@@ -71,7 +72,15 @@ export function claimTypeFor(situation, remedy) {
     case 'keep_compensation':
       return 'compensation'
     case 'device_fault':
-      return remedy === 'repair' ? 'warranty' : remedy === 'refund' ? 'issue' : null
+      // 'accidental' is the Revibe Care accidental-damage arm. Operationally
+      // identical to a warranty repair — device leaves, gets fixed, comes back,
+      // no money moves — so it rides the warranty pipeline and WarrantyClaimCard.
+      // `remedy` stays the discriminator for coverage copy downstream.
+      return remedy === 'repair' || remedy === 'accidental'
+        ? 'warranty'
+        : remedy === 'refund'
+          ? 'issue'
+          : null
     case 'wrong_item':
       // refund and replacement both ride the issue pipeline (replacement is
       // distinguished by `remedy` for the tail + confirmation copy).

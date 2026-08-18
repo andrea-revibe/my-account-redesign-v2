@@ -1,6 +1,132 @@
-// Warranty-claim mocks — hand-seeded to exercise WarrantyClaimCard heroes
-// (under_repair, ship_back) that in-session submit (always `initiated`) can’t reach.
+// Warranty mocks, two kinds:
+//
+//  1. Claim-free delivered orders that exercise the three warranty-coverage
+//     tiers on the returns flow's remedy screen (lib/coverage.js). Coverage runs
+//     off `placedAt` + the Revibe Care add-on (`warranty`), so these need real
+//     order ages — the rest of the mock set is only a few months old and would
+//     all resolve to the same tier.
+//  2. Layered claim mocks that exercise WarrantyClaimCard heroes (under_repair,
+//     ship_back) which in-session submit (always `initiated`) can’t reach.
 export const WARRANTY_ORDERS = [
+  // ----- Coverage tier: standard + Care, inside the 10-day return window.
+  // The full remedy menu — refund, repair under warranty, and the accidental
+  // damage arm. The only mock still refund-eligible, so it's also the one that
+  // proves the return-window gate on `Return for a refund`.
+  {
+    id: '89660',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '01/08/2026 10:15 AM',
+    placedAtFull: '1 Aug 2026 · 10:15 AM',
+    deliveredOn: '2026-08-06',
+    deliveredOnLong: 'Thursday, 6 August',
+    quantity: 1,
+    unitPrice: 1049,
+    subtotal: 1049,
+    warranty: 85,
+    total: 1134,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25194118',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '1 Aug · 10:15 AM',
+      quality_check: '2 Aug · 12:40 PM',
+      shipped: '4 Aug · 9:05 AM',
+      delivered: '6 Aug · 2:20 PM',
+    },
+    product: {
+      name: 'iPhone 15',
+      variant: 'Blue · 256 GB · Excellent',
+      image: '/iphone-cutout.png',
+    },
+  },
+  // ----- Coverage tier: extended (Revibe Care). 14 months old, so the standard
+  // warranty has lapsed and only Care is left. The headline case: no refund
+  // (window long closed), repair reads as Revibe Care, accidental damage
+  // available.
+  {
+    id: '89380',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '05/06/2025 11:20 AM',
+    placedAtFull: '5 Jun 2025 · 11:20 AM',
+    deliveredOn: '2025-06-12',
+    deliveredOnLong: 'Thursday, 12 June',
+    quantity: 1,
+    unitPrice: 1299,
+    subtotal: 1299,
+    warranty: 110,
+    total: 1409,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25188402',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Mastercard', last4: '8821' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '5 Jun · 11:20 AM',
+      quality_check: '6 Jun · 3:15 PM',
+      shipped: '9 Jun · 10:30 AM',
+      delivered: '12 Jun · 4:05 PM',
+    },
+    product: {
+      name: 'iPhone 14 Pro',
+      variant: 'Deep Purple · 256 GB · Excellent',
+      image: '/iphone-cutout.png',
+    },
+  },
+  // ----- Coverage tier: expired. Past the first year too, but no Revibe Care, so the
+  // standard warranty has run out and nothing replaces it. Uncovered devices
+  // are out of scope this phase: the remedy screen must look exactly as it does
+  // today (no coverage strip, no accidental arm, repair still offered).
+  {
+    id: '89381',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '18/06/2025 04:40 PM',
+    placedAtFull: '18 Jun 2025 · 4:40 PM',
+    deliveredOn: '2025-06-25',
+    deliveredOnLong: 'Wednesday, 25 June',
+    quantity: 1,
+    unitPrice: 699,
+    subtotal: 699,
+    total: 699,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25188655',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'android',
+    timeline: {
+      created: '18 Jun · 4:40 PM',
+      quality_check: '19 Jun · 1:05 PM',
+      shipped: '21 Jun · 11:45 AM',
+      delivered: '25 Jun · 5:30 PM',
+    },
+    product: {
+      name: 'Samsung Galaxy S22',
+      variant: 'Phantom Black · 128 GB · Good',
+      image: '/iphone-cutout.png',
+    },
+  },
   // ----- Layered mock: delivered → warranty claim → under repair.
   // Exercises the WarrantyClaimCard's `under_repair` hero: brand-tone
   // headline, Wrench-iconed repair-window strip. No takeover cards

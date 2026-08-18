@@ -12,6 +12,7 @@ import {
 import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
 import { claimTypeLabel, expectedCompletionFor, formatClaimRef } from '../../lib/claims'
+import { coverageFor, coverageSummary } from '../../lib/coverage'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import NpsSurvey from '../NpsSurvey'
 
@@ -32,6 +33,19 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
       )
   const currency = order.currency
   const warrantyEta = isWarranty ? expectedCompletionFor('warranty') : null
+  // Same coverage line as Review + the tracking card. On the accidental arm this
+  // is where the customer leaves knowing a repair-cost check is still ahead.
+  const warrantyCoverage = isWarranty
+    ? (() => {
+        const c = coverageFor(order)
+        return coverageSummary({
+          cause: state.remedy === 'accidental' ? 'accidental' : 'defect',
+          tier: c.tier,
+          cap: c.cap,
+          currency,
+        })
+      })()
+    : null
   const timeline =
     state.refundMethod === 'wallet'
       ? 'Lands in your Revibe Wallet within 1 hour once return is complete.'
@@ -138,6 +152,14 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
                 No refund is issued — the same device is returned to you after
                 repair.
               </span>
+              {warrantyCoverage && (
+                <span className="block mt-1 text-[12px] text-muted">
+                  <span className="text-ink font-semibold">
+                    {warrantyCoverage.label}
+                  </span>{' '}
+                  — {warrantyCoverage.detail}
+                </span>
+              )}
             </Row>
           ) : isReplacement ? (
             <Row Icon={Package} title="What you'll get back">

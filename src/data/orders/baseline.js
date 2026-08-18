@@ -233,10 +233,13 @@ export const BASELINE_ORDERS = [
     phone: '+971 50 559 5034',
     email: 'andrea.grossi@example.com',
     address: 'Ontario Tower, Office 103, Business Bay Dubai',
-    placedAt: '24/05/2026 09:15 AM',
-    placedAtFull: '24 May 2026 · 9:15 AM',
-    deliveredOn: '2026-05-29',
-    deliveredOnLong: 'Friday, 29 May',
+    // Dated inside the 10-day return window on purpose: this is the split-paid
+    // order, so it has to stay refund-eligible for the device-fault →
+    // `Return for a refund` path to reach the RefundSplitRows surfaces.
+    placedAt: '02/08/2026 09:15 AM',
+    placedAtFull: '2 Aug 2026 · 9:15 AM',
+    deliveredOn: '2026-08-07',
+    deliveredOnLong: 'Friday, 7 August',
     quantity: 1,
     unitPrice: 3299,
     subtotal: 3299,
@@ -255,10 +258,10 @@ export const BASELINE_ORDERS = [
     paymentSplit: { card: 1499, giftCard: 2000 },
     deviceOs: 'ios',
     timeline: {
-      created: '24 May · 9:15 AM',
-      quality_check: '25 May · 11:20 AM',
-      shipped: '27 May · 8:40 AM',
-      delivered: '29 May · 2:05 PM',
+      created: '2 Aug · 9:15 AM',
+      quality_check: '3 Aug · 11:20 AM',
+      shipped: '5 Aug · 8:40 AM',
+      delivered: '7 Aug · 2:05 PM',
     },
     conditionReport: {
       url: 'https://www.nsysgroup.com',

@@ -24,8 +24,9 @@ import { isSplitPaid } from '../lib/returns'
 import KeepOrderSheet from './KeepOrderSheet'
 import HistoryThread from './HistoryThread'
 import BnplDisclaimerTooltip from './BnplDisclaimerTooltip'
-import { ProductSummary } from './ProductSummary'
+import { ProductSummary, REVIBE_CARE_ICON } from './ProductSummary'
 import { ConditionReportChip } from './ConditionReportChip'
+import { coverageFor, coverageStripFor } from '../lib/coverage'
 import DeliveryAddressPill from './DeliveryAddressPill'
 import OrderClaimLink from './OrderClaimLink'
 
@@ -52,14 +53,7 @@ function DeliveredOrderCard({ order, onRaiseClaim }) {
         <OrderEyebrow id={order.id} />
         <DeliveredStatePill />
         <DeliveredHero order={order} />
-        <ProductSummary
-          order={order}
-          afterRow={
-            order.conditionReport?.url ? (
-              <ConditionReportChip report={order.conditionReport} />
-            ) : null
-          }
-        />
+        <ProductSummary order={order} afterRow={<DeliveredChips order={order} />} />
         {history.length > 0 && <HistoryThread events={history} />}
         <div className="flex flex-col gap-2 pt-2.5 border-t border-line-2 -mx-1 px-1">
           <PastButton
@@ -75,6 +69,32 @@ function DeliveredOrderCard({ order, onRaiseClaim }) {
         </div>
       </div>
     </article>
+  )
+}
+
+// Quiet chips under the product row: the NSYS condition report, and — when the
+// device is still covered — the date that cover runs to. The Revibe Care tile in
+// ProductSummary says the plan was *bought*; this says how long it has left,
+// which is what a customer weighing up a claim actually needs. Returns null when
+// there's nothing to show, so ProductSummary doesn't render an empty slot.
+function DeliveredChips({ order }) {
+  const coverage = coverageStripFor(coverageFor(order))
+  const report = order.conditionReport?.url ? order.conditionReport : null
+  if (!coverage && !report) return null
+  return (
+    <div className="flex flex-col gap-1.5">
+      {report && <ConditionReportChip report={report} />}
+      {coverage && (
+        <div className="inline-flex items-center gap-1.5 text-[11px] text-ink-2">
+          <img
+            src={REVIBE_CARE_ICON}
+            alt=""
+            className="w-3.5 h-3.5 object-contain shrink-0"
+          />
+          {coverage.headline}
+        </div>
+      )}
+    </div>
   )
 }
 
