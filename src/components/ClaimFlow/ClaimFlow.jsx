@@ -4,6 +4,7 @@ import { ORDERS } from '../../data/orders'
 import { flowReducer, initialState, stepError } from './flowReducer'
 import { generateClaimRef, refundBreakdown, assessBattery } from '../../lib/returns'
 import { expectedCompletionFor } from '../../lib/claims'
+import { coverageFor } from '../../lib/coverage'
 import ProgressBar from './ProgressBar'
 import StickyActionBar from './StickyActionBar'
 import Step1Situation from './Step1Situation'
@@ -196,7 +197,12 @@ export default function ClaimFlow({
             <StepWrongItem state={state} dispatch={dispatch} error={errorKey} />
           )}
           {state.step === 'remedy' && (
-            <StepRemedy state={state} dispatch={dispatch} error={errorKey} />
+            <StepRemedy
+              state={state}
+              dispatch={dispatch}
+              order={order}
+              error={errorKey}
+            />
           )}
           {state.step === 'evidence' && (
             <StepEvidence
@@ -433,13 +439,22 @@ function buildClaim({ state, order, claimRef }) {
   // Warranty — no refund block; carry a placeholder repairWindow so the
   // WarrantyClaimCard's later `under_repair` hero has something to land
   // on if/when the claim is progressed manually.
+  //
+  // `coverage` / `cause` freeze the entitlement the claim was raised under, so
+  // the tracking surfaces don't have to re-derive it later (and can't drift if
+  // the device crosses a warranty boundary while the claim is open):
+  //   coverage 'standard' | 'extended'   which warranty answered
+  //   cause    'defect' | 'accidental'   what the customer declared
   const eta = expectedCompletionFor('warranty', now)
+  const coverage = coverageFor(order)
   return {
     ...base,
     issueDetails: { ...state.issueDetails },
     issueScope: state.issueScope,
     issueSubtypeId: state.issueSubtypeId,
     remedy: state.remedy,
+    coverage: coverage.tier === 'extended' ? 'extended' : 'standard',
+    cause: state.remedy === 'accidental' ? 'accidental' : 'defect',
     ...(batteryAssessment ? { batteryAssessment } : {}),
     repairWindow: {
       expectedComplete: eta.short,

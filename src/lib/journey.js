@@ -58,16 +58,22 @@ export function useJourney(journeyId, country = DEFAULT_COUNTRY) {
     const node = journey.nodes.find((n) => n.id === currentNodeId)
     if (!node) return []
     if (Array.isArray(node.next)) {
-      // An edge is either a plain id string (all countries) or an object
-      // { id, countries: [...] } applying only when the active country is
-      // listed. Untagged edges always pass, so non-country journeys are
-      // unchanged. See docs/output/country_split.md §6.
+      // An edge is either a plain id string (unconditional) or an object with
+      // optional guards:
+      //   { id, countries: [...] }  only when the active country is listed
+      //                             (docs/output/country_split.md §6)
+      //   { id, when: (order) => }  only when the replayed order satisfies it
+      //
+      // `when` exists because the graph now has to fork on claim *state*, not
+      // just market: one QC node serves both the refund and the repair tail, and
+      // which one continues depends on the remedy the customer picked. Untagged
+      // edges always pass, so every existing journey is unchanged.
       return node.next
         .filter(
           (e) =>
             typeof e === 'string' ||
-            !e.countries ||
-            e.countries.includes(country),
+            ((!e.countries || e.countries.includes(country)) &&
+              (!e.when || e.when(order))),
         )
         .map((e) => {
           const id = typeof e === 'string' ? e : e.id
@@ -78,7 +84,7 @@ export function useJourney(journeyId, country = DEFAULT_COUNTRY) {
     const i = journey.nodes.findIndex((n) => n.id === currentNodeId)
     if (i < 0 || i >= journey.nodes.length - 1) return []
     return [journey.nodes[i + 1]]
-  }, [journey, currentNodeId, country])
+  }, [journey, currentNodeId, country, order])
 
   const advance = useCallback(
     (nodeId) => {

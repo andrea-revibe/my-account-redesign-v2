@@ -28,6 +28,8 @@
 //
 // Issue subtype seeded as `battery` (from issueSubtypes.NOT_WORKING_SUBTYPES)
 // so the ops dialogue can quote a concrete diagnostic ("cell health 92%").
+import { REPAIR_SUBMIT_NODES, REPAIR_TAIL_NODES } from './repairPath'
+
 export const CLAIM_ISSUE_NODES = [
   {
     id: 'placed',
@@ -120,7 +122,12 @@ export const CLAIM_ISSUE_NODES = [
     label: 'Delivered',
     trigger: 'system',
     event: 'shipment.delivered',
-    next: ['claim_submitted_wallet', 'claim_submitted_card'],
+    next: [
+      'claim_submitted_wallet',
+      'claim_submitted_card',
+      'claim_submitted_warranty',
+      'claim_submitted_warranty_accidental',
+    ],
     apply: (o) => ({
       ...o,
       statusId: 'delivered',
@@ -440,8 +447,12 @@ export const CLAIM_ISSUE_NODES = [
     label: 'Claim quality check started',
     trigger: 'system',
     event: 'claim.qc.started',
+    // One QC node serves both tails, so the outcome edge forks on the remedy
+    // the customer chose (`when` guard in lib/journey.js): a repair claim can't
+    // continue into a refund, and vice versa. The failure detours apply to both.
     next: [
-      'claim_refund_issued',
+      { id: 'claim_refund_issued', when: (o) => o.claim?.type !== 'warranty' },
+      { id: 'claim_repair_quote', when: (o) => o.claim?.type === 'warranty' },
       'claim_invalid_confirmed',
       'claim_reset_failed',
       'claim_cancelled_shipback',
@@ -487,6 +498,14 @@ export const CLAIM_ISSUE_NODES = [
   // ----- Customer-cancelled terminal — reachable from the cancellable
   //       (pre-pickup) submitted nodes. Strips the claim so the order
   //       reverts to its delivered PastOrderCard (re-raisable). -------
+  // ----- Repair-path submit nodes (defect + accidental), shared with
+  //       claim_warranty — reached when the remedy screen's repair options are
+  //       chosen instead of a refund.
+  ...REPAIR_SUBMIT_NODES,
+  // ----- Repair + ship-back tail, shared with claim_warranty. Reached when the
+  //       customer picked a repair remedy rather than a refund (the QC fork
+  //       above). Spread as one contiguous run — adjacency carries the chain.
+  ...REPAIR_TAIL_NODES,
   {
     id: 'claim_cancelled',
     label: 'Claim cancelled by customer',

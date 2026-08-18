@@ -6,6 +6,7 @@ import {
   MapPin,
   CheckCircle2,
   Zap,
+  ShieldCheck,
 } from 'lucide-react'
 import {
   WARRANTY_CLAIM_STATUSES,
@@ -22,6 +23,7 @@ import {
   transitSubProgressIndex,
 } from '../lib/claims'
 import { getHistoryEvents } from '../lib/events'
+import { coverageArmLabel } from '../lib/coverage'
 import { formatAddress } from '../lib/address'
 import ClaimDetailsSheet from './ClaimDetailsSheet'
 import OrderClaimLink from './OrderClaimLink'
@@ -222,6 +224,7 @@ function WarrantyHero({ order, claim, tone }) {
   const phase = warrantyClaimPhaseTag(claim.claimStatusId)
   const headline = warrantyClaimStatusHeadline(claim)
   const subline = warrantyClaimStatusSubline(claim)
+  const armLabel = coverageArmLabel(claim)
   // The pickup strip only surfaces once the airway bill exists (its number
   // rides on scheduledPickup.awb) — matching ClaimCard. Before that the claim
   // sits at `initiated` with no bookable pickup, so we show a calm "arranging
@@ -259,6 +262,17 @@ function WarrantyHero({ order, claim, tone }) {
 
       {subline && (
         <div className="mt-1 text-[11.5px] text-ink-2">{subline}</div>
+      )}
+
+      {/* Which warranty arm this repair is running under — "Warranty" alone
+          can't separate an accidental-damage repair from a defect one. Its own
+          quiet line rather than an eyebrow suffix, which would wrap the header
+          row at 430px. */}
+      {armLabel && (
+        <div className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-[0.06em] text-ink-2">
+          <ShieldCheck size={11} strokeWidth={2} />
+          {armLabel}
+        </div>
       )}
 
       {showScheduledPickup && (

@@ -2,6 +2,8 @@
 status: live
 verified_against: ecdda19
 covers:
+  - src/lib/coverage.js
+  - src/components/ClaimFlow/StepRemedy.jsx
   - src/components/WarrantyClaimCard.jsx
   - src/components/AwbLink.jsx
   - src/components/ConditionReportChip.jsx
@@ -25,7 +27,8 @@ Step 1's full option set across the returns flow:
 |---|---|---|
 | `My device works great, but I want to return it` | — | **Wired** — see [returns/change_of_mind.md](./returns/change_of_mind.md) |
 | `Something's wrong with my device` | `Return for a refund` | **Wired** — see [returns/issue.md](./returns/issue.md) |
-| `Something's wrong with my device` | `Use my warranty` | **Wired** — intake + tracking — covered here (§2) |
+| `Something's wrong with my device` | `Repair under standard warranty` | **Wired** — intake + tracking — covered here (§2) |
+| `Something's wrong with my device` | `Repair accidental damage` (Revibe Care) | **Wired** — intake + tracking; the AED 1,500 quote is deferred — coverage model in §4 |
 | `Request compensation` | shipping refund / faulty charger — keep the item | **Wired** — intake + tracking — covered here (§3) |
 
 Selecting `Request compensation` now dispatches `SET_CLAIM_TYPE: 'compensation'` (the old inline `not part of this build` note is gone); `canAdvance` accepts `change_of_mind`, `issue`, `warranty`, **and** `compensation`. The **warranty tracking card** has two hand-seeded mocks (89610, 89580) to exercise the `under_repair` and `ship_back` heroes that the in-session pipeline can't reach without ops simulation — see §2. The **compensation tracking card** has three hand-seeded mocks (89630 under review, 89605 refunded, 89572 closed-invalid) — see §3.8.
@@ -315,3 +318,92 @@ On top of the standard claim shape (`claimRef`, `claimStatusId`, `type`, `submit
 | `claim.invalidClaim` *(optional)* | `{ determinedAt, opsName, opsRole, opsMessage }` | `CompensationClosedCard` — note the **absence** of `returnShipping` / `returnShipment` distinguishes it from a refund-flow invalid claim |
 
 Compensation carries **no** `scheduledPickup` / `devicePrep` / `pickupDetails` — those steps are skipped. `COMPENSATION_CLAIM_STATUSES` reuses the refund status ids, so no new terminal is needed.
+
+## 4. Warranty coverage — standard vs Revibe Care
+
+### 4.1 The model
+
+Every order carries warranty. The tier decides the **duration** and **which kinds of fault qualify**:
+
+| Tier | Entitlement | Covers | For |
+|---|---|---|---|
+| **Standard** | free, every order | defects present from the start / developed on their own | 12 months |
+| **Extended (Revibe Care)** | paid add-on at checkout | the same defects **plus accidental damage the customer caused** | 24 months |
+
+Accidental damage carries two extra conditions: the repair must come in **under the market cap** (AED 1,500 in AE) and the arm is usable **once**.
+
+Resolved as a matrix (`coverageFor` in [`../../src/lib/coverage.js`](../../src/lib/coverage.js)):
+
+| Device age | Cause | Standard only | + Revibe Care |
+|---|---|---|---|
+| ≤ 12 months | Defect | Repair — free | Repair — free |
+| ≤ 12 months | Accidental | ✗ not covered | **Repair** — ≤ cap, one use |
+| 12–24 months | Defect | ✗ not covered | **Repair** — free |
+| 12–24 months | Accidental | ✗ not covered | **Repair** — ≤ cap, one use |
+| > 24 months | Any | ✗ | ✗ |
+
+So Care only *earns a place on screen* in three cells — accidental damage inside 2 years, and any defect in months 12–24. Inside year 1 with a defect it adds nothing, so it stays hidden there.
+
+**Two traps:**
+
+- **The entitlement is `order.warranty > 0`, not `!= null`.** `order.warranty` is the amount paid for Care at checkout (the tile `ProductSummary` renders as "2-year extended warranty · added"). A couple of compensation mocks carry `warranty: 0`, which is not Care — and `ProductSummary` itself still gates on `!= null`, so those mocks render a "+AED 0" Care tile. Pre-existing display quirk, called out rather than fixed.
+- **Ages run from the order date** (`order.placedAt`), a *different clock* from `eligibilityFor`'s 10-day return window, which runs from delivery.
+
+`tier` is `'standard' | 'extended' | 'expired' | 'unknown'` — `'extended'` requires Care, and `'unknown'` (no parseable date) deliberately degrades to pre-coverage behaviour so no mock can regress.
+
+### 4.2 The remedy screen
+
+`StepRemedy` renders whatever `remedyOptionsFor` returns, so all tier logic stays in the lib and the component stays presentational:
+
+| Option | When it appears |
+|---|---|
+| `Return for a refund` | only inside the 10-day return window (`eligibilityFor`) |
+| `Repair under standard warranty` | **always** |
+| `Repair accidental damage` | Care held · inside 24 months · arm unused |
+
+**Why `repair` is never removed:** uncovered devices keep today's behaviour this phase, and dropping it alongside a closed refund window would leave the screen with nothing on it. `coverage.coversDefect` is descriptive, for copy — it is **not** a filter.
+
+**Why the accidental option is phrased as an outcome, not a cause.** Picking it *is* the customer declaring they caused the damage. The screen's job is to show eligible outcomes, so "I broke it" would be the only cause-shaped item in an outcome menu; `Repair accidental damage` carries the same declaration without needing a separate fault-attribution screen.
+
+**Layout.** Refund sits alone at the top. The Care coverage strip is the **header of one purple-outlined group** wrapping the two repair options — the strip is what explains why those two are on offer, so it reads as their label rather than a floating banner, and it resolves why an option labelled *standard warranty* sits under a *Revibe Care* header. Letting the outlined group pull the eye is a deliberate steer toward repair over refund. With no Care there is no strip, no group and no third option: that path renders exactly as it did before coverage existed.
+
+The strip headline always names the **Care** expiry, never the standard one — Care covers defects *and* damage for the full two years, so a Care holder never hits the one-year cliff and quoting that date would understate what they bought.
+
+Labelled *standard warranty* in **both** tiers: Care extends that warranty's duration rather than replacing it, so a Care holder in months 12–24 is still using "the standard warranty option" (and defect repairs are never use-limited — only the accidental arm is).
+
+### 4.3 Downstream
+
+`remedy: 'accidental'` → `claimTypeFor` → `'warranty'`. Operationally identical to a repair — device leaves, gets fixed, comes back, no money moves — so it rides the existing 6-state pipeline and `WarrantyClaimCard`, and **card routing is untouched**.
+
+`buildClaim` freezes the entitlement onto the claim:
+
+| Field | Values | Why frozen |
+|---|---|---|
+| `claim.coverage` | `'standard'` / `'extended'` | which warranty answered |
+| `claim.cause` | `'defect'` / `'accidental'` | what the customer declared |
+
+Frozen rather than re-derived so a claim raised in month 11 still reads as standard warranty once the device crosses into Care territory mid-claim. **Absent on every pre-existing mock**, so all readers tolerate `undefined`.
+
+Three surfaces read it, all through `lib/coverage.js` so the terms agreed at submit are the terms shown later:
+
+- `coverageSummary` → the cover line on **Step 6 Review** + **Step 7 Confirmation** (on the accidental arm this is where the customer leaves knowing a repair-cost check is still ahead) and the **"Covered by"** row in `ClaimDetailsSheet`.
+- `coverageArmLabel` → the quiet `REVIBE CARE · ACCIDENTAL DAMAGE` line in the `WarrantyClaimCard` hero. Its own line rather than an eyebrow suffix, which would wrap the header row at 430px.
+- `coverageStripFor` → the remedy-screen strip, and a coverage-date chip on the delivered `PastOrderCard` (via `ProductSummary`'s `afterRow`). The Care tile says the plan was *bought*; the chip says how long it has **left**.
+
+### 4.4 Deliberately out of scope
+
+The **AED 1,500 check is structurally unknowable at intake** — the customer can't know the repair cost when raising the claim — so this phase is intake-only: the flow states the terms and defers the quote. The journey graph carries a `claim_repair_quote` placeholder node modelling only the *within-cover* outcome; the over-cap branch (quote → accept / decline / return the device) has no customer surface.
+
+Uncovered paths keep today's behaviour: over 24 months, non-Care past year 1, non-Care accidental damage, repairs over the cap.
+
+**Known consequence:** an out-of-warranty device is still offered `Repair under standard warranty` — naming an entitlement it no longer has. Pre-existing (the option was always shown), but the word *standard* makes the mismatch louder. The natural landing spots for a later phase are a paid-repair quote or a "not covered" explanation; note QC already routes an uncovered verdict to `InvalidClaimCard` ("device at Revibe, pay return shipping").
+
+### 4.5 Mocked vs production
+
+| Behaviour | Prototype | Production |
+|---|---|---|
+| Care entitlement | `order.warranty > 0` on the mock | a real plan record per order |
+| Repair cost vs cap | never evaluated — terms stated, quote deferred | quote from the repair partner, checked against the cap |
+| One-use accidental arm | `careAccidentalUsed(order)` exists and gates the option, but **nothing sets it** — a used entitlement is an uncovered path | consumed on claim approval |
+| Per-country cap | `ACCIDENTAL_DAMAGE_CAPS` — AE is the real figure, ZA/SA/Others stubbed at parity (they also need local currency) | per-market published figures |
+| Coverage tiers on demo data | three claim-free delivered mocks (89660 recent + Care · 89380 14 months + Care · 89381 past year 1, no Care) | derived from real order dates |

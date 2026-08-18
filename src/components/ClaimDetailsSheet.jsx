@@ -11,6 +11,7 @@ import { COMPENSATION_SUBTYPE_LABELS } from './ClaimFlow/compensationSubtypes'
 import BnplDisclaimerTooltip, { isBnpl } from './BnplDisclaimerTooltip'
 import RefundSplitRows from './RefundSplitRows'
 import { isSplitPaid } from '../lib/returns'
+import { coverageSummary, accidentalDamageCap } from '../lib/coverage'
 import { formatAddress } from '../lib/address'
 
 // Bottom sheet surfacing the full set of choices captured during the
@@ -40,6 +41,19 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
   const isWallet = claim.refundMethod === 'wallet'
   const isWarranty = claim.type === 'warranty'
   const isCompensation = claim.type === 'compensation'
+  // Read the entitlement frozen onto the claim at submit — not re-derived from
+  // the order, so a claim raised in month 11 still reads as standard warranty
+  // even once the device has crossed into Revibe Care territory. Absent on the
+  // hand-seeded mocks, which predate the field.
+  const warrantyCoverage =
+    isWarranty && claim.cause
+      ? coverageSummary({
+          cause: claim.cause,
+          tier: claim.coverage,
+          cap: accidentalDamageCap(order),
+          currency,
+        })
+      : null
 
   return (
     <div
@@ -77,6 +91,13 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           <SectionCard title="Summary">
             <Row label="Claim type" value={claimTypeLabel(claim)} />
+            {isWarranty && warrantyCoverage && (
+              <Row
+                label="Covered by"
+                value={warrantyCoverage.label}
+                sub={warrantyCoverage.detail}
+              />
+            )}
             {isCompensation ? (
               <>
                 <Row

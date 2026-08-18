@@ -10,6 +10,7 @@ import {
   Wrench,
   Package,
   AlertCircle,
+  ShieldCheck,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import { formatAddress } from '../../lib/address'
@@ -18,6 +19,7 @@ import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
 import { expectedCompletionFor } from '../../lib/claims'
+import { coverageFor, coverageSummary } from '../../lib/coverage'
 import { findSpecificIssue } from './issueTaxonomy'
 import { PACKING_LABELS } from './Step4Packing'
 import { findCompensationSubtype } from './compensationSubtypes'
@@ -51,6 +53,19 @@ export default function Step6Review({
         state.claimType,
       )
   const warrantyEta = isWarranty ? expectedCompletionFor('warranty') : null
+  // Which warranty is answering for this repair, and on what terms — the same
+  // line the confirmation and the tracking card show, so it can't drift.
+  const warrantyCoverage = isWarranty
+    ? (() => {
+        const c = coverageFor(order)
+        return coverageSummary({
+          cause: state.remedy === 'accidental' ? 'accidental' : 'defect',
+          tier: c.tier,
+          cap: c.cap,
+          currency,
+        })
+      })()
+    : null
   const reasonText = !state.reason.value
     ? 'Not provided'
     : state.reason.value === 'other' && state.reason.otherText.trim()
@@ -283,6 +298,23 @@ export default function Step6Review({
                 </div>
               </div>
             </div>
+            {warrantyCoverage && (
+              <div className="mt-3 pt-3 border-t border-line-2 flex items-start gap-2.5">
+                <ShieldCheck
+                  size={13}
+                  strokeWidth={1.75}
+                  className="text-brand mt-0.5 shrink-0"
+                />
+                <div className="min-w-0">
+                  <div className="text-[12.5px] font-semibold text-ink leading-[1.3]">
+                    {warrantyCoverage.label}
+                  </div>
+                  <div className="text-[11.5px] text-muted mt-0.5 leading-[1.4]">
+                    {warrantyCoverage.detail}
+                  </div>
+                </div>
+              </div>
+            )}
           </Section>
         ) : isReplacement ? (
           <Section title="What you'll get back">

@@ -23,6 +23,8 @@
 // No refund-method fork: warranty intake skips Step 5, so the claim has no
 // `refundMethod` / `expectedRefund` fields. Cf. `CLAIM_COM_NODES` which
 // branches on refund method at submit.
+import { REPAIR_SUBMIT_NODES, REPAIR_TAIL_NODES } from './repairPath'
+
 export const CLAIM_WARRANTY_NODES = [
   {
     id: 'placed',
@@ -115,7 +117,7 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Delivered',
     trigger: 'system',
     event: 'shipment.delivered',
-    next: ['claim_submitted_warranty'],
+    next: ['claim_submitted_warranty', 'claim_submitted_warranty_accidental'],
     apply: (o) => ({
       ...o,
       statusId: 'delivered',
@@ -145,55 +147,9 @@ export const CLAIM_WARRANTY_NODES = [
       timeline: { ...o.timeline, shipped: '23 May · 11:02 AM' },
     }),
   },
-  // ----- Warranty claim submitted (customer-triggered via ClaimFlow) ----
-  {
-    id: 'claim_submitted_warranty',
-    label: 'Warranty claim submitted',
-    trigger: 'customer',
-    event: 'claim.created',
-    next: ['claim_proof_accepted', 'claim_docs_rejected', 'claim_cancelled'],
-    apply: (o) => ({
-      ...o,
-      claim: {
-        claimRef: 'WrJrn1',
-        claimStatusId: 'initiated',
-        type: 'warranty',
-        submittedAt: '25 May 2026 · 4:02 PM',
-        units: 1,
-        issueScope: 'not_working',
-        issueSubtypeId: 'battery_drain',
-        issueDetails: {
-          description:
-            'Battery drains in under 4 hours of light use, even after a factory reset.',
-          attachmentName: 'IMG_0710.jpg',
-        },
-        // Shape parity with the refund-flow mocks — warranty intake
-        // doesn't collect a reason field, but ClaimDetailsSheet reads
-        // it defensively in shared rows.
-        reason: { value: 'other', otherText: '' },
-        devicePrep: { option: 'reset', os: 'ios' },
-        pickupDetails: {
-          address: o.address,
-          email: o.email,
-          phone: o.phone,
-        },
-        scheduledPickup: {
-          courier: 'DHL Express',
-          date: 'Wednesday, 27 May',
-          slot: '10 AM – 12 PM',
-        },
-        timeline: { initiated: '25 May · 4:02 PM' },
-        // Placeholder repair window — refined once QC completes and the
-        // claim advances to `under_repair`. Matches `buildClaim`'s
-        // initial-submit shape (expectedCompletionFor('warranty')).
-        repairWindow: {
-          expectedComplete: 'Mon, 8 Jun',
-          expectedCompleteLong: 'Monday, 8 June',
-          note: "We'll confirm the exact repair window after inspection.",
-        },
-      },
-    }),
-  },
+  // ----- Repair-path submit nodes (defect + accidental), shared with
+  //       claim_issue. Both converge on the proof-accepted beat below.
+  ...REPAIR_SUBMIT_NODES,
   // ----- Proof accepted. Background proof review passed — the customer
   //       hears "courier will be in touch" (the same pending-collection
   //       message change-of-mind gets at claim.created, one beat later).
@@ -384,7 +340,7 @@ export const CLAIM_WARRANTY_NODES = [
     trigger: 'system',
     event: 'claim.qc.started',
     next: [
-      'claim_under_repair',
+      'claim_repair_quote',
       'claim_invalid_confirmed',
       'claim_reset_failed',
       'claim_cancelled_shipback',
@@ -398,163 +354,10 @@ export const CLAIM_WARRANTY_NODES = [
       },
     }),
   },
-  {
-    id: 'claim_under_repair',
-    label: 'Under repair',
-    trigger: 'system',
-    event: 'claim.repair.started',
-    apply: (o) => ({
-      ...o,
-      claim: {
-        ...o.claim,
-        claimStatusId: 'under_repair',
-        timeline: { ...o.claim.timeline, under_repair: '30 May · 2:12 PM' },
-        // Sharpen the placeholder repair window now that QC has cleared
-        // and the seller has committed to a fix. Mirrors mock 89610.
-        repairWindow: {
-          expectedComplete: 'Mon, 8 Jun',
-          expectedCompleteLong: 'Monday, 8 June',
-          note: 'Battery replacement — typically wraps up within 7–10 days.',
-        },
-      },
-    }),
-  },
-  {
-    id: 'claim_ship_back_created',
-    label: 'Ship-back AWB created',
-    trigger: 'system',
-    event: 'claim.ship_back.created',
-    // Ship-back country fork — the AWB-created node already set the repaired
-    // unit's shipment in motion, so SA/Others skip the four granular ship-back
-    // sub-statuses straight to device_returned (no detailed tracking). AE/ZA
-    // walk them. country_split.md §6.
-    next: [
-      { id: 'claim_ship_back_arrived_destination', countries: ['AE', 'ZA'] },
-      { id: 'claim_device_returned', countries: ['SA', 'Others'] },
-    ],
-    apply: (o) => ({
-      ...o,
-      claim: {
-        ...o.claim,
-        claimStatusId: 'ship_back',
-        timeline: { ...o.claim.timeline, ship_back: '8 Jun · 11:05 AM' },
-        shipBack: {
-          courier: 'DHL Express',
-          awb: '25193620',
-          estimatedDelivery: 'Jun 12',
-          estimatedDeliveryLong: 'Friday, 12 June',
-          subStatusId: null,
-          subTimeline: {},
-        },
-      },
-    }),
-  },
-  {
-    id: 'claim_ship_back_arrived_destination',
-    label: 'Ship-back arrived in destination country',
-    trigger: 'system',
-    event: 'claim.ship_back.arrived_destination',
-    apply: (o) => ({
-      ...o,
-      claim: {
-        ...o.claim,
-        shipBack: {
-          ...o.claim.shipBack,
-          subStatusId: 'arrived_destination',
-          subTimeline: {
-            ...o.claim.shipBack.subTimeline,
-            arrived_destination: '10 Jun · 8:30 AM',
-          },
-        },
-      },
-    }),
-  },
-  {
-    id: 'claim_ship_back_cleared_customs',
-    label: 'Ship-back cleared customs',
-    trigger: 'system',
-    event: 'claim.ship_back.cleared_customs',
-    apply: (o) => ({
-      ...o,
-      claim: {
-        ...o.claim,
-        shipBack: {
-          ...o.claim.shipBack,
-          subStatusId: 'cleared_customs',
-          subTimeline: {
-            ...o.claim.shipBack.subTimeline,
-            cleared_customs: '10 Jun · 11:15 AM',
-          },
-        },
-      },
-    }),
-  },
-  {
-    id: 'claim_ship_back_forwarded_to_agent',
-    label: 'Ship-back forwarded to third-party agent',
-    trigger: 'system',
-    event: 'claim.ship_back.forwarded_to_agent',
-    apply: (o) => ({
-      ...o,
-      claim: {
-        ...o.claim,
-        shipBack: {
-          ...o.claim.shipBack,
-          subStatusId: 'forwarded_to_agent',
-          subTimeline: {
-            ...o.claim.shipBack.subTimeline,
-            forwarded_to_agent: '11 Jun · 4:45 PM',
-          },
-        },
-      },
-    }),
-  },
-  {
-    id: 'claim_ship_back_out_for_delivery',
-    label: 'Ship-back out for delivery',
-    trigger: 'system',
-    event: 'claim.ship_back.out_for_delivery',
-    apply: (o) => ({
-      ...o,
-      claim: {
-        ...o.claim,
-        shipBack: {
-          ...o.claim.shipBack,
-          subStatusId: 'out_for_delivery',
-          subTimeline: {
-            ...o.claim.shipBack.subTimeline,
-            out_for_delivery: '12 Jun · 7:30 AM',
-          },
-        },
-      },
-    }),
-  },
-  {
-    id: 'claim_device_returned',
-    label: 'Device returned',
-    trigger: 'system',
-    event: 'claim.device.returned',
-    next: [],
-    apply: (o) => ({
-      ...o,
-      claim: {
-        ...o.claim,
-        claimStatusId: 'device_returned',
-        timeline: { ...o.claim.timeline, device_returned: '12 Jun · 3:14 PM' },
-        shipBack: {
-          ...o.claim.shipBack,
-          deliveredOn: '2026-06-12',
-          deliveredOnLong: 'Friday, 12 June',
-          // Fresh NSYS condition report for the repaired unit we sent back —
-          // the "Verified by NSYS" chip re-appears on the returned device.
-          conditionReport: {
-            url: 'https://www.nsys.com/',
-            reportId: 'NSYS-WAR-89610-R2',
-          },
-        },
-      },
-    }),
-  },
+  // ----- Repair + ship-back tail, shared with claim_issue (the remedy screen
+  //       can reach a repair from either journey). Spread as one contiguous run:
+  //       nodes without an explicit `next` fall through by array adjacency.
+  ...REPAIR_TAIL_NODES,
   // ----- Customer-cancelled terminal — reachable from the cancellable
   //       (pre-pickup) submitted node. Strips the claim so the order
   //       reverts to its delivered PastOrderCard (re-raisable). -------

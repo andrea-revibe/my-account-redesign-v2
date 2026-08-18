@@ -19,7 +19,9 @@ export const SHIPPED_CANCEL_WINDOW_DAYS = 7
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-function parsePlacedAtDate(s) {
+// Parses the mock `placedAt` format ("14/04/2026 09:24 AM"). Exported for
+// lib/coverage.js, which dates warranty windows from the order date.
+export function parsePlacedAtDate(s) {
   if (!s) return null
   const [datePart, timePart, ampm] = s.split(' ')
   const [d, m, y] = datePart.split('/').map(Number)
@@ -44,6 +46,38 @@ function deliveryDateOf(order) {
 
 export function addDays(date, days) {
   return new Date(date.getTime() + days * MS_PER_DAY)
+}
+
+// ----- The prototype's clock --------------------------------------------
+// Journey replays run on a frozen synthetic calendar: every journey stamps its
+// own `placedAt` / `deliveredOn`, authored months before any given session.
+// Measuring a return window or a warranty age against the wall clock therefore
+// drifts further from the replay's intent every day the prototype isn't touched
+// — a window that was open when the journey was authored silently closes, and
+// eventually a warranty would too.
+//
+// So journey orders carry `asOfDate` (stamped in App.jsx beside the country
+// injection, covering both replay and sandbox journeys) and every date-sensitive
+// helper measures from it when present, falling back to the wall clock for the
+// real mock order list, whose dates are maintained relative to today.
+
+// The replay's own "now": the delivery date once delivered (the moment a claim
+// becomes possible), else the order date.
+export function journeyAsOfDate(order) {
+  if (!order) return null
+  if (order.deliveredOn) return order.deliveredOn
+  const placed = parsePlacedAtDate(order.placedAt)
+  if (!placed) return null
+  const mm = String(placed.getMonth() + 1).padStart(2, '0')
+  const dd = String(placed.getDate()).padStart(2, '0')
+  return `${placed.getFullYear()}-${mm}-${dd}`
+}
+
+// Resolves the date all window/coverage math should run against for this order.
+export function orderAsOf(order, fallback = new Date()) {
+  if (!order?.asOfDate) return fallback
+  const d = new Date(order.asOfDate + 'T12:00:00')
+  return Number.isNaN(d.getTime()) ? fallback : d
 }
 
 export function startOfDay(date) {
@@ -78,7 +112,9 @@ export function canCancelShipped(order) {
   return order.promiseBreached === true
 }
 
-export function eligibilityFor(order, today = new Date()) {
+// `today` defaults to the order's own clock (`orderAsOf`) so journey replays are
+// judged on their synthetic calendar rather than the wall clock.
+export function eligibilityFor(order, today = null) {
   if (order.state === 'cancelled') {
     if (order.cancellationStatusId === 'refunded') {
       return { eligible: false, reason: 'Already refunded' }
@@ -93,7 +129,7 @@ export function eligibilityFor(order, today = new Date()) {
     return { eligible: false, reason: 'Delivery date unknown' }
   }
   const deadline = addDays(startOfDay(delivered), RETURN_WINDOW_DAYS)
-  const now = startOfDay(today)
+  const now = startOfDay(today ?? orderAsOf(order))
   if (now > deadline) {
     return { eligible: false, reason: 'Delivered more than 10 days ago' }
   }
@@ -103,7 +139,7 @@ export function eligibilityFor(order, today = new Date()) {
   return { eligible: true, untilDate: deadline }
 }
 
-export function groupOrdersByEligibility(orders, today = new Date()) {
+export function groupOrdersByEligibility(orders, today = null) {
   const eligible = []
   const ineligible = []
   for (const order of orders) {

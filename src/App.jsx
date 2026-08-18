@@ -25,6 +25,7 @@ import EddSandboxPanel from './components/EddSandboxPanel'
 import WalletSheet from './components/WalletSheet'
 import { ORDERS } from './data/orders'
 import { pickActiveOrderId } from './lib/statuses'
+import { journeyAsOfDate } from './lib/returns'
 import { walletLedger, walletBalance, walletCurrency } from './lib/wallet'
 import {
   hasActiveClaim,
@@ -165,13 +166,17 @@ export default function App() {
   // nodes set (they never set `country`), keeping INITIAL_ORDER country-free.
   // Memoized so the spread doesn't mint a new object every render (which
   // would defeat the downstream useMemo that depends on it).
-  const activeOrderFromJourney = useMemo(
-    () => ({
+  // `asOfDate` pins date math (return window, warranty coverage) to the replay's
+  // own frozen calendar instead of the wall clock — see `journeyAsOfDate` in
+  // lib/returns.js for why. Stamped here so both journey kinds get it.
+  const activeOrderFromJourney = useMemo(() => {
+    const base = {
       ...(isSandbox ? sandbox.order : journey.order),
       country: activeCountry,
-    }),
-    [isSandbox, sandbox.order, journey.order, activeCountry],
-  )
+    }
+    const asOfDate = journeyAsOfDate(base)
+    return asOfDate ? { ...base, asOfDate } : base
+  }, [isSandbox, sandbox.order, journey.order, activeCountry])
   const toggleJourneyMode = () => {
     setJourneyMode((prev) => {
       const next = !prev
@@ -253,16 +258,31 @@ export default function App() {
         if (raised) journey.advance(raised.id)
         return
       }
-      const target =
+      // Warranty submits fork on what the customer declared: accidental damage
+      // carries its own node so the claim lands with `cause`/`coverage` set.
+      // Listed most-specific-first and resolved against validNext, so a journey
+      // that only wires the defect node still catches an accidental submit.
+      const targets =
         claim.type === 'warranty'
-          ? 'claim_submitted_warranty'
+          ? claim.cause === 'accidental'
+            ? ['claim_submitted_warranty_accidental', 'claim_submitted_warranty']
+            : ['claim_submitted_warranty']
           : claim.type === 'compensation'
-            ? `claim_submitted_${claim.compensationSubtype}`
-            : `claim_submitted_${claim.refundMethod === 'wallet' ? 'wallet' : 'card'}`
-      if (journey.validNext().some((n) => n.id === target)) {
+            ? [`claim_submitted_${claim.compensationSubtype}`]
+            : [`claim_submitted_${claim.refundMethod === 'wallet' ? 'wallet' : 'card'}`]
+      const reachable = journey.validNext()
+      const target = targets.find((id) => reachable.some((n) => n.id === id))
+      if (target) {
         journey.advance(target)
+        return
       }
-      return
+      // No node models this claim type on the current journey — e.g. picking a
+      // repair remedy inside `claim_issue`, whose graph only carries the two
+      // refund branches. Fall through to the in-session overlay rather than
+      // silently dropping the submit (which left the order on its delivered card
+      // and made "Track this claim" look broken). Same demo-only-overlay
+      // pattern the journey cancel flags use, and cleared on node change by the
+      // effect below, so the journey stays replayable.
     }
     setSubmittedClaims((prev) => ({ ...prev, [orderId]: claim }))
     setPendingUndo({
@@ -470,7 +490,18 @@ export default function App() {
       }
       return o
     }
-    if (journeyMode) return [applyCancel(activeOrderFromJourney)]
+    if (journeyMode) {
+      // A node-driven claim always wins: the journey is the source of truth
+      // whenever it models the state. The in-session overlay only fills the gap
+      // for claim types the current journey has no node for (see
+      // handleSubmitClaim).
+      const submitted = submittedClaims[activeOrderFromJourney?.id]
+      const journeyOrder =
+        submitted && !activeOrderFromJourney.claim
+          ? { ...activeOrderFromJourney, claim: submitted }
+          : activeOrderFromJourney
+      return [applyCancel(journeyOrder)]
+    }
     return ORDERS.map((o) => {
       const submitted = submittedClaims[o.id]
       if (!submitted) return applyCancel(o)
@@ -508,6 +539,9 @@ export default function App() {
     }
     setCancelledClaims(drop)
     setShipBackCancels(drop)
+    // Same for a claim submitted via the overlay fallback — the node change
+    // replays the order, so a stale claim must not ride along.
+    setSubmittedClaims(drop)
     // Wallet transfers key off the credit's txId (cancel:<id> / claim:<id>),
     // so a Move-to-card doesn't leak across replays/resets of this order.
     setWalletTransfers((prev) => {

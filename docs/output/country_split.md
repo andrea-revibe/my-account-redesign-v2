@@ -141,6 +141,9 @@ Use this whenever a market should *show / hide / alter a piece of a card*. This 
 
 ## 6. Recipe — add a JOURNEY-flow country difference
 
+> **Sibling mechanism.** `countries` is no longer the only per-edge guard: `{ id, when: (order) => bool }` forks the graph on **claim state** instead of market, and the two are ANDed in `validNext`. Added so one `claim_qc_started` node can continue into either a refund or the shared repair tail depending on the remedy the customer picked. If you add a third guard, keep them ANDing. See `journey_backend_spec.md`.
+
+
 Use this when a market has a *different sequence of steps*. The mechanism is **per-edge country tags** on a node's `next`, filtered in `useJourney`'s `validNext` (`lib/journey.js`). Chosen over a function-valued `next` because it's declarative, greppable, and the dev panel can introspect it; chosen over forked journeys because most of the graph is shared.
 
 **How it works.** A `next` entry is either a plain id string (applies to all countries) or an object `{ id, countries: [...] }` (applies only when the active country is listed). `validNext` filters edges by `order.country`; untagged edges always pass, so every existing journey is unchanged.
