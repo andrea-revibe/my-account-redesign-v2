@@ -102,18 +102,29 @@ export function subProgressIndex(currentSubStatusId) {
   return i // -1 if not provided — caller handles
 }
 
-export function cancellationProgressIndex(currentCancellationStatusId) {
-  const i = CANCELLATION_STATUSES.findIndex(
-    (s) => s.id === currentCancellationStatusId,
-  )
-  return i // -1 if not provided
+// Index of the order's current phase *within its own step list*
+// (`cancellationStepsFor`) — not within CANCELLATION_STATUSES, which can be one
+// step longer than what the card actually renders. Indexing the constant would
+// put a two-step timeline one row out.
+export function cancellationProgressIndex(order) {
+  return cancellationStepsFor(order).findIndex(
+    (s) => s.id === order?.cancellationStatusId,
+  ) // -1 if not provided
 }
 
-// All cancellation paths render the same three steps. The created-stage
-// path moves through `requested` instantly (no supplier check needed); the
-// quality_check path waits on supplier confirmation. Either way the
+// Every *customer-raised* cancellation renders the same three steps. The
+// created-stage path moves through `requested` instantly (no supplier check
+// needed); the quality_check path waits on supplier confirmation. Either way the
 // customer sees the same step labels.
-export function cancellationStepsFor() {
+//
+// A refused delivery is the exception: it cancels itself, so there is no request
+// to show. Only markets with `refusalReview` keep that step, and it means local
+// ops sign-off rather than a supplier check — everywhere else the timeline is
+// two steps and opens on `refund_pending`. cancellations.md §2.7.
+export function cancellationStepsFor(order) {
+  if (order?.deliveryRefused === true && !countryConfig(order).refusalReview) {
+    return CANCELLATION_STATUSES.slice(1)
+  }
   return CANCELLATION_STATUSES
 }
 
@@ -132,6 +143,29 @@ export function statusDescription(order) {
 
   if (order.state === 'cancelled') {
     const phase = order.cancellationStatusId
+    // Refused delivery: the cancellation is ours, not the customer's. Nobody
+    // asked for it, and neither the supplier's packing desk nor a courier recall
+    // is involved, so the default bodies below would all misdescribe it.
+    // `refunded` is shared — a completed refund reads the same whoever started
+    // it. cancellations.md §2.7.
+    if (order.deliveryRefused === true && phase === 'requested') {
+      return {
+        tone: 'danger',
+        lead: 'Cancellation requested',
+        body:
+          order.statusMessage ??
+          "You turned the parcel away at the door, so we've cancelled the order for you and it's heading back to us. Our local team is signing off on the cancellation, and your refund starts once they do.",
+      }
+    }
+    if (order.deliveryRefused === true && phase === 'refund_pending') {
+      return {
+        tone: 'danger',
+        lead: 'Refund pending',
+        body:
+          order.statusMessage ??
+          "You turned the parcel away at the door, so we've cancelled the order for you. Your full refund is on its way back to your original payment method with nothing deducted, and typically lands within 5–7 business days.",
+      }
+    }
     if (phase === 'requested') {
       return {
         tone: 'danger',
@@ -268,16 +302,18 @@ export const STATUS_EXPLANATIONS = {
   // order is waiting on a courier recall, not on the supplier's packing desk.
   cancellation_requested_shipped:
     "Your parcel is already with the courier, so we've asked them to send it back to us. We'll confirm within 48 hours — if it can't be stopped we'll let you know and your order stays on its way.",
-  // Refusal variant: nothing has to be recalled, the parcel turned around at
-  // the door, so the 48h is ours to confirm rather than the courier's to try.
+  // Refusal variant: the customer never asked, so there is no request of theirs
+  // to confirm. This step is local ops signing the cancellation off, and it
+  // quotes no window — nothing is being recalled, so there's no courier
+  // timeframe to borrow. Only markets with `refusalReview` ever show it.
   cancellation_requested_refused:
-    "You refused the delivery, so the parcel is already on its way back to us. We'll confirm your cancellation within 48 hours and start your refund from there.",
+    'You refused the delivery, so we cancelled the order for you — you did not need to ask. Our local team is signing the cancellation off, and your refund is released as soon as they do.',
   cancellation_refund_pending:
     "Your cancellation has been accepted - the order won't ship. We're now processing your refund on our end.",
   cancellation_refund_pending_shipped:
     "The courier confirmed your parcel is coming back to us, so your cancellation is accepted. We're now processing your refund on our end.",
   cancellation_refund_pending_refused:
-    "Your cancellation is accepted and the refused parcel is on its way back to us. We're now processing your refund on our end.",
+    "Your order was cancelled because you refused the delivery, and the parcel is on its way back to us. We're processing your full refund back to the payment method you paid with — nothing is deducted.",
   cancellation_refunded:
     'Your cancellation is complete and your refund has been issued. Funds can take up to 10 business days to appear depending on your payment method.',
 }

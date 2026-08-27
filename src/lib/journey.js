@@ -40,16 +40,21 @@ export function useJourney(journeyId, country = DEFAULT_COUNTRY) {
     setPath(hasNodes ? [journey.nodes[0].id] : [])
   }, [journey, hasNodes])
 
+  // Country is stamped on before the first `apply` so a node can fork on market
+  // (`countryConfig(o)` inside `apply`) and so a `when(order)` guard can see it
+  // — without it both fall back to DEFAULT_COUNTRY whatever `?country=` says.
+  // App.jsx re-injects the same value downstream, so this changes nothing for
+  // consumers; INITIAL_ORDER itself stays country-free.
   const order = useMemo(() => {
-    if (!hasNodes) return journey.initialOrder
-    let o = journey.initialOrder
+    if (!hasNodes) return { ...journey.initialOrder, country }
+    let o = { ...journey.initialOrder, country }
     for (const id of path) {
       const node = journey.nodes.find((n) => n.id === id)
       if (!node) break
       o = node.apply(o)
     }
     return o
-  }, [journey, path, hasNodes])
+  }, [journey, path, hasNodes, country])
 
   const currentNodeId = path[path.length - 1]
   const currentIndex = path.length - 1

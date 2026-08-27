@@ -138,7 +138,7 @@ export default function OrderCard({ order, defaultExpanded = false, onCancelOrde
               // banner resolution). The `pending` / `just now` stamps mirror
               // the prior CancellationSubTimeline copy.
               const steps = cancellationStepsFor(order)
-              const cur = cancellationProgressIndex(order.cancellationStatusId)
+              const cur = cancellationProgressIndex(order)
               const tl = order.cancellationTimeline || {}
               const stamps = {}
               steps.forEach((s, i) => {

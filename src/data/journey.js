@@ -85,9 +85,10 @@ export const JOURNEYS = [
     nodes: SHIPPED_CANCELLATION_NODES,
   },
   // Happy path plus one extra outcome at the door: the customer refuses the
-  // parcel, which drops the order into the same self-cancellation flow as a
-  // stuck shipment (reused `cancel_shipped_*` nodes). Also country-gated on the
-  // hero — replay with `?country=ZA` to reach the live cancel path.
+  // parcel, and the refusal scan cancels the order and starts a refund on its
+  // own — no cancel sheet, no refund-method choice. The market fork is the
+  // `refusalReview` flag: replay `?country=SA` for the ops sign-off step,
+  // any other country to land straight on Refund pending.
   {
     id: 'refused_delivery',
     label: 'Refused delivery',

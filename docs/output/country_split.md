@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: c2cd56d
+verified_against: 61b0866
 covers:
   - src/lib/countries.js
   - src/components/CountryPicker.jsx
@@ -19,6 +19,9 @@ covers:
   - src/components/EditableContactCard.jsx
   - src/components/ClaimFlow/Step4PickupDetails.jsx
   - src/data/journeys/shippedCancellation.js
+  - src/data/journeys/refusedDelivery.js
+  - src/lib/statuses.js
+  - src/components/PastOrderCard.jsx
 ---
 
 # Country split
@@ -47,10 +50,10 @@ The single source of truth. Add a flag here, gate on it in the card; add a marke
 ```js
 export const DEFAULT_COUNTRY = 'AE'
 export const COUNTRIES = {
-  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  shippedCancellation: false, eddMarket: 'UAE' },
-  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, shippedCancellation: true,  eddMarket: 'ZA'  },
-  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  shippedCancellation: true,  eddMarket: 'SA'  },
-  Others: { label: 'Others',       detailedTracking: false, expertReview: false, shippedCancellation: true,  eddMarket: null  },
+  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  shippedCancellation: false, refusalReview: false, eddMarket: 'UAE' },
+  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, shippedCancellation: true,  refusalReview: false, eddMarket: 'ZA'  },
+  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  shippedCancellation: true,  refusalReview: true,  eddMarket: 'SA'  },
+  Others: { label: 'Others',       detailedTracking: false, expertReview: false, shippedCancellation: true,  refusalReview: false, eddMarket: null  },
 }
 export const COUNTRY_CODES = ['AE', 'ZA', 'SA', 'Others']
 export function countryConfig(country) { /* code string OR order → config, safe default */ }
@@ -59,7 +62,8 @@ export function countryConfig(country) { /* code string OR order → config, saf
 | Flag | Meaning | Status |
 |---|---|---|
 | `detailedTracking` | Show the `See detailed tracking` dropdowns (order delivery + claim inbound/return legs). `false` → the dropdown is omitted entirely. | **live** (§4) |
-| `shippedCancellation` | Customer can self-cancel a **shipped** order stuck in transit past `SHIPPED_CANCEL_WINDOW_DAYS` (`lib/returns.js`). `false` (AE) → the hero's `Cancel order` stays the decorative "contact support" stub. Covers the *stalled-parcel* path only — a refused delivery bypasses the flag (§4c). | **live** (§4c) |
+| `shippedCancellation` | Customer can self-cancel a **shipped** order stuck in transit past `SHIPPED_CANCEL_WINDOW_DAYS` (`lib/returns.js`). `false` (AE) → the hero's `Cancel order` stays the decorative "contact support" stub. Covers the *stalled-parcel* path only — a refused delivery never reaches this gate at all (§4d). | **live** (§4c) |
+| `refusalReview` | An **automatic** cancellation raised by a refused delivery opens on `requested`, waiting on local ops sign-off, before the refund starts. `false` → it lands straight on `refund_pending` and the cancellation timeline drops the `Requested` step entirely (two steps, not three). Refusal path only — a customer-raised cancellation still walks all three steps everywhere. | **live** (§4d) |
 | `expertReview` | Claim gets an expert-revision step before it can be marked invalid (a journey-sequence difference). | **scaffolded — flag exists, nothing reads it yet** (§6 worked example) |
 | `eddMarket` | Bridge to `lib/edd.js` `MARKETS` keys. | reserved, unread (§8) |
 
@@ -123,10 +127,25 @@ Address is **structured per market**, not one free-text line. This is a third me
 The second live flag, and the first one that is **off** in AE rather than on. A shipment that has stopped moving for longer than `SHIPPED_CANCEL_WINDOW_DAYS` (7, `lib/returns.js`) can be cancelled by the customer in `ZA` / `SA` / `Others`; in AE the affordance stays a stub and support handles it.
 
 - **Read at one call site:** `canCancelShipped(order)` in `lib/returns.js` folds the flag into the gate (`statusId === 'shipped'` + not already cancelled + `countryConfig(order).shippedCancellation` + `order.promiseBreached`), and `HeroCard` reads that single predicate. This keeps the country check next to the *other* two conditions instead of scattering three guards through the card — the §5 step-2 idiom, hoisted into `lib/` because the rule is more than a render toggle.
-- **Scope: the stalled path only.** The same predicate has a second, **un-gated** entry — `order.deliveryRefused` returns `true` before the country check runs, so a refused delivery is self-cancellable in every market including AE ([cancellations.md](./cancellations.md) §2.7). The flag encodes an operational capability (can this market have a *moving* parcel recalled by the courier), and a refused parcel is already travelling back on its own, so the capability question doesn't apply. Worth knowing before reading the flag as "AE can never self-cancel a shipped order".
+- **Scope: the stalled path only.** A refused delivery never reaches this gate — the refusal scan cancels the order itself, so the predicate's `state === 'cancelled'` line rejects it before the flag is read (§4d, [cancellations.md](./cancellations.md) §2.7). The flag encodes one operational capability: can this market have a *moving* parcel recalled by the courier. Worth knowing before reading it as "AE can never end up with a cancelled shipped order".
 - **Surface:** `HeroCard`'s `Cancel order` button — live (opens `CancelOrderSheet`, hosted by the hero) when the gate passes, the decorative `CancelOrderButton` tooltip stub when it doesn't. Terms and copy live in [cancellations.md](./cancellations.md) §2.6.
 - **The journey is shared, not forked.** `shipped_cancellation` (`data/journeys/shippedCancellation.js`) replays under every country — its `shipped_stuck` node stamps `promiseBreached` and a **country-neutral** amber banner, deliberately promising nothing about cancellation, so AE sees the identical stall with no cancel affordance. That's the intended contrast demo (`?journey=shipped_cancellation&country=AE` vs `…&country=ZA`), and the reason the `cancel_shipped_*` edges need no `countries:` tag — the card gate already decides reachability for the customer, and the dev panel deliberately keeps the node walkable for demo purposes.
 - **Verify:** `?journey=shipped_cancellation&country=ZA` (live) vs `&country=AE` (stub) at 430px, advancing to `shipped_stuck`.
+
+## 4d. Shipped difference #4 — ops sign-off on a refused delivery (SA)
+
+The first flag that forks a **timeline's shape** rather than showing or hiding a block, and the first that is on in exactly one market. When a customer refuses a delivery at the door, the refusal scan cancels the order and starts the refund on its own ([cancellations.md](./cancellations.md) §2.7). `refusalReview` decides whether local ops sign that automatic cancellation off first:
+
+| Market | Entry phase | Cancellation timeline |
+|---|---|---|
+| `SA` (`refusalReview: true`) | `requested` | `Requested → Pending → Refunded` (3 steps) |
+| `AE` / `ZA` / `Others` | `refund_pending` | `Pending → Refunded` (**2 steps**) |
+
+- **Read in three places, all in `lib/statuses.js` + the node's own `apply`:** `cancellationStepsFor(order)` returns `CANCELLATION_STATUSES.slice(1)` for a refusal in a non-`refusalReview` market — the `Requested` step is **dropped, not shown pre-completed**, because nobody requested anything; `statusDescription` picks the refusal `requested` body only where that step exists; and `delivery_refused`'s `apply` reads the flag to choose its entry `cancellationStatusId`. `PastOrderCard`'s requested-hero caveat row inherits the fork for free (it only renders on `requested`).
+- **The step-list fork has a knock-on:** the rendered list can be shorter than the constant, so `cancellationProgressIndex(order)` now takes the order and searches `cancellationStepsFor(order)`. Indexing `CANCELLATION_STATUSES` directly puts a two-step timeline one row out — the trap to remember if another path ever drops a step.
+- **`apply` reading country is new, and required a hook fix.** `useJourney` now spreads `country` onto the replayed order **before** the first `apply`, so both a node's `apply` and its per-edge `when(order)` guards can call `countryConfig(o)`. Before that they always saw `DEFAULT_COUNTRY`, so a market fork inside `apply` silently never fired (§6, `apply` convention).
+- **The journey is shared, not forked:** `refused_delivery` replays under every country; the market difference is two per-edge `when: (o) => countryConfig(o).refusalReview` guards on `delivery_refused.next` mirroring its own `apply`, so the dev panel offers exactly one next step.
+- **Verify:** `?journey=refused_delivery&country=SA` (three steps, ops-sign-off copy) vs `&country=AE` (two steps, opens on Refund pending) at 430px, advancing to `delivery_refused`.
 
 ## 5. Recipe — add a CARD-design country difference
 
@@ -184,11 +203,11 @@ The skipped nodes stay in each journey's array — they're simply unreached for 
 
 **Caveats:**
 - **Set country before walking a branched journey.** `validNext` filters on the *current* country; flipping mid-path can leave a visited path that includes a node the new country wouldn't reach. For demos, pick the country first (or `Reset journey` after switching). Acceptable for a dev tool; flagged in §8.
-- **`apply` must not depend on country** for correctness of replay — country is injected by `App.jsx` after replay, and the hook's internal `order` doesn't carry it. Country decides *which* nodes are reachable (via `next` tags), not what a node computes.
+- **`apply` may depend on country, and a fork inside one must mirror its edge guards.** `useJourney` stamps `country` onto the replay order before the first `apply` (added for §4d), so `countryConfig(o)` is readable inside both `apply` and a `when(order)` guard; `App.jsx` re-injects the same value downstream and `INITIAL_ORDER` stays country-free. Prefer `next` tags for *which nodes are reachable* and keep `apply` forks for the field values a reachable node has to compute — and when a node does both, derive them from the same flag (see `delivery_refused`) or the panel offers a step the card can't render.
 
 ## 7. Mocked vs production
 
-- **Country picker is a demo control**, journey-mode only; production reads `order.country` from the order. The showcase mocks are all `AE` — so the non-AE-only surfaces (`shippedCancellation`, §4c) are reachable only in journey mode.
+- **Country picker is a demo control**, journey-mode only; production reads `order.country` from the order. The showcase mocks are all `AE` — so the non-AE surfaces (`shippedCancellation` §4c, `refusalReview` §4d) are reachable only in journey mode.
 - **`?country=` is in-session** — flipping it re-derives the cards immediately but persists nothing.
 - **EDD sandbox shows two market controls** right now (the Country chips + the EDD `Market` dropdown) — different axes (capabilities vs timing), not yet unified. See §8.
 - **The journey-flow path is live; `expertReview` is still scaffolded.** The per-edge country tags are now used in earnest by the shipment-step collapse (§6) across all six journeys. The `expertReview` flag itself is still unread — reserved for the future AE expert-revision step (same mechanism, not yet built).

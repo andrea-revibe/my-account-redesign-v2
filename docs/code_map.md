@@ -28,7 +28,7 @@
 | Journey replay mode | `lib/journey.js` + `data/journey.js` + `JourneyDevPanel.jsx` | `output/journey_backend_spec.md` |
 | Card routing (which card renders) | `App.jsx` (routing block ≈ L285–375) | `output/orders.md` §2 |
 | Cancellation sheet / keep-order undo | `CancelOrderSheet.jsx`, `KeepOrderSheet.jsx` | `output/cancellations.md` |
-| Refused-delivery self-cancellation (parcel turned away at the door) | `data/journeys/refusedDelivery.js` (`REFUSED_DELIVERY_NODES`·51, `delivery_refused` node), `lib/returns.js` (`canCancelShipped` — `deliveryRefused` arm), `components/CancelOrderSheet.jsx` (`refused` / `feeWaived`), `lib/statuses.js` (`statusHeadline` banner-headline override + `cancellation_*_refused` copy), `components/PastOrderCard.jsx` (caveat row) | `output/cancellations.md` §2.7 |
+| Refused-delivery **auto-cancellation** (parcel turned away at the door → we cancel + refund, no sheet) | `data/journeys/refusedDelivery.js` (`REFUSED_DELIVERY_NODES`·40 — `delivery_refused` stamps the cancellation, `refused_cancel_accepted` = SA ops sign-off), `lib/countries.js` (`refusalReview` flag), `lib/statuses.js` (`cancellationStepsFor`·124 two-vs-three-step fork, `cancellationProgressIndex`·109, refusal `statusDescription` branches + `cancellation_*_refused` copy), `components/PastOrderCard.jsx` (`canKeep` excludes refusals, SA caveat row) | `output/cancellations.md` §2.7, `output/country_split.md` §4d |
 | Stuck-in-transit self-cancellation (cancel a `shipped` order) | `lib/returns.js` (`SHIPPED_CANCEL_WINDOW_DAYS`·18, `canCancelShipped`·66), `lib/countries.js` (`shippedCancellation` flag), `components/HeroCard.jsx` (live `Cancel order` + hosts the sheet), `components/CancelOrderSheet.jsx` (`DISSUADE_STATUSES` incl. `shipped` + 48h recall-review copy, all `isShipped`-gated), `data/journeys/shippedCancellation.js`, `App.jsx` (`cancel_shipped_*` candidates) | `output/cancellations.md` §2.6 |
 | Cancellation review outcomes (accepted / declined / reversed) | `data/journeys/shippedCancellation.js` (`cancel_shipped_accepted_*`, shared `cancel_shipped_declined`, `cancellation_kept`) + `data/journeys/cancellation.js` (at-QC equivalents), `lib/statuses.js` (`statusExplanation` stage-specific `cancellation_{phase}_{statusId}` key), `lib/events.js` (`buildCancellationEvent` rejected/reverted), `components/HistoryThread.jsx` (`chipLabel`), `components/PastOrderCard.jsx` (`canKeep` = `requested` only) | `output/cancellations.md` §2.6/§4/§5 |
 | Mock orders / field shapes | `data/orders.js` | `output/orders.md` §7 |
@@ -58,11 +58,11 @@ These are **string contracts**: a value written as a literal in data/flow code, 
 | `category_name` (`iPhone`/`Macbook`/`Samsung phone`/`Tablet`/`Laptop`) | `data/orders.js` product | `lib/devices.js` → `ResetGuideSheet` variant | mapping in `devices.js` + a guide variant in `ResetGuideSheet.jsx` |
 | `claim.transitSubTimeline.picked_up`, `claim.shipBack.awb` | `data/orders.js` | gate the `See detailed tracking` dropdown in `ClaimCard` / `WarrantyClaimCard` | the gating check in the relevant card |
 | `claim.scheduledPickup.awb` (airway-bill number) | `data/orders/claims.js`, `data/orders/warranty.js`, `data/journeys/claim*.js` (`claim_awb_generated` — now incl. `claimWarranty.js`) | gates the Initiated scheduled-pickup strip on **both** `ClaimCard` and `WarrantyClaimCard` (present → strip w/ `AwbLink` row; absent → `ArrangingPickupStrip` placeholder) | the `showScheduledPickup` / `showArrangingPickup` checks in `ClaimCard.jsx` **and** `WarrantyClaimCard.jsx` |
-| `order.country` (`AE`/`ZA`/`SA`/`Others`) | `data/orders/*` (mocks), `App.jsx` (injected onto the replayed order from `?country=`/`CountryPicker`) | `lib/countries.js` (`countryConfig`) → `detailedTracking` gate in `HeroCard`/`OrderCard`/`ClaimCard`/`WarrantyClaimCard`/`InvalidClaimCard`, `shippedCancellation` gate via `canCancelShipped` in `HeroCard`; per-edge `next` country tags in `lib/journey.js` (`validNext`) | a flag in `COUNTRIES` + the card guard, or a `{id,countries}` edge in the journey `next` |
+| `order.country` (`AE`/`ZA`/`SA`/`Others`) | `data/orders/*` (mocks), `App.jsx` (injected onto the replayed order from `?country=`/`CountryPicker`) | `lib/countries.js` (`countryConfig`) → `detailedTracking` gate in `HeroCard`/`OrderCard`/`ClaimCard`/`WarrantyClaimCard`/`InvalidClaimCard`, `shippedCancellation` gate via `canCancelShipped` in `HeroCard`, `refusalReview` fork in `cancellationStepsFor`/`statusDescription`; per-edge `next` country tags in `lib/journey.js` (`validNext`, which reads the `country` now stamped onto the replay order by `useJourney` itself) | a flag in `COUNTRIES` + the card guard, or a `{id,countries}` edge in the journey `next` |
 | `order.promiseBreached` (boolean — SLA blown past the initial delivery promise) | `data/journeys/cancellation.js` (`order_late`/`qc_late`), `data/journeys/shippedCancellation.js` (`shipped_stuck`) | `CancelOrderSheet.jsx` (fee waived + `LATE_PROMISE_WALLET_BONUS` + apology dissuade variant), `lib/returns.js` (`canCancelShipped` — stands in for the transit-window check) | the `breached` branches in `CancelOrderSheet.jsx` **and** `canCancelShipped` |
-| `order.deliveryRefused` (boolean — parcel turned away at the door) | `data/journeys/refusedDelivery.js` (`delivery_refused`) | `lib/returns.js` (`canCancelShipped` — opens the shipped-cancel gate on its own, **before** the `shippedCancellation` country check, so AE included), `CancelOrderSheet.jsx` (`refused` → fee waived **without** bonus/apology, dissuade skipped), `PastOrderCard.jsx` (requested-hero caveat row), `lib/statuses.js` (`statusExplanation` `cancellation_{phase}_refused` key) | all four consumers — the flag deliberately splits fee-waiver (`feeWaived`) from apology+bonus (`breached`) |
+| `order.deliveryRefused` (boolean — parcel turned away at the door; the node stamps `state: 'cancelled'` in the same breath) | `data/journeys/refusedDelivery.js` (`delivery_refused`) | `lib/statuses.js` (`cancellationStepsFor` drops the `requested` step outside `refusalReview` markets; `statusDescription` refusal bodies; `statusExplanation` `cancellation_{phase}_refused` keys), `PastOrderCard.jsx` (`canKeep` false — the customer never asked; SA caveat row) | every consumer must pair it with `countryConfig(order).refusalReview`; it is **not** a self-cancel gate any more (`canCancelShipped` no longer reads it) |
 | Banner `tone` (`brand`/`warn`/`danger`/`success`) | `lib/statuses.js` (`STATUS_DESCRIPTIONS`, `statusDescription`), journey `statusBanner`s | `HeroCard.jsx` (`ALERT_TONES` → `warn` = amber "Active order" + amber block; `danger` = red "Action needed" pill + red block), `OrderCard` / `InProgressCard` banner styling | the `ALERT_TONES` map in `HeroCard.jsx` when adding a tone — and pick `warn` vs `danger` by whether the customer must act |
-| `statusBanner.headline` (optional — overrides the card headline, not just the banner) | `data/journeys/refusedDelivery.js` (`REFUSED_BANNER`) | `lib/statuses.js` (`statusHeadline`, after the cancelled branch) | nothing else sets it; add it only when an event *contradicts* the last courier scan |
+| `statusBanner.headline` (optional — overrides the card headline, not just the banner) | **nothing today** (the refusal banner that introduced it is gone — the refusal now cancels straight away) | `lib/statuses.js` (`statusHeadline`, after the cancelled branch) | the mechanism is live but unused; set it only when an event *contradicts* the last courier scan |
 | `state.remedy` gained `'accidental'` (the Revibe Care accidental-damage arm) | `StepRemedy.jsx` via `remedyOptionsFor` | `flowReducer.js` (`claimTypeFor` → `'warranty'`, `tailSteps` `noRefund`), `ClaimFlow.jsx` (`buildClaim`) | `claimTypeFor` + `tailSteps` in `flowReducer.js`, and the copy map in `StepRemedy.jsx` |
 | `claim.coverage` (`'standard'`/`'extended'`) + `claim.cause` (`'defect'`/`'accidental'`) — the entitlement **frozen at submit**, never re-derived | `ClaimFlow.jsx` (`buildClaim`, warranty branch), `data/journeys/repairPath.js` (`claim_submitted_warranty_accidental`) | `lib/coverage.js` (`coverageSummary`, `coverageArmLabel`) → `WarrantyClaimCard` arm label, `ClaimDetailsSheet` "Covered by" row | the two helpers in `coverage.js`; absent on pre-existing mocks, so every reader must tolerate `undefined` |
 | `order.warranty > 0` = the Revibe Care entitlement (**not** `!= null` — some compensation mocks carry `warranty: 0`) | `data/orders/*` (amount paid at checkout) | `lib/coverage.js` (`hasExtendedWarranty`), `ProductSummary` Care tile (still gates on `!= null`) | `hasExtendedWarranty` in `coverage.js` |
@@ -94,7 +94,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/AwbLink.jsx` | 40 | 2 | `AwbLink`·11 |
 | `components/BnplDisclaimerTooltip.jsx` | 86 | 7 | `bnplProviderLabel`·9, `isBnpl`·13, `BnplDisclaimerTooltip`·17 |
 | `components/CancelClaimSheet.jsx` | 155 | 1 | `CancelClaimSheet`·15 |
-| `components/CancelOrderSheet.jsx` | 801 | 3 | `CancelOrderSheet`·28 |
+| `components/CancelOrderSheet.jsx` | 781 | 3 | `CancelOrderSheet`·28 |
 | `components/ChatFab.jsx` | 14 | 1 | `ChatFab`·3 |
 | `components/ClaimActionBanner.jsx` | 46 | 1 | `ClaimActionBanner`·8 |
 | `components/ClaimCard.jsx` | 398 | 1 | `ClaimCard`·51 |
@@ -147,7 +147,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/OrderCard.jsx` | 430 | 1 | `OrderCard`·38 |
 | `components/OrderClaimLink.jsx` | 248 | 9 | `OrderClaimLink`·182 |
 | `components/OrderFilters.jsx` | 75 | 1 | `STATUS_CHIPS`·3, `OrderFilters`·13 |
-| `components/PastOrderCard.jsx` | 450 | 3 | `PastOrderCard`·38, `DestinationChip`·398 |
+| `components/PastOrderCard.jsx` | 456 | 3 | `PastOrderCard`·38, `DestinationChip`·404 |
 | `components/PickupFailedCard.jsx` | 335 | 1 | `PickupFailedCard`·23 |
 | `components/ProductSummary.jsx` | 154 | 19 | `REVIBE_CARE_ICON`·1, `ProductSummary`·20 |
 | `components/RefundDetailsSheet.jsx` | 177 | 2 | `RefundDetailsSheet`·9 |
@@ -163,7 +163,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/WalletInfoTooltip.jsx` | 71 | 6 | `REVIBE_WALLET_ICON`·4, `WalletInfoTooltip`·7 |
 | `components/WalletSheet.jsx` | 300 | 1 | `WalletSheet`·21 |
 | `components/WarrantyClaimCard.jsx` | 434 | 1 | `WarrantyClaimCard`·60 |
-| `data/journey.js` | 146 | 3 | `INITIAL_ORDER`·34, `JOURNEYS`·48 |
+| `data/journey.js` | 147 | 3 | `INITIAL_ORDER`·34, `JOURNEYS`·48 |
 | `data/journeys/cancellation.js` | 778 | 1 | `CANCELLATION_NODES`·25 |
 | `data/journeys/claimChangeOfMind.js` | 916 | 1 | `CLAIM_COM_NODES`·19 |
 | `data/journeys/claimCompensation.js` | 375 | 1 | `CLAIM_COMPENSATION_NODES`·29 |
@@ -172,7 +172,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/journeys/happyPath.js` | 128 | 1 | `HAPPY_PATH_NODES`·5 |
 | `data/journeys/inTransitClaim.js` | 97 | 1 | `IN_TRANSIT_ENTRY_STAGES`·32, `withInTransitClaim`·44 |
 | `data/journeys/initialOrder.js` | 41 | 1 | `INITIAL_ORDER`·2 |
-| `data/journeys/refusedDelivery.js` | 336 | 1 | `REFUSED_DELIVERY_NODES`·57 |
+| `data/journeys/refusedDelivery.js` | 275 | 1 | `REFUSED_DELIVERY_NODES`·40 |
 | `data/journeys/repairPath.js` | 309 | 2 | `REPAIR_SUBMIT_NODES`·25, `REPAIR_TAIL_NODES`·130 |
 | `data/journeys/shippedCancellation.js` | 384 | 1 | `SHIPPED_CANCELLATION_NODES`·51 |
 | `data/notifications/claims.js` | 263 | 1 | `CLAIM_NOTIFICATIONS`·26 |
@@ -187,16 +187,16 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/wallet.js` | 94 | 1 | `WALLET_SEED_TRANSACTIONS`·21 |
 | `lib/address.js` | 111 | 10 | `ADDRESS_SCHEMAS`·34, `addressSchema`·72, `emptyAddress`·78, `formatAddress`·87, `addressError`·100, `isAddressComplete`·108 |
 | `lib/claims.js` | 755 | 18 | `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `claimStatusesFor`·98, `CLAIM_EXPLANATIONS`·108, `COMPENSATION_EXPLANATIONS`·120, `claimExplanation`·132, `claimToneFor`·142, `claimProgressIndex`·148, `RETURN_CLAIM_STATUSES`·158, `returnClaimProgressIndex`·171, `CLAIM_TRANSIT_SUB_STATUSES`·180, `transitSubProgressIndex`·187, `hasActiveClaim`·196, `isClaimRefunded`·205, `isClaimClosed`·216, `CLAIM_CLOSURE_REASONS`·222, `closureCopyFor`·261, `canCancelClaim`·276, `cancelNeedsShipBack`·287, `cancelReturnGate`·299, `isWarrantyDelivered`·319, `isReturnDelivered`·332, `claimPhaseTag`·338, `claimStatusHeadline`·355, `claimStatusSubline`·360, `WARRANTY_CLAIM_STATUSES`·378, `warrantyClaimToneFor`·426, `warrantyClaimProgressIndex`·434, `warrantyClaimPhaseTag`·438, `warrantyClaimStatusHeadline`·457, `warrantyClaimStatusSubline`·462, `WARRANTY_EXPLANATIONS`·471, `warrantyClaimExplanation`·485, `REASON_LABELS`·499, `reasonText`·511, `devicePrepText`·519, `CLAIM_TYPE_LABELS`·527, `claimTypeLabel`·534, `CLAIM_REF_PREFIXES`·546, `formatClaimRef`·554, `claimRequiresProof`·567, `refundMethodLabel`·573, `CLAIM_SLAS`·592, `expectedCompletionFor`·615, `SUB_STATUS_LABELS`·640, `actionGateCopy`·701 |
-| `lib/countries.js` | 39 | 12 | `DEFAULT_COUNTRY`·22, `COUNTRIES`·24, `COUNTRY_CODES`·31, `countryConfig`·35 |
+| `lib/countries.js` | 46 | 13 | `DEFAULT_COUNTRY`·29, `COUNTRIES`·31, `COUNTRY_CODES`·38, `countryConfig`·42 |
 | `lib/coverage.js` | 223 | 7 | `STANDARD_WARRANTY_MONTHS`·33, `EXTENDED_WARRANTY_MONTHS`·34, `ACCIDENTAL_DAMAGE_CAPS`·41, `ACCIDENTAL_DAMAGE_CAP`·47, `accidentalDamageCap`·49, `hasExtendedWarranty`·55, `careAccidentalUsed`·63, `coverageFor`·101, `remedyOptionsFor`·158, `coverageSummary`·172, `coverageArmLabel`·196, `coverageStripFor`·212 |
 | `lib/devices.js` | 65 | 5 | `osForCategory`·26, `deviceOsForOrder`·33, `deviceTypeForCategory`·39, `deviceTypeForOrder`·51, `isOsAmbiguous`·62 |
 | `lib/edd.js` | 245 | 1 | `MARKETS`·24, `STAGE_ORDER_CREATED`·60, `STAGE_QC`·61, `STAGE_SHIPPED`·62, `SLA_ON_TIME`·64, `SLA_LATE`·65, `MSG_ORDER_LATE`·72, `MSG_QC_BACK_ON_TRACK`·74, `MSG_QC_LATE`·76, `MSG_SHIPPED_LATE`·78, `workdayIntl`·100, `currentStage`·117, `calculateEdd`·125, `buildCustomerMessage`·161, `orderStatus`·185 |
 | `lib/eddSandbox.js` | 231 | 1 | `useEddSandbox`·187 |
 | `lib/events.js` | 152 | 3 | `getHistoryEvents`·119 |
-| `lib/journey.js` | 118 | 1 | `useJourney`·25 |
+| `lib/journey.js` | 123 | 1 | `useJourney`·25 |
 | `lib/notifications.js` | 93 | 2 | `NOTIFICATIONS`·14, `NOTIFICATION_STATUSES`·26, `notificationStatus`·39, `notificationFor`·53, `journeyNotificationCoverage`·83 |
-| `lib/returns.js` | 365 | 18 | `RETURN_WINDOW_DAYS`·5, `RESTOCKING_FEE_RATE`·6, `CANCELLATION_FEE_RATE`·11, `ISSUE_WALLET_BONUS`·15, `SHIPPED_CANCEL_WINDOW_DAYS`·18, `parsePlacedAtDate`·24, `addDays`·47, `journeyAsOfDate`·66, `orderAsOf`·77, `startOfDay`·83, `canCancelShipped`·107, `eligibilityFor`·117, `groupOrdersByEligibility`·142, `refundBreakdown`·160, `isSplitPaid`·210, `refundDestinations`·221, `formatMoney`·230, `formatLongDate`·235, `formatShortDate`·244, `generateClaimRef`·256, `BATTERY_BASELINE_BY_GRADE`·264, `conditionGradeOf`·273, `batteryBaselineFor`·280, `daysSinceDelivery`·291, `assessBattery`·308 |
-| `lib/statuses.js` | 415 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·105, `cancellationStepsFor`·116, `statusDescription`·126, `STATUS_EXPLANATIONS`·260, `statusExplanation`·289, `pickActiveOrderId`·323, `statusHeadline`·342, `statusSubline`·362, `statusIconFor`·391 |
+| `lib/returns.js` | 362 | 18 | `RETURN_WINDOW_DAYS`·5, `RESTOCKING_FEE_RATE`·6, `CANCELLATION_FEE_RATE`·11, `ISSUE_WALLET_BONUS`·15, `SHIPPED_CANCEL_WINDOW_DAYS`·18, `parsePlacedAtDate`·24, `addDays`·47, `journeyAsOfDate`·66, `orderAsOf`·77, `startOfDay`·83, `canCancelShipped`·105, `eligibilityFor`·114, `groupOrdersByEligibility`·139, `refundBreakdown`·157, `isSplitPaid`·207, `refundDestinations`·218, `formatMoney`·227, `formatLongDate`·232, `formatShortDate`·241, `generateClaimRef`·253, `BATTERY_BASELINE_BY_GRADE`·261, `conditionGradeOf`·270, `batteryBaselineFor`·277, `daysSinceDelivery`·288, `assessBattery`·305 |
+| `lib/statuses.js` | 451 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·109, `cancellationStepsFor`·124, `statusDescription`·137, `STATUS_EXPLANATIONS`·294, `statusExplanation`·325, `pickActiveOrderId`·359, `statusHeadline`·378, `statusSubline`·398, `statusIconFor`·427 |
 | `lib/wallet.js` | 303 | 2 | `walletLedger`·92, `walletBalance`·214, `walletCurrency`·222, `latestSwitchableCredit`·231, `cardEquivalentFor`·244 |
 | `main.jsx` | 11 | 0 | _(none)_ |
 
@@ -208,7 +208,7 @@ _Editing a `lib/` or `data/` module touches every file listed. Hand these import
 |---|---|
 | `lib/claims.js` | `App.jsx`, `components/AwbFailedCard.jsx`, `components/CancelClaimSheet.jsx`, `components/ClaimActionBanner.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/ClosedClaimCard.jsx`, `components/DocsRejectedCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderClaimLink.jsx`, `components/PickupFailedCard.jsx`, `components/ResetFailedCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/notifications.js` |
 | `lib/returns.js` | `App.jsx`, `components/CancelOrderSheet.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/BatteryHealthCheck.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/IssueEvidence.jsx`, `components/ClaimFlow/Step5RefundMethod.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/ClaimFlow/StepRemedy.jsx`, `components/HeroCard.jsx`, `components/PastOrderCard.jsx`, `components/RefundDetailsSheet.jsx`, `components/RefundSplitRows.jsx`, `components/WalletSheet.jsx`, `lib/coverage.js`, `lib/wallet.js` |
-| `lib/countries.js` | `App.jsx`, `components/ClaimCard.jsx`, `components/ClaimFlow/flowReducer.js`, `components/CountryPicker.jsx`, `components/HeroCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/WarrantyClaimCard.jsx`, `lib/address.js`, `lib/journey.js`, `lib/returns.js`, `lib/statuses.js` |
+| `lib/countries.js` | `App.jsx`, `components/ClaimCard.jsx`, `components/ClaimFlow/flowReducer.js`, `components/CountryPicker.jsx`, `components/HeroCard.jsx`, `components/InvalidClaimCard.jsx`, `components/OrderCard.jsx`, `components/WarrantyClaimCard.jsx`, `data/journeys/refusedDelivery.js`, `lib/address.js`, `lib/journey.js`, `lib/returns.js`, `lib/statuses.js` |
 | `lib/address.js` | `components/AddressForm.jsx`, `components/AwbFailedCard.jsx`, `components/ClaimCard.jsx`, `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/Step4PickupDetails.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/flowReducer.js`, `components/EditableContactCard.jsx`, `components/PickupFailedCard.jsx`, `components/WarrantyClaimCard.jsx` |
 | `lib/coverage.js` | `components/ClaimDetailsSheet.jsx`, `components/ClaimFlow/ClaimFlow.jsx`, `components/ClaimFlow/Step6Review.jsx`, `components/ClaimFlow/Step7Confirmation.jsx`, `components/ClaimFlow/StepRemedy.jsx`, `components/PastOrderCard.jsx`, `components/WarrantyClaimCard.jsx` |
 | `lib/statuses.js` | `App.jsx`, `components/HeroCard.jsx`, `components/InProgressCard.jsx`, `components/OrderCard.jsx`, `components/PastOrderCard.jsx`, `components/ReturnShipmentTracking.jsx` |
@@ -295,6 +295,7 @@ graph LR
   data_journey_js --> data_journeys_inTransitClaim_js
   data_journeys_claimIssue_js --> data_journeys_repairPath_js
   data_journeys_claimWarranty_js --> data_journeys_repairPath_js
+  data_journeys_refusedDelivery_js --> lib_countries_js
   data_notifications_index_js --> data_notifications_orders_js
   data_notifications_index_js --> data_notifications_shipment_js
   data_notifications_index_js --> data_notifications_claims_js
@@ -316,6 +317,6 @@ graph LR
   lib_wallet_js --> data_wallet_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 111 modules, 30500 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 111 modules, 30471 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

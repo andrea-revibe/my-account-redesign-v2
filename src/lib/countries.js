@@ -16,16 +16,23 @@
 //     been in transit past SHIPPED_CANCEL_WINDOW_DAYS (lib/returns.js). Off in
 //     AE, where a stalled shipment can only be cancelled through support. Gated
 //     on the delivery hero (HeroCard) via canCancelShipped. Scope note: this
-//     covers the *stalled-parcel* path only — a refused delivery is
-//     self-cancellable everywhere (no courier recall to arrange), so it
-//     bypasses this flag.
+//     covers the *stalled-parcel* path only — a refused delivery is cancelled
+//     automatically by the refusal scan, so it never reaches this gate (see
+//     `refusalReview` below).
+//   refusalReview — a cancellation raised automatically by a refused delivery
+//     (lib/statuses.js + data/journeys/refusedDelivery.js) opens on the
+//     `requested` step, awaiting local ops sign-off, before the refund starts.
+//     Off → the refusal lands straight on `refund_pending` and the cancellation
+//     timeline drops the `Requested` step entirely (two steps, not three).
+//     Scope note: this is about the *refusal* path only — a customer-raised
+//     cancellation still walks all three steps in every market.
 export const DEFAULT_COUNTRY = 'AE'
 
 export const COUNTRIES = {
-  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  shippedCancellation: false, eddMarket: 'UAE' },
-  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, shippedCancellation: true,  eddMarket: 'ZA'  },
-  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  shippedCancellation: true,  eddMarket: 'SA'  },
-  Others: { label: 'Others',       detailedTracking: false, expertReview: false, shippedCancellation: true,  eddMarket: null  },
+  AE:     { label: 'UAE',          detailedTracking: true,  expertReview: true,  shippedCancellation: false, refusalReview: false, eddMarket: 'UAE' },
+  ZA:     { label: 'South Africa', detailedTracking: true,  expertReview: false, shippedCancellation: true,  refusalReview: false, eddMarket: 'ZA'  },
+  SA:     { label: 'Saudi Arabia', detailedTracking: false, expertReview: true,  shippedCancellation: true,  refusalReview: true,  eddMarket: 'SA'  },
+  Others: { label: 'Others',       detailedTracking: false, expertReview: false, shippedCancellation: true,  refusalReview: false, eddMarket: null  },
 }
 
 export const COUNTRY_CODES = ['AE', 'ZA', 'SA', 'Others']
