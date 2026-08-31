@@ -95,7 +95,11 @@ export default function ClaimDetailsSheet({ order, open, onClose }) {
               <Row
                 label="Covered by"
                 value={warrantyCoverage.label}
-                sub={warrantyCoverage.detail}
+                sub={
+                  claim.accidentalAck
+                    ? `${warrantyCoverage.detail} You confirmed at submit that this uses your one-time accidental damage cover.`
+                    : warrantyCoverage.detail
+                }
               />
             )}
             {isCompensation ? (

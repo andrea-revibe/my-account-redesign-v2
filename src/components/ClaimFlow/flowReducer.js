@@ -216,6 +216,11 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     packingMethod: null,
     packingConfirmed: false,
     factoryResetConfirmed: false,
+    // Accidental-damage arm only: the one-use acknowledgement collected on
+    // Review (copy from `coverageSummary().ack`). Gates submit in
+    // ClaimFlow.handlePrimary alongside the reset + packing acks; irrelevant on
+    // every other remedy, where nothing reads it.
+    accidentalAckConfirmed: false,
     claimRef: null,
     // Soft-validation flag: set by ATTEMPT when Continue is clicked with a
     // required input still missing, and cleared atomically by every
@@ -313,6 +318,8 @@ export function flowReducer(state, action) {
       return { ...state, packingConfirmed: action.value }
     case 'SET_FACTORY_RESET_CONFIRMED':
       return { ...state, factoryResetConfirmed: action.value }
+    case 'SET_ACCIDENTAL_ACK':
+      return { ...state, accidentalAckConfirmed: action.value }
     case 'ATTEMPT':
       return { ...state, attempted: true }
     case 'GO_TO_STEP': {

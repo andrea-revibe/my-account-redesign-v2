@@ -91,11 +91,15 @@ export default function ClaimFlow({
   const handlePrimary = () => {
     if (isReview) {
       // Compensation keeps the device — no factory-reset / packing acks to
-      // gate on. Refund + warranty flows still require both.
+      // gate on. Refund + warranty flows still require both, and the
+      // accidental-damage arm adds a third: the one-use acknowledgement, since
+      // Revibe Care answers for damage the customer caused only once.
       const requiresAcks = state.claimType !== 'compensation'
       if (
         requiresAcks &&
-        (!state.factoryResetConfirmed || !state.packingConfirmed)
+        (!state.factoryResetConfirmed ||
+          !state.packingConfirmed ||
+          (state.remedy === 'accidental' && !state.accidentalAckConfirmed))
       ) {
         dispatch({ type: 'ATTEMPT' })
         return
@@ -455,6 +459,10 @@ function buildClaim({ state, order, claimRef }) {
     remedy: state.remedy,
     coverage: coverage.tier === 'extended' ? 'extended' : 'standard',
     cause: state.remedy === 'accidental' ? 'accidental' : 'defect',
+    // The one-use acknowledgement the customer ticked on Review, frozen so the
+    // terms they agreed to stay recoverable on the tracking surfaces. Absent on
+    // a defect repair (nothing to acknowledge) and on pre-existing mocks.
+    ...(state.remedy === 'accidental' ? { accidentalAck: true } : {}),
     ...(batteryAssessment ? { batteryAssessment } : {}),
     repairWindow: {
       expectedComplete: eta.short,

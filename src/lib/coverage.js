@@ -169,11 +169,20 @@ export function remedyOptionsFor(order, coverage, refundEligible) {
 // Takes primitives rather than an order because the callers hold different
 // shapes: the flow has a draft (`state.remedy`), the tracking cards have the
 // frozen `claim.cause` / `claim.coverage`.
+//
+// `ack` carries the one-use acknowledgement the accidental arm has to collect
+// before submit (Step6Review renders it as a checkbox; ClaimFlow gates on it and
+// freezes `claim.accidentalAck`). Null on every other arm — a defect repair is
+// unlimited, so there is nothing to acknowledge.
 export function coverageSummary({ cause, tier, cap, currency }) {
   if (cause === 'accidental') {
     return {
       label: 'Revibe Care · accidental damage',
       detail: `Covered once, up to ${currency} ${formatMoney(cap)} — we'll confirm the repair cost after inspection.`,
+      ack: {
+        title: 'I understand this uses my one-time accidental damage cover.',
+        body: 'After this claim your standard warranty still covers defects — but accidental damage can only be claimed once.',
+      },
     }
   }
   if (tier === 'extended') {
@@ -181,11 +190,34 @@ export function coverageSummary({ cause, tier, cap, currency }) {
       label: 'Revibe Care · standard warranty cover',
       detail:
         'Your first-year warranty has ended — Revibe Care carries the same cover to two years.',
+      ack: null,
     }
   }
   return {
     label: 'Standard warranty',
     detail: "Faults you didn't cause are repaired free of charge.",
+    ack: null,
+  }
+}
+
+// Split a repair quote against the accidental-damage cap. The only place this
+// arithmetic lives, so the quote card, the seeded mocks and the journey nodes
+// can't drift apart on what "you pay" means.
+//
+// `covered` is what Revibe Care absorbs (the whole quote when it fits under the
+// cap, the cap itself when it doesn't); `excess` is the customer's share, which
+// is zero on a within-cover quote. `overCap` is the gate the takeover card is
+// routed on.
+export function repairQuoteSplit(order, total) {
+  const cap = accidentalDamageCap(order)
+  const amount = Number(total) || 0
+  const covered = Math.min(amount, cap)
+  return {
+    total: amount,
+    cap,
+    covered,
+    excess: Math.max(0, amount - cap),
+    overCap: amount > cap,
   }
 }
 

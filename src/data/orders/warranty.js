@@ -204,6 +204,112 @@ export const WARRANTY_ORDERS = [
       },
     },
   },
+  // ----- Layered mock: delivered → accidental-damage claim → QC priced the
+  // repair ABOVE the Revibe Care cap. Parks on `claim.repairQuote` (undecided),
+  // which is the only state RepairQuoteCard renders — the sixth takeover. The
+  // claim deliberately stays on `qc`: the over-cap gate is a pause, not a
+  // pipeline step. In-session submit always lands on `initiated`, so this is the
+  // only way to reach the surface outside journey mode.
+  //
+  // A higher-value device on purpose: with a AED 1,500 cap, a cheap handset
+  // makes every over-cap quote read as absurd rather than as a real decision.
+  {
+    id: '89615',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '12/06/2026 02:10 PM',
+    placedAtFull: '12 Jun 2026 · 2:10 PM',
+    deliveredOn: '2026-06-18',
+    deliveredOnLong: 'Thursday, 18 June',
+    quantity: 1,
+    unitPrice: 3290,
+    subtotal: 3290,
+    warranty: 180,
+    total: 3470,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193615',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '12 Jun · 2:10 PM',
+      quality_check: '13 Jun · 10:05 AM',
+      shipped: '15 Jun · 3:20 PM',
+      delivered: '18 Jun · 11:40 AM',
+    },
+    product: {
+      name: 'MacBook Air 13″',
+      variant: 'Midnight · M2 · 512 GB · Excellent',
+      category_name: 'Macbook',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'WrQt15',
+      claimStatusId: 'qc',
+      type: 'warranty',
+      submittedAt: '20 Aug 2026 · 9:15 AM',
+      units: 1,
+      remedy: 'accidental',
+      // Raised inside the first year, so the standard warranty is still live —
+      // but damage the customer caused is only ever Revibe Care's to answer.
+      coverage: 'standard',
+      cause: 'accidental',
+      accidentalAck: true,
+      issueScope: 'not_working',
+      issueSubtypeId: 'screen',
+      issueDetails: {
+        description:
+          'Knocked it off the desk with the lid open — the screen is cracked corner to corner and the lid no longer sits flush.',
+        attachmentName: 'IMG_0908.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Friday, 22 August',
+        slot: '10 AM – 12 PM',
+        awb: '25193615',
+      },
+      timeline: {
+        initiated: '20 Aug · 9:15 AM',
+        pickup: '22 Aug · 10:48 AM',
+        qc: '26 Aug · 2:05 PM',
+      },
+      // Priced above the AED 1,500 accidental cap, so Revibe Care can't absorb
+      // the whole job. Numbers mirror `repairQuoteSplit(order, 2450)` — kept
+      // literal here because mocks are data, but they must agree with the
+      // helper or the card and the journey would tell different stories.
+      repairQuote: {
+        total: 2450,
+        cap: 1500,
+        covered: 1500,
+        excess: 950,
+        overCap: true,
+        summary: 'Display assembly and top case replacement',
+        quotedAt: '28 Aug · 11:20 AM',
+        deadline: '2026-09-02',
+        deadlineLabel: 'Respond by Wed, 2 Sep',
+        paidAt: null,
+        declinedAt: null,
+      },
+      actionRequired: {
+        kind: 'repair_over_cap',
+        deadline: '2026-09-02',
+        deadlineLabel: 'Respond by Wed, 2 Sep',
+      },
+    },
+  },
   // ----- Layered mock: delivered → warranty claim → repair complete →
   // device on its way back, currently in transit. Exercises the
   // WarrantyClaimCard's `ship_back` hero (brand-gradient ETA, courier

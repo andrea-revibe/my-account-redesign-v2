@@ -1,6 +1,6 @@
 ---
 status: live
-verified_against: 8e46514
+verified_against: 622e9f0
 covers:
   - src/App.jsx
   - src/lib/claims.js
@@ -38,7 +38,9 @@ flowchart TD
   ip3 -- yes --> ResetFailedCard
   ip3 -- no --> ip4{"claim.invalidClaim?"}
   ip4 -- yes --> InvalidClaimCard
-  ip4 -- no --> ip5{"claim.type == 'warranty'?"}
+  ip4 -- no --> ip4a{"repairQuotePending?"}
+  ip4a -- yes --> RepairQuoteCard
+  ip4a -- no --> ip5{"claim.type == 'warranty'?"}
   ip5 -- yes --> WCI["WarrantyClaimCard"]
   ip5 -- no --> ip6{"hasActiveClaim?"}
   ip6 -- yes --> CCI["ClaimCard"]
@@ -61,7 +63,7 @@ flowchart TD
   p3 -- no --> POC["PastOrderCard (onRaiseClaim)"]
 ```
 
-The first five in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline (`awbFailure` sits pre-pickup: no airway bill → no bookable pickup). (The `invalidClaim` branch is also reached via the post-collection cancel projection — see [returns/claim_tracking.md](./returns/claim_tracking.md) §2.8.) In the past ladder, a Revibe-closed claim (`isClaimClosed` — `claim.closure` set, no refund) routes to `ClosedClaimCard` ahead of the cancellation check, and a Revibe-initiated cancellation (`cancellationInitiator === 'revibe'`) routes to `RevibeCancellationCard` ahead of the customer `PastOrderCard` fallback. Full prose tree: [orders.md](./orders.md) §2.
+The first six in-progress branches are the **takeover cards** — they supersede `ClaimCard` / `WarrantyClaimCard` while the claim is blocked on a single customer action, ordered chronologically in the pipeline (`awbFailure` sits pre-pickup: no airway bill → no bookable pickup). `repairQuotePending` is the odd one out: it is a **pause, not a detour** — the claim keeps `claimStatusId: 'qc'`, and stamping `repairQuote.paidAt` / `.declinedAt` retires the takeover and hands the surface straight back to `WarrantyClaimCard` (see [warranties_compensations.md](./warranties_compensations.md) §5). (The `invalidClaim` branch is also reached via the post-collection cancel projection — see [returns/claim_tracking.md](./returns/claim_tracking.md) §2.8.) In the past ladder, a Revibe-closed claim (`isClaimClosed` — `claim.closure` set, no refund) routes to `ClosedClaimCard` ahead of the cancellation check, and a Revibe-initiated cancellation (`cancellationInitiator === 'revibe'`) routes to `RevibeCancellationCard` ahead of the customer `PastOrderCard` fallback. Full prose tree: [orders.md](./orders.md) §2.
 
 ---
 
@@ -69,7 +71,7 @@ The first five in-progress branches are the **takeover cards** — they supersed
 
 **Read before:** changing a claim pipeline, adding a claim state, or wiring a new takeover. **Source:** `src/lib/claims.js` — `CLAIM_STATUSES`·18, `COMPENSATION_CLAIM_STATUSES`·64, `WARRANTY_CLAIM_STATUSES`·284, terminal predicates `hasActiveClaim`·160 / `isClaimRefunded`·168 / `isWarrantyDelivered`·225. Takeover seeded states: `src/data/orders/claims.js`.
 
-All four pipelines on one canvas, tone-classed **warn → brand → success** (matching the card tone helpers), with the five takeover detours annotated by trigger flag + the claim state they're seeded at.
+All four pipelines on one canvas, tone-classed **warn → brand → success** (matching the card tone helpers), with the six takeover detours annotated by trigger flag + the claim state they're seeded at.
 
 ```mermaid
 flowchart LR
@@ -89,6 +91,7 @@ flowchart LR
   subgraph WARR["Warranty · WARRANTY_CLAIM_STATUSES · WarrantyClaimCard"]
     direction LR
     w1["initiated"]:::warn --> w2["pickup"]:::warn --> w3["qc"]:::warn --> w4["under_repair"]:::brand --> w5["ship_back"]:::brand --> w6["device_returned"]:::done
+    w3 -. "repairQuote declined — no repair" .-> w5
   end
 
   r1 -. "docsRejection (@initiated)" .-> T1["DocsRejectedCard"]:::takeover
@@ -97,12 +100,14 @@ flowchart LR
   r3 -. "resetFailed (@qc)" .-> T3["ResetFailedCard"]:::takeover
   r3 -. "invalidClaim (@qc)" .-> T4["InvalidClaimCard"]:::takeover
   c3 -. "invalidClaim (compensation @qc)" .-> T5["InvalidClaimCard → CompensationClosedCard"]:::takeover
+  w3 -. "repairQuote over cap (@qc, pause)" .-> T6["RepairQuoteCard"]:::takeover
 ```
 
 Notes:
 - **In progress vs Past.** `hasActiveClaim` keeps a claim in the *In progress* section until its terminal state — `refund_credited` (refund/compensation) or `device_returned` (warranty) — which flips it to *Past* via `isClaimRefunded` / `isWarrantyDelivered`. A `claim.closure` flag (Revibe closed the claim, no refund) is terminal regardless of `claimStatusId`: `hasActiveClaim` returns false and the order routes to *Past* via `isClaimClosed` → `ClosedClaimCard`.
+- **A declined over-cap repair quote skips `under_repair`.** The device was never repaired, so `warrantyStepsFor(claim)` drops the step from the timeline and the tail's headline / tone / explanation are overridden (`repairDeclined`) — `device_returned` lands on **warn**, not success. Spec: [warranties_compensations.md](./warranties_compensations.md) §5.
 - **Compensation reuses the refund status ids** (`initiated` / `qc` / `refund_issued` / `refund_credited`) minus the pickup leg, so the tone/phase helpers apply unchanged.
-- **Projection invariant.** A freshly-submitted claim always lands on `initiated` (see [Returns data-flow](#returns-data-flow)). Every post-`initiated` state and all five takeovers are reachable only via hand-seeded mocks in `data/orders/*` (or the journey-mode replay) — see each `docs/output/*.md` "Mocked vs production" list. Spec: [returns/claim_tracking.md](./returns/claim_tracking.md), [warranties_compensations.md](./warranties_compensations.md).
+- **Projection invariant.** A freshly-submitted claim always lands on `initiated` (see [Returns data-flow](#returns-data-flow)). Every post-`initiated` state and all six takeovers are reachable only via hand-seeded mocks in `data/orders/*` (or the journey-mode replay) — see each `docs/output/*.md` "Mocked vs production" list. Spec: [returns/claim_tracking.md](./returns/claim_tracking.md), [warranties_compensations.md](./warranties_compensations.md).
 
 ---
 

@@ -453,6 +453,13 @@ export const CLAIM_ISSUE_NODES = [
     next: [
       { id: 'claim_refund_issued', when: (o) => o.claim?.type !== 'warranty' },
       { id: 'claim_repair_quote', when: (o) => o.claim?.type === 'warranty' },
+      // Over-cap needs both guards ANDed: a repair claim (not a refund one) AND
+      // the accidental arm, which is the only one the cap applies to.
+      {
+        id: 'claim_repair_quote_over_cap',
+        when: (o) =>
+          o.claim?.type === 'warranty' && o.claim?.cause === 'accidental',
+      },
       'claim_invalid_confirmed',
       'claim_reset_failed',
       'claim_cancelled_shipback',

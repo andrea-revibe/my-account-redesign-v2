@@ -9,14 +9,15 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import {
-  WARRANTY_CLAIM_STATUSES,
   canCancelClaim,
   warrantyClaimToneFor,
   warrantyClaimProgressIndex,
+  warrantyStepsFor,
   warrantyClaimPhaseTag,
   warrantyClaimStatusHeadline,
   warrantyClaimStatusSubline,
   warrantyClaimExplanation,
+  repairDeclined,
   claimTypeLabel,
   formatClaimRef,
   CLAIM_TRANSIT_SUB_STATUSES,
@@ -77,7 +78,7 @@ export default function WarrantyClaimCard({
   }, [openSignal])
 
   const claim = order.claim
-  const tone = warrantyClaimToneFor(claim.claimStatusId)
+  const tone = warrantyClaimToneFor(claim.claimStatusId, claim)
   const t = TONE[tone]
 
   return (
@@ -129,8 +130,8 @@ export default function WarrantyClaimCard({
             </div>
             <Timeline
               orientation="horizontal"
-              steps={WARRANTY_CLAIM_STATUSES}
-              currentIndex={warrantyClaimProgressIndex(claim.claimStatusId)}
+              steps={warrantyStepsFor(claim)}
+              currentIndex={warrantyClaimProgressIndex(claim.claimStatusId, claim)}
               stamps={claim.timeline}
               tone={tone}
             />
@@ -221,7 +222,7 @@ function WarrantyHero({ order, claim, tone }) {
   }
 
   const t = TONE[tone]
-  const phase = warrantyClaimPhaseTag(claim.claimStatusId)
+  const phase = warrantyClaimPhaseTag(claim.claimStatusId, claim)
   const headline = warrantyClaimStatusHeadline(claim)
   const subline = warrantyClaimStatusSubline(claim)
   const armLabel = coverageArmLabel(claim)
@@ -291,7 +292,11 @@ function WarrantyHero({ order, claim, tone }) {
       )}
 
       {showReturnedOn && (
-        <ReturnedStrip shipBack={claim.shipBack} toneText={t.text} />
+        <ReturnedStrip
+          shipBack={claim.shipBack}
+          toneText={t.text}
+          declined={repairDeclined(claim)}
+        />
       )}
     </div>
   )
@@ -381,17 +386,24 @@ function RepairWindowStrip({ repair, toneText }) {
   )
 }
 
-function ReturnedStrip({ shipBack, toneText }) {
+function ReturnedStrip({ shipBack, toneText, declined }) {
   return (
-    <div className="mt-3 pt-3 border-t border-line-2/70 flex items-start gap-1.5 text-[12px] text-ink-2">
-      <CheckCircle2
-        size={13}
-        strokeWidth={2}
-        className={`${toneText} shrink-0 mt-px`}
-      />
-      <span className="font-semibold leading-[1.3]">
-        Delivered on {shipBack.deliveredOnLong || shipBack.deliveredOn}
-      </span>
+    <div className="mt-3 pt-3 border-t border-line-2/70 flex flex-col gap-1 text-[12px] text-ink-2">
+      <div className="flex items-start gap-1.5">
+        <CheckCircle2
+          size={13}
+          strokeWidth={2}
+          className={`${toneText} shrink-0 mt-px`}
+        />
+        <span className="font-semibold leading-[1.3]">
+          Delivered on {shipBack.deliveredOnLong || shipBack.deliveredOn}
+        </span>
+      </div>
+      {declined && (
+        <span className="text-[11.5px] leading-[1.4] pl-[18px]">
+          No repair was carried out — your accidental damage cover stays unused.
+        </span>
+      )}
     </div>
   )
 }
@@ -404,6 +416,9 @@ function ReturnedStrip({ shipBack, toneText }) {
 // WarrantyClaimCard owns the surface end-to-end.
 function ShipBackHero({ order, claim }) {
   const ship = claim.shipBack
+  // A declined over-cap quote sends the device home untouched, so the hero must
+  // not promise a repair. Everything else about the leg is identical.
+  const declined = repairDeclined(claim)
   return (
     <div className="rounded-[14px] border p-3.5 bg-gradient-to-br from-brand-bg to-brand-bg2 border-brand-bg2">
       <div className="flex items-start justify-between gap-2">
@@ -419,7 +434,9 @@ function ShipBackHero({ order, claim }) {
         {ship.estimatedDeliveryLong || ship.estimatedDelivery}
       </div>
       <div className="mt-1.5 text-[12px] leading-[1.45] text-ink-2">
-        Your repaired device is on its way back — we'll track it like any other delivery.
+        {declined
+          ? "Your device is on its way back unrepaired, as you asked — we'll track it like any other delivery."
+          : "Your repaired device is on its way back — we'll track it like any other delivery."}
       </div>
       <DeliveryAddressPill label="Delivering to" address={order.address} />
       <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-ink-2 tabular-nums">
