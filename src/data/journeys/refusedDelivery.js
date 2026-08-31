@@ -1,58 +1,41 @@
-
 // ----- Refused-delivery journey ------------------------------------------
 // The happy path with one extra outcome at the door: instead of accepting the
-// parcel, the customer turns the courier away. From there the order enters the
-// same self-cancellation flow as a stuck-in-transit shipment — the customer
-// raises it from the delivery hero's `Cancel order`, it lands on `requested`
-// awaiting confirmation, and the refund follows.
+// parcel, the customer turns the courier away. The refusal scan does the rest —
+// it cancels the order automatically and starts a refund. The customer never
+// asks for the cancellation and never picks a refund method.
 //
 // Shape of the flow:
 //
 //   placed → qc_started → shipped (country fork) → out for delivery
 //     ├─ delivered                                  (happy path, unchanged)
-//     └─ delivery_refused
-//          ├─ cancel_shipped_wallet (requested) → accepted → refunded
-//          └─ cancel_shipped_card   (requested) → accepted → refunded
+//     └─ delivery_refused        ← stamps the cancellation itself
+//          ├─ refused_cancel_accepted  (SA)  → refused_refunded
+//          └─ refused_refunded         (rest)
 //
-// Two things make this journey cheap:
+// The market fork is the `refusalReview` flag (lib/countries.js), read both by
+// the refusal node's `apply` and by the guards on its outgoing edges:
 //
-//   1. The cancellation nodes reuse the `cancel_shipped_*` ids from the
-//      stuck-in-transit journey. Ids are journey-scoped, and App.jsx's
-//      `handleCancelOrder` advances whichever `cancel_shipped_{branch}` is in
-//      validNext, so the real cancel sheet drives this journey with no App
-//      change.
-//   2. `delivery_refused` never touches `subStatusId`, so the single node
-//      serves both the granular (AE/ZA) and the collapsed (SA/Others)
-//      shipping chain.
+//   SA    (refusalReview) → Cancellation requested → Refund pending → Refunded
+//   rest                  → Refund pending → Refunded
 //
-// Unlike the stuck-in-transit cancellation, this path is **not** country-gated:
-// `canCancelShipped` returns true on `deliveryRefused` before it looks at
-// `shippedCancellation`, because that flag is about whether a market can have a
-// *moving* parcel recalled by the courier — and a refused parcel is already
-// travelling back on its own. So the flow is live under every country; replay
-// any of them:
-//   ?journey=refused_delivery&country=AE   (granular shipping chain)
-//   ?journey=refused_delivery&country=SA   (collapsed chain)
+// SA's extra step is local ops signing off on the cancellation. It carries no
+// stated timeframe on purpose — nothing is being recalled, so there's no
+// courier window to quote. Outside SA there's nothing to sign off, so the
+// `Requested` step is dropped from the timeline entirely rather than shown
+// pre-completed (`cancellationStepsFor` in lib/statuses.js returns two steps).
 //
-// Terms differ from the stuck-in-transit cancellation. Refusal opens the gate
-// via `deliveryRefused` rather than `promiseBreached`: the 5% processing fee is
-// waived (the customer never took the device) but there's no delay to
-// apologise for, so no Wallet bonus and no missed-promise dissuade screen —
-// see CancelOrderSheet.
-const REFUSED_BANNER = {
-  // `danger`, not `warn`: the customer has to decide something (cancel, or ask
-  // for another delivery). `warn` is the "we're on it, sit tight" tone the stall
-  // uses — HeroCard renders the two differently on purpose.
-  tone: 'danger',
-  lead: 'Delivery refused',
-  // The refusal contradicts the last courier scan rather than continuing it, so
-  // it overrides the sub-status headline too (`statusHeadline` in
-  // lib/statuses.js) — otherwise the hero reads "Out for delivery" above copy
-  // saying the parcel is coming back.
-  headline: 'Delivery refused',
-  body:
-    "You turned the parcel away at the door, so it's on its way back to us. Cancel the order to get your money back, or contact us to arrange another delivery.",
-}
+// `delivery_refused` never touches `subStatusId`, so the single node serves both
+// the granular (AE/ZA) and the collapsed (SA/Others) shipping chain. Replay any
+// market:
+//   ?journey=refused_delivery&country=AE   (granular chain, 2 refund steps)
+//   ?journey=refused_delivery&country=SA   (collapsed chain, 3 refund steps)
+//
+// Terms: full refund to the **original payment method**, no deductions — the 5%
+// processing fee is waived (the customer never took the device) and there's no
+// Wallet bonus, because there's no broken delivery promise to apologise for.
+// There is no store-credit option: the customer made no choice here, so we
+// don't get to move their money somewhere they didn't pick.
+import { countryConfig } from '../../lib/countries'
 
 export const REFUSED_DELIVERY_NODES = [
   {
@@ -185,68 +168,84 @@ export const REFUSED_DELIVERY_NODES = [
   },
   // ----- The refusal ------------------------------------------------------
   // Courier scan, not an in-app action: the customer refused at the door, the
-  // depot reports it. Stage-agnostic on purpose — it never touches
-  // `subStatusId`, so it serves both the granular (AE/ZA) and the collapsed
-  // (SA/Others) chain, and the order stays `shipped` because the parcel is
-  // still in the courier's hands (heading the other way). `event` is
-  // unauthored, so it resolves to the silent notification placeholder — the
-  // comm copy is the owner's to write.
+  // depot reports it, and we cancel on their behalf. Stage-agnostic on purpose
+  // — it never touches `subStatusId`, so it serves both the granular (AE/ZA)
+  // and the collapsed (SA/Others) chain.
+  //
+  // This node collapses the refusal and the cancellation into one step: there
+  // is no intermediate "Delivery refused" hero asking the customer to cancel,
+  // so the first thing they see is the cancellation card. `statusBanner` is
+  // therefore never set — `statusDescription()` checks it *before* the cancelled
+  // branch, so a banner here would mask the cancellation copy.
+  //
+  // `event` stays the courier scan (`shipment.delivery_refused`, unauthored ⇒
+  // silent). One node fires one event, so there is no separate
+  // `order.cancellation.*` comm on the entry step — if the customer needs a
+  // "we've cancelled your order" message, that wants its own node.
   {
     id: 'delivery_refused',
     label: 'Delivery refused at the door',
     trigger: 'system',
     event: 'shipment.delivery_refused',
-    next: ['cancel_shipped_wallet', 'cancel_shipped_card'],
-    apply: (o) => ({
-      ...o,
-      // Opens the self-cancel gate on the delivery hero (canCancelShipped) and
-      // waives the processing fee in the cancel sheet — without claiming a
-      // missed delivery promise, which is what `promiseBreached` would do.
-      deliveryRefused: true,
-      // The promise is spent: the parcel arrived and went back. No honest ETA
-      // left to show. `estimatedDeliveryLong` survives for the sheet's copy.
-      estimatedDelivery: null,
-      statusBanner: REFUSED_BANNER,
-    }),
-  },
-  // ----- Cancellation request (wallet) ----------------------------------
-  // Lands on `requested`: the parcel is with the courier and has to get back
-  // to us before any money moves — the same review shape as the
-  // stuck-in-transit cancellation. `statusBanner` is cleared because
-  // statusDescription() checks it *before* the cancelled branch; leaving it
-  // would keep the refusal banner on a cancelled order.
-  {
-    id: 'cancel_shipped_wallet',
-    label: 'Cancellation requested after refusal — wallet refund',
-    trigger: 'customer',
-    event: 'order.cancellation.requested',
-    next: ['cancel_shipped_accepted_wallet'],
-    apply: (o) => ({
-      ...o,
-      state: 'cancelled',
-      statusBanner: null,
-      cancellationStatusId: 'requested',
-      cancellationRef: 'R3fus3',
-      cancellationTimeline: { requested: '25 May · 12:05 PM' },
-      // No `bonus`: the fee is waived because the device was never taken, but
-      // there's no delay to compensate for.
-      refund: {
-        subtotal: 1029,
-        amount: 1029,
-        destination: { kind: 'wallet', label: 'Revibe Wallet' },
-        breakdown: [
-          { label: 'iPhone 13', amount: 939 },
-          { label: 'Revibe Care', amount: 90 },
-        ],
+    // Guards mirror the `apply` fork below: SA stops at `requested` for local
+    // ops sign-off, every other market is already on `refund_pending`.
+    next: [
+      {
+        id: 'refused_cancel_accepted',
+        when: (o) => countryConfig(o).refusalReview,
       },
-    }),
+      { id: 'refused_refunded', when: (o) => !countryConfig(o).refusalReview },
+    ],
+    apply: (o) => {
+      const review = countryConfig(o).refusalReview
+      const at = '25 May · 12:05 PM'
+      return {
+        ...o,
+        // Still read by the refusal-specific copy: the cancellation banner,
+        // the ⓘ explainer (`cancellation_<phase>_refused`), the SA caveat row,
+        // and the two-step timeline fork.
+        deliveryRefused: true,
+        // The promise is spent: the parcel arrived and went back. No honest ETA
+        // left to show.
+        estimatedDelivery: null,
+        state: 'cancelled',
+        // Deliberately NOT `cancellationInitiator: 'revibe'` — that field routes
+        // to RevibeCancellationCard (App.jsx), which is a settled, instant,
+        // no-timeline surface. This cancellation has a refund journey to walk,
+        // so it belongs on the refund-hero PastOrderCard.
+        cancellationRef: 'R3fus3',
+        cancellationStatusId: review ? 'requested' : 'refund_pending',
+        cancellationTimeline: review
+          ? { requested: at }
+          : { refund_pending: at },
+        // Original payment method, nothing deducted: no `fee` (waived — the
+        // device was never taken) and no `bonus` (no delay to compensate for).
+        refund: {
+          subtotal: 1029,
+          amount: 1029,
+          destination: {
+            kind: 'card',
+            label: o.paymentMethod?.brand ?? 'Visa',
+            last4: o.paymentMethod?.last4 ?? '4242',
+          },
+          breakdown: [
+            { label: 'iPhone 13', amount: 939 },
+            { label: 'Revibe Care', amount: 90 },
+          ],
+        },
+      }
+    },
   },
+  // ----- Local ops sign-off (SA only) -------------------------------------
+  // Only reachable where `refusalReview` is on. Nothing is being recalled — the
+  // parcel turned around on its own — so this is our confirmation to give, not
+  // the courier's to attempt, and it can't fail: there is no declined branch.
   {
-    id: 'cancel_shipped_accepted_wallet',
-    label: 'Cancellation accepted — parcel on its way back',
+    id: 'refused_cancel_accepted',
+    label: 'Cancellation signed off — refund started',
     trigger: 'system',
     event: 'order.cancellation.accepted',
-    next: ['refunded_shipped_wallet'],
+    next: ['refused_refunded'],
     apply: (o) => ({
       ...o,
       cancellationStatusId: 'refund_pending',
@@ -256,70 +255,10 @@ export const REFUSED_DELIVERY_NODES = [
       },
     }),
   },
+  // ----- Refund issued ----------------------------------------------------
   {
-    id: 'refunded_shipped_wallet',
-    label: 'Wallet refund credited',
-    trigger: 'system',
-    event: 'order.refund.completed',
-    next: [],
-    apply: (o) => ({
-      ...o,
-      cancellationStatusId: 'refunded',
-      cancellationTimeline: {
-        ...o.cancellationTimeline,
-        refunded: '25 May · 4:35 PM',
-      },
-      refund: {
-        ...o.refund,
-        fundsAvailable: 'Available now in your wallet',
-      },
-    }),
-  },
-  // ----- Cancellation request (original payment) -------------------------
-  // Full total back to the card: the 5% processing fee is waived on a refused
-  // delivery (`deliveryRefused`), so `refund` carries no `fee` object.
-  {
-    id: 'cancel_shipped_card',
-    label: 'Cancellation requested after refusal — card refund',
-    trigger: 'customer',
-    event: 'order.cancellation.requested',
-    next: ['cancel_shipped_accepted_card'],
-    apply: (o) => ({
-      ...o,
-      state: 'cancelled',
-      statusBanner: null,
-      cancellationStatusId: 'requested',
-      cancellationRef: 'R3fus3',
-      cancellationTimeline: { requested: '25 May · 12:05 PM' },
-      refund: {
-        subtotal: 1029,
-        amount: 1029,
-        destination: { kind: 'card', label: 'Visa', last4: '4242' },
-        breakdown: [
-          { label: 'iPhone 13', amount: 939 },
-          { label: 'Revibe Care', amount: 90 },
-        ],
-      },
-    }),
-  },
-  {
-    id: 'cancel_shipped_accepted_card',
-    label: 'Cancellation accepted — parcel on its way back',
-    trigger: 'system',
-    event: 'order.cancellation.accepted',
-    next: ['refunded_shipped_card'],
-    apply: (o) => ({
-      ...o,
-      cancellationStatusId: 'refund_pending',
-      cancellationTimeline: {
-        ...o.cancellationTimeline,
-        refund_pending: '25 May · 4:20 PM',
-      },
-    }),
-  },
-  {
-    id: 'refunded_shipped_card',
-    label: 'Card refund issued',
+    id: 'refused_refunded',
+    label: 'Refund issued to the original payment method',
     trigger: 'system',
     event: 'order.refund.completed',
     next: [],

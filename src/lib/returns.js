@@ -86,28 +86,25 @@ export function startOfDay(date) {
   return d
 }
 
-// Can the customer self-cancel this *shipped* order? Two ways in, both
-// requiring the order to be in transit and not already cancelled:
+// Can the customer self-cancel this *shipped* order? One way in: the shipment
+// stalled in transit past SHIPPED_CANCEL_WINDOW_DAYS (`promiseBreached`), in a
+// market whose courier will pull a moving parcel back (`shippedCancellation`).
+// Off in AE, where support has to do it.
 //
-//   1. Refused at the door (`deliveryRefused`) — allowed in **every** market,
-//      including AE. There's no courier recall to arrange: the parcel is
-//      already travelling back to us, so the market's recall capability (the
-//      `shippedCancellation` flag) has nothing to say about it.
-//   2. Stalled in transit past SHIPPED_CANCEL_WINDOW_DAYS (`promiseBreached`)
-//      — country-gated, because this one *does* need the courier to pull a
-//      moving parcel back. Off in AE, where support has to do it.
+// A refused delivery is **not** a second way in, though it used to be. The
+// refusal scan now cancels the order itself (cancellations.md §2.7), so a
+// `deliveryRefused` order is always already `state: 'cancelled'` and never has
+// a self-cancel affordance to gate.
 //
 // The window condition is represented by the stamped `promiseBreached` flag
 // rather than computed from a shipped date — the prototype has no ISO shipped
 // timestamp (`timeline.shipped` is display copy) and the flag already carries
 // exactly the terms this flow needs: fee waived + Wallet bonus, read by
 // CancelOrderSheet. Production computes it from the EDD model instead
-// (`orderStatus` in lib/edd.js) and drops the flag. `deliveryRefused` stays a
-// real courier event either way, and waives the fee without the bonus.
+// (`orderStatus` in lib/edd.js) and drops the flag.
 export function canCancelShipped(order) {
   if (!order || order.statusId !== 'shipped') return false
   if (order.state === 'cancelled') return false
-  if (order.deliveryRefused === true) return true
   if (!countryConfig(order).shippedCancellation) return false
   return order.promiseBreached === true
 }

@@ -12,9 +12,9 @@ import { CANCELLATION_FEE_RATE, isSplitPaid } from '../lib/returns'
 // variant of the step rather than the waiver pitch. Delivered orders never open
 // the sheet — returns take over.
 //
-// A refused delivery is the exception that skips the step entirely (see
-// `refused` below): there's no delay to apologise for and nothing to talk the
-// customer into keeping — the parcel is already heading back to us.
+// A refused delivery never reaches this sheet at all: the refusal scan cancels
+// the order itself (cancellations.md §2.7), so by the time the customer sees it
+// there is nothing left to request.
 const DISSUADE_STATUSES = new Set(['created', 'quality_check', 'shipped'])
 
 // Flat Wallet bonus paid when the customer cancels an order that has blown
@@ -28,10 +28,7 @@ const LATE_PROMISE_WALLET_BONUS = 100
 export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
   const [step, setStep] = useState('select')
   const [method, setMethod] = useState(null)
-  // Refused delivery: the parcel was turned away at the door and is on its way
-  // back, so the dissuade pitch has nothing to offer.
-  const refused = order.deliveryRefused === true
-  const dissuadeEligible = DISSUADE_STATUSES.has(order.statusId) && !refused
+  const dissuadeEligible = DISSUADE_STATUSES.has(order.statusId)
 
   useEffect(() => {
     if (!open) return
@@ -60,12 +57,11 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
   const warranty = order.warranty
   const total = order.total
   // Late + past-promise orders get a full refund (fee waived) plus a flat
-  // Wallet bonus on the store-credit path. A refused delivery waives the fee
-  // too — the customer never took the device — but earns no bonus, so the two
-  // conditions stay separate: `feeWaived` drives the money, `breached` drives
-  // the apology + bonus copy.
+  // Wallet bonus on the store-credit path. `feeWaived` stays a separate name
+  // from `breached` because the money and the apology copy are separate
+  // questions, even though only one condition currently sets it.
   const breached = order.promiseBreached === true
-  const feeWaived = breached || refused
+  const feeWaived = breached
   const fee = feeWaived ? 0 : Math.round(total * CANCELLATION_FEE_RATE * 100) / 100
   const refundOriginal = Math.round((total - fee) * 100) / 100
   const walletBonus = breached ? LATE_PROMISE_WALLET_BONUS : 0
@@ -107,7 +103,6 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
             currency={currency}
             cardLabel={cardLabel}
             breached={breached}
-            refused={refused}
             feeWaived={feeWaived}
             walletBonus={walletBonus}
             walletTotal={walletTotal}
@@ -147,7 +142,6 @@ export default function CancelOrderSheet({ order, open, onClose, onSubmit }) {
             currency={currency}
             cardLabel={cardLabel}
             breached={breached}
-            refused={refused}
             feeWaived={feeWaived}
             walletBonus={walletBonus}
             walletTotal={walletTotal}
@@ -207,7 +201,6 @@ function SelectStep({
   currency,
   cardLabel,
   breached,
-  refused,
   feeWaived,
   walletBonus,
   walletTotal,
@@ -285,14 +278,11 @@ function SelectStep({
               }
               detailLine={
                 // "instantly" only holds while nothing has shipped — a stuck
-                // parcel has to be recalled before the credit is issued, and a
-                // refused one has to make it back to us.
+                // parcel has to be recalled before the credit is issued.
                 order.statusId === 'shipped'
-                  ? refused
-                    ? 'Full refund · once the cancellation is confirmed'
-                    : breached
-                      ? 'Full refund + bonus · once the recall is confirmed'
-                      : 'Full refund · once the recall is confirmed'
+                  ? breached
+                    ? 'Full refund + bonus · once the recall is confirmed'
+                    : 'Full refund · once the recall is confirmed'
                   : breached
                     ? 'Full refund + bonus · available instantly'
                     : 'Full refund · available instantly'
@@ -350,17 +340,15 @@ function ConfirmStep({
   currency,
   cardLabel,
   breached,
-  refused,
   feeWaived,
   walletBonus,
   walletTotal,
 }) {
   const isStoreCredit = method === 'store_credit'
   const isSplit = !isStoreCredit && isSplitPaid(order)
-  // Stuck-in-transit or refused-delivery cancellation: the parcel is already
-  // with the courier, so the one thing the customer will ask is what happens to
-  // it. The answer differs — a stuck parcel has to be recalled, a refused one
-  // is already on its way back.
+  // Stuck-in-transit cancellation: the parcel is already with the courier, so
+  // the one thing the customer will ask is what happens to it — it has to be
+  // recalled before any money moves.
   const isShipped = order.statusId === 'shipped'
   const amount = isStoreCredit ? (breached ? walletTotal : total) : refundOriginal
   const destination = isStoreCredit
@@ -465,21 +453,13 @@ function ConfirmStep({
           />
           <span>
             {message}
-            {isShipped &&
-              (refused ? (
-                <>
-                  {' '}
-                  The parcel is already on its way back to us — we'll confirm
-                  your cancellation within 48 hours.
-                </>
-              ) : (
-                <>
-                  {' '}
-                  We'll ask the courier to send the parcel back and confirm
-                  within 48 hours — if it can't be stopped, your order stays on
-                  its way.
-                </>
-              ))}
+            {isShipped && (
+              <>
+                {' '}
+                We'll ask the courier to send the parcel back and confirm within
+                48 hours — if it can't be stopped, your order stays on its way.
+              </>
+            )}
           </span>
         </div>
       </div>
