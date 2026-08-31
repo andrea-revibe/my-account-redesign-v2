@@ -1,10 +1,14 @@
 ---
 status: live
-verified_against: ecdda19
+verified_against: 622e9f0
 covers:
   - src/lib/coverage.js
   - src/components/ClaimFlow/StepRemedy.jsx
   - src/components/WarrantyClaimCard.jsx
+  - src/components/RepairQuoteCard.jsx
+  - src/components/ClaimFlow/Step6Review.jsx
+  - src/components/ClaimFlow/flowReducer.js
+  - src/data/journeys/repairPath.js
   - src/components/AwbLink.jsx
   - src/components/ConditionReportChip.jsx
   - src/components/ClaimFlow/Step2Compensation.jsx
@@ -28,7 +32,7 @@ Step 1's full option set across the returns flow:
 | `My device works great, but I want to return it` | — | **Wired** — see [returns/change_of_mind.md](./returns/change_of_mind.md) |
 | `Something's wrong with my device` | `Return for a refund` | **Wired** — see [returns/issue.md](./returns/issue.md) |
 | `Something's wrong with my device` | `Repair under standard warranty` | **Wired** — intake + tracking — covered here (§2) |
-| `Something's wrong with my device` | `Repair accidental damage` (Revibe Care) | **Wired** — intake + tracking; the AED 1,500 quote is deferred — coverage model in §4 |
+| `Something's wrong with my device` | `Repair accidental damage` (Revibe Care) | **Wired** — intake + tracking + the over-cap quote decision — coverage model in §4, quote surface in §5 |
 | `Request compensation` | shipping refund / faulty charger — keep the item | **Wired** — intake + tracking — covered here (§3) |
 
 Selecting `Request compensation` now dispatches `SET_CLAIM_TYPE: 'compensation'` (the old inline `not part of this build` note is gone); `canAdvance` accepts `change_of_mind`, `issue`, `warranty`, **and** `compensation`. The **warranty tracking card** has two hand-seeded mocks (89610, 89580) to exercise the `under_repair` and `ship_back` heroes that the in-session pipeline can't reach without ops simulation — see §2. The **compensation tracking card** has three hand-seeded mocks (89630 under review, 89605 refunded, 89572 closed-invalid) — see §3.8.
@@ -54,7 +58,7 @@ stateDiagram-v2
     device_returned --> [*]
 ```
 
-The head (`initiated → pickup → qc`) is shared with the refund pipeline; the tail (`under_repair → ship_back → device_returned`) replaces the refund chain. Seller-vs-LAB repair routing is internal to operations — both paths surface as a single neutral "Under repair" state. The prototype's in-session submit always lands a warranty claim on `initiated` (with a seeded `scheduledPickup` strip and a placeholder `repairWindow`); progressing through the pipeline requires manually editing the seeded claim or the two hand-seeded mocks (see §2.8).
+The head (`initiated → pickup → qc`) is shared with the refund pipeline; the tail (`under_repair → ship_back → device_returned`) replaces the refund chain. **One fork:** a customer who *declines* an over-cap repair quote (§5) never enters repair — `warrantyStepsFor(claim)` drops `under_repair` from the step list, so the timeline runs `initiated → pickup → qc → ship_back → device_returned`. Same shape as `cancellationStepsFor` in `lib/statuses.js`: the fork lives in the steps list, so `Timeline` needs no new state. Seller-vs-LAB repair routing is internal to operations — both paths surface as a single neutral "Under repair" state. The prototype's in-session submit always lands a warranty claim on `initiated` (with a seeded `scheduledPickup` strip and a placeholder `repairWindow`); progressing through the pipeline requires manually editing the seeded claim or the two hand-seeded mocks (see §2.8).
 
 ### 2.3 WarrantyClaimCard
 
@@ -67,6 +71,7 @@ Lives at `src/components/WarrantyClaimCard.jsx`. Wrapped in shared `OrderClaimLi
 | `initiated`, `pickup`, `qc` | **warn (amber)** | Device leaving the customer or being inspected — same posture as `ClaimCard`. |
 | `under_repair`, `ship_back` | **brand (purple)** | Revibe is doing the work (repairing + shipping back) — matches `ClaimCard`'s `refund_issued`. |
 | `device_returned` | **success (green)** | Terminal — device is home. |
+| `device_returned` **after a declined quote** | **warn (amber)** | `warrantyClaimToneFor(id, claim)` reads `repairDeclined(claim)` — a device that came home unrepaired shouldn't land on the "all done" palette (§5.4). |
 
 #### 2.3.2 State-specific heroes
 
@@ -165,7 +170,9 @@ flowchart TD
   q2 -->|yes| pickup[PickupFailedCard]
   q2 -->|no| q3{claim.invalidClaim?}
   q3 -->|yes| invalid[InvalidClaimCard]
-  q3 -->|no| q4{type === 'warranty' &amp; active?}
+  q3 -->|no| q3b{repairQuotePending?}
+  q3b -->|yes| quote[RepairQuoteCard]
+  q3b -->|no| q4{type === 'warranty' &amp; active?}
   q4 -->|yes| warranty[WarrantyClaimCard — In progress]
   q4 -->|no| q5{hasActiveClaim?}
   q5 -->|yes| baseline[ClaimCard — In progress]
@@ -175,7 +182,7 @@ flowchart TD
   q7 -->|yes| past[ClaimCard — Past orders]
 ```
 
-A warranty claim that triggers a takeover routes to it ahead of `WarrantyClaimCard`. The `claim_warranty` journey now exercises this directly: it forks into `claim_docs_rejected` at intake (docs-rejected — `n6` on the operational diagram → `DocsRejectedCard`), in addition to the pickup-failed and reset-failed forks it already had. The takeover copy is still the shared refund-flow copy ("Return claim") — see §2.9.
+`repairQuotePending(order)` is the last takeover check before `WarrantyClaimCard` — the only *warranty-only* one, and the only one that is a pause rather than a detour (§5.1). A warranty claim that triggers a takeover routes to it ahead of `WarrantyClaimCard`. The `claim_warranty` journey now exercises this directly: it forks into `claim_docs_rejected` at intake (docs-rejected — `n6` on the operational diagram → `DocsRejectedCard`), in addition to the pickup-failed and reset-failed forks it already had. The takeover copy is still the shared refund-flow copy ("Return claim") — see §2.9.
 
 ### 2.7 Data model — warranty-specific fields
 
@@ -186,6 +193,8 @@ On top of the standard claim shape (`claimRef`, `claimStatusId`, `type`, `submit
 | `claim.type` | `'warranty'` | Routing in `App.jsx`; hero copy; sheet branching |
 | `claim.repairWindow` *(optional)* | `{ expectedComplete, expectedCompleteLong, note? }` | `under_repair` hero strip |
 | `claim.shipBack` *(optional)* | `{ courier, awb, estimatedDelivery, estimatedDeliveryLong, subStatusId, subTimeline, deliveredOn?, deliveredOnLong?, conditionReport? }` | `ship_back` hero + detailed-tracking dropdown; `device_returned` hero strip. `conditionReport` (`{ url, reportId }`) is the fresh NSYS report for the returned unit — surfaced via `ConditionReportChip` at `device_returned`, resolved before `order.conditionReport`. |
+| `claim.repairQuote` *(optional)* | `{ total, cap, covered, excess, overCap, summary, quotedAt, deadline, deadlineLabel, paidAt, declinedAt }` | The over-cap gate (§5). `repairQuotePending` routes to `RepairQuoteCard` while `!paidAt && !declinedAt`; `repairDeclined` (i.e. `declinedAt` set) reshapes the warranty tail. Numbers come from `repairQuoteSplit(order, total)` (`lib/coverage.js`). |
+| `claim.accidentalAck` *(optional)* | `true` | Frozen at submit on the accidental arm only — the one-use acknowledgement ticked on Step 6 (§4.3). Read by `ClaimDetailsSheet`'s "Covered by" row. |
 | `claim.batteryAssessment` *(optional)* | `{ capacity, baseline, degradation, nonOriginal, remedy, reason }` | Set when the optional Step-2 battery check (§7.2) was filled in on the `battery` sub-type — same shape and helper (`assessBattery`) as the issue branch (see [returns/issue.md](./returns/issue.md) §6.2). Data only; no warranty-card surface reads it yet. |
 
 `claim.shipBack.subStatusId` is one of the four `SHIPPING_SUB_STATUSES` ids (`arrived_destination`, `cleared_customs`, `forwarded_to_agent`, `out_for_delivery`). `claim.shipBack.subTimeline` is a map keyed by the same ids with human-readable timestamps (e.g. `'19 May · 4:45 PM'`).
@@ -198,6 +207,7 @@ No `refundMethod` / `expectedRefund` fields are needed — the warranty branch h
 - **Pipeline progression isn't simulated.** Submitted claims always land on `claimStatusId: 'initiated'`. The post-pickup heroes (`under_repair` `RepairWindowStrip`, `ship_back` brand-gradient ETA, `device_returned` `ReturnedStrip`, the `See detailed tracking` dropdown) only render on the three hand-seeded mocks **89610** (`under_repair`), **89580** (`ship_back`), and **89568** (`device_returned` — the terminal `ReturnedStrip` + the re-appearing "Verified by NSYS" chip, lands in Past via `isWarrantyDelivered`). Production needs the same webhook / polling mechanism as the refund flow to move the claim through the 6 states.
 - **`scheduledPickup`, `repairWindow`, `shipBack.*`** are either hand-written (mocks) or filled with placeholders by `buildClaim` (`'DHL Express'`, "10 AM – 12 PM", tomorrow's date for the scheduled pickup; SLA-summed estimated complete date for the repair window). Production needs the supplier + courier integrations that today feed the refund flow. `scheduledPickup.awbUrl` + `shipBack.conditionReport` are hand-written placeholders (the AWB PDF and NSYS report are demo links).
 - **Seller-vs-LAB routing not surfaced.** A neutral "Under repair" state is shown regardless of which actor is doing the work; per the §2 design decision the customer doesn't need to see the distinction.
+- **The over-cap quote** (`89615`) is hand-seeded too — see §5.6.
 - **Invalid-warranty path not wired.** The `Inspector decision = Invalid → customer pays return shipping` branch from the operational diagram is structurally identical to today's Issue-flow invalid path (`InvalidClaimCard`) and would route there. Today's mocks don't exercise it.
 - **Auto-expand.** Warranty claims do not currently participate in `pickActiveOrderId` — same posture as `ClaimCard`.
 
@@ -381,8 +391,13 @@ Labelled *standard warranty* in **both** tiers: Care extends that warranty's dur
 |---|---|---|
 | `claim.coverage` | `'standard'` / `'extended'` | which warranty answered |
 | `claim.cause` | `'defect'` / `'accidental'` | what the customer declared |
+| `claim.accidentalAck` | `true` (accidental arm only) | the one-use terms the customer ticked |
 
 Frozen rather than re-derived so a claim raised in month 11 still reads as standard warranty once the device crosses into Care territory mid-claim. **Absent on every pre-existing mock**, so all readers tolerate `undefined`.
+
+**The one-time acknowledgement (accidental arm only).** `coverageSummary()` returns an `ack` object (`{ title, body }`) on the accidental branch and `null` everywhere else — a defect repair is unlimited, so there is nothing to acknowledge. `Step6Review` renders it as a third `AckCheckboxRow` inside the **"What you'll get back"** section (the section that states the cover), bound to `state.accidentalAckConfirmed` via `SET_ACCIDENTAL_ACK`. It joins the reset + packing acks in `ClaimFlow.handlePrimary`'s submit gate — same soft validation as the rest of the flow (Submit is never disabled; a missing tick dispatches `ATTEMPT` and lights the section). Errors stay **one-at-a-time**: the accidental ack only lights once reset *and* packing are satisfied, so the customer is never shown three at once. On submit `buildClaim` freezes `accidentalAck: true`, and `ClaimDetailsSheet` appends "You confirmed at submit that this uses your one-time accidental damage cover." to the "Covered by" row so the terms stay recoverable after the fact.
+
+The ack is a **statement of terms, not a state change**: `careAccidentalUsed(order)` still isn't set by anything (§4.5) — production consumes the entitlement on claim approval, not at submit.
 
 Three surfaces read it, all through `lib/coverage.js` so the terms agreed at submit are the terms shown later:
 
@@ -392,9 +407,9 @@ Three surfaces read it, all through `lib/coverage.js` so the terms agreed at sub
 
 ### 4.4 Deliberately out of scope
 
-The **AED 1,500 check is structurally unknowable at intake** — the customer can't know the repair cost when raising the claim — so this phase is intake-only: the flow states the terms and defers the quote. The journey graph carries a `claim_repair_quote` placeholder node modelling only the *within-cover* outcome; the over-cap branch (quote → accept / decline / return the device) has no customer surface.
+The **AED 1,500 check is structurally unknowable at intake** — the customer can't know the repair cost when raising the claim — so the *flow* stays intake-only: it states the terms, collects the one-use ack, and defers the quote to QC. The over-cap outcome now has a customer surface downstream — see **§5**.
 
-Uncovered paths keep today's behaviour: over 24 months, non-Care past year 1, non-Care accidental damage, repairs over the cap.
+Uncovered paths keep today's behaviour: over 24 months, non-Care past year 1, non-Care accidental damage.
 
 **Known consequence:** an out-of-warranty device is still offered `Repair under standard warranty` — naming an entitlement it no longer has. Pre-existing (the option was always shown), but the word *standard* makes the mismatch louder. The natural landing spots for a later phase are a paid-repair quote or a "not covered" explanation; note QC already routes an uncovered verdict to `InvalidClaimCard` ("device at Revibe, pay return shipping").
 
@@ -403,7 +418,98 @@ Uncovered paths keep today's behaviour: over 24 months, non-Care past year 1, no
 | Behaviour | Prototype | Production |
 |---|---|---|
 | Care entitlement | `order.warranty > 0` on the mock | a real plan record per order |
-| Repair cost vs cap | never evaluated — terms stated, quote deferred | quote from the repair partner, checked against the cap |
+| Repair cost vs cap | split by `repairQuoteSplit(order, total)`, but the `total` itself is hand-written (mock 89615: AED 2,450; journey node: AED 1,780) | quote from the repair partner, checked against the cap |
+| Paying the excess | no payment step — the CTA advances the journey node (or flips a local `decided` state on the standalone mock) | a real checkout for the excess before the repair is released |
 | One-use accidental arm | `careAccidentalUsed(order)` exists and gates the option, but **nothing sets it** — a used entitlement is an uncovered path | consumed on claim approval |
 | Per-country cap | `ACCIDENTAL_DAMAGE_CAPS` — AE is the real figure, ZA/SA/Others stubbed at parity (they also need local currency) | per-market published figures |
 | Coverage tiers on demo data | three claim-free delivered mocks (89660 recent + Care · 89380 14 months + Care · 89381 past year 1, no Care) | derived from real order dates |
+
+---
+
+## 5. Over-cap repair quote (`RepairQuoteCard`)
+
+### 5.1 Scope — a pause, not a pipeline state
+
+QC inspects an **accidental-damage** claim and prices the repair. If the quote clears the market cap (`ACCIDENTAL_DAMAGE_CAPS`, AED 1,500 in AE), Revibe Care can't absorb the whole job, so the claim stops and asks the customer one question: **pay the excess and let the repair run, or take the device back unrepaired at no cost.**
+
+The claim **keeps `claimStatusId: 'qc'` throughout** — the gate lives on `claim.repairQuote`, exactly like the other takeover flags. That is what makes this a *pause* rather than a seventh warranty state:
+
+- `repairQuotePending(order)` is true only while `repairQuote` is set **and** neither `paidAt` nor `declinedAt` is stamped. It is the sixth (and last) takeover check in `App.jsx`, sitting just above the `WarrantyClaimCard` branch.
+- The moment either stamp lands the predicate goes false, the takeover retires, and `WarrantyClaimCard` takes the surface back on the normal tail.
+
+So `RepairQuoteCard` has **one** state, unlike `InvalidClaimCard`'s three: the post-decision surfaces already exist on the warranty card.
+
+A within-cap quote has no surface at all — nothing to decide, so QC simply moves the claim to `under_repair`.
+
+### 5.2 The split — one source of truth
+
+`repairQuoteSplit(order, total)` (`lib/coverage.js`) is the only place the arithmetic lives, so the card, the seeded mock and the journey node can't tell different stories:
+
+| Field | Meaning |
+|---|---|
+| `total` | the whole quote |
+| `cap` | `accidentalDamageCap(order)` — the market figure |
+| `covered` | what Care absorbs — `min(total, cap)` |
+| `excess` | the customer's share — `max(0, total − cap)`, zero within cover |
+| `overCap` | `total > cap` — the gate the card is routed on |
+
+The result is **frozen onto `claim.repairQuote`** along with the display fields (`summary`, `quotedAt`, `deadline`, `deadlineLabel`) and the two decision stamps; nothing is re-derived at render.
+
+### 5.3 The card
+
+`src/components/RepairQuoteCard.jsx`, wrapped in `OrderClaimLink` like every claim-card-family member, danger-toned (red left accent strip, `Action needed` pill) because the customer is blocked.
+
+**Collapsed** — typed claim-ref eyebrow (`formatClaimRef`), the `Action needed` pill, a danger-tinted hero (`Quote ready` tag · "Repair costs more than your cover" · one line naming the total and how far over cover it is), the quiet `REVIBE CARE · ACCIDENTAL DAMAGE` arm label the warranty card uses so the two surfaces read as one claim, a deadline strip ("Respond by … — we hold your device until then, then send it back unrepaired"), the shared `ProductSummary`, and `TapToFixCta`.
+
+**Expanded** — a `QuoteBreakdown` panel (repair summary · Total repair cost · `Revibe Care · accidental` credit · a **You pay** line for the excess · a footnote restating "covers accidental damage once, up to {cap}"), then the two CTAs:
+
+| CTA | Effect |
+|---|---|
+| **`Pay {excess} · start repair`** (danger, primary) | `onPayRepairExcess(order.id)` → journey node `claim_repair_excess_paid`, which stamps `paidAt`, clears `actionRequired`, and falls through to `claim_under_repair`. The repair then runs exactly as a within-cover one would. |
+| **`Send my device back — no repair`** (secondary) | `onDeclineRepair(order.id)` → `claim_repair_declined`, which stamps `declinedAt` and hands straight to the ship-back chain. |
+
+Under them, the line that makes the decision safe: sending it back is **free**, and the accidental cover **stays unused**. This is deliberately *not* the `InvalidClaimCard` gate — the customer declined a price, they didn't raise a bad claim, so they never pay return shipping.
+
+Both handlers follow the same boolean contract as `handleConfirmReschedule`: they return `false` outside journey mode, and the card falls back to a local `decided` flip (`DecisionConfirmation`) so the standalone mock still shows an outcome instead of an inert button. A `Cancel claim` footer is still offered (the claim is live and cancellable at `qc`).
+
+`actionGateCopy('repair_over_cap')` supplies the matching `ClaimActionBanner` copy ("Action needed — repair costs more than your cover" · `Review repair cost` / `Send my device back`).
+
+### 5.4 The declined tail
+
+A declined quote means the device comes home **untouched**, so every surface that would otherwise promise a repair is overridden off `repairDeclined(claim)` (i.e. `repairQuote.declinedAt` set):
+
+| Surface | Normal | Declined |
+|---|---|---|
+| Timeline steps (`warrantyStepsFor`) | 6 states | `under_repair` **dropped** — the step never happened |
+| Tone at `device_returned` (`warrantyClaimToneFor`) | success | **warn** |
+| Phase tag (`warrantyClaimPhaseTag`) | `Complete` (Check) | **`Not repaired`** (ShieldX) |
+| Headline (`warrantyClaimStatusHeadline`) | "On its way back" / "Delivered" | "Coming back unrepaired" / "Returned unrepaired" |
+| Explanation (`warrantyClaimExplanation`) | "your repaired device…" | copy naming the customer's own decision |
+| `ShipBackHero` body | "Your repaired device is on its way back…" | "…on its way back unrepaired, as you asked…" |
+| `ReturnedStrip` | "Delivered on {date}" | + "No repair was carried out — your accidental damage cover stays unused." |
+
+`warrantyClaimProgressIndex(id, claim)` indexes into `warrantyStepsFor(claim)`, so the forked list and the current index can't disagree. Every one of these helpers takes `claim` as an **optional** second argument, so existing callers are unaffected.
+
+### 5.5 Journey wiring
+
+Three nodes in the shared `data/journeys/repairPath.js` (`REPAIR_TAIL_NODES`), so both `claim_issue` and `claim_warranty` inherit them:
+
+| Node | Trigger | Event | Next |
+|---|---|---|---|
+| `claim_repair_quote_over_cap` | system | `claim.repair.quote_over_cap` | `claim_repair_excess_paid` · `claim_repair_declined` |
+| `claim_repair_excess_paid` | customer | `claim.repair.excess_paid` | *(array-adjacent)* → `claim_under_repair` |
+| `claim_repair_declined` | customer | `claim.repair.declined` | `claim_ship_back_created` |
+
+Two things worth knowing before editing this block:
+
+- The existing within-cover node `claim_repair_quote` now carries an **explicit `next: ['claim_under_repair']`**. It used to fall through to its array neighbour; the over-cap sibling now sits between the two, so fall-through would have sent the within-cover path into the gate.
+- The edge into the gate is guarded on the **accidental arm** — `when: (o) => o.claim?.cause === 'accidental'` from `claim_qc_started` in both `claimWarranty.js` and `claimIssue.js` (the latter ANDs it with the existing `type === 'warranty'` guard). A defect repair has no cap, so it can only ever take the within-cover edge.
+
+Notification copy for the three new events is **owner-authored** — unauthored events resolve to a `silent` notification.
+
+### 5.6 Mocked vs production
+
+- **Mock `89615`** (MacBook Air 13″, Care held, accidental claim at `qc`) is the only way to reach the card outside journey mode — in-session submit always lands on `initiated`. Its `repairQuote` numbers are hand-written to match `repairQuoteSplit(order, 2450)`; the journey node computes its own from AED 1,780. A deliberately higher-value device: against a AED 1,500 cap, a cheap handset makes every over-cap quote read as absurd rather than as a real decision.
+- **No payment.** The pay CTA advances a node; there is no checkout, no receipt, no refund path if the repair later fails.
+- **No deadline enforcement.** `deadline` / `deadlineLabel` are display strings — nothing expires the quote or auto-returns the device.
+- **One quote per claim.** No re-quote, no partial approval, no itemised line-by-line acceptance.

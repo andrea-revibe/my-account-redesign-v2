@@ -13,6 +13,7 @@ import {
   Sparkles,
   Wrench,
   PackageCheck,
+  ShieldX,
 } from 'lucide-react'
 
 export const CLAIM_STATUSES = [
@@ -314,6 +315,30 @@ export function cancelReturnGate(order) {
   }
 }
 
+// ----- Over-cap repair quote (accidental-damage arm) -------------------------
+//
+// When QC prices an accidental-damage repair above the market cap
+// (`ACCIDENTAL_DAMAGE_CAPS` in lib/coverage.js), Revibe Care can't absorb the
+// whole job, so the claim pauses at `qc` behind `claim.repairQuote` and the
+// customer decides: pay the excess and let the repair run, or take the device
+// back unrepaired at no cost.
+//
+// The gate is only *live* while undecided — once `paidAt` / `declinedAt` is
+// stamped, the claim resumes its normal warranty tail and WarrantyClaimCard
+// takes the surface back. That's what keeps this a pause rather than a sixth
+// pipeline state.
+export function repairQuotePending(order) {
+  const q = order?.claim?.repairQuote
+  return Boolean(q) && !q.paidAt && !q.declinedAt
+}
+
+// The customer turned the quote down: the device ships home unrepaired. Read by
+// the warranty tail's headline / tone / explanation so the card never implies a
+// repair that never happened.
+export function repairDeclined(claim) {
+  return Boolean(claim?.repairQuote?.declinedAt)
+}
+
 // Warranty equivalent of `isClaimRefunded` — true once the repaired device
 // has been delivered back to the customer (warranty terminal).
 export function isWarrantyDelivered(order) {
@@ -423,19 +448,37 @@ export const WARRANTY_CLAIM_STATUSES = [
 // Tone progression: warn (amber) while the device is leaving the customer
 // or being verified, brand (purple) once Revibe is doing the work
 // (repairing + shipping back), success (green) when the device is home.
-export function warrantyClaimToneFor(claimStatusId) {
-  if (claimStatusId === 'device_returned') return 'success'
+// `claim` is optional and only consulted for the declined-quote tail: a device
+// that came home unrepaired shouldn't land on the green "all done" palette.
+export function warrantyClaimToneFor(claimStatusId, claim = null) {
+  if (claimStatusId === 'device_returned') {
+    return repairDeclined(claim) ? 'warn' : 'success'
+  }
   if (claimStatusId === 'under_repair' || claimStatusId === 'ship_back') {
     return 'brand'
   }
   return 'warn'
 }
 
-export function warrantyClaimProgressIndex(claimStatusId) {
-  return WARRANTY_CLAIM_STATUSES.findIndex((s) => s.id === claimStatusId)
+// A declined over-cap quote never enters repair — the device goes QC → straight
+// back to the customer. Dropping the step keeps the timeline from ticking
+// "Repair" complete on a card whose own hero says nothing was repaired. Same
+// shape as `cancellationStepsFor` in lib/statuses.js: the fork lives in the
+// steps list, so Timeline needs no new state.
+export function warrantyStepsFor(claim) {
+  if (!repairDeclined(claim)) return WARRANTY_CLAIM_STATUSES
+  return WARRANTY_CLAIM_STATUSES.filter((s) => s.id !== 'under_repair')
 }
 
-export function warrantyClaimPhaseTag(claimStatusId) {
+// `claim` is optional: pass it wherever the index is read against a list that
+// may have been forked by `warrantyStepsFor`.
+export function warrantyClaimProgressIndex(claimStatusId, claim = null) {
+  return warrantyStepsFor(claim).findIndex((s) => s.id === claimStatusId)
+}
+
+// `claim` is optional — passed only where the declined-quote tail needs to
+// override the tag ("Complete" is wrong for a device returned unrepaired).
+export function warrantyClaimPhaseTag(claimStatusId, claim = null) {
   switch (claimStatusId) {
     case 'initiated':
       return { label: 'Submitted', Icon: FileText }
@@ -448,13 +491,27 @@ export function warrantyClaimPhaseTag(claimStatusId) {
     case 'ship_back':
       return { label: 'Coming back', Icon: Truck }
     case 'device_returned':
-      return { label: 'Complete', Icon: Check }
+      return repairDeclined(claim)
+        ? { label: 'Not repaired', Icon: ShieldX }
+        : { label: 'Complete', Icon: Check }
     default:
       return { label: '', Icon: Sparkles }
   }
 }
 
+// Declined-quote overrides: the pipeline's own `headline` promises a repair
+// ("On its way back" / "Delivered" both read as a fixed device), so the tail
+// after a declined over-cap quote names what actually happened instead.
+const REPAIR_DECLINED_HEADLINES = {
+  ship_back: 'Coming back unrepaired',
+  device_returned: 'Returned unrepaired',
+}
+
 export function warrantyClaimStatusHeadline(claim) {
+  if (repairDeclined(claim)) {
+    const declined = REPAIR_DECLINED_HEADLINES[claim.claimStatusId]
+    if (declined) return declined
+  }
   const step = WARRANTY_CLAIM_STATUSES.find((s) => s.id === claim.claimStatusId)
   return step ? step.headline : 'Warranty claim'
 }
@@ -482,7 +539,20 @@ export const WARRANTY_EXPLANATIONS = {
     'Your repaired device has been delivered. Thanks for your patience!',
 }
 
+// Same override shape as the headlines — the stock ship-back / delivered copy
+// talks about "your repaired device", which is false after a declined quote.
+const REPAIR_DECLINED_EXPLANATIONS = {
+  ship_back:
+    'You asked us to send the device back without repairing it. It has left Revibe and is on its way to you, unrepaired.',
+  device_returned:
+    'Your device has been delivered, unrepaired, as you asked. You can raise a new claim any time if you change your mind about the repair.',
+}
+
 export function warrantyClaimExplanation(claim) {
+  if (repairDeclined(claim)) {
+    const declined = REPAIR_DECLINED_EXPLANATIONS[claim.claimStatusId]
+    if (declined) return declined
+  }
   return WARRANTY_EXPLANATIONS[claim?.claimStatusId] ?? null
 }
 
@@ -739,6 +809,14 @@ export function actionGateCopy(actionRequired) {
         body: 'Your claim couldn’t be approved after inspection. Cover the return shipping fee to get your device sent back.',
         primaryCta: 'Pay return shipping',
         secondaryCta: 'Discuss with support',
+      }
+    case 'repair_over_cap':
+      return {
+        ...base,
+        headline: 'Action needed — repair costs more than your cover',
+        body: 'We inspected your device and the repair comes to more than Revibe Care covers. Review the cost and tell us whether to go ahead or send the device back.',
+        primaryCta: 'Review repair cost',
+        secondaryCta: 'Send my device back',
       }
     case 'reset_failed':
       return {

@@ -339,8 +339,16 @@ export const CLAIM_WARRANTY_NODES = [
     label: 'Claim quality check started',
     trigger: 'system',
     event: 'claim.qc.started',
+    // The over-cap branch is guarded on the accidental arm: the AED 1,500 cap
+    // is Revibe Care's ceiling for damage the customer caused. A defect repair
+    // under standard/extended warranty has no cap, so it can only ever take the
+    // within-cover edge.
     next: [
       'claim_repair_quote',
+      {
+        id: 'claim_repair_quote_over_cap',
+        when: (o) => o.claim?.cause === 'accidental',
+      },
       'claim_invalid_confirmed',
       'claim_reset_failed',
       'claim_cancelled_shipback',

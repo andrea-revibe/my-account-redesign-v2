@@ -22,6 +22,8 @@
 // REPAIR_TAIL_NODES entry point is `claim_repair_quote`; terminal is
 // `claim_device_returned`. Both submit nodes point at `claim_proof_accepted`,
 // which each host journey defines itself.
+import { repairQuoteSplit } from '../../lib/coverage'
+
 export const REPAIR_SUBMIT_NODES = [
   {
     id: 'claim_submitted_warranty',
@@ -141,7 +143,92 @@ export const REPAIR_TAIL_NODES = [
     label: 'Repair cost confirmed — within cover',
     trigger: 'system',
     event: 'claim.repair.quoted',
+    // Explicit rather than array-adjacent: the over-cap sibling below now sits
+    // between this node and `claim_under_repair`, so fall-through would send
+    // the within-cover path into the gate.
+    next: ['claim_under_repair'],
     apply: (o) => o,
+  },
+  // ----- Over-cap outcome. The quote clears the market cap, so Revibe Care
+  //       can't absorb the whole job and the claim pauses at `qc` behind
+  //       `claim.repairQuote` — the sixth takeover surface (RepairQuoteCard).
+  //       The claim's own `claimStatusId` deliberately does NOT move: this is a
+  //       gate on the existing state, like the other five takeovers, not a new
+  //       pipeline step. lib/coverage.js owns the split arithmetic.
+  {
+    id: 'claim_repair_quote_over_cap',
+    label: 'Repair cost confirmed — over cover',
+    trigger: 'system',
+    event: 'claim.repair.quote_over_cap',
+    next: ['claim_repair_excess_paid', 'claim_repair_declined'],
+    apply: (o) => {
+      const split = repairQuoteSplit(o, 1780)
+      return {
+        ...o,
+        claim: {
+          ...o.claim,
+          repairQuote: {
+            ...split,
+            summary: 'Screen assembly, rear housing and camera module',
+            quotedAt: '30 May · 9:40 AM',
+            deadline: '2026-06-04',
+            deadlineLabel: 'Respond by Thu, 4 Jun',
+            paidAt: null,
+            declinedAt: null,
+          },
+          actionRequired: {
+            kind: 'repair_over_cap',
+            deadline: '2026-06-04',
+            deadlineLabel: 'Respond by Thu, 4 Jun',
+          },
+        },
+      }
+    },
+  },
+  // ----- Customer turns the quote down: the device ships home untouched, free
+  //       of charge (they declined a price, they didn't raise a bad claim — so
+  //       this is NOT the invalid-claim pay-return-shipping gate). `declinedAt`
+  //       retires the takeover and rides along the ship-back tail, where the
+  //       warranty card's headline / tone / explanation read it so nothing
+  //       claims a repair that never happened.
+  {
+    id: 'claim_repair_declined',
+    label: 'Repair declined — device returned unrepaired',
+    trigger: 'customer',
+    event: 'claim.repair.declined',
+    next: ['claim_ship_back_created'],
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        repairQuote: {
+          ...o.claim.repairQuote,
+          declinedAt: '30 May · 6:18 PM',
+        },
+      },
+    }),
+  },
+  // ----- Customer covers the excess, so the repair runs exactly as a
+  //       within-cover one would. Deliberately array-adjacent to
+  //       `claim_under_repair`: no explicit `next`, so it falls straight through
+  //       and rejoins the happy tail.
+  {
+    id: 'claim_repair_excess_paid',
+    label: 'Repair excess paid — repair approved',
+    trigger: 'customer',
+    event: 'claim.repair.excess_paid',
+    apply: (o) => ({
+      ...o,
+      claim: {
+        ...o.claim,
+        actionRequired: undefined,
+        repairQuote: {
+          ...o.claim.repairQuote,
+          paidAt: '30 May · 1:05 PM',
+        },
+      },
+    }),
   },
   {
     id: 'claim_under_repair',

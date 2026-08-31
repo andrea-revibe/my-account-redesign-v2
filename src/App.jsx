@@ -13,6 +13,7 @@ import PickupFailedCard from './components/PickupFailedCard'
 import AwbFailedCard from './components/AwbFailedCard'
 import ResetFailedCard from './components/ResetFailedCard'
 import InvalidClaimCard from './components/InvalidClaimCard'
+import RepairQuoteCard from './components/RepairQuoteCard'
 import ClosedClaimCard from './components/ClosedClaimCard'
 import RevibeCancellationCard from './components/RevibeCancellationCard'
 import ChatFab from './components/ChatFab'
@@ -35,6 +36,7 @@ import {
   isClaimClosed,
   cancelNeedsShipBack,
   cancelReturnGate,
+  repairQuotePending,
 } from './lib/claims'
 import { useJourney } from './lib/journey'
 import { useEddSandbox } from './lib/eddSandbox'
@@ -445,6 +447,34 @@ export default function App() {
     return false
   }
 
+  // "Pay ... start repair" on RepairQuoteCard — the customer covers the excess
+  // over the Revibe Care cap, so the repair goes ahead. Advances the
+  // customer-triggered `claim_repair_excess_paid` node, which stamps `paidAt`
+  // (retiring the gate) and falls through to `claim_under_repair`. Same
+  // boolean contract as handleConfirmReschedule: false outside journey mode, so
+  // the standalone mock falls back to the card's local confirmation.
+  const handlePayRepairExcess = (orderId) => {
+    if (!journeyMode || isSandbox) return false
+    if (journey.validNext().some((n) => n.id === 'claim_repair_excess_paid')) {
+      journey.advance('claim_repair_excess_paid')
+      return true
+    }
+    return false
+  }
+
+  // "Send my device back — no repair" on RepairQuoteCard. Advances
+  // `claim_repair_declined`, which stamps `declinedAt` and hands straight to the
+  // ship-back chain — free of charge, unlike the invalid-claim return, because
+  // the customer declined a quote rather than raising a bad claim.
+  const handleDeclineRepair = (orderId) => {
+    if (!journeyMode || isSandbox) return false
+    if (journey.validNext().some((n) => n.id === 'claim_repair_declined')) {
+      journey.advance('claim_repair_declined')
+      return true
+    }
+    return false
+  }
+
   // Step 7 "Track this return" — close the flow and signal the matched
   // ClaimCard to mount expanded. Bumping `n` forces the key change.
   const handleTrackClaim = (orderId) => {
@@ -483,6 +513,7 @@ export default function App() {
             awbFailure: undefined,
             pickupFailure: undefined,
             resetFailed: undefined,
+            repairQuote: undefined,
             actionRequired: undefined,
             invalidClaim: cancelReturnGate(o),
           },
@@ -691,6 +722,17 @@ export default function App() {
                           onKeepClaim={handleKeepClaim}
                           onPayReturnShipping={handlePayReturnShipping}
                           onDeclineReturn={handleDeclineReturn}
+                        />
+                      )
+                    }
+                    if (hasActiveClaim(o) && repairQuotePending(o)) {
+                      return (
+                        <RepairQuoteCard
+                          key={o.id}
+                          order={o}
+                          onPayRepairExcess={handlePayRepairExcess}
+                          onDeclineRepair={handleDeclineRepair}
+                          onRequestCancelClaim={onRequestCancelClaim}
                         />
                       )
                     }

@@ -121,6 +121,15 @@ export default function Step6Review({
     submitAttempted &&
     !state.packingConfirmed &&
     state.factoryResetConfirmed
+  // Third ack, accidental arm only. Same one-at-a-time ordering as the two
+  // above: it only lights once the reset + packing acks are satisfied, so the
+  // customer is never shown three errors at once.
+  const accidentalAckError =
+    submitAttempted &&
+    state.remedy === 'accidental' &&
+    !state.accidentalAckConfirmed &&
+    state.factoryResetConfirmed &&
+    state.packingConfirmed
 
   return (
     <>
@@ -274,7 +283,11 @@ export default function Step6Review({
         )}
 
         {isWarranty ? (
-          <Section title="What you'll get back">
+          <Section
+            title="What you'll get back"
+            error={accidentalAckError}
+            scrollOnError={accidentalAckError}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[13.5px] text-ink flex items-center gap-1.5">
@@ -314,6 +327,17 @@ export default function Step6Review({
                   </div>
                 </div>
               </div>
+            )}
+            {warrantyCoverage?.ack && (
+              <AckCheckboxRow
+                checked={state.accidentalAckConfirmed}
+                error={accidentalAckError}
+                onChange={(value) =>
+                  dispatch({ type: 'SET_ACCIDENTAL_ACK', value })
+                }
+                title={warrantyCoverage.ack.title}
+                subtitle={warrantyCoverage.ack.body}
+              />
             )}
           </Section>
         ) : isReplacement ? (
