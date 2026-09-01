@@ -32,7 +32,7 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
         state.claimType,
       )
   const currency = order.currency
-  const warrantyEta = isWarranty ? expectedCompletionFor('warranty') : null
+  const warrantyEta = isWarranty ? expectedCompletionFor('warranty', new Date(), { country: order?.country }) : null
   // Same coverage line as Review + the tracking card. On the accidental arm this
   // is where the customer leaves knowing a repair-cost check is still ahead.
   const warrantyCoverage = isWarranty

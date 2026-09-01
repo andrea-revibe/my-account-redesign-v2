@@ -38,6 +38,7 @@ export const REPAIR_SUBMIT_NODES = [
         claimStatusId: 'initiated',
         type: 'warranty',
         submittedAt: '25 May 2026 · 4:02 PM',
+        milestones: { createdAt: '2026-05-25', docsClearedAt: '2026-05-25', asOf: '2026-05-25' },
         units: 1,
         issueScope: 'not_working',
         issueSubtypeId: 'battery_drain',
@@ -93,6 +94,7 @@ export const REPAIR_SUBMIT_NODES = [
         claimStatusId: 'initiated',
         type: 'warranty',
         submittedAt: '25 May 2026 · 4:02 PM',
+        milestones: { createdAt: '2026-05-25', docsClearedAt: '2026-05-25', asOf: '2026-05-25' },
         units: 1,
         remedy: 'accidental',
         // Raised inside the first year, so the standard warranty is still live —
@@ -241,6 +243,7 @@ export const REPAIR_TAIL_NODES = [
         ...o.claim,
         claimStatusId: 'under_repair',
         timeline: { ...o.claim.timeline, under_repair: '30 May · 2:12 PM' },
+        milestones: { ...o.claim.milestones, decidedAt: '2026-05-30', asOf: '2026-05-30' },
         // Sharpen the placeholder repair window now that QC has cleared and the
         // seller has committed to a fix. The note names the actual work, so it
         // follows what the customer declared: accidental damage is a screen
@@ -275,6 +278,7 @@ export const REPAIR_TAIL_NODES = [
         ...o.claim,
         claimStatusId: 'ship_back',
         timeline: { ...o.claim.timeline, ship_back: '8 Jun · 11:05 AM' },
+        milestones: { ...o.claim.milestones, asOf: '2026-06-08' },
         shipBack: {
           courier: 'DHL Express',
           awb: '25193620',
@@ -378,6 +382,7 @@ export const REPAIR_TAIL_NODES = [
         ...o.claim,
         claimStatusId: 'device_returned',
         timeline: { ...o.claim.timeline, device_returned: '12 Jun · 3:14 PM' },
+        milestones: { ...o.claim.milestones, asOf: '2026-06-12' },
         shipBack: {
           ...o.claim.shipBack,
           deliveredOn: '2026-06-12',

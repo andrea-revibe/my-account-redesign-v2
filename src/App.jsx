@@ -7,6 +7,7 @@ import OrderCard from './components/OrderCard'
 import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
 import ClaimCard from './components/ClaimCard'
+import ClaimErdPanel from './components/ClaimErdPanel'
 import WarrantyClaimCard from './components/WarrantyClaimCard'
 import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
@@ -40,6 +41,7 @@ import {
 } from './lib/claims'
 import { useJourney } from './lib/journey'
 import { useEddSandbox } from './lib/eddSandbox'
+import { useClaimErdSandbox } from './lib/claimErdSandbox'
 import { COUNTRY_CODES, DEFAULT_COUNTRY } from './lib/countries'
 import { JOURNEYS } from './data/journey'
 
@@ -162,8 +164,16 @@ export default function App() {
   const journey = useJourney(journeyId, activeCountry)
   // Sandbox state lives outside the replay hook — both hooks are called
   // unconditionally (hook rules), then `active` is the one we actually use.
-  const sandbox = useEddSandbox(journey.journey)
-  const isSandbox = journey.kind === 'sandbox'
+  // Two sandbox models, two hooks — both called unconditionally (hook rules),
+  // then `sandbox` picks the one this journey's `kind` selected. `isSandbox`
+  // keeps its original meaning throughout: this journey has no node graph, so
+  // every advance/back handler below stands down.
+  const eddSandbox = useEddSandbox(journey.journey)
+  const claimSandbox = useClaimErdSandbox(journey.journey, activeCountry)
+  const sandboxKind =
+    journey.kind === 'sandbox' ? 'edd' : journey.kind === 'claim_sandbox' ? 'claim' : null
+  const isSandbox = sandboxKind !== null
+  const sandbox = sandboxKind === 'claim' ? claimSandbox : eddSandbox
   // Inject the selected country last so it wins over anything the journey
   // nodes set (they never set `country`), keeping INITIAL_ORDER country-free.
   // Memoized so the spread doesn't mint a new object every render (which
@@ -960,12 +970,32 @@ export default function App() {
           />
         </div>
       )}
-      {journeyMode && isSandbox && (
+      {journeyMode && sandboxKind === 'edd' && (
         <EddSandboxPanel
           inputs={sandbox.inputs}
           setInput={sandbox.setInput}
+          setReached={sandbox.setReached}
+          anchorDate={sandbox.anchorDate}
           status={sandbox.status}
           markets={sandbox.markets}
+          reset={sandbox.reset}
+          journeys={sandbox.journeys}
+          activeJourneyId={journey.journey.id}
+          onSelectJourney={selectJourney}
+          activeCountry={activeCountry}
+          onSelectCountry={selectCountry}
+        />
+      )}
+      {journeyMode && sandboxKind === 'claim' && (
+        <ClaimErdPanel
+          inputs={sandbox.inputs}
+          setInput={sandbox.setInput}
+          setReached={sandbox.setReached}
+          anchorDate={sandbox.anchorDate}
+          erd={sandbox.erd}
+          stageLabel={sandbox.stageLabel}
+          levers={sandbox.levers}
+          claimTypes={sandbox.claimTypes}
           reset={sandbox.reset}
           journeys={sandbox.journeys}
           activeJourneyId={journey.journey.id}

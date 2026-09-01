@@ -165,6 +165,7 @@ export const CLAIM_COMPENSATION_NODES = [
         claimStatusId: 'initiated',
         type: 'compensation',
         submittedAt: '25 May 2026 · 4:02 PM',
+        milestones: { createdAt: '2026-05-25', docsClearedAt: '2026-05-25', asOf: '2026-05-25' },
         units: 1,
         compensationSubtype: 'shipping_refund',
         issueDetails: {
@@ -195,6 +196,7 @@ export const CLAIM_COMPENSATION_NODES = [
         claimStatusId: 'initiated',
         type: 'compensation',
         submittedAt: '25 May 2026 · 4:02 PM',
+        milestones: { createdAt: '2026-05-25', docsClearedAt: '2026-05-25', asOf: '2026-05-25' },
         units: 1,
         compensationSubtype: 'accessory_broken',
         issueDetails: {
@@ -223,6 +225,7 @@ export const CLAIM_COMPENSATION_NODES = [
         ...o.claim,
         claimStatusId: 'qc',
         timeline: { ...o.claim.timeline, qc: '28 May · 10:12 AM' },
+        milestones: { ...o.claim.milestones, qcAt: '2026-05-28', asOf: '2026-05-28' },
       },
     }),
   },
@@ -245,6 +248,7 @@ export const CLAIM_COMPENSATION_NODES = [
             ? { itemTotal: 120, warranty: 0, gross: 120, fee: 0, net: 120, rate: 0 }
             : { itemTotal: 30, warranty: 0, gross: 30, fee: 0, net: 30, rate: 0 },
         timeline: { ...o.claim.timeline, refund_issued: '30 May · 2:18 PM' },
+        milestones: { ...o.claim.milestones, decidedAt: '2026-05-30', asOf: '2026-05-30' },
       },
     }),
   },
@@ -260,6 +264,7 @@ export const CLAIM_COMPENSATION_NODES = [
         ...o.claim,
         claimStatusId: 'refund_credited',
         timeline: { ...o.claim.timeline, refund_credited: '30 May · 2:19 PM' },
+        milestones: { ...o.claim.milestones, asOf: '2026-05-30' },
       },
     }),
   },

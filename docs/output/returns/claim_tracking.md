@@ -16,7 +16,11 @@ covers:
   - src/components/ConditionReportChip.jsx
   - src/components/OrderClaimLink.jsx
   - src/lib/claims.js
+  - src/lib/claimErd.js
+  - src/lib/claimErdSandbox.js
   - src/lib/events.js
+  - src/components/ClaimErdStrip.jsx
+  - src/components/ClaimErdPanel.jsx
   - src/data/orders/claims.js
 ---
 
@@ -447,7 +451,9 @@ The deadline label uses the prototype convention from `claim.docsRejection.timeL
 
 ### 4.4 SLA placeholders (`CLAIM_SLAS`)
 
-Lives in `src/lib/claims.js`. Drives the returns flow's Step 4 detailed-timeline dropdown and the `expectedCompletionFor(claimType)` helper that computes the "Expected by" headline (and the warranty Review / Confirmation expected-back dates). **Placeholder values — ops to revise.**
+Lives in `src/lib/claims.js`. Drives the returns flow's Step 4 detailed-timeline dropdown and the `expectedCompletionFor(claimType, today, { country })` helper that computes the "Expected by" headline (and the warranty Review / Confirmation expected-back dates). **Placeholder values — ops to revise.**
+
+> **These hours no longer own the whole estimate.** Everything up to the verdict now comes from the working-day ERD model in §11; `expectedCompletionFor` calls it for that span and uses the rows below only for the tail the ERD model doesn't cover (`refund_issued` → `refund_credited`, and the warranty `under_repair` → `ship_back` repair leg). The pre-verdict rows here are still the reference for ops, but they are not what the customer-facing dates are computed from any more.
 
 | Step | `expectedHours` | `bufferHours` | Notes |
 |---|---|---|---|
@@ -491,6 +497,7 @@ Optional object populated on a delivered order to drive `ClaimCard` and its take
 | `claim.refundMethod` | `'wallet' | 'original'` | Drives the destination chip and the `Includes 10% restocking fee` sub-copy when `original`. |
 | `claim.expectedRefund` | `{ gross, fee, bonus, net, rate }` | Pre-computed at submission so the card doesn't re-run `refundBreakdown` on every render. `net` is what the hero displays. `bonus` is the optional Wallet bonus on issue claims (AED 100); `0` elsewhere. |
 | `claim.timeline` | map keyed by `claimStatusId` | Timestamp at which the claim entered each phase. Populated progressively. |
+| `claim.milestones` *(optional)* | `{ createdAt, docsClearedAt, pickedUpAt, qcAt, expertRevisionAt, decidedAt, asOf? }` | ISO `YYYY-MM-DD` clock the resolution-window model runs on (§11). Parallel to `claim.timeline`, which is display strings — these are machine dates. `docsClearedAt` is the clock start, stamped at submit; `asOf` is an optional per-mock "today" so a fixture dated last spring doesn't read as months overdue against the wall clock; `assumeToday` is a sandbox-only what-if flag (§11.3a). Absent on anything predating the field, so every reader must tolerate `undefined` — and a claim with no block at all gets no resolution date rather than an assumed one. |
 
 ### 5.2 Sub-status, transit, & detailed-timeline fields
 
@@ -606,7 +613,9 @@ src/
 - **InvalidClaimCard delivered.** Hand-seeded mock 89928 (delivered iPhone 12 → issue claim, invalid verdict, customer paid return shipping, device shipped back and `returnShipment.currentStatusId: 'delivered'`) exercises the terminal green paid-return surface + the re-appearing "Verified by NSYS" chip (fresh `returnShipment.conditionReport`); submit-time seeding can't reach a delivered ship-back. Lands in Past via `isReturnDelivered`. The condition report + return-shipment tracking are hand-written placeholders.
 - **ResetFailedCard.** Submit is local component state only — the guide-completed flag, unlink confirmation, and passcode are never transmitted, never persisted, and the warn-toned "received" view is a visual stub. The unlink walkthrough reuses the device-typed `ResetGuideSheet` remote route (§3.4.1), but the card chrome (confirm toggle + summary) is still iOS-worded — see the Android-branch open question. Auto-cancel countdown is hand-written. Production must encrypt the passcode in transit + at rest, scope visibility to the named technician, and delete it on a short timer once the wipe succeeds.
 - **ClosedClaimCard (§3.7).** Hand-seeded mock 89705 (delivered iPhone XR → issue claim closed `not_reproduced`); submit-time seeding can't reach a closed terminal. The closure ops note + timestamp are hand-written, `Contact support` is a placeholder, and only `Raise a new claim` is wired. Production needs a real ops-driven close action that sets `claim.closure` (reason + attributed note) and the notification/email it triggers.
-- **SLA placeholders.** `CLAIM_SLAS` values are hand-guessed; ops to revise.
+- **SLA placeholders.** `CLAIM_SLAS` values are hand-guessed; ops to revise. So are the ERD working-day levers (§11) — they come from the spreadsheet's own placeholder column.
+- **ERD milestones are hand-written.** `claim.milestones` is back-filled on all 20 claim mocks and stamped through the claim journey nodes; production would take these from real event timestamps. Only 6 mocks actually render the strip (the rest are behind an action gate or past the verdict — see §11.4). Mock 89622 (delivered iPhone 13 → warranty claim at `qc`) exists solely so `WarrantyClaimCard`'s strip has a pre-verdict state to render; every other warranty mock is past the decision. Mock 89762 carries `subStatusId: 'expert_revision'` + an `expertRevisionAt` milestone so the escalated single-date collapse is visible on a real card.
+- **No holiday calendar.** The ERD model skips weekends per market but knows nothing about Eid or public holidays, so real resolution dates will drift. Called out in the source spreadsheet too.
 - **`order.country` drives the country split (partial).** It now gates the inbound-pickup + return-leg detailed-tracking dropdowns via `countryConfig` (`SA`/`Others` → hidden). Other country-aware behaviour (repair-partner routing, country-varying SLAs) is still future work. See `docs/output/country_split.md`.
 
 ## 9. Open questions
@@ -636,3 +645,106 @@ A submitted claim **replaces** the delivered order card in the list, so the orig
 **`OriginalOrderSheet` retired.** The summary sheet (order total / payment / receipt + reciprocal `Linked claim` row) and the `View order details` trigger beneath the open order half are **gone** — the expanded real `PastOrderCard` (or `PreCancellationOrderCard`) is now the only order surface. Order total + payment are covered by `ProductSummary`'s price breakdown inside the delivered card; the reciprocal "linked entity" affordance is the order/claim compact rows themselves (tapping either flips the accordion). The component file was deleted.
 
 **Journey order id.** `INITIAL_ORDER.id` in `src/data/journeys/initialOrder.js` changed `JOURNEY-001` → `89610` so the journey-replayed order reads as a real order number in the order half.
+
+## 11. Estimated resolution date (ERD)
+
+The claim-side equivalent of the order EDD: a customer-facing answer to *"when will I know?"*, computed rather than hard-coded. Ported from `claims_ERD_model_v2.xlsx` (sheets UAE / ZA / SA) into `src/lib/claimErd.js`, which reuses `workdayIntl` from `src/lib/edd.js` so both models share one Excel `WORKDAY.INTL` implementation.
+
+Two things separate it from the delivery EDD:
+
+1. **The output is a window, not a date.** `earliest` assumes the claim is never escalated to expert revision; `latest` reserves that step. They collapse to a single date once the claim is escalated (both bounds re-anchor on the escalation) or decided.
+2. **It ends at the verdict.** Everything after — `refund_issued` → `refund_credited`, `under_repair` → `ship_back` → `device_returned` — is outside the model. The strip stands down there and the card's existing tail (refund destination block, `RepairWindowStrip`, ship-back tracking) takes the surface back. The two never render together.
+
+### 11.1 Stages
+
+Precedence, highest first. Ports the spreadsheet's `Current stage` formula.
+
+| Stage | Anchor milestone | Prototype state |
+|---|---|---|
+| `decided` | `decidedAt` | `refund_issued` / `under_repair`, or an invalid verdict |
+| `expert_revision` | `expertRevisionAt` | `qc` + `subStatusId: 'expert_revision'` |
+| `quality_check` | `qcAt` | `qc` |
+| `in_transit` | `pickedUpAt` | `pickup` |
+| `awaiting_collection` | `docsClearedAt` | `initiated`, device claims |
+| `awaiting_review` | `docsClearedAt` | `initiated`, compensation (no courier leg) |
+| `pre_collection` | — | documents not cleared → model returns `pending`, no date |
+
+### 11.2 Levers
+
+Working days, per market. Keyed on `order.country`, so `Others` needs a row of its own — it has no sheet in the source model and inherits SA, the most conservative set.
+
+| Lever | AE | ZA | SA | Others |
+|---|--:|--:|--:|--:|
+| In transit | 2 | 4 | 5 | 5 |
+| Quality check | 4 | 4 | 4 | 4 |
+| Ready for refund | 1 | 1 | 1 | 1 |
+| Expert revision (additive) | +3 | +3 | +3 | +3 |
+| Overdue pad | 0 | 0 | 0 | 0 |
+| Weekend | Sat/Sun | Sat/Sun | Fri/Sat | Fri/Sat |
+
+Compensation drops the transit lever entirely — the customer keeps the device, so there is no courier leg to wait on.
+
+**These are still placeholders — ops to revise**, which is what the source spreadsheet says of its own column too. Two have already been tuned away from it: quality check 3 → 4, and the sheet's `Decision` lever renamed **Ready for refund** and cut 2 → 1. Neither is measured yet, and the `.xlsx` is now behind the code on both.
+
+Worth knowing that pair **cancels out**. Every bound depends on the two summed, and 3 + 2 = 4 + 1, so no window moved except the expert-revision tail — `expert extra + ready for refund` went 5 → 4, one working day tighter. If a future revision means to widen the estimate, the sum is the number to change, not either lever alone.
+
+The rename stops at the lever. The stage it leads to is still `decided` / `ERD_DECIDED`, because a warranty verdict sends the device to repair and no money moves — the stage stays type-agnostic even though the lever now reads refund-first. `claim.milestones.decidedAt` is unchanged for the same reason.
+
+### 11.3 How a bound is computed
+
+For the current stage: `baseline = WORKDAY.INTL(anchor, remaining working days)`, where "remaining" is the sum of the levers still ahead (`earliest` excludes the expert-revision extra, `latest` includes it). If `today` has passed the **earliest** baseline, the stage is assumed to finish today and both bounds roll forward to `today + downstream levers`. Both bounds test against the same (earliest) trigger, which is what stops `latest` landing before `earliest`; a `MAX()` guard backs it up.
+
+Three behaviours worth knowing:
+
+- **The window rebases at each milestone, and can move *later*.** Collection is treated as instant in the source model, so the full transit lever runs again from the pickup date — a claim collected two days after documents cleared sees its window shift out by two days. Faithful to the spreadsheet, and the same thing order EDD already does, but it is a customer-facing date moving in the wrong direction.
+- **Upstream lateness is forgiven.** Once the next milestone lands, the estimate re-anchors on it and the overrun disappears.
+- **Escalation is sequential, not additive-on-top.** Filling `expertRevisionAt` re-anchors both bounds on that date (`expert extra + decision`), so time already burnt in QC stops distorting the estimate.
+
+#### 11.3a Assuming the outstanding milestone lands today
+
+The model returns `pending` — no date at all — whenever the current stage has no anchor. `claimErd`'s `assume` option closes that gap by standing today in for the milestone the stage is waiting on, i.e. *"assuming this step completes today, here's your resolution date"*:
+
+| `assume` | Behaviour | Used by |
+|---|---|---|
+| `'never'` | The spreadsheet's own behaviour — no anchor means pending. | the sheet-parity tests |
+| `'when_pending'` | Substitute **only** where there would otherwise be no date. | the cards |
+| `'always'` | Substitute at every stage that has an outstanding milestone. | the sandbox's what-if toggle |
+
+Three rules make this safe:
+
+- **The reported `stage` is never advanced.** Only the date is hypothetical, so a card's pill, headline and timeline keep saying where the device actually is — a claim whose docs haven't cleared still reads `Claim initiated`, and the maths simply runs on the awaiting-collection row. `erd.assumed` names the substituted milestone.
+- **The verdict is never assumed.** `OUTSTANDING_MILESTONE` maps both QC stages to `null`, because the step they wait on *is* the decision — "assume the verdict lands today" resolves to "you have your answer today", an assertion rather than an estimate.
+- **`'always'` is deliberately kept off the cards.** At awaiting-collection it makes the date slide a day later for every day the courier hasn't come, even inside SLA — while the overdue roll already handles genuine slippage at the SLA boundary, which is the right trigger. Measured on an AE claim: identical on day one, identical once overdue, up to **8 days later** in between. It stays a sandbox tool.
+
+`claimErdFor` additionally requires the claim to *carry* a `milestones` block before it will assume anything. Absent the block we know nothing about that claim's clock, and inventing a confident date from no data is worse than showing none.
+
+**Copy names the assumption** (`CLAIM_ERD_ASSUMED`, keyed by the substituted milestone rather than the stage, because that is what the sentence is about) — "Based on your documents clearing today. We'll firm this up as soon as our team has checked them." Without it the estimate reads as a firm promise and its later movement reads as a broken one.
+
+### 11.4 Surface
+
+`ClaimErdStrip` (`src/components/ClaimErdStrip.jsx`), rendered inside the hero of both `ClaimCard` and `WarrantyClaimCard`, below the headline / pickup strip and above the refund block. Same strip grammar as `ScheduledPickupStrip` / `RepairWindowStrip`: top rule, uppercase label, toned icon + bold value, muted sub-copy.
+
+- **Label** — `Estimated resolution`, or `Updated resolution estimate` when the stage has run past its baseline and the date has rolled. A date that moves with no acknowledgement reads as a broken promise; this is the acknowledgement.
+- **Value** — `20–25 May` for a window (tight when both bounds share a month, `28 May – 2 June` when they don't), `Monday, 25 May` when it has collapsed to one date.
+- **Sub-copy** — a per-stage line explaining what the wait is for, resolved by `claimErdExplanation`. Compensation gets its own variants for the stages whose stock copy talks about inspecting or shipping "your device". Overdue stages substitute a "taking longer than usual" line.
+
+**Suppression** is entirely owned by `claimErdFor(order)` in `src/lib/claimErd.js` — cards call it unconditionally and render on a truthy result, so there are no card-level guards to keep in sync. It returns `null` for:
+
+| Case | Why |
+|---|---|
+| `docsRejection` / `awbFailure` / `pickupFailure` / `resetFailed` / `invalidClaim` / `actionRequired` | The clock is on the **customer**, not Revibe. Each has its own deadline on its own takeover card, and none is a lever in the model. |
+| `repairQuote` (at any point, paid or declined) | Pricing the repair *is* the verdict — the ERD's job is done. |
+| `claim.closure` | Terminal. |
+| `refund_issued` / `refund_credited` / `under_repair` / `ship_back` / `device_returned` | Past the verdict; the card's own tail narrates these. |
+| Model returns `decided` | Past the verdict; nothing useful to say. |
+| Model returns `pending` | Only reachable now when the claim carries **no** `milestones` block at all — otherwise `when_pending` (§11.3a) stands today in for the outstanding milestone and a date is shown. |
+
+### 11.5 Sandbox
+
+`?journey=claim_erd` ("Dynamic claim ERD") — the claim sibling of the EDD sandbox, same no-node-graph shape. `useClaimErdSandbox` (`src/lib/claimErdSandbox.js`) builds a claim from the six milestone dates plus a claim type; `ClaimErdPanel` exposes them and prints the raw model output — stage, whether the clock is on baseline or rolled, both bounds, the rendered label, working days, and the active market's levers. The market control is the app-level `CountryPicker`: `App.jsx` stamps `country` onto the sandbox order, which is the same field the model reads, so there is exactly one control for it.
+
+Each of the five milestones the model branches on is a **checkbox plus a date**, not a nullable date field: unticking one is how you say "not reached yet". That is partly ergonomics — ticking a box walks the claim forward a stage without typing anything — and partly a workaround. A native date input with no value opens its calendar on the real current month whatever the rest of the panel says, and nothing in the platform changes that, so an unticked row still shows a date: the derived `anchorDate`, i.e. the latest date already committed (or Today if none is). Re-date the claim and every unticked row follows it. `Claim created` and `Today` have no checkbox — the model never branches on the former and always needs the latter.
+
+A further checkbox toggles `assume: 'always'` (§11.3a), so you can ask "what if this step happened today?" at any stage. **It ships ticked**, which means the panel's opening view is deliberately *not* what a card shows — untick it for card behaviour. (At the default milestone set the two agree anyway: the stage is quality check, whose outstanding milestone is the verdict, and the verdict is never assumed.) It reaches the real card by way of a sandbox-only `claim.milestones.assumeToday` flag — nothing outside `lib/claimErdSandbox.js` sets it — and the debug strip's `Assumed` row names whichever milestone was stood in for.
+
+The panel deliberately shows the model's answer even where the card suppresses the strip (decided, or a claim with no milestones) — the panel's job is to expose the model, the card's is to be honest about when it has nothing useful to say.

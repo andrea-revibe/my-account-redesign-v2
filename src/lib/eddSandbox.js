@@ -27,6 +27,10 @@ const DEFAULT_INPUTS = {
   deliveredDate: null,
 }
 
+// Stages the panel switches on and off; `today` / `orderDate` always hold one.
+const TOGGLEABLE_DATES = ['qcDate', 'shippedDate', 'deliveredDate']
+const REQUIRED_DATES = ['today', 'orderDate']
+
 function parseDate(s) {
   if (!s) return null
   const [y, m, d] = s.split('-').map(Number)
@@ -188,7 +192,12 @@ export function useEddSandbox(journey) {
   const [inputs, setInputs] = useState(DEFAULT_INPUTS)
 
   const setInput = useCallback((key, value) => {
-    setInputs((prev) => ({ ...prev, [key]: value || null }))
+    setInputs((prev) => {
+      // Today and Order date always carry a date — an empty value there is a
+      // mis-tap, not an instruction, so the previous one stands.
+      if (!value && REQUIRED_DATES.includes(key)) return prev
+      return { ...prev, [key]: value || null }
+    })
   }, [])
 
   const reset = useCallback(() => {
@@ -213,12 +222,31 @@ export function useEddSandbox(journey) {
     [journey, inputs, status],
   )
 
+  // The month an unset stage's date picker should open on. A native date input
+  // with no value opens on the real current month, which for an order dated
+  // last spring is months from every other field; there's no attribute for the
+  // empty-state view month, so the panel always hands the input a date — its
+  // own, or this anchor. Latest date already committed, else Today. ISO strings
+  // sort chronologically, so `sort().at(-1)` is the max.
+  const anchorDate = useMemo(() => {
+    const set = ['orderDate', ...TOGGLEABLE_DATES].map((k) => inputs[k]).filter(Boolean)
+    return set.length ? set.slice().sort().at(-1) : inputs.today
+  }, [inputs])
+
+  // Ticking a stage commits the date the row is showing; unticking clears it.
+  const setReached = useCallback(
+    (key, reached) => setInput(key, reached ? anchorDate : null),
+    [setInput, anchorDate],
+  )
+
   return {
     kind: 'sandbox',
     journey,
     journeys: JOURNEYS,
     inputs,
     setInput,
+    setReached,
+    anchorDate,
     reset,
     status,
     order,

@@ -152,6 +152,7 @@ export const CLAIM_COM_NODES = [
         claimStatusId: 'initiated',
         type: 'change_of_mind',
         submittedAt: '25 May 2026 · 4:02 PM',
+        milestones: { createdAt: '2026-05-25', docsClearedAt: '2026-05-25', asOf: '2026-05-25' },
         units: 1,
         reason: { value: 'changed_mind', otherText: '' },
         devicePrep: { option: 'reset', os: 'ios' },
@@ -191,6 +192,7 @@ export const CLAIM_COM_NODES = [
         claimStatusId: 'initiated',
         type: 'change_of_mind',
         submittedAt: '25 May 2026 · 4:02 PM',
+        milestones: { createdAt: '2026-05-25', docsClearedAt: '2026-05-25', asOf: '2026-05-25' },
         units: 1,
         reason: { value: 'changed_mind', otherText: '' },
         devicePrep: { option: 'reset', os: 'ios' },
@@ -323,6 +325,7 @@ export const CLAIM_COM_NODES = [
         pickupFailure: undefined,
         actionRequired: undefined,
         timeline: { ...o.claim.timeline, pickup: '28 May · 10:14 AM' },
+        milestones: { ...o.claim.milestones, pickedUpAt: '2026-05-28', asOf: '2026-05-28' },
         transitSubStatusId: 'picked_up',
         transitSubTimeline: {
           ...(o.claim.transitSubTimeline ?? {}),
@@ -342,6 +345,7 @@ export const CLAIM_COM_NODES = [
       claim: {
         ...o.claim,
         transitSubStatusId: 'arrived_origin_hub',
+        milestones: { ...o.claim.milestones, asOf: '2026-05-28' },
         transitSubTimeline: {
           ...o.claim.transitSubTimeline,
           arrived_origin_hub: '28 May · 1:22 PM',
@@ -360,6 +364,7 @@ export const CLAIM_COM_NODES = [
       claim: {
         ...o.claim,
         transitSubStatusId: 'in_transit',
+        milestones: { ...o.claim.milestones, asOf: '2026-05-28' },
         transitSubTimeline: {
           ...o.claim.transitSubTimeline,
           in_transit: '28 May · 5:42 PM',
@@ -378,6 +383,7 @@ export const CLAIM_COM_NODES = [
       claim: {
         ...o.claim,
         transitSubStatusId: 'arrived_revibe_hub',
+        milestones: { ...o.claim.milestones, asOf: '2026-05-29' },
         transitSubTimeline: {
           ...o.claim.transitSubTimeline,
           arrived_revibe_hub: '29 May · 9:10 AM',
@@ -402,6 +408,7 @@ export const CLAIM_COM_NODES = [
         ...o.claim,
         claimStatusId: 'qc',
         timeline: { ...o.claim.timeline, qc: '29 May · 11:00 AM' },
+        milestones: { ...o.claim.milestones, qcAt: '2026-05-29', asOf: '2026-05-29' },
       },
     }),
   },
@@ -416,6 +423,7 @@ export const CLAIM_COM_NODES = [
         ...o.claim,
         claimStatusId: 'refund_issued',
         timeline: { ...o.claim.timeline, refund_issued: '30 May · 2:18 PM' },
+        milestones: { ...o.claim.milestones, decidedAt: '2026-05-30', asOf: '2026-05-30' },
       },
     }),
   },
@@ -431,6 +439,7 @@ export const CLAIM_COM_NODES = [
         ...o.claim,
         claimStatusId: 'refund_credited',
         timeline: { ...o.claim.timeline, refund_credited: '30 May · 2:19 PM' },
+        milestones: { ...o.claim.milestones, asOf: '2026-05-30' },
       },
     }),
   },

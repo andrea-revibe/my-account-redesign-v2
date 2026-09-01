@@ -40,6 +40,8 @@ import {
   TrackingDropdown,
 } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
+import { claimErdFor } from '../lib/claimErd'
+import ClaimErdStrip from './ClaimErdStrip'
 
 // Tone palette mirrors ClaimCard's so the two card types feel like
 // siblings. Warranty tones: warn while the device is leaving the customer
@@ -240,6 +242,10 @@ function WarrantyHero({ order, claim, tone }) {
   const showReturnedOn =
     claim.claimStatusId === 'device_returned' &&
     Boolean(claim.shipBack?.deliveredOnLong || claim.shipBack?.deliveredOn)
+  // Pre-verdict only. The ERD model stops at the decision, so once the repair
+  // is under way `RepairWindowStrip` owns the date instead — the two never
+  // render together.
+  const erd = claimErdFor(order)
 
   return (
     <div className={`rounded-[14px] border p-3.5 ${t.heroBg} ${t.border}`}>
@@ -286,6 +292,8 @@ function WarrantyHero({ order, claim, tone }) {
       )}
 
       {showArrangingPickup && <ArrangingPickupStrip toneText={t.text} />}
+
+      <ClaimErdStrip erd={erd} toneText={t.text} />
 
       {showRepairWindow && (
         <RepairWindowStrip repair={claim.repairWindow} toneText={t.text} />

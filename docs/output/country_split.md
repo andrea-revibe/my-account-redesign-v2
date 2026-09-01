@@ -147,6 +147,17 @@ The first flag that forks a **timeline's shape** rather than showing or hiding a
 - **The journey is shared, not forked:** `refused_delivery` replays under every country; the market difference is two per-edge `when: (o) => countryConfig(o).refusalReview` guards on `delivery_refused.next` mirroring its own `apply`, so the dev panel offers exactly one next step.
 - **Verify:** `?journey=refused_delivery&country=SA` (three steps, ops-sign-off copy) vs `&country=AE` (two steps, opens on Refund pending) at 430px, advancing to `delivery_refused`.
 
+## 4e. Shipped difference #5 — per-market claim resolution SLAs
+
+The first country difference that is **numeric rather than structural**: the same strip renders in every market, but the dates inside it differ. The claim resolution window (`src/lib/claimErd.js`, spec in [`returns/claim_tracking.md`](./returns/claim_tracking.md) §11) carries a working-day lever set per market — in-transit 2 / 4 / 5 working days for AE / ZA / SA, a shared 4-day quality check and 1-day ready-for-refund, a +3-day expert-revision reserve, and the weekend mask that separates Sat/Sun markets from SA's Fri/Sat. Only the transit lever and the weekend mask actually vary by market today; the rest is shared, and all of it is still placeholder.
+
+Two notes for anyone extending it:
+
+- **`Others` needs its own row.** The source spreadsheet has three sheets (UAE / ZA / SA) and no fourth market, so `CLAIM_MARKETS.Others` is a deliberate copy of SA — the most conservative set — rather than a fallthrough. Revisit when Others gets real numbers.
+- **It reads `order.country`, not `countryConfig`.** This is a lever table, not a capability flag, so it does not belong in `COUNTRIES`. `countryConfig` answers "can this market do X"; `CLAIM_MARKETS` answers "how long does X take here". Adding a market means a row in both.
+
+This also partly answers the **country-aware transit SLA** open question in `claim_tracking.md` §9: claim-side transit is now market-aware; order-side delivery SLAs (`lib/edd.js` `MARKETS`) already were. Neither has a holiday calendar.
+
 ## 5. Recipe — add a CARD-design country difference
 
 Use this whenever a market should *show / hide / alter a piece of a card*. This is the §4 pattern generalised.
