@@ -1,19 +1,22 @@
 import { RotateCcw } from 'lucide-react'
 import CountryPicker from './CountryPicker'
 
-// Sandbox sibling to JourneyDevPanel — same chrome (fixed bottom-right,
-// w-360, journey-picker chips), but instead of Next-button replay it
-// exposes the EDD model's inputs (market + four dates + an "actual
-// delivered" toggle) and a debug strip showing the computed stage, SLA
-// status, message key, and EDD. Surfaces to stakeholders: tweak any input,
-// watch the order card banner + ETA hero re-derive immediately.
-export default function EddSandboxPanel({
+// Sandbox sibling to EddSandboxPanel — same chrome (fixed bottom-right,
+// w-360, journey-picker chips), but it exposes the claim ERD model's inputs:
+// the claim type and the six milestone dates, plus Today. The market is the
+// app-level CountryPicker: App.jsx stamps it onto the sandbox order, which is
+// the same `order.country` the model reads, so there is exactly one control
+// for it. Debug strip shows the raw model output including the states where
+// the card deliberately shows nothing (pending / decided).
+export default function ClaimErdPanel({
   inputs,
   setInput,
   setReached,
   anchorDate,
-  status,
-  markets,
+  erd,
+  stageLabel,
+  levers,
+  claimTypes,
   reset,
   journeys,
   activeJourneyId,
@@ -53,27 +56,33 @@ export default function EddSandboxPanel({
       )}
 
       <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-2">
-        Dynamic EDD · inputs
+        Claim ERD · inputs
       </div>
 
-      <Row label="Market">
+      <Row label="Claim type">
         <select
-          value={inputs.market}
-          onChange={(e) => setInput('market', e.target.value)}
+          value={inputs.claimType}
+          onChange={(e) => setInput('claimType', e.target.value)}
           className="w-full text-[12px] font-medium text-ink bg-canvas border border-line rounded-md px-2 py-1.5 outline-none focus:border-brand"
         >
-          {markets.map((m) => (
-            <option key={m} value={m}>{m}</option>
+          {claimTypes.map((t) => (
+            <option key={t} value={t}>{t}</option>
           ))}
         </select>
       </Row>
 
       <DateRow label="Today" value={inputs.today} onChange={(v) => setInput('today', v)} />
-      <DateRow label="Order date" value={inputs.orderDate} onChange={(v) => setInput('orderDate', v)} />
+
+      <div className="mt-2.5 mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
+        Milestones
+      </div>
+      <DateRow label="Claim created" value={inputs.createdAt} onChange={(v) => setInput('createdAt', v)} />
       {[
-        ['qcDate', 'QC date'],
-        ['shippedDate', 'Shipped date'],
-        ['deliveredDate', 'Delivered date'],
+        ['docsClearedAt', 'Docs cleared'],
+        ['pickedUpAt', 'Picked up'],
+        ['qcAt', 'QC started'],
+        ['expertRevisionAt', 'Expert revision'],
+        ['decidedAt', 'Decision'],
       ].map(([key, label]) => (
         <MilestoneRow
           key={key}
@@ -85,35 +94,58 @@ export default function EddSandboxPanel({
         />
       ))}
 
+      <label className="flex items-start gap-2 mt-2 mb-1 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(inputs.assumeToday)}
+          onChange={(e) => setInput('assumeToday', e.target.checked)}
+          className="mt-0.5 accent-brand"
+        />
+        <span className="text-[11.5px] text-muted leading-[1.35]">
+          Assume the outstanding milestone lands <strong className="text-ink">today</strong>
+          <span className="block text-[10.5px] text-muted/80">
+            On by default, so this view is <strong className="text-ink">not</strong> what a
+            card shows — cards assume only where there'd otherwise be no date.
+            Untick for card behaviour. At other stages this slides the date a day
+            later for every day nothing happens.
+          </span>
+        </span>
+      </label>
+
       <div className="mt-3 pt-3 border-t border-line">
         <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-2">
-          Computed state
+          Computed window
         </div>
-        {status ? (
-          <div className="flex flex-col gap-1.5 text-[12px]">
-            <DebugRow k="Stage" v={status.currentStage} />
-            <DebugRow k="Elapsed" v={`${status.currentStageElapsedDays} day${status.currentStageElapsedDays === 1 ? '' : 's'}`} />
-            <DebugRow
-              k="SLA"
-              v={status.currentStageSlaStatus}
-              vClass={status.currentStageSlaStatus === 'late' ? 'text-chip-danger' : 'text-success'}
-            />
-            {status.previousStage && (
-              <DebugRow
-                k={`Prev (${status.previousStage})`}
-                v={`${status.previousStageElapsedDays}d · ${status.previousStageSlaStatus}`}
-                vClass={status.previousStageSlaStatus === 'late' ? 'text-chip-danger' : 'text-muted'}
-              />
-            )}
-            <DebugRow k="Message" v={status.customerMessage.key} mono />
-            <DebugRow k="Initial promise" v={formatEddDate(status.initialPromise)} />
-            <DebugRow k="EDD" v={formatEddDate(status.deliveryBy)} bold />
+        <div className="flex flex-col gap-1.5 text-[12px]">
+          <DebugRow k="Stage" v={stageLabel} />
+          <DebugRow
+            k="Clock"
+            v={erd.pending ? 'pending — docs not cleared' : erd.overdue ? 'rolled (overdue)' : 'on baseline'}
+            vClass={erd.overdue ? 'text-chip-danger' : erd.pending ? 'text-muted' : 'text-success'}
+          />
+          <DebugRow k="Earliest" v={fmtDate(erd.earliest)} />
+          <DebugRow k="Latest" v={fmtDate(erd.latest)} />
+          <DebugRow
+            k="Assumed"
+            v={erd.assumed ? `${erd.assumed} = today` : 'nothing — all real'}
+            vClass={erd.assumed ? 'text-brand' : 'text-muted'}
+          />
+          <DebugRow k="Shown as" v={erd.label ?? '—'} bold />
+          <DebugRow k="Working days" v={erd.workingDays ?? '—'} />
+        </div>
+
+        <div className="mt-2.5 pt-2.5 border-t border-line">
+          <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-2">
+            Levers · {levers.name} (working days)
           </div>
-        ) : (
-          <div className="text-[12px] text-muted italic">
-            Set both Today and Order date to compute.
+          <div className="flex flex-col gap-1.5">
+            <DebugRow k="In transit" v={levers.slaTransit} />
+            <DebugRow k="Quality check" v={levers.slaQc} />
+            <DebugRow k="Ready for refund" v={levers.slaReadyForRefund} />
+            <DebugRow k="Expert extra" v={`+${levers.expertExtra}`} />
+            <DebugRow k="Weekend" v={levers.weekend.includes(4) ? 'Fri / Sat' : 'Sat / Sun'} />
           </div>
-        )}
+        </div>
       </div>
 
       <button
@@ -154,11 +186,10 @@ function DateRow({ label, value, onChange }) {
   )
 }
 
-// A stage that can be switched on and off — the shared shape with
-// ClaimErdPanel's MilestoneRow. The date input always carries a value (its own,
-// or the anchor when the stage hasn't happened) because a native picker opened
-// on an empty input jumps to the real current month; the checkbox is what says
-// "not yet", not an empty field.
+// A milestone that can be switched on and off. The date input is *always*
+// given a value — its own, or the anchor when the milestone hasn't been reached
+// — because a native date picker opened on an empty input jumps to the real
+// current month. The checkbox, not an empty field, is what says "not yet".
 function MilestoneRow({ label, value, anchor, onChange, onToggle }) {
   const reached = Boolean(value)
   return (
@@ -193,15 +224,14 @@ function MilestoneRow({ label, value, anchor, onChange, onToggle }) {
   )
 }
 
-function DebugRow({ k, v, vClass, mono, bold }) {
+function DebugRow({ k, v, vClass, bold }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="text-[11.5px] text-muted w-[88px] shrink-0">{k}</div>
+      <div className="text-[11.5px] text-muted w-[100px] shrink-0">{k}</div>
       <div
         className={
           'flex-1 text-[12px] ' +
           (bold ? 'font-semibold ' : 'font-medium ') +
-          (mono ? 'font-mono ' : '') +
           (vClass ?? 'text-ink')
         }
       >
@@ -214,7 +244,7 @@ function DebugRow({ k, v, vClass, mono, bold }) {
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-function formatEddDate(d) {
+function fmtDate(d) {
   if (!d) return '—'
   return `${WEEKDAYS_SHORT[d.getDay()]}, ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
 }

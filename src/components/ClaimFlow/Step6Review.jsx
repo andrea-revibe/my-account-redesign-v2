@@ -52,7 +52,7 @@ export default function Step6Review({
         state.refundMethod,
         state.claimType,
       )
-  const warrantyEta = isWarranty ? expectedCompletionFor('warranty') : null
+  const warrantyEta = isWarranty ? expectedCompletionFor('warranty', new Date(), { country: order?.country }) : null
   // Which warranty is answering for this repair, and on what terms — the same
   // line the confirmation and the tracking card show, so it can't drift.
   const warrantyCoverage = isWarranty

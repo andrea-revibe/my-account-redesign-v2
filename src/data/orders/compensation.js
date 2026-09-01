@@ -46,6 +46,12 @@ export const COMPENSATION_ORDERS = [
       claimStatusId: 'qc',
       type: 'compensation',
       submittedAt: '14 May 2026 · 2:40 PM',
+      milestones: {
+        createdAt: '2026-05-14',
+        docsClearedAt: '2026-05-14',
+        qcAt: '2026-05-15',
+        asOf: '2026-05-18',
+      },
       units: 1,
       compensationSubtype: 'shipping_refund',
       issueDetails: {
@@ -101,6 +107,13 @@ export const COMPENSATION_ORDERS = [
       claimStatusId: 'refund_credited',
       type: 'compensation',
       submittedAt: '28 Apr 2026 · 9:05 AM',
+      milestones: {
+        createdAt: '2026-04-28',
+        docsClearedAt: '2026-04-28',
+        qcAt: '2026-04-29',
+        decidedAt: '2026-05-01',
+        asOf: '2026-05-03',
+      },
       units: 1,
       compensationSubtype: 'accessory_broken',
       issueDetails: {
@@ -158,6 +171,13 @@ export const COMPENSATION_ORDERS = [
       claimStatusId: 'qc',
       type: 'compensation',
       submittedAt: '10 May 2026 · 11:30 AM',
+      milestones: {
+        createdAt: '2026-05-10',
+        docsClearedAt: '2026-05-10',
+        qcAt: '2026-05-12',
+        decidedAt: '2026-05-13',
+        asOf: '2026-05-14',
+      },
       units: 1,
       compensationSubtype: 'accessory_broken',
       issueDetails: {

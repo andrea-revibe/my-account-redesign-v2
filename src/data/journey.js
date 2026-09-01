@@ -63,6 +63,16 @@ export const JOURNEYS = [
     initialOrder: INITIAL_ORDER,
     nodes: [],
   },
+  // The claim-side equivalent: same no-node-graph shape, but the inputs are a
+  // claim's six milestone dates and its type, and the model is the resolution
+  // window in src/lib/claimErd.js. Rendered by ClaimErdPanel.
+  {
+    id: 'claim_erd',
+    label: 'Dynamic claim ERD',
+    kind: 'claim_sandbox',
+    initialOrder: INITIAL_ORDER,
+    nodes: [],
+  },
   {
     id: 'cancellation',
     label: 'Cancellation',

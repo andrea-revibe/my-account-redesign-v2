@@ -127,6 +127,86 @@ export const WARRANTY_ORDERS = [
       image: '/iphone-cutout.png',
     },
   },
+  // ----- Layered mock: delivered → warranty claim → at quality check,
+  // pre-verdict. The only warranty mock inside the ERD model's span (the
+  // rest are past the verdict or parked on the over-cap gate), so it is
+  // what exercises WarrantyClaimCard's resolution strip: a device with
+  // Revibe, no decision yet, window still open on both bounds.
+  {
+    id: '89622',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '21/04/2026 10:12 AM',
+    placedAtFull: '21 Apr 2026 · 10:12 AM',
+    deliveredOn: '2026-04-29',
+    deliveredOnLong: 'Wednesday, 29 April',
+    quantity: 1,
+    unitPrice: 989,
+    subtotal: 989,
+    total: 989,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193622',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'ios',
+    timeline: {
+      created: '21 Apr · 10:12 AM',
+      quality_check: '22 Apr · 9:40 AM',
+      shipped: '24 Apr · 3:18 PM',
+      delivered: '29 Apr · 1:26 PM',
+    },
+    product: {
+      name: 'iPhone 13',
+      variant: 'Starlight · 128 GB · Good',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Wq2vTm',
+      claimStatusId: 'qc',
+      type: 'warranty',
+      submittedAt: '18 May 2026 · 10:05 AM',
+      milestones: {
+        createdAt: '2026-05-18',
+        docsClearedAt: '2026-05-18',
+        pickedUpAt: '2026-05-20',
+        qcAt: '2026-05-25',
+        asOf: '2026-05-27',
+      },
+      units: 1,
+      coverage: 'standard',
+      cause: 'defect',
+      issueDetails: {
+        category: 'speaker',
+        description:
+          'Earpiece speaker crackles on calls at any volume — happens on speakerphone too, so it is not the case.',
+        attachmentName: 'VID_0221.mov',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', os: 'ios' },
+      pickupDetails: {
+        address: 'Ontario Tower, Office 103, Business Bay Dubai',
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Wednesday, 20 May',
+        slot: '10 AM – 12 PM',
+        awb: '25193622',
+      },
+      timeline: {
+        initiated: '18 May · 10:05 AM',
+        pickup: '20 May · 11:22 AM',
+        qc: '25 May · 10:40 AM',
+      },
+    },
+  },
   // ----- Layered mock: delivered → warranty claim → under repair.
   // Exercises the WarrantyClaimCard's `under_repair` hero: brand-tone
   // headline, Wrench-iconed repair-window strip. No takeover cards
@@ -172,6 +252,14 @@ export const WARRANTY_ORDERS = [
       claimStatusId: 'under_repair',
       type: 'warranty',
       submittedAt: '09 May 2026 · 8:42 AM',
+      milestones: {
+        createdAt: '2026-05-09',
+        docsClearedAt: '2026-05-09',
+        pickedUpAt: '2026-05-11',
+        qcAt: '2026-05-14',
+        decidedAt: '2026-05-14',
+        asOf: '2026-05-20',
+      },
       units: 1,
       issueDetails: {
         category: 'charging_port',
@@ -254,6 +342,14 @@ export const WARRANTY_ORDERS = [
       claimStatusId: 'qc',
       type: 'warranty',
       submittedAt: '20 Aug 2026 · 9:15 AM',
+      milestones: {
+        createdAt: '2026-08-20',
+        docsClearedAt: '2026-08-20',
+        pickedUpAt: '2026-08-22',
+        qcAt: '2026-08-26',
+        decidedAt: '2026-08-28',
+        asOf: '2026-08-28',
+      },
       units: 1,
       remedy: 'accidental',
       // Raised inside the first year, so the standard warranty is still live —
@@ -355,6 +451,14 @@ export const WARRANTY_ORDERS = [
       claimStatusId: 'ship_back',
       type: 'warranty',
       submittedAt: '28 Apr 2026 · 4:10 PM',
+      milestones: {
+        createdAt: '2026-04-28',
+        docsClearedAt: '2026-04-28',
+        pickedUpAt: '2026-04-30',
+        qcAt: '2026-05-04',
+        decidedAt: '2026-05-05',
+        asOf: '2026-05-18',
+      },
       units: 1,
       issueDetails: {
         category: 'speaker',
@@ -449,6 +553,14 @@ export const WARRANTY_ORDERS = [
       claimStatusId: 'device_returned',
       type: 'warranty',
       submittedAt: '25 May 2026 · 4:02 PM',
+      milestones: {
+        createdAt: '2026-05-25',
+        docsClearedAt: '2026-05-25',
+        pickedUpAt: '2026-05-28',
+        qcAt: '2026-06-01',
+        decidedAt: '2026-06-01',
+        asOf: '2026-06-13',
+      },
       units: 1,
       issueDetails: {
         category: 'battery',

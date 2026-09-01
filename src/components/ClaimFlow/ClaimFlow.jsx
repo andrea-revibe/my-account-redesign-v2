@@ -318,6 +318,12 @@ function formatStamp(d = new Date()) {
 }
 
 // '19 May 2026 · 9:12 AM' — used for `claim.submittedAt`.
+function isoDay(d) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
 function formatSubmittedAt(d = new Date()) {
   const day = d.getDate()
   const month = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(d)
@@ -372,6 +378,13 @@ function buildClaim({ state, order, claimRef }) {
     claimStatusId: 'initiated',
     type: state.claimType,
     submittedAt,
+    // Submitting starts the resolution clock: the prototype folds proof review
+    // into the SLA rather than gating on it, so docs are cleared at submit.
+    // A later rejection un-clears it (see claimMilestones in lib/claimErd.js).
+    milestones: {
+      createdAt: isoDay(now),
+      docsClearedAt: isoDay(now),
+    },
     units: state.units || 1,
     devicePrep: { ...state.devicePrep },
     pickupDetails: { ...state.pickupDetails },
@@ -449,7 +462,7 @@ function buildClaim({ state, order, claimRef }) {
   // the device crosses a warranty boundary while the claim is open):
   //   coverage 'standard' | 'extended'   which warranty answered
   //   cause    'defect' | 'accidental'   what the customer declared
-  const eta = expectedCompletionFor('warranty', now)
+  const eta = expectedCompletionFor('warranty', now, { country: order?.country })
   const coverage = coverageFor(order)
   return {
     ...base,

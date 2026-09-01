@@ -15,6 +15,7 @@ import {
   PackageCheck,
   ShieldX,
 } from 'lucide-react'
+import { claimErd, formatClaimErd } from './claimErd'
 
 export const CLAIM_STATUSES = [
   {
@@ -675,21 +676,32 @@ export const CLAIM_SLAS = {
   ship_back:            { expectedHours:  96, bufferHours:  24 },
 }
 
-// Sums the per-step `expectedHours` across the relevant pipeline,
-// adds it to `today`, and returns the projected completion date in the
-// same shape as `claim.repairWindow.expectedComplete{,Long}` so the
-// Step 4 / Step 6 surfaces and the WarrantyClaimCard speak one language.
-// Steps without an SLA entry (e.g. terminal states like refund_credited
-// or device_returned) contribute 0 — they're instant once the prior
-// step lands.
-export function expectedCompletionFor(claimType, today = new Date()) {
-  const steps =
-    claimType === 'warranty' ? WARRANTY_CLAIM_STATUSES : CLAIM_STATUSES
-  const hours = steps.reduce(
-    (sum, s) => sum + (CLAIM_SLAS[s.id]?.expectedHours || 0),
+// The date a claim submitted *now* should be finished by, in the same shape
+// as `claim.repairWindow.expectedComplete{,Long}` so the Step 4 / Step 6 /
+// Step 7 surfaces and the WarrantyClaimCard speak one language.
+//
+// Composed from the two models that meet here. Everything up to the verdict
+// comes from lib/claimErd.js — real working days against the market's SLA
+// levers — because submitting starts that clock immediately (the prototype
+// treats submit as docs-cleared). Everything *after* the verdict is outside
+// that model, so the repair / ship-back / payout tail still comes from the
+// flat `CLAIM_SLAS` hours below.
+//
+// `long` / `short` quote the pessimistic bound: pre-submit this is a promise,
+// and a promise reserves the escalation. `window` carries the underlying
+// range for any surface that would rather show both.
+export function expectedCompletionFor(claimType, today = new Date(), { country } = {}) {
+  const transit = claimType !== 'compensation'
+  const erd = claimErd(country, today, { docsClearedAt: today }, { transit })
+  const tailIds =
+    claimType === 'warranty'
+      ? ['under_repair', 'ship_back']
+      : ['refund_issued', 'refund_credited']
+  const hours = tailIds.reduce(
+    (sum, id) => sum + (CLAIM_SLAS[id]?.expectedHours || 0),
     0,
   )
-  const target = new Date(today.getTime() + hours * 60 * 60 * 1000)
+  const target = new Date(erd.latest.getTime() + hours * 60 * 60 * 1000)
   // Build the strings explicitly so the output matches the existing
   // `repairWindow.expectedComplete{,Long}` shape ("Monday, 14 May" and
   // "Mon, 14 May") regardless of locale CLDR formatting quirks.
@@ -703,6 +715,7 @@ export function expectedCompletionFor(claimType, today = new Date()) {
     short: `${weekdayShort}, ${day} ${monthShort}`,
     hours,
     date: target,
+    window: formatClaimErd(erd),
   }
 }
 

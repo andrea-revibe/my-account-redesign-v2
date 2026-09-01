@@ -34,6 +34,8 @@ import { ProductSummary } from './ProductSummary'
 import { AwbLink } from './AwbLink'
 import RefundSplitRows from './RefundSplitRows'
 import { isSplitPaid } from '../lib/returns'
+import { claimErdFor } from '../lib/claimErd'
+import ClaimErdStrip from './ClaimErdStrip'
 import Timeline from './Timeline'
 import { TrackingDropdown } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
@@ -215,6 +217,7 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
     claim.refundMethod === 'original' &&
     Boolean(claim.expectedRefund) &&
     isSplitPaid(order)
+  const erd = claimErdFor(order)
 
   return (
     <div className={`rounded-[14px] border p-3.5 ${t.heroBg} ${t.border}`}>
@@ -250,6 +253,8 @@ function ClaimHero({ order, claim, tone, onOpenWallet }) {
       )}
 
       {showArrangingPickup && <ArrangingPickupStrip toneText={t.text} />}
+
+      <ClaimErdStrip erd={erd} toneText={t.text} />
 
       <div className="mt-3 pt-3 border-t border-line-2/70 flex items-end justify-between gap-3">
         <div className="min-w-0">

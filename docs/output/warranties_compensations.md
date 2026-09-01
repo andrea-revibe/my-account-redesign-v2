@@ -15,6 +15,8 @@ covers:
   - src/components/ClaimFlow/compensationSubtypes.js
   - src/components/ClaimFlow/Step5RefundMethod.jsx
   - src/lib/claims.js
+  - src/lib/claimErd.js
+  - src/components/ClaimErdStrip.jsx
   - src/data/orders/warranty.js
   - src/data/orders/compensation.js
 ---
@@ -115,6 +117,14 @@ Followed by a Track package / Get Help action row (Track package → the hardcod
 #### 2.3.6 Status explainer ("Learn more")
 
 The warranty state pill is routed through the shared `StatusExplainer` (see [orders.md](orders.md) §4.6 + [returns/claim_tracking.md](returns/claim_tracking.md) §2.2.1): an inline `ⓘ Learn more` link beside the pill reveals a full-width plain-language definition of the current warranty stage below the chip row. Copy is data-driven from `lib/claims.js` — `WARRANTY_EXPLANATIONS` (the 6-state repair-and-return chain, no money-movement copy) resolved by `warrantyClaimExplanation(claim)`. Always shown (the `WarrantyClaimCard` header carries no banner of its own).
+
+### 2.3.4 Estimated resolution strip (pre-verdict)
+
+`ClaimErdStrip` renders in the hero from `initiated` through `qc`, carrying the computed resolution window and a per-stage explanation — the same shared strip `ClaimCard` uses. Full spec: [`returns/claim_tracking.md`](./returns/claim_tracking.md) §11.
+
+The warranty tail is where the handoff matters. The ERD model **stops at the verdict**, and for a warranty claim the verdict is the decision to repair — so the moment the claim reaches `under_repair` the resolution strip disappears and `RepairWindowStrip` (§2.3) owns the date instead. The two never coexist, and neither does the strip appear on `RepairQuoteCard`: pricing an over-cap repair *is* the verdict, so `claim.repairQuote` suppresses the strip whether or not the customer has answered yet.
+
+One consequence for the mock fleet: every pre-existing warranty mock is past the verdict or parked on the over-cap gate, so **89622** (delivered iPhone 13 → warranty claim at `qc`, standard coverage) was added purely to give the strip a pre-verdict warranty state to render.
 
 ### 2.4 Intake flow
 

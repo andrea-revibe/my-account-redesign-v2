@@ -59,8 +59,8 @@ export default function Step4PickupDetails({ state, dispatch, error }) {
   const editingField = FIELDS.find((f) => f.key === editingKey) || null
   const isWarranty = state.claimType === 'warranty'
   const eta = useMemo(
-    () => expectedCompletionFor(state.claimType),
-    [state.claimType],
+    () => expectedCompletionFor(state.claimType, new Date(), { country }),
+    [state.claimType, country],
   )
 
   const errorRef = useRef(null)
