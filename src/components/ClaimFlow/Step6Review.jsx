@@ -18,7 +18,7 @@ import WalletInfoTooltip, { REVIBE_WALLET_ICON } from '../WalletInfoTooltip'
 import BnplDisclaimerTooltip, { isBnpl } from '../BnplDisclaimerTooltip'
 import { refundBreakdown, formatMoney, isSplitPaid } from '../../lib/returns'
 import RefundSplitRows from '../RefundSplitRows'
-import { expectedCompletionFor } from '../../lib/claims'
+import { devicePrepText, expectedCompletionFor } from '../../lib/claims'
 import { coverageFor, coverageSummary } from '../../lib/coverage'
 import { findSpecificIssue } from './issueTaxonomy'
 import { PACKING_LABELS } from './Step4Packing'
@@ -74,11 +74,9 @@ export default function Step6Review({
 
   const isUnlinkPath = state.devicePrep.option === 'credentials'
   const isNeverSetUp = state.devicePrep.neverSetUp
-  const devicePrep = isNeverSetUp
-    ? 'Not set up — no reset needed'
-    : isUnlinkPath
-      ? 'Unlinked + passcode shared'
-      : 'Factory reset confirmed'
+  const isRepairPrep = state.devicePrep.mode === 'repair'
+  const isNoReset = state.devicePrep.guideId === 'no_reset'
+  const devicePrep = devicePrepText({ devicePrep: state.devicePrep })
   const devicePrepAck = isNeverSetUp
     ? {
         title: 'This device was never set up.',
@@ -95,6 +93,21 @@ export default function Step6Review({
           title: "I've unlinked the device and shared my passcode.",
           subtitle: 'Required so our technician can complete the wipe.',
         }
+      : isNoReset
+        ? {
+            title: 'My item is packed with everything from the box.',
+            subtitle: 'No reset needed for this item.',
+          }
+      : isRepairPrep
+        ? {
+            title: "I've turned off the account lock and screen lock.",
+            subtitle: (
+              <span className="text-warn">
+                A locked device can't be tested, so the repair{' '}
+                <span className="font-semibold">may be delayed</span>.
+              </span>
+            ),
+          }
       : {
           title: 'I have factory reset my device.',
           subtitle: (

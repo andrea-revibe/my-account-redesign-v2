@@ -12,15 +12,13 @@ import {
   Lock,
   ChevronDown,
   HelpCircle,
+  Package,
 } from 'lucide-react'
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
-import {
-  deviceOsForOrder,
-  deviceTypeForOrder,
-  isOsAmbiguous,
-} from '../../lib/devices'
+import { deviceOsForOrder, resetGuideForOrder } from '../../lib/devices'
+import { guideById, modeForClaimType, stepsFor } from '../../lib/resetGuides'
 
 // Step 3 — a single, mandatory path: run the guided reset, then confirm it.
 // The guide itself branches (reset on-device vs erase remotely from
@@ -36,32 +34,30 @@ import {
 // the clear final action.
 export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const dp = state.devicePrep
-  // The guide platform is driven by the order's category (seeded in the
-  // reducer from category_name). The only manual input is for the OS-ambiguous
-  // `Tablet` category — `ambiguous` gates the iPad/Android chooser below. The
-  // fallbacks are defensive should dp.os / dp.device ever be unset. `os`
-  // (ios|android) drives the iCloud-vs-Google copy; `device`
-  // (iphone|ipad|mac|android) selects which walkthrough the guide shows.
-  const ambiguous = isOsAmbiguous(order)
-  const os = dp.os || deviceOsForOrder(order)
-  const device = dp.device || deviceTypeForOrder(order)
-  const stepCount = os === 'android' ? 4 : 3
+  // Guide + variant are seeded in the reducer from the order line
+  // (resetGuideForOrder); mode follows the claim type (warranty → repair).
+  // The only manual input is a Tablet whose title can't tell iPad from
+  // Android (`needsChooser`). `os` only drives the backup reassurance copy.
+  const resolved = resetGuideForOrder(order)
+  const guideId = dp.guideId || resolved.guideId
+  const variant = dp.variant || resolved.variant
+  const guide = guideById(guideId)
+  const mode = modeForClaimType(state.claimType) ?? 'return'
+  const isRepair = mode === 'repair'
+  const os = guideId === 'android' ? 'android' : guideId === 'apple_mobile' || guideId === 'mac' ? 'ios' : deviceOsForOrder(order)
+  const stepCount = stepsFor(guide, mode, { variant }).length
 
   // Switching tablet OS invalidates any reset already run on the other guide,
-  // so re-gate the confirm checkbox. The Android pick resolves to the dedicated
-  // `android_tablet` guide (tablet-shaped frames + tablet copy), kept distinct
-  // from the `android` Samsung-phone guide.
+  // so re-gate the confirm checkbox.
   const setTabletOs = (pick) => {
-    const nextDevice = pick === 'android' ? 'android_tablet' : 'ipad'
-    if (nextDevice === device) return
+    const next =
+      pick === 'android'
+        ? { guideId: 'android', variant: 'samsung_tablet' }
+        : { guideId: 'apple_mobile', variant: 'ipad' }
+    if (next.guideId === guideId) return
     dispatch({
       type: 'SET_DEVICE_PREP',
-      value: {
-        device: nextDevice,
-        os: pick === 'android' ? 'android' : 'ios',
-        resetGuideSeen: false,
-        resetConfirmed: false,
-      },
+      value: { ...next, resetGuideSeen: false, resetConfirmed: false, passcodeProvided: false },
     })
   }
 
@@ -94,24 +90,43 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
     }
   }, [confirmError])
 
+  if (guideId === 'no_reset') {
+    return (
+      <>
+        <StepHeading
+          title={isRepair ? 'Prepare your item for repair' : 'Prepare your item for return'}
+          subtitle="This item has no account lock, so there's nothing to reset."
+        />
+        <div className="px-4">
+          <NoResetCard />
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <StepHeading
-        title="Prepare your device for return"
-        subtitle="Returns are delayed when this step is skipped. The guided reset walks you through it — even if the device is broken or you can't unlock it."
+        title={isRepair ? 'Prepare your device for repair' : 'Prepare your device for return'}
+        subtitle={
+          isRepair
+            ? 'Repairs are delayed when the device is locked. The guide turns the locks off — your data stays on the device, and you never share an account password.'
+            : "Returns are delayed when this step is skipped. The guided reset walks you through it — even if the device is broken or you can't unlock it."
+        }
       />
 
       <div className="px-4 flex flex-col gap-3">
-        <Callout />
+        <Callout isRepair={isRepair} />
 
-        {ambiguous && (
+        {resolved.needsChooser && (
           <TabletPicker
-            value={device === 'android_tablet' ? 'android' : 'ipad'}
+            value={guideId === 'android' ? 'android' : 'ipad'}
             onChange={setTabletOs}
           />
         )}
 
         <HeroLauncher
+          isRepair={isRepair}
           guideSeen={guideSeen}
           showError={showGuideError}
           stepCount={stepCount}
@@ -128,15 +143,22 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
           onCheck={setNeverSetUp}
         />
 
-        {!neverSetUp && <SafetyNote os={os} />}
+        {!neverSetUp && !isRepair && <SafetyNote os={os} />}
 
         {guideOpen && (
           <ResetGuideSheet
-            device={device}
-            onDone={() => {
+            guideId={guideId}
+            mode={mode}
+            facts={{ variant }}
+            onDone={({ via, passcodeProvided }) => {
               dispatch({
                 type: 'SET_DEVICE_PREP',
-                value: { resetGuideSeen: true },
+                value: {
+                  resetGuideSeen: true,
+                  mode,
+                  guideVia: via,
+                  passcodeProvided,
+                },
               })
               setGuideOpen(false)
             }}
@@ -155,6 +177,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
               })
             }
             locked={confirmLocked}
+            isRepair={isRepair}
             confirmError={confirmError}
             showGuideError={showGuideError}
           />
@@ -218,7 +241,7 @@ function TabletPicker({ value, onChange }) {
   )
 }
 
-function Callout() {
+function Callout({ isRepair }) {
   return (
     <div className="flex items-start gap-3 rounded-[14px] border border-warn-bg bg-warn-bg/70 px-3.5 py-3">
       <span
@@ -228,11 +251,23 @@ function Callout() {
         <ShieldAlert size={16} strokeWidth={2} />
       </span>
       <p className="text-[12.5px] text-ink leading-[1.45]">
-        <span className="font-semibold text-ink">
-          Reset the device before we can refund you.
-        </span>{' '}
-        If it reaches us still locked, your refund may be delayed and a fee
-        deducted.
+        {isRepair ? (
+          <>
+            <span className="font-semibold text-ink">
+              Turn the locks off before pickup.
+            </span>{' '}
+            A locked device can't be tested, so the repair waits until it's
+            unlocked.
+          </>
+        ) : (
+          <>
+            <span className="font-semibold text-ink">
+              Reset the device before we can refund you.
+            </span>{' '}
+            If it reaches us still locked, your refund may be delayed and a fee
+            deducted.
+          </>
+        )}
       </p>
     </div>
   )
@@ -241,7 +276,7 @@ function Callout() {
 // The one prominent action on the step: an elevated hero launcher with a
 // gradient icon coin, decorative ring texture, and meta chips. Turns green
 // once completed, red (and shakes) if Continue is pressed before it's run.
-function HeroLauncher({ guideSeen, showError, stepCount = 3, dimmed = false, onOpen }) {
+function HeroLauncher({ isRepair, guideSeen, showError, stepCount = 3, dimmed = false, onOpen }) {
   const tone = showError ? 'error' : guideSeen ? 'done' : 'default'
   const surface =
     tone === 'error'
@@ -317,7 +352,13 @@ function HeroLauncher({ guideSeen, showError, stepCount = 3, dimmed = false, onO
 
         <span className="min-w-0 flex-1">
           <span className="block text-[15.5px] font-bold text-ink leading-snug tracking-[-0.01em]">
-            {tone === 'done' ? 'Guided reset completed' : 'Start the guided reset'}
+            {tone === 'done'
+              ? isRepair
+                ? 'Repair prep completed'
+                : 'Guided reset completed'
+              : isRepair
+                ? 'Start the repair prep guide'
+                : 'Start the guided reset'}
           </span>
           {tone === 'done' ? (
             <span className="mt-0.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-success">
@@ -329,7 +370,7 @@ function HeroLauncher({ guideSeen, showError, stepCount = 3, dimmed = false, onO
                 <Clock size={11} strokeWidth={2.2} /> ~10 min
               </span>
               <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-surface/80 border border-line px-2 h-[22px] text-[11px] font-semibold text-ink-2">
-                {stepCount} simple steps
+                {stepCount} simple {stepCount === 1 ? 'step' : 'steps'}
               </span>
             </span>
           )}
@@ -407,7 +448,7 @@ function ResetOffRamps({ os, open, onToggle, offerNeverSetUp, neverSetUp, onChec
         }`}
       >
         <HelpCircle size={16} strokeWidth={2.2} className="shrink-0 text-brand" />
-        <span>Can't run the guided reset?</span>
+        <span>Can't run the guide?</span>
         <ChevronDown
           size={16}
           strokeWidth={2.2}
@@ -460,8 +501,9 @@ function ResetOffRamps({ os, open, onToggle, offerNeverSetUp, neverSetUp, onChec
               <span className="font-semibold text-ink">
                 Broken, or can't unlock it?
               </span>{' '}
-              Start the guide and choose “No” — you'll erase it remotely from{' '}
-              {os === 'ios' ? 'iCloud' : 'your Google account'} instead.
+              Start the guide and tap “I can't use my device” — it covers a
+              forgotten passcode, a broken screen, and a device that won't
+              turn on.
             </p>
           </div>
         </div>
@@ -477,6 +519,7 @@ function ConfirmGate({
   confirmed,
   setConfirmed,
   locked,
+  isRepair,
   confirmError,
   showGuideError,
 }) {
@@ -524,8 +567,9 @@ function ConfirmGate({
             locked ? 'text-muted' : 'text-ink'
           }`}
         >
-          I confirm I've completed the guided reset — this device is unlinked
-          and erased.
+          {isRepair
+            ? "I confirm I've completed the guide — the account lock and screen lock are off."
+            : "I confirm I've completed the guided reset — this device is unlinked and erased."}
         </span>
       </label>
 
@@ -547,3 +591,18 @@ function ConfirmGate({
   )
 }
 
+// Items with no account lock (accessories, non-Apple watches, controllers…):
+// nothing to run, so the step is just a packing note and is always satisfied.
+function NoResetCard() {
+  return (
+    <div className="flex items-start gap-3 rounded-[14px] border border-line bg-line-2/40 px-3.5 py-3.5">
+      <span className="w-9 h-9 rounded-full grid place-items-center shrink-0 bg-success-bg text-success">
+        <Package size={18} strokeWidth={2} />
+      </span>
+      <p className="text-[12.5px] text-ink-2 leading-[1.5]">
+        <span className="font-semibold text-ink">No reset needed.</span>{' '}
+        Remove your own items, and pack everything that came in the box.
+      </p>
+    </div>
+  )
+}

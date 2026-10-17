@@ -62,3 +62,59 @@ export function deviceTypeForOrder(order) {
 export function isOsAmbiguous(order) {
   return deviceTypeForOrder(order) === 'tablet'
 }
+
+// Order line → reset guide (data/resetGuides/*). Catalogue category first,
+// then the product title, per the guided-reset doc's mapping table. Returns
+// { guideId, variant, needsChooser } — needsChooser marks a Tablet whose title
+// can't tell iPad from Android (Step 3 then asks). Care+ lines never reach
+// here: a Care+ claim carries its covered device's product.
+const SAMSUNG_RE = /^(samsung|galaxy)/i
+const WINDOWS_BRANDS = [
+  [/thinkpad/i, 'thinkpad'],
+  [/lenovo|ideapad/i, 'ideapad'],
+  [/^dell/i, 'dell'],
+  [/^hp\b/i, 'hp'],
+  [/^acer/i, 'acer'],
+  [/surface|^microsoft/i, 'surface'],
+]
+
+export function resetGuideForOrder(order) {
+  const category = order?.product?.category_name ?? order?.category_name
+  const title = (order?.product?.name ?? '').trim()
+  const g = (guideId, variant, needsChooser = false) => ({ guideId, variant, needsChooser })
+
+  if (!category) {
+    return order?.deviceOs === 'android' ? g('android', 'samsung_phone') : g('apple_mobile', 'iphone')
+  }
+  if (/iphone/i.test(category)) return g('apple_mobile', 'iphone')
+  if (MAC_RE.test(category)) return g('mac', 'macbook')
+  if (/ipad/i.test(category) || (TABLET_RE.test(category) && /^ipad/i.test(title))) {
+    return g('apple_mobile', 'ipad')
+  }
+  if (TABLET_RE.test(category)) {
+    if (SAMSUNG_RE.test(title)) return g('android', 'samsung_tablet')
+    if (title) return g('android', 'other_android')
+    return g('apple_mobile', 'ipad', true)
+  }
+  if (/samsung/i.test(category)) return g('android', 'samsung_phone')
+  if (/smartphone|android/i.test(category)) {
+    return g('android', SAMSUNG_RE.test(title) ? 'samsung_phone' : 'other_android')
+  }
+  if (/laptop/i.test(category)) {
+    const hit = WINDOWS_BRANDS.find(([re]) => re.test(title))
+    return g('windows', hit ? hit[1] : 'dell')
+  }
+  if (/watch/i.test(category)) {
+    return /^apple/i.test(title) ? g('watch', 'apple_watch') : g('no_reset', 'accessory')
+  }
+  if (/audio/i.test(category)) {
+    if (/airpods max/i.test(title)) return g('airpods', 'airpods_max')
+    return /airpods/i.test(title) ? g('airpods', 'airpods') : g('no_reset', 'audio')
+  }
+  if (/gaming/i.test(category)) {
+    const ps = title.match(/(?:ps|playstation)\s?([345])\b/i)
+    if (ps && !/controller/i.test(title)) return g('playstation', `ps${ps[1]}`)
+    return g('no_reset', 'controller')
+  }
+  return g('no_reset', 'accessory')
+}

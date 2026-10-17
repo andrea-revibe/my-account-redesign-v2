@@ -5,447 +5,122 @@ import {
   Clock,
   Check,
   CheckCircle2,
-  AlertTriangle,
   ArrowRight,
   ChevronLeft,
   ChevronDown,
   HelpCircle,
-  ShieldCheck,
-  RotateCcw,
+  Home,
+  Truck,
+  KeyRound,
+  LifeBuoy,
+  Info,
 } from 'lucide-react'
 import { STEP_ANIM_CSS, stepAnim } from './resetGuideAnim'
 import {
-  MiniPhone,
   SettingsSignOut,
   SettingsErase,
   HelloScreen,
-  ICloudRemove,
-  MockCarousel,
-  AcctMenu,
-  AcctDeviceList,
-  AcctDeviceDetail,
-  AcctRemove,
   SamsungRemoveGoogle,
   SamsungSignOutCarousel,
   SamsungFactoryReset,
   SamsungWelcome,
-  GoogleRemoveRemote,
-  SamsungRemoveRemote,
   AndroidTabletRemoveGoogle,
   AndroidTabletSignOutCarousel,
   AndroidTabletFactoryReset,
   AndroidTabletWelcome,
-  AndroidTabletGoogleRemoveRemote,
-  AndroidTabletSamsungRemoveRemote,
-  IntroDevice,
-  MiniTablet,
   IpadSettingsSignOut,
   IpadSettingsErase,
   IpadHelloScreen,
   MacSignOut,
   MacErase,
   MacWelcome,
-  MacICloudRemove,
-  MacAccountRemove,
 } from './resetGuideMocks'
+import { PathFrame, GuideIntroArt } from './resetGuideFrames'
+import PasscodeField from './PasscodeField'
+import { ACCOUNT_RECOVERY, NEVER_ASK } from '../../data/resetGuides'
+import {
+  guideById,
+  effectiveMode,
+  variantFor,
+  stepsFor,
+  cantUseFor,
+  fillNoun,
+  passcodeError,
+  RESET_MODES,
+} from '../../lib/resetGuides'
 
-// Guided reset — a focused, one-step-per-screen walkthrough launched from the
-// "I've factory reset the device" option on Step 3. The `os` prop ('ios' |
-// 'android') selects the platform's steps, copy, and mock screens; everything
-// else (the phase machine, the shell, the progress + trouble chrome) is
-// shared. The customer picks a route on the intro screen (reset from the
-// device, or remove it remotely), walks each step grounded in a mock OS
-// screen, then lands on a centered "ready to ship" finish. Pressing Done fires
-// onDone so the step can unlock its confirm checkbox. Instructional only —
-// never gates the flow directly; the step's confirm checkbox does.
-//
-// iOS = Activation Lock (one Apple account). Android = Samsung One UI, where
-// two separate locks must clear: Google's Factory Reset Protection (FRP) and
-// Samsung's Reactivation Lock — which is why the Android routes carry an extra
-// account step.
+// Guided reset — one engine that renders any guide definition from
+// data/resetGuides/* (G1–G7 + no-reset) in Return or Repair mode. One step per
+// screen; "I can't use my device" is reachable from every screen and asks
+// where the device is (still with you → on-device fixes; already sent →
+// account actions only), with the vendor's account recovery behind it.
+// Finishing either path fires onDone({ via, passcodeProvided }) — the caller
+// (Step 3 / ResetFailedCard / the sandbox) decides what that unlocks.
 
-const DEVICE_STEPS = {
-  iphone: [
-    {
-      Mock: SettingsSignOut,
-      title: 'Sign out of iCloud',
-      lead: 'Open Settings, tap your name, scroll to the very bottom and tap Sign Out. Enter your Apple ID password to confirm.',
-      why: 'This is the one step that removes Activation Lock.',
-      trouble: {
-        label: "It won't let me sign out",
-        body: 'On iOS 17.3+, Stolen Device Protection can add a 1-hour delay away from home or work — do it at home, or turn it off under Settings › Face ID & Passcode. Forgot the password or biometrics broken? Switch to the remote path.',
-        escalate: true,
-      },
-    },
-    {
-      Mock: SettingsErase,
-      title: 'Erase all content',
-      lead: 'Go to Settings › General › Transfer or Reset, then tap Erase All Content and Settings. It takes 2–10 minutes — don’t interrupt it.',
-      why: 'Not the “Reset” sub-menu — that only clears network & keyboard settings.',
-    },
-    {
-      Mock: HelloScreen,
-      title: 'Restart and check',
-      lead: 'When it reboots you’ll see the rotating “hello” screen and a language picker — not an Apple ID prompt. Then power it off and pack it.',
-      why: 'No Apple ID prompt means Activation Lock is off — you’re done.',
-      trouble: {
-        label: 'I see a passcode or “Locked to Owner” screen',
-        body: 'A passcode keypad means the erase didn’t run — redo the erase step. An Apple ID / “iPhone Locked to Owner” prompt means it’s wiped but still linked — finish it on the remote path.',
-        escalate: true,
-      },
-    },
-  ],
-  ipad: [
-    {
-      Mock: IpadSettingsSignOut,
-      title: 'Sign out of iCloud',
-      lead: 'Open Settings, tap your name at the top, scroll to the bottom and tap Sign Out. Enter your Apple ID password to confirm.',
-      why: 'This is the one step that removes Activation Lock.',
-      trouble: {
-        label: "It won’t let me sign out",
-        body: 'On iPadOS 17.3+, Stolen Device Protection can add a 1-hour delay away from home or work — do it at home, or turn it off under Settings › Face ID & Passcode. Forgot the password or the screen’s broken? Switch to the remote path.',
-        escalate: true,
-      },
-    },
-    {
-      Mock: IpadSettingsErase,
-      title: 'Erase all content',
-      lead: 'Go to Settings › General › Transfer or Reset iPad, then tap Erase All Content and Settings. It takes 2–10 minutes — don’t interrupt it.',
-      why: 'Not the “Reset” sub-menu — that only clears network & keyboard settings.',
-    },
-    {
-      Mock: IpadHelloScreen,
-      title: 'Restart and check',
-      lead: 'When it reboots you’ll see the rotating “hello” screen and a language picker — not an Apple ID prompt. Then power it off and pack it.',
-      why: 'No Apple ID prompt means Activation Lock is off — you’re done.',
-      trouble: {
-        label: 'I see a passcode or “Locked to Owner” screen',
-        body: 'A passcode keypad means the erase didn’t run — redo the erase step. An Apple ID / “iPad Locked to Owner” prompt means it’s wiped but still linked — finish it on the remote path.',
-        escalate: true,
-      },
-    },
-  ],
-  mac: [
-    {
-      Mock: MacSignOut,
-      title: 'Sign out of your Apple Account',
-      lead: 'Open System Settings, click your name at the top of the sidebar, scroll down and click Sign Out. Enter your Apple ID password to confirm.',
-      why: 'Signing out turns off Find My and lifts Activation Lock on Apple silicon and T2 Macs.',
-      trouble: {
-        label: "It won’t let me sign out",
-        body: 'Find My asks for your Apple ID password before it releases the Mac. Forgot it, or the Mac won’t start up? Switch to the remote path and unlink it from your account instead.',
-        escalate: true,
-      },
-    },
-    {
-      Mock: MacErase,
-      title: 'Erase all content and settings',
-      lead: 'Go to System Settings › General › Transfer or Reset, then click Erase All Content and Settings. The Erase Assistant wipes the Mac and signs you out automatically.',
-      why: 'On Apple silicon and 2018-or-newer (T2) Macs this is the clean one-click wipe — the same idea as on iPhone.',
-      trouble: {
-        label: "I don’t see Erase All Content and Settings",
-        body: 'Older Intel Macs without the T2 chip don’t have it. Restart holding ⌘-R to enter Recovery, open Disk Utility and erase Macintosh HD, then reinstall macOS from the Recovery menu.',
-      },
-    },
-    {
-      Mock: MacWelcome,
-      title: 'Restart and check',
-      lead: 'When it reboots you’ll see the Setup Assistant — the globe and “Select Your Country or Region” — not a login or Apple ID prompt. Then shut it down and pack it.',
-      why: 'Landing on Setup Assistant with no account prompt means Activation Lock is off — you’re done.',
-      trouble: {
-        label: 'I see a login window or Activation Lock',
-        body: 'A login window means the erase didn’t run — redo the erase step. An “Activation Lock” / Apple ID prompt means it’s wiped but still linked — finish it on the remote path.',
-        escalate: true,
-      },
-    },
-  ],
-  android: [
-    {
-      Mock: SamsungRemoveGoogle,
-      title: 'Remove your Google account',
-      lead: 'Open Settings › Accounts and backup › Manage accounts, tap your Google account, then Remove account. Repeat for every Google account signed in.',
-      why: 'This is what stops Factory Reset Protection (FRP) locking the device after the wipe.',
-      trouble: {
-        label: 'I forgot my Google password',
-        body: 'Stop here and reset it at accounts.google.com/signin/recovery before you reset the phone — without it you can’t clear FRP afterwards, and there’s no workaround we or Google can offer. If the phone is broken and you can’t reach this screen, switch to the remote path.',
-        escalate: true,
-      },
-    },
-    {
-      Mock: SamsungSignOutCarousel,
-      title: 'Sign out of Samsung & turn off Find My Mobile',
-      lead: 'Settings › Security and privacy › Find My Mobile — toggle it off (and Reactivation lock if shown). Then Accounts and backup › Manage accounts › your Samsung account › Sign out.',
-      why: 'Leaving the Samsung account signed in keeps Reactivation Lock active — it’ll block the device after reset even with Google removed.',
-      trouble: {
-        label: 'It needs my fingerprint or face',
-        body: 'On One UI 6.1+ (most 2024-or-newer Galaxy devices) Identity Check can require biometric verification before you can sign out. Turn it off under Settings › Security and privacy › Lost device protection. If your fingerprint sensor or front camera is broken, switch to the remote path instead.',
-        escalate: true,
-      },
-    },
-    {
-      Mock: SamsungFactoryReset,
-      title: 'Remove the screen lock, then factory reset',
-      lead: 'First set Settings › Lock screen › Screen lock type to None. Then Settings › General management › Reset › Factory data reset › Reset › Delete all.',
-      why: 'Pick “Factory data reset” — not “Reset settings” or “Reset network settings”, which only clear preferences and are the #1 reason people think they’ve reset but haven’t.',
-    },
-    {
-      Mock: SamsungWelcome,
-      title: 'Restart and check',
-      lead: 'When it reboots you’ll see the Samsung welcome screen with a language picker — not a Google or Samsung sign-in. Then power it off and pack it. Don’t connect to Wi-Fi or finish setup.',
-      why: 'No account prompt means FRP and Reactivation Lock are both off — you’re done.',
-      trouble: {
-        label: 'I see a PIN or an account sign-in',
-        body: 'A PIN/pattern keypad means the erase didn’t run — redo the factory reset step. A “Verify your account” (Google) or “Sign in to your Samsung account” prompt means it’s wiped but still linked — finish it on the remote path.',
-        escalate: true,
-      },
-    },
-  ],
-  // Android tablet — identical One UI steps to the Samsung phone guide, just
-  // rendered in the wider tablet frame (MiniTablet) and worded "tablet".
-  android_tablet: [
-    {
-      Mock: AndroidTabletRemoveGoogle,
-      title: 'Remove your Google account',
-      lead: 'Open Settings › Accounts and backup › Manage accounts, tap your Google account, then Remove account. Repeat for every Google account signed in.',
-      why: 'This is what stops Factory Reset Protection (FRP) locking the device after the wipe.',
-      trouble: {
-        label: 'I forgot my Google password',
-        body: 'Stop here and reset it at accounts.google.com/signin/recovery before you reset the tablet — without it you can’t clear FRP afterwards, and there’s no workaround we or Google can offer. If the tablet is broken and you can’t reach this screen, switch to the remote path.',
-        escalate: true,
-      },
-    },
-    {
-      Mock: AndroidTabletSignOutCarousel,
-      title: 'Sign out of Samsung & turn off Find My Mobile',
-      lead: 'Settings › Security and privacy › Find My Mobile — toggle it off (and Reactivation lock if shown). Then Accounts and backup › Manage accounts › your Samsung account › Sign out.',
-      why: 'Leaving the Samsung account signed in keeps Reactivation Lock active — it’ll block the device after reset even with Google removed.',
-      trouble: {
-        label: 'It needs my fingerprint or face',
-        body: 'On One UI 6.1+ (most 2024-or-newer Galaxy devices) Identity Check can require biometric verification before you can sign out. Turn it off under Settings › Security and privacy › Lost device protection. If your fingerprint sensor or front camera is broken, switch to the remote path instead.',
-        escalate: true,
-      },
-    },
-    {
-      Mock: AndroidTabletFactoryReset,
-      title: 'Remove the screen lock, then factory reset',
-      lead: 'First set Settings › Lock screen › Screen lock type to None. Then Settings › General management › Reset › Factory data reset › Reset › Delete all.',
-      why: 'Pick “Factory data reset” — not “Reset settings” or “Reset network settings”, which only clear preferences and are the #1 reason people think they’ve reset but haven’t.',
-    },
-    {
-      Mock: AndroidTabletWelcome,
-      title: 'Restart and check',
-      lead: 'When it reboots you’ll see the Samsung welcome screen with a language picker — not a Google or Samsung sign-in. Then power it off and pack it. Don’t connect to Wi-Fi or finish setup.',
-      why: 'No account prompt means FRP and Reactivation Lock are both off — you’re done.',
-      trouble: {
-        label: 'I see a PIN or an account sign-in',
-        body: 'A PIN/pattern keypad means the erase didn’t run — redo the factory reset step. A “Verify your account” (Google) or “Sign in to your Samsung account” prompt means it’s wiped but still linked — finish it on the remote path.',
-        escalate: true,
-      },
-    },
-  ],
+// step.mock keys → the existing CSS-art screens. Steps without a match render
+// a PathFrame with the menu path instead.
+const MOCKS = {
+  ios_signout: SettingsSignOut,
+  ios_erase: SettingsErase,
+  ios_hello: HelloScreen,
+  ipad_signout: IpadSettingsSignOut,
+  ipad_erase: IpadSettingsErase,
+  ipad_hello: IpadHelloScreen,
+  sam_remove_google: SamsungRemoveGoogle,
+  sam_signout: SamsungSignOutCarousel,
+  sam_reset: SamsungFactoryReset,
+  sam_welcome: SamsungWelcome,
+  tab_remove_google: AndroidTabletRemoveGoogle,
+  tab_signout: AndroidTabletSignOutCarousel,
+  tab_reset: AndroidTabletFactoryReset,
+  tab_welcome: AndroidTabletWelcome,
+  mac_signout: MacSignOut,
+  mac_erase: MacErase,
+  mac_welcome: MacWelcome,
 }
 
-// iPhone & iPad unlink the same way (icloud.com/find + account.apple.com ›
-// Devices) on a portrait touch device, so they share one factory — only the
-// device noun and the frame change. Mac uses a desktop-Safari layout (see
-// MAC_REMOTE_STEPS). Android keeps its own two-account remote path below.
-function appleRemoteSteps(noun, Frame = MiniPhone) {
-  const a = /^[aeiou]/i.test(noun) ? 'an' : 'a'
-  return [
-    {
-      Mock: () => <ICloudRemove noun={noun} Frame={Frame} />,
-      title: 'Remove it from iCloud',
-      lead: `On any device, open icloud.com/find and sign in with the Apple ID that was on this ${noun}. Pick the device, then tap Remove This Device — not Erase.`,
-      why: 'Remove This Device is what unlinks it and lifts Activation Lock. Erase only wipes the data — the lock stays on.',
-      trouble: {
-        label: 'What if it’s still online?',
-        body: `If the ${noun} is offline, Activation Lock lifts straight away (and it drops off Find My after 30 days). If it’s still online it can’t be removed yet — tap Continue to mark it “Ready for Repair / Trade In” for 30 days. One catch: if it later comes back online while still signed in, it can reappear and re-lock — so if you can still reach the device, also sign out of iCloud on it. You can do the same from appleid.apple.com › Devices.`,
-      },
-    },
-    {
-      Mock: makeAccountCarousel(noun, Frame),
-      title: 'Or unlink it from your account',
-      lead: `No iCloud access? On any device open account.apple.com and sign in. Open the menu, tap Devices, pick this ${noun}, scroll to About, then tap Remove from account. Swipe the screens with the arrows.`,
-      why: 'Removing it from your Apple Account lifts Activation Lock too — same result as the iCloud step, just a different route.',
-      trouble: {
-        label: 'Which one should I use?',
-        body: `Either lifts the lock. Use icloud.com/find if the ${noun} is lost or you also want to erase it remotely. Use account.apple.com › Devices when you just need to unlink ${a} ${noun} you still have in hand.`,
-      },
-    },
-  ]
+function mockFor(step, variantId) {
+  const key = typeof step.mock === 'string' ? step.mock : step.mock?.[variantId]
+  return key ? MOCKS[key] : null
 }
 
-// Mac remote path — a Mac is unlocked from a desktop browser, so the screens
-// render in the laptop shell with Safari-window chrome rather than a phone.
-const MAC_REMOTE_STEPS = [
-  {
-    Mock: MacICloudRemove,
-    title: 'Remove it from iCloud',
-    lead: 'On any computer, open icloud.com/find and sign in with the Apple ID that was on this Mac. Select the Mac, then click Remove This Device — not Erase.',
-    why: 'Remove This Device unlinks it and lifts Activation Lock. Erase only wipes the data — the lock stays on.',
-    trouble: {
-      label: 'What if it’s still online?',
-      body: 'If the Mac is offline, Activation Lock lifts straight away (and it drops off Find My after 30 days). If it’s still online it can’t be removed yet — sign out of iCloud on the Mac itself, or remove it from account.apple.com › Devices once it’s offline.',
-    },
-  },
-  {
-    Mock: MacAccountRemove,
-    title: 'Or unlink it from your account',
-    lead: 'No iCloud access? Open account.apple.com, sign in, go to Devices, select this Mac, then click Remove from account.',
-    why: 'Removing it from your Apple Account lifts Activation Lock too — same result as the iCloud step, just a different route.',
-    trouble: {
-      label: 'Which one should I use?',
-      body: 'Either lifts the lock. Use icloud.com/find if the Mac is lost or you also want to erase it remotely. Use account.apple.com › Devices when you just need to unlink a Mac you still have in hand.',
-    },
-  },
-]
-
-const REMOTE_STEPS = {
-  iphone: appleRemoteSteps('iPhone'),
-  ipad: appleRemoteSteps('iPad', MiniTablet),
-  mac: MAC_REMOTE_STEPS,
-  android: [
-    {
-      Mock: GoogleRemoveRemote,
-      title: 'Remove it from your Google account',
-      lead: 'On any device, open myaccount.google.com/device-activity and sign in with the Google account that was on this phone. Tap this phone in the list, then tap Sign out.',
-      why: 'This clears Factory Reset Protection so our technician can wipe and resell the device.',
-      trouble: {
-        label: 'How long does this take?',
-        body: 'Google’s FRP cache can take up to 72 hours to fully clear after a remote sign-out. If you’re shipping urgently and still remember the password, signing in on the device once is faster.',
-      },
-    },
-    {
-      Mock: SamsungRemoveRemote,
-      title: 'And remove it from your Samsung account',
-      lead: 'Open account.samsung.com, sign in, go to Devices, find this phone and tap Remove.',
-      why: 'This lifts Samsung’s Reactivation Lock — the same result as on-device, just remote.',
-      trouble: {
-        label: 'Do I need to do both?',
-        body: 'Yes. Google and Samsung locks are separate systems — removing only one still leaves the other able to block the device. Do both before you ship.',
-      },
-    },
-  ],
-  android_tablet: [
-    {
-      Mock: AndroidTabletGoogleRemoveRemote,
-      title: 'Remove it from your Google account',
-      lead: 'On any device, open myaccount.google.com/device-activity and sign in with the Google account that was on this tablet. Tap this tablet in the list, then tap Sign out.',
-      why: 'This clears Factory Reset Protection so our technician can wipe and resell the device.',
-      trouble: {
-        label: 'How long does this take?',
-        body: 'Google’s FRP cache can take up to 72 hours to fully clear after a remote sign-out. If you’re shipping urgently and still remember the password, signing in on the device once is faster.',
-      },
-    },
-    {
-      Mock: AndroidTabletSamsungRemoveRemote,
-      title: 'And remove it from your Samsung account',
-      lead: 'Open account.samsung.com, sign in, go to Devices, find this tablet and tap Remove.',
-      why: 'This lifts Samsung’s Reactivation Lock — the same result as on-device, just remote.',
-      trouble: {
-        label: 'Do I need to do both?',
-        body: 'Yes. Google and Samsung locks are separate systems — removing only one still leaves the other able to block the device. Do both before you ship.',
-      },
-    },
-  ],
-}
-
-const COPY = {
-  iphone: {
-    fallbackTitle: 'Reset your iPhone',
-    introTitle: 'Let’s unlock your iPhone',
-    introSub:
-      'We’ll go one step at a time. First — can you still unlock and use this phone?',
-    yes: 'Yes, I can unlock it',
-    yesSub: 'Reset right from the device · most people',
-    no: 'No — it’s broken or won’t turn on',
-    noSub: 'We’ll erase it remotely instead',
-    doneTitle: 'Your iPhone is ready to ship',
-    doneSub: 'It’s erased and unlinked from your account.',
-  },
-  ipad: {
-    fallbackTitle: 'Reset your iPad',
-    introTitle: 'Let’s unlock your iPad',
-    introSub:
-      'We’ll go one step at a time. First — can you still unlock and use this iPad?',
-    yes: 'Yes, I can unlock it',
-    yesSub: 'Reset right from the device · most people',
-    no: 'No — it’s broken or won’t turn on',
-    noSub: 'We’ll erase it remotely instead',
-    doneTitle: 'Your iPad is ready to ship',
-    doneSub: 'It’s erased and unlinked from your account.',
-  },
-  mac: {
-    fallbackTitle: 'Reset your MacBook',
-    introTitle: 'Let’s wipe your MacBook',
-    introSub:
-      'We’ll go one step at a time. First — can you still log in and use this Mac?',
-    yes: 'Yes, I can log in',
-    yesSub: 'Erase right from the Mac · most people',
-    no: 'No — it’s broken or won’t start up',
-    noSub: 'We’ll unlink it remotely instead',
-    doneTitle: 'Your MacBook is ready to ship',
-    doneSub: 'It’s erased and unlinked from your account.',
-  },
-  android: {
-    fallbackTitle: 'Reset your Samsung phone',
-    introTitle: 'Let’s unlock your Samsung phone',
-    introSub:
-      'We’ll go one step at a time. First — can you still unlock and use this phone?',
-    yes: 'Yes, I can unlock it',
-    yesSub: 'Reset right from the device · most people',
-    no: 'No — it’s broken or won’t turn on',
-    noSub: 'We’ll erase it remotely instead',
-    doneTitle: 'Your phone is ready to ship',
-    doneSub: 'It’s erased and unlinked from your Google and Samsung accounts.',
-  },
-  android_tablet: {
-    fallbackTitle: 'Reset your Samsung tablet',
-    introTitle: 'Let’s unlock your Samsung tablet',
-    introSub:
-      'We’ll go one step at a time. First — can you still unlock and use this tablet?',
-    yes: 'Yes, I can unlock it',
-    yesSub: 'Reset right from the device · most people',
-    no: 'No — it’s broken or won’t turn on',
-    noSub: 'We’ll erase it remotely instead',
-    doneTitle: 'Your tablet is ready to ship',
-    doneSub: 'It’s erased and unlinked from your Google and Samsung accounts.',
-  },
-}
-
-const DEVICE_LABEL = {
-  iphone: 'iPhone',
-  ipad: 'iPad',
-  mac: 'MacBook',
-  android: 'Samsung',
-  android_tablet: 'Samsung tablet',
-}
+const INITIAL_WHERE = { with_you: 'withYou', sent: 'sent', recovery: 'withYou' }
 
 export default function ResetGuideSheet({
-  device = 'iphone',
+  guideId = 'apple_mobile',
+  mode = 'return',
+  facts = {},
+  // 'start' | 'with_you' | 'sent' | 'recovery' — opens the can't-use branch
+  // directly (ResetFailedCard: the device is already at Revibe → 'sent').
+  initialView = 'start',
+  // Close via onDone on finish instead of showing the done screen.
+  skipDone = false,
   onDone,
   onClose,
-  // When set (e.g. 'remote'), the sheet skips the intro fork and opens
-  // straight onto that route's first step — used by ResetFailedCard, where
-  // QC already established the device is locked and at Revibe, so only the
-  // remote path applies. `skipDone` then closes via onDone on the last step
-  // instead of showing the "ready to ship" screen (the device is already here).
-  initialRoute = null,
-  skipDone = false,
 }) {
-  const c = COPY[device] || COPY.iphone
-  const [phase, setPhase] = useState(initialRoute ? 'steps' : 'intro')
-  const [route, setRoute] = useState(initialRoute ?? null)
+  const guide = guideById(guideId)
+  const m = effectiveMode(guide, mode)
+  const variant = variantFor(guide, facts.variant)
+  const noun = variant.noun
+  const fill = (t) => fillNoun(t, noun, variant.plural)
+  const direct = initialView !== 'start'
+
+  const [view, setView] = useState(direct ? 'cant_use' : 'intro')
+  const [returnTo, setReturnTo] = useState(null)
+  const [chip, setChip] = useState(facts.chip ?? null)
+  const [chipError, setChipError] = useState(false)
   const [i, setI] = useState(0)
   const [dir, setDir] = useState(1)
-  // Index within a carousel step (steps whose Mock carries a `.screens`
-  // array). Reset whenever the step or route changes. The footer button walks
-  // this forward one screen at a time and only advances the step once the last
-  // screen has been viewed.
   const [carouselIdx, setCarouselIdx] = useState(0)
+  const [where, setWhere] = useState(INITIAL_WHERE[initialView] ?? null)
+  const [recoveryOpen, setRecoveryOpen] = useState(initialView === 'recovery')
+  const [passcode, setPasscode] = useState('')
+  const [passcodeShown, setPasscodeShown] = useState(false)
+  const [doneVia, setDoneVia] = useState('guide')
+
   useEffect(() => {
     setCarouselIdx(0)
-  }, [i, route])
+  }, [i])
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -458,65 +133,73 @@ export default function ResetGuideSheet({
     }
   }, [onClose])
 
-  const deviceSteps = DEVICE_STEPS[device] || DEVICE_STEPS.iphone
-  const remoteSteps = REMOTE_STEPS[device] || REMOTE_STEPS.iphone
-  const steps = route === 'remote' ? remoteSteps : deviceSteps
-
-  // A step is a carousel when its Mock exposes a `.screens` array (see
-  // AccountRemoveCarousel / SamsungSignOutCarousel). `atCarouselEnd` is true
-  // for non-carousel steps and for carousel steps sitting on their last screen.
-  const activeScreens = steps[i]?.Mock?.screens
-  const isCarousel = Array.isArray(activeScreens)
-  const atCarouselEnd = !isCarousel || carouselIdx >= activeScreens.length - 1
+  const steps = stepsFor(guide, m, { variant: variant.id, chip })
+  const step = steps[i]
+  const screens = view === 'steps' ? mockFor(step, variant.id)?.screens : null
+  const isCarousel = Array.isArray(screens)
+  const atCarouselEnd = !isCarousel || carouselIdx >= screens.length - 1
   const showFinish = atCarouselEnd && i === steps.length - 1
+  const pcError = step?.passcode ? passcodeError(passcode, step.passcode) : null
+  const passcodeProvided = !!passcode.trim() && !passcodeError(passcode, guide.steps.find((s) => s.passcode)?.passcode)
 
-  const start = (r) => {
-    setRoute(r)
+  const finish = (via) => {
+    const result = { via, passcodeProvided }
+    if (skipDone) return onDone(result)
+    setDoneVia(via)
+    setView('done')
+  }
+  const start = () => {
+    if (guide.branch && !chip) {
+      setChipError(true)
+      return
+    }
     setI(0)
     setDir(1)
-    setPhase('steps')
+    setView('steps')
   }
   const next = () => {
-    if (isCarousel && carouselIdx < activeScreens.length - 1) {
+    if (isCarousel && carouselIdx < screens.length - 1) {
       setCarouselIdx((n) => n + 1)
+      return
+    }
+    if (pcError) {
+      setPasscodeShown(true)
       return
     }
     setDir(1)
     if (i < steps.length - 1) setI(i + 1)
-    else if (skipDone) onDone()
-    else setPhase('done')
+    else finish('guide')
   }
   const back = () => {
-    if (isCarousel && carouselIdx > 0) {
-      setCarouselIdx((n) => n - 1)
-      return
+    if (view === 'cant_use') {
+      if (where && !direct) return setWhere(null)
+      if (returnTo) return setView(returnTo)
+      return onClose()
     }
+    if (isCarousel && carouselIdx > 0) return setCarouselIdx((n) => n - 1)
     setDir(-1)
     if (i > 0) setI(i - 1)
-    else if (initialRoute) onClose()
-    else setPhase('intro')
+    else setView('intro')
   }
-  const escalate = () => {
-    setRoute('remote')
-    setI(0)
-    setDir(1)
+  const openCantUse = () => {
+    setReturnTo(view)
+    setWhere(null)
+    setView('cant_use')
   }
 
   const headerTitle =
-    phase === 'done'
+    view === 'done'
       ? ''
-      : route === 'remote'
-        ? 'Remote reset'
-        : route === 'device'
-          ? 'Reset from the device'
-          : c.fallbackTitle
+      : view === 'cant_use'
+        ? 'I can’t use my device'
+        : guide.label
 
   return createPortal(
     <div
       className="fixed inset-0 z-[60] flex justify-center"
       role="dialog"
       aria-modal="true"
-      aria-label={`Guided ${DEVICE_LABEL[device] || 'device'} reset`}
+      aria-label={`Guided ${guide.label} reset`}
     >
       <style>{STEP_ANIM_CSS}</style>
       <button
@@ -526,9 +209,9 @@ export default function ResetGuideSheet({
       />
       <div className="relative w-full max-w-mobile h-full bg-surface flex flex-col animate-slideUp overflow-hidden">
         <header className="shrink-0 px-4 pt-4 pb-3 border-b border-line">
-          <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              {phase === 'steps' && (
+              {(view === 'steps' || view === 'cant_use') && (
                 <button
                   onClick={back}
                   className="w-8 h-8 -ml-1 rounded-full grid place-items-center text-ink hover:bg-line-2/60 shrink-0"
@@ -537,9 +220,8 @@ export default function ResetGuideSheet({
                   <ChevronLeft size={18} strokeWidth={2} />
                 </button>
               )}
-              <span className="text-[13px] font-bold text-ink truncate">
-                {headerTitle}
-              </span>
+              <span className="text-[13px] font-bold text-ink truncate">{headerTitle}</span>
+              {view !== 'done' && guide.id !== 'no_reset' && <ModeBadge mode={m} />}
             </div>
             <button
               onClick={onClose}
@@ -549,168 +231,108 @@ export default function ResetGuideSheet({
               <X size={18} strokeWidth={2} />
             </button>
           </div>
-          {phase === 'steps' && (
-            <Progress current={i + 1} total={steps.length} />
+          {view === 'steps' && (
+            <div className="mt-3">
+              <Progress current={i + 1} total={steps.length} />
+            </div>
           )}
         </header>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {phase === 'intro' && (
-            <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center animate-fadeIn">
-              <IntroDevice device={device} />
-              <h2 className="mt-3 text-[21px] font-bold text-ink leading-tight">
-                {c.introTitle}
-              </h2>
-              <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">
-                {c.introSub}
-              </p>
-              <div className="mt-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-line-2/70 text-ink-2 px-2.5 h-6 text-[11px] font-semibold">
-                  <Clock size={12} strokeWidth={2} />
-                  About 10 minutes
-                </span>
-              </div>
-              <div className="mt-5 w-full flex flex-col gap-2.5">
-                <button
-                  onClick={() => start('device')}
-                  className="w-full text-left rounded-[16px] border-2 border-brand bg-brand-bg/50 px-4 py-3.5 flex items-center gap-3 hover:bg-brand-bg/70 transition-colors"
-                >
-                  <span className="w-10 h-10 rounded-full bg-brand text-white grid place-items-center shrink-0">
-                    <CheckCircle2 size={20} strokeWidth={2} />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[14.5px] font-semibold text-ink">
-                      {c.yes}
-                    </span>
-                    <span className="block text-[12px] text-muted">
-                      {c.yesSub}
-                    </span>
-                  </span>
-                  <ArrowRight
-                    size={18}
-                    strokeWidth={2.2}
-                    className="text-brand shrink-0"
-                  />
-                </button>
-                <button
-                  onClick={() => start('remote')}
-                  className="w-full text-left rounded-[16px] border-2 border-line bg-surface px-4 py-3.5 flex items-center gap-3 hover:bg-line-2/30 transition-colors"
-                >
-                  <span className="w-10 h-10 rounded-full bg-warn-bg text-warn grid place-items-center shrink-0">
-                    <AlertTriangle size={20} strokeWidth={2} />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[14.5px] font-semibold text-ink leading-snug">
-                      {c.no}
-                    </span>
-                    <span className="block text-[12px] text-muted">
-                      {c.noSub}
-                    </span>
-                  </span>
-                  <ArrowRight
-                    size={18}
-                    strokeWidth={2.2}
-                    className="text-muted shrink-0"
-                  />
-                </button>
-              </div>
-            </div>
+          {view === 'intro' && (
+            <Intro
+              guide={guide}
+              variant={variant}
+              mode={m}
+              stepCount={steps.length}
+              chip={chip}
+              chipError={chipError}
+              onChip={(id) => {
+                setChip(id)
+                setChipError(false)
+              }}
+            />
           )}
 
-          {phase === 'steps' &&
-            (() => {
-              const s = steps[i]
-              const Mock = s.Mock
-              return (
-                <div
-                  key={`${route}-${i}`}
-                  className="px-5 pt-5 pb-5 flex flex-col items-center text-center"
-                  style={{ animation: stepAnim(dir) }}
-                >
-                  {isCarousel ? (
-                    <Mock idx={carouselIdx} onIdxChange={setCarouselIdx} />
-                  ) : (
-                    <Mock />
-                  )}
-                  <h2 className="mt-4 text-[20px] font-bold text-ink leading-tight">
-                    {s.title}
-                  </h2>
-                  <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.55] max-w-[320px]">
-                    {s.lead}
-                  </p>
-                  {s.why && (
-                    <div
-                      className={`mt-3 inline-flex items-start gap-1.5 rounded-[10px] px-3 py-2 text-[12px] leading-snug max-w-[320px] ${
-                        route === 'remote'
-                          ? 'bg-warn-bg/70 text-warn'
-                          : 'bg-brand-bg/70 text-brand'
-                      }`}
-                    >
-                      <ShieldCheck
-                        size={14}
-                        strokeWidth={2}
-                        className="shrink-0 mt-px"
-                      />
-                      <span className="text-left font-medium">{s.why}</span>
-                    </div>
-                  )}
-                  {s.trouble && (
-                    <Trouble trouble={s.trouble} onEscalate={escalate} />
-                  )}
-                </div>
-              )
-            })()}
+          {view === 'steps' && step && (
+            <StepScreen
+              key={`${step.id}-${i}`}
+              step={step}
+              guide={guide}
+              variant={variant}
+              mode={m}
+              dir={dir}
+              fill={fill}
+              carouselIdx={carouselIdx}
+              setCarouselIdx={setCarouselIdx}
+              passcode={passcode}
+              setPasscode={(v) => {
+                setPasscode(v)
+                setPasscodeShown(false)
+              }}
+              passcodeErr={passcodeShown ? pcError : null}
+            />
+          )}
 
-          {phase === 'done' && (
-            <div className="min-h-full px-5 py-8 flex flex-col items-center justify-center text-center animate-fadeIn">
-              <div className="relative w-16 h-16">
-                <div className="absolute inset-0 rounded-full bg-success-bg" />
-                <div className="absolute inset-0 grid place-items-center text-success">
-                  <CheckCircle2 size={40} strokeWidth={1.9} />
-                </div>
-              </div>
-              <h2 className="mt-4 text-[21px] font-bold text-ink leading-tight">
-                {c.doneTitle}
-              </h2>
-              <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">
-                {c.doneSub}
-              </p>
-            </div>
+          {view === 'cant_use' && (
+            <CantUse
+              guide={guide}
+              mode={m}
+              fill={fill}
+              noun={noun}
+              where={where}
+              setWhere={setWhere}
+              recoveryOpen={recoveryOpen}
+              setRecoveryOpen={setRecoveryOpen}
+            />
+          )}
+
+          {view === 'done' && (
+            <Done guide={guide} mode={m} fill={fill} via={doneVia} passcodeProvided={passcodeProvided} />
           )}
         </div>
 
         <footer className="shrink-0 px-4 py-3 border-t border-line">
-          {phase === 'steps' && (
-            <button
-              onClick={next}
-              className="w-full h-[48px] rounded-[12px] bg-brand text-white font-semibold text-[14.5px] inline-flex items-center justify-center gap-1.5 active:scale-[0.99] transition-transform"
-            >
+          {view === 'intro' && (
+            <PrimaryButton onClick={start}>
+              Start <ArrowRight size={16} strokeWidth={2.4} />
+            </PrimaryButton>
+          )}
+          {view === 'steps' && (
+            <PrimaryButton onClick={next}>
               {showFinish ? (
                 <>
-                  I’ve done this — finish
-                  <Check size={16} strokeWidth={2.6} />
+                  I’ve done this — finish <Check size={16} strokeWidth={2.6} />
                 </>
               ) : (
                 <>
-                  I’ve done this
-                  <ArrowRight size={16} strokeWidth={2.4} />
+                  I’ve done this <ArrowRight size={16} strokeWidth={2.4} />
                 </>
               )}
-            </button>
+            </PrimaryButton>
           )}
-          {phase === 'done' && (
+          {view === 'cant_use' && where && (
+            <PrimaryButton onClick={() => finish('cant_use')}>
+              Continue with this <ArrowRight size={16} strokeWidth={2.4} />
+            </PrimaryButton>
+          )}
+          {view === 'done' && (
             <button
-              onClick={onDone}
+              onClick={() => onDone({ via: doneVia, passcodeProvided })}
               className="w-full h-[48px] rounded-[12px] bg-success text-white font-semibold text-[14.5px] inline-flex items-center justify-center gap-1.5"
             >
               <Check size={16} strokeWidth={2.6} />
               Done
             </button>
           )}
-          {phase === 'intro' && (
-            <p className="text-center text-[11.5px] text-muted leading-snug py-1">
-              Not sure? Pick “Yes” — you can switch paths anytime.
-            </p>
+          {(view === 'intro' || view === 'steps') && guide.cantUse && (
+            <button
+              onClick={openCantUse}
+              className="mt-2 w-full inline-flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-brand py-1"
+            >
+              <HelpCircle size={14} strokeWidth={2.2} />
+              I can’t use my device
+            </button>
           )}
         </footer>
       </div>
@@ -719,15 +341,350 @@ export default function ResetGuideSheet({
   )
 }
 
+function PrimaryButton({ onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full h-[48px] rounded-[12px] bg-brand text-white font-semibold text-[14.5px] inline-flex items-center justify-center gap-1.5 active:scale-[0.99] transition-transform"
+    >
+      {children}
+    </button>
+  )
+}
+
+function ModeBadge({ mode }) {
+  const tone =
+    mode === 'repair'
+      ? 'bg-accent/10 text-accent'
+      : mode === 'single'
+        ? 'bg-line-2 text-ink-2'
+        : 'bg-brand/10 text-brand'
+  return (
+    <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-[0.06em] ${tone}`}>
+      {mode === 'single' ? 'Return & repair' : RESET_MODES[mode].label}
+    </span>
+  )
+}
+
+const INTRO_COPY = {
+  return: {
+    title: 'Reset your {noun}',
+    sub: 'We’ll unlink it from your accounts and erase it, one step at a time. Back up anything you want to keep first.',
+  },
+  repair: {
+    title: 'Prepare your {noun} for repair',
+    sub: 'We’ll lift the locks so the repairer can test it. Your data stays on the device, and you never share an account password.',
+  },
+  single: {
+    title: 'Prepare your {noun}',
+    sub: 'The same few steps for a return or a repair — they free it from your Apple Account.',
+  },
+}
+
+function Intro({ guide, variant, mode, stepCount, chip, chipError, onChip }) {
+  const copy = INTRO_COPY[mode]
+  return (
+    <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center animate-fadeIn">
+      <GuideIntroArt variant={variant} />
+      <h2 className="mt-3 text-[21px] font-bold text-ink leading-tight">
+        {fillNoun(copy.title, variant.noun)}
+      </h2>
+      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">{copy.sub}</p>
+      <div className="mt-3 flex items-center gap-1.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-line-2/70 text-ink-2 px-2.5 h-6 text-[11px] font-semibold">
+          <Clock size={12} strokeWidth={2} /> ~10 min
+        </span>
+        <span className="inline-flex items-center rounded-full bg-line-2/70 text-ink-2 px-2.5 h-6 text-[11px] font-semibold">
+          {stepCount} {stepCount === 1 ? 'step' : 'steps'}
+        </span>
+      </div>
+
+      {guide.branch && (
+        <div className="mt-5 w-full text-left">
+          <div className="text-[13px] font-semibold text-ink">{guide.branch.question}</div>
+          <p className="mt-1 text-[11.5px] text-muted leading-snug">{guide.branch.hint}</p>
+          <div className="mt-2.5 flex flex-col gap-2">
+            {guide.branch.options.map((o) => {
+              const active = chip === o.id
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => onChip(o.id)}
+                  className={`flex items-center gap-2.5 rounded-[12px] border-[1.5px] px-3 py-2.5 text-left transition-colors ${
+                    active
+                      ? 'border-brand bg-brand-bg/50'
+                      : chipError
+                        ? 'border-danger bg-surface'
+                        : 'border-line bg-surface hover:border-brand/40'
+                  }`}
+                >
+                  <span
+                    className={`w-[15px] h-[15px] rounded-full border-2 grid place-items-center shrink-0 ${
+                      active ? 'border-brand' : 'border-line'
+                    }`}
+                  >
+                    {active && <span className="w-[7px] h-[7px] rounded-full bg-brand" />}
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-[13px] font-semibold text-ink">{o.label}</span>
+                    <span className="block text-[11.5px] text-muted">{o.sub}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {chipError && (
+            <p className="mt-1.5 ml-1 text-[11.5px] font-medium text-danger">
+              Pick your Mac’s chip — the erase steps depend on it.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StepScreen({
+  step,
+  guide,
+  variant,
+  mode,
+  dir,
+  fill,
+  carouselIdx,
+  setCarouselIdx,
+  passcode,
+  setPasscode,
+  passcodeErr,
+}) {
+  const Mock = mockFor(step, variant.id)
+  const isCarousel = Array.isArray(Mock?.screens)
+  const path = step.path?.map(fill)
+  const biosLine = step.bios ? guide.bios?.[variant.id] : null
+  return (
+    <div
+      className="px-5 pt-5 pb-5 flex flex-col items-center text-center"
+      style={{ animation: stepAnim(dir) }}
+    >
+      {Mock ? (
+        isCarousel ? (
+          <Mock idx={carouselIdx} onIdxChange={setCarouselIdx} />
+        ) : (
+          <Mock noun={variant.noun} />
+        )
+      ) : (
+        <PathFrame frame={step.frame ?? variant.frame} path={path} label={variant.label} />
+      )}
+      <h2 className="mt-4 text-[20px] font-bold text-ink leading-tight">{fill(step.title)}</h2>
+      {Mock && path && (
+        <p className="mt-1.5 text-[11.5px] font-semibold text-brand leading-snug max-w-[320px]">
+          {path.join(' › ')}
+        </p>
+      )}
+      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.55] max-w-[320px]">{fill(step.body)}</p>
+      {step.revibe && (
+        <span className="mt-2 inline-flex items-center rounded-full bg-brand/10 text-brand px-2 h-5 text-[10px] font-bold uppercase tracking-[0.05em]">
+          Revibe check
+        </span>
+      )}
+      {biosLine && (
+        <div className="mt-3 w-full max-w-[320px] rounded-[12px] border border-line bg-line-2/40 px-3 py-2.5 text-left">
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-muted">
+            {variant.label} · open BIOS / UEFI
+          </div>
+          <p className="mt-0.5 text-[12.5px] text-ink leading-snug">{biosLine}</p>
+        </div>
+      )}
+      {step.notes?.length > 0 && (
+        <ul className="mt-3 w-full max-w-[320px] flex flex-col gap-1.5 text-left">
+          {step.notes.map((n) => (
+            <li key={n.when} className="rounded-[10px] bg-brand-bg/60 px-3 py-2 text-[12px] leading-snug text-ink-2">
+              <span className="font-semibold text-brand">{n.when}:</span> {fill(n.text)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {step.passcode && mode === 'repair' && (
+        <PasscodeField kind={step.passcode} value={passcode} onChange={setPasscode} error={passcodeErr} />
+      )}
+      {step.trouble && <Trouble trouble={step.trouble} />}
+    </div>
+  )
+}
+
+function CantUse({ guide, mode, fill, noun, where, setWhere, recoveryOpen, setRecoveryOpen }) {
+  if (!where) {
+    return (
+      <div className="px-5 pt-6 pb-4 animate-fadeIn">
+        <h2 className="text-[20px] font-bold text-ink leading-tight text-center">
+          Where is your {noun} now?
+        </h2>
+        <p className="mt-2 text-[13px] text-ink-2 leading-[1.5] text-center">
+          The fixes are different, so tell us first.
+        </p>
+        <div className="mt-5 flex flex-col gap-2.5">
+          <WhereButton
+            icon={Home}
+            title="Still with me"
+            sub="Forgot the passcode, broken screen, or it won’t turn on"
+            onClick={() => setWhere('withYou')}
+          />
+          <WhereButton
+            icon={Truck}
+            title="Already sent to Revibe"
+            sub="Only account actions from another device or a browser work"
+            onClick={() => setWhere('sent')}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  const items = cantUseFor(guide, mode, where)
+  const accounts = guide.account.map((a) => ACCOUNT_RECOVERY[a]).filter(Boolean)
+  const lastResort = accounts.map((a) => a.nothingWorks).filter(Boolean)
+  return (
+    <div className="px-5 pt-5 pb-5 animate-fadeIn">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+          {where === 'withYou' ? `${noun} is still with you` : 'Already sent to Revibe'}
+        </span>
+        <button
+          onClick={() => setWhere(where === 'withYou' ? 'sent' : 'withYou')}
+          className="text-[11.5px] font-semibold text-brand"
+        >
+          {where === 'withYou' ? 'Already sent?' : 'Still with you?'}
+        </button>
+      </div>
+      <ul className="mt-3 flex flex-col gap-2">
+        {items.map((it) => (
+          <li key={it.title} className="rounded-[12px] border border-line bg-surface px-3.5 py-3">
+            <div className="text-[13.5px] font-semibold text-ink">{fill(it.title)}</div>
+            <p className="mt-1 text-[12.5px] text-ink-2 leading-[1.5]">{fill(it.body)}</p>
+          </li>
+        ))}
+      </ul>
+
+      {accounts.length > 0 && (
+        <div className="mt-3">
+          <button
+            onClick={() => setRecoveryOpen((v) => !v)}
+            aria-expanded={recoveryOpen}
+            className={`flex w-full items-center gap-2 rounded-[12px] border px-3.5 py-3 text-[13px] font-semibold text-ink transition-colors ${
+              recoveryOpen ? 'border-brand/40 bg-brand-bg/30' : 'border-line bg-surface hover:border-brand/40'
+            }`}
+          >
+            <KeyRound size={16} strokeWidth={2.2} className="text-brand shrink-0" />
+            <span className="text-left">
+              Can’t sign in to your {accounts.map((a) => a.name).join(' or ')}?
+            </span>
+            <ChevronDown
+              size={16}
+              strokeWidth={2.2}
+              className={`ml-auto shrink-0 text-muted transition-transform ${recoveryOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {recoveryOpen && (
+            <div className="mt-2 flex flex-col gap-2 animate-slideDown">
+              {accounts.map((a) => (
+                <div key={a.name} className="rounded-[12px] border border-line bg-line-2/40 px-3.5 py-3">
+                  <div className="text-[12.5px] font-semibold text-ink">Recover your {a.name}</div>
+                  <p className="mt-1 text-[12px] text-ink-2 leading-[1.5]">{a.recover}</p>
+                  <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] text-muted leading-snug">
+                    <Info size={12} strokeWidth={2} className="shrink-0 mt-px" />
+                    {a.limits}
+                  </p>
+                </div>
+              ))}
+              <div className="rounded-[12px] border border-warn-bg bg-warn-bg/60 px-3.5 py-3">
+                <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+                  <LifeBuoy size={14} strokeWidth={2.2} className="text-warn" />
+                  If nothing works
+                </div>
+                <ul className="mt-1 flex flex-col gap-1 text-[12px] text-ink-2 leading-[1.5]">
+                  {lastResort.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                  <li>Continue anyway — if it still reaches us locked, we’ll contact you with the next step.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="mt-4 text-center text-[11.5px] font-semibold text-ink-2 leading-snug">{NEVER_ASK}</p>
+    </div>
+  )
+}
+
+function WhereButton({ icon: Icon, title, sub, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left rounded-[16px] border-2 border-line bg-surface px-4 py-3.5 flex items-center gap-3 hover:border-brand/50 transition-colors"
+    >
+      <span className="w-10 h-10 rounded-full bg-brand-bg text-brand grid place-items-center shrink-0">
+        <Icon size={19} strokeWidth={2} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[14.5px] font-semibold text-ink">{title}</span>
+        <span className="block text-[12px] text-muted leading-snug">{sub}</span>
+      </span>
+      <ArrowRight size={18} strokeWidth={2.2} className="text-muted shrink-0" />
+    </button>
+  )
+}
+
+const DONE_COPY = {
+  return: {
+    title: 'Your {noun} {is} at the setup screen',
+    sub: 'Leave it there — don’t set it up again. It’s unlinked, erased and ready for pickup.',
+  },
+  repair: {
+    title: 'Your {noun} {is} ready for repair',
+    sub: 'The locks are off and your data stays on it.',
+  },
+  single: {
+    title: 'Your {noun} {is} ready to send',
+    sub: 'It’s removed from your Apple Account, so it won’t lock again.',
+  },
+}
+
+function Done({ guide, mode, fill, via, passcodeProvided }) {
+  const copy =
+    via === 'cant_use'
+      ? {
+          title: 'Thanks — you can continue',
+          sub: 'Your claim goes ahead. If the device still reaches us locked, we’ll contact you with the next step.',
+        }
+      : guide.id === 'no_reset'
+        ? { title: 'All set', sub: 'Pack everything that came in the box.' }
+        : DONE_COPY[mode]
+  return (
+    <div className="min-h-full px-5 py-8 flex flex-col items-center justify-center text-center animate-fadeIn">
+      <div className="relative w-16 h-16">
+        <div className="absolute inset-0 rounded-full bg-success-bg" />
+        <div className="absolute inset-0 grid place-items-center text-success">
+          <CheckCircle2 size={40} strokeWidth={1.9} />
+        </div>
+      </div>
+      <h2 className="mt-4 text-[21px] font-bold text-ink leading-tight">{fill(copy.title)}</h2>
+      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">
+        {copy.sub}
+        {passcodeProvided && via === 'guide' && ' Your passcode is stored securely for the repair partner only.'}
+      </p>
+    </div>
+  )
+}
+
 function Progress({ current, total }) {
   return (
     <div>
       <div className="flex items-center gap-1.5">
         {Array.from({ length: total }, (_, idx) => (
-          <span
-            key={idx}
-            className="flex-1 h-1.5 rounded-full overflow-hidden bg-line"
-          >
+          <span key={idx} className="flex-1 h-1.5 rounded-full overflow-hidden bg-line">
             <span
               className={`block h-full rounded-full bg-brand transition-all duration-500 ${
                 idx < current ? 'w-full' : 'w-0'
@@ -743,7 +700,7 @@ function Progress({ current, total }) {
   )
 }
 
-function Trouble({ trouble, onEscalate }) {
+function Trouble({ trouble }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="mt-4">
@@ -763,40 +720,8 @@ function Trouble({ trouble, onEscalate }) {
       {open && (
         <div className="mt-2 rounded-[12px] border border-line bg-line-2/40 px-3.5 py-3 animate-slideDown text-left">
           <p className="text-[12.5px] text-ink-2 leading-[1.5]">{trouble.body}</p>
-          {trouble.escalate && (
-            <button
-              onClick={onEscalate}
-              className="mt-2.5 inline-flex items-center gap-1.5 rounded-[10px] bg-warn-bg text-warn font-semibold text-[12px] px-3 h-9 hover:brightness-95"
-            >
-              <RotateCcw size={14} strokeWidth={2.2} />
-              Switch to the remote path
-              <ArrowRight size={13} strokeWidth={2.4} />
-            </button>
-          )}
         </div>
       )}
     </div>
   )
-}
-
-/* ----------------------------------------------------- iOS mock screens */
-
-// Builds the four-screen account.apple.com carousel for a given device. The
-// returned component carries `.screens` so ResetGuideSheet detects it as a
-// carousel step and gates its footer button on reaching the last screen.
-function makeAccountCarousel(noun, Frame = MiniPhone) {
-  const screens = [
-    { Screen: AcctMenu, caption: 'Open the menu, tap Devices' },
-    { Screen: () => <AcctDeviceList noun={noun} />, caption: `Pick this ${noun}` },
-    {
-      Screen: () => <AcctDeviceDetail noun={noun} />,
-      caption: 'Open it, scroll to About',
-    },
-    { Screen: () => <AcctRemove noun={noun} />, caption: 'Tap Remove from account' },
-  ]
-  function AccountRemoveCarousel(props) {
-    return <MockCarousel screens={screens} Frame={Frame} {...props} />
-  }
-  AccountRemoveCarousel.screens = screens
-  return AccountRemoveCarousel
 }

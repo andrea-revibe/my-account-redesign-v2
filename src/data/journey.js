@@ -73,6 +73,16 @@ export const JOURNEYS = [
     initialOrder: INITIAL_ORDER,
     nodes: [],
   },
+  // Guided-reset previewer: every guide × device variant × Return/Repair mode
+  // from data/resetGuides/*, opened straight from its own panel
+  // (ResetGuidePanel) — no claim walk needed. See useResetGuideSandbox.
+  {
+    id: 'guided_reset',
+    label: 'Guided reset',
+    kind: 'reset_sandbox',
+    initialOrder: INITIAL_ORDER,
+    nodes: [],
+  },
   {
     id: 'cancellation',
     label: 'Cancellation',

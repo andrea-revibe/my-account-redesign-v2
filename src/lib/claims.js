@@ -588,8 +588,16 @@ export function reasonText(claim) {
 }
 
 export function devicePrepText(claim) {
-  if (claim?.devicePrep?.neverSetUp) return 'Not set up — no reset needed'
-  if (claim?.devicePrep?.option === 'reset') return 'Factory reset confirmed'
+  const dp = claim?.devicePrep
+  if (dp?.neverSetUp) return 'Not set up — no reset needed'
+  if (dp?.guideId === 'no_reset') return 'No reset needed for this item'
+  if (dp?.option === 'reset' && dp.guideVia === 'cant_use')
+    return "Couldn't use the device — remote steps followed"
+  if (dp?.option === 'reset' && dp.mode === 'repair')
+    return dp.passcodeProvided
+      ? 'Locks off for repair · passcode shared securely'
+      : 'Locks off for repair'
+  if (dp?.option === 'reset') return 'Factory reset confirmed'
   if (claim?.devicePrep?.option === 'credentials')
     return 'Unlinked + passcode shared'
   return 'Not provided'

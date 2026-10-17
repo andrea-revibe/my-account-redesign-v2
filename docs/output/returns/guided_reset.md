@@ -1,110 +1,128 @@
 ---
 status: live
-verified_against: cc39517
+verified_against: e8888d6
 covers:
   - src/lib/devices.js
+  - src/lib/resetGuides.js
+  - src/lib/resetGuideSandbox.js
+  - src/data/resetGuides
   - src/components/ClaimFlow/Step3DevicePrep.jsx
   - src/components/ClaimFlow/ResetGuideSheet.jsx
+  - src/components/ClaimFlow/resetGuideFrames.jsx
   - src/components/ClaimFlow/resetGuideMocks.jsx
   - src/components/ClaimFlow/resetGuideAnim.js
+  - src/components/ClaimFlow/PasscodeField.jsx
   - src/components/ClaimFlow/flowReducer.js
+  - src/components/ResetGuidePanel.jsx
 ---
 
 # Guided reset (device prep)
 
-Step 3 of every device return flow — **"Prepare your device for return"** (`change_of_mind` / `issue` / `warranty`; `compensation` skips it). The customer must run a guided reset — unlink their account and wipe the device — before pickup, so Revibe can resell it. It's a single mandatory path: there's no separate passcode-handover option, because the guide itself branches to a remote route for devices that can't be unlocked or powered on.
+Step 3 of every device claim flow (`change_of_mind` / `issue` / `warranty`; `compensation` skips it). Before pickup, the customer runs a guide that removes the device's **account lock**: Apple Find My, Google + Samsung, Microsoft, or PlayStation primary console. Source of truth for the content is the doc *Guided resets for returns and warranties*. This prototype implements its guides, modes, mapping, "I can't use my device" branch and Repair-mode passcode field. It keeps the guide at Step 3 (no post-submit move, no pickup gate) and leaves out Arabic/RTL, the shared opening steps and the per-guide "Before you start" notes.
 
-The feature is two layers:
+## 1. Seven guides + no-reset, grouped by lock system
 
-1. **The mapping** (`src/lib/devices.js`) — resolves an order's product category to the two dimensions that pick the right guide. Pure functions, no UI.
-2. **The guide surface** — `Step3DevicePrep.jsx` (the step: launcher + confirm gate) opens `ResetGuideSheet.jsx` (the full walkthrough), which draws device mockups from `resetGuideMocks.jsx` and slide transitions from `resetGuideAnim.js`. The flow reducer (`flowReducer.js`) seeds the starting `os`/`device` from the mapping.
+Guides are grouped by what locks the device, not by brand. Brand and model differences are a variant, a branch question or a one-line note inside the guide.
 
-## 1. The mapping — `src/lib/devices.js`
-
-The canonical field is `product.category_name ?? order.category_name` (the production category, e.g. `iPhone`, `Macbook`, `Samsung phone`, `Tablet`, `Laptop`). `order.deviceOs` is only a fallback for orders that predate the field. From the category the mapping derives **two independent dimensions**:
-
-| Dimension | Values | Drives | Functions |
-|---|---|---|---|
-| `os` | `ios` \| `android` | The Apple-vs-Google split — iCloud-vs-Google account copy in the step | `osForCategory(categoryName)`, `deviceOsForOrder(order)` |
-| `device` (deviceType) | `iphone` \| `ipad` \| `mac` \| `android` \| `tablet` | The finer split that selects the guide's copy, steps, mock screens, and frame | `deviceTypeForCategory(categoryName)`, `deviceTypeForOrder(order)` |
-
-`isOsAmbiguous(order)` is `true` exactly when `deviceTypeForOrder` returns the OS-ambiguous `tablet` (see §3).
-
-Matching is regex-based (`IOS_RE` / `ANDROID_RE` / `IPAD_RE` / `MAC_RE` / `TABLET_RE`), Android-first, so any Android-ish category resolves to the Samsung guide knowingly (it's the only Android guide built).
-
-### Production category → guide
-
-| Category | `os` | `device` | Guide variant | Notes |
+| # | Guide (`id`) | Variants | Modes | Brand/model handled by |
 |---|---|---|---|---|
-| `iPhone` | `ios` | `iphone` | iPhone | |
-| `Macbook` | `ios` | `mac` | MacBook | desktop-Safari remote path, laptop frame |
-| `Samsung phone` | `android` | `android` | Samsung phone | |
-| `Tablet` | — | `tablet` → resolved | iPad **or** Samsung tablet | **OS-ambiguous** — resolved by the Step 3 chooser (§3) |
-| `Laptop` (Windows) | `ios` (fallback) | `iphone` (fallback) | iPhone | **no Windows guide yet** — falls through to the iPhone guide |
+| G1 | iPhone & iPad (`apple_mobile`) | `iphone`, `ipad` | Return · Repair | `{noun}` wording; iOS-version notes |
+| G2 | Android (`android`) | `samsung_phone`, `samsung_tablet`, `other_android` | Return · Repair | Samsung-only steps via `when.variant` |
+| G3 | Windows laptop (`windows`) | `dell`, `ideapad`, `thinkpad`, `hp`, `acer`, `surface` | Return · Repair | one BIOS-key line per brand (`guide.bios`) |
+| G4 | MacBook (`mac`) | `macbook` | Return · Repair | intro chip question (`branch.chip`: Apple silicon / Intel+T2 / Intel 2012–17) |
+| G5 | Apple Watch (`watch`) | `apple_watch` | single | — |
+| G6 | AirPods (`airpods`) | `airpods`, `airpods_max` | single | Max reset step via variant |
+| G7 | PlayStation (`playstation`) | `ps5`, `ps4`, `ps3` | Return · Repair | per-console steps via variant |
+| — | No reset (`no_reset`) | accessory / audio / controller | single | packing note only |
 
-Unknown categories, or orders with only `deviceOs`, fall back to `iphone`/`ios` (an `android` `deviceOs` collapses to the Samsung-phone guide).
+**Content as data.** Each guide is one file in `src/data/resetGuides/*`. The barrel `index.js` exports `RESET_GUIDES` / `RESET_GUIDE_BY_ID`. Account recovery and "if nothing works" are shared in `recovery.js` (`ACCOUNT_RECOVERY`, `NEVER_ASK`). Step shape: `{ id, modes?, when?: { variant | chip }, title, body, path?, notes?: [{ when, text }], mock?, frame?, revibe?, bios?, passcode?, trouble? }`. `{noun}` / `{is}` are filled from the variant. Step order is array order after filtering, so a step shared by both modes sits where *both* sequences want it.
 
-## 2. The five guide variants
+## 2. Mode from claim type
 
-`device` keys five parallel guide definitions in `ResetGuideSheet.jsx`. Each variant has its own on-device steps (`DEVICE_STEPS`), remote steps (`REMOTE_STEPS`), copy (`COPY`), short label (`DEVICE_LABEL`), and frame:
+`modeForClaimType` (`lib/resetGuides.js`):
 
-| `device` | Frame (`resetGuideMocks.jsx`) | On-device steps | Account system unlocked |
-|---|---|---|---|
-| `iphone` | `MiniPhone` | 3 | iCloud / Activation Lock |
-| `ipad` | `MiniTablet` | 3 | iCloud / Activation Lock |
-| `mac` | `Laptop` shell (Safari chrome) | 3 | Apple Account / Activation Lock (Apple silicon + T2) |
-| `android` | `MiniPhone` | 4 | Google FRP + Samsung Reactivation Lock |
-| `android_tablet` | `MiniTablet` | 4 | Google FRP + Samsung Reactivation Lock |
+- `change_of_mind` / `issue` → **Return**: remove every account, then factory reset. Ends at the setup screen.
+- `warranty` (incl. Care accidental) → **Repair**: lift the account lock and turn the screen lock off. The data stays, and no account password is shared.
+- `compensation` → no guide.
 
-`iphone`/`ipad` share one Apple remote-step factory (`appleRemoteSteps(noun, Frame)` — icloud.com/find + account.apple.com); `mac` has its own desktop variant (`MAC_REMOTE_STEPS`); `android`/`android_tablet` each remove both Google and Samsung accounts. `android_tablet` is intentionally a **tablet-shaped clone** of the Samsung-phone guide — same One UI steps, just the `MiniTablet` frame and "tablet" wording — kept distinct from `android` (Samsung phone).
+Single-mode guides (`modes: ['single']`, G5/G6/no-reset) ignore the mode. `stepsFor(guide, mode, { variant, chip })` does all the filtering. An unanswered Mac chip counts as the majority Intel 2012–17 path, so step counts are stable before the question is answered.
 
-### Guide internal structure
+## 3. Mapping an order line — `resetGuideForOrder(order)` (`lib/devices.js`)
 
-`ResetGuideSheet` is a full-screen sheet with its own phases (component-local state, not the flow reducer):
+Catalogue `category_name` first, then `product.name` (title). Returns `{ guideId, variant, needsChooser }`.
 
-1. **`intro`** — `COPY[device]` asks *"can you still unlock and use this device?"* → **Yes** picks the on-device route, **No** picks the **remote** route (`route === 'remote'` swaps `DEVICE_STEPS` → `REMOTE_STEPS`). This is what covers broken/locked devices without a separate option.
-2. **Steps** — one screen per step with a device mockup (`Mock`), a `lead` (what to do) and a `why` (why it matters). Some steps are **carousels**: their `Mock` exposes a `.screens` array and the footer walks screen-by-screen before advancing the step. Slide transitions come from `resetGuideAnim.js` (`STEP_ANIM_CSS` / `stepAnim`).
-3. **Trouble** — most steps carry `trouble: { label, body, escalate? }`. When `escalate` is set, the trouble panel offers a jump to the remote route (the standard "forgot password / device broken" off-ramp).
-4. **Done** — a centered success state: green check coin + `doneTitle` ("Your {device} is ready to ship") + `doneSub` ("It's erased and unlinked…"). The header title is blank on this phase (just the close ✕). Tapping `Done` fires `onDone`, which sets `resetGuideSeen`. (There is no pre-ship checklist — the optional `FINAL_CHECKS` list, its `resetGuideChecks` persistence, and the "Almost there" header were removed.)
+| Category | Rule |
+|---|---|
+| `iPhone` | G1 `iphone` |
+| `Macbook` | G4 |
+| `Tablet` | title starts "iPad" → G1 `ipad`; "Samsung"/"Galaxy" → G2 `samsung_tablet`; any other title → G2 `other_android`; **no title** → G1 `ipad` + `needsChooser` |
+| `Samsung phone` | G2 `samsung_phone` |
+| `Smartphone` / Android | G2, Samsung by title else `other_android` |
+| `Laptop` | G3, brand from the title (ThinkPad / Lenovo→IdeaPad / Dell / HP / Acer / Surface; default Dell) |
+| `Watch` | title "Apple…" → G5, else no-reset |
+| `Audio` | "AirPods Max" / "AirPods" → G6, else no-reset |
+| `Gaming` | PS3–PS5 / PlayStation 3–5 and not a controller → G7, else no-reset |
+| anything else | no-reset |
+| *(no category)* | legacy `deviceOs` fallback: android → G2 Samsung phone, else G1 iPhone |
 
-## 3. OS-ambiguous `Tablet` → the chooser
+Care+ lines never reach the mapper: a Care+ claim carries its covered device's product. Production should key this on a controlled `reset_guide` catalogue column, and these rules are its migration seed. The older `osForCategory` / `deviceTypeFor*` exports stay because `issueTaxonomy.js` reads the OS.
 
-The production `Tablet` category covers both iPads and Android tablets, so the category alone can't pin the OS. `deviceTypeForCategory` returns `tablet`, and the resolution is deferred to a single manual input in Step 3:
+## 4. The engine — `ResetGuideSheet.jsx`
 
-- **Seeding** (`flowReducer.js`): a `tablet` order is **preselected to iPad** — `device: 'ipad'`, `os: 'ios'`. Everything non-ambiguous resolves directly from the category.
-- **Chooser** (`TabletPicker` in `Step3DevicePrep.jsx`): rendered only when `isOsAmbiguous(order)`. Two options — **Apple** → `device: 'ipad'`, `os: 'ios'`; **Android** → `device: 'android_tablet'`, `os: 'android'`.
-- Switching the OS invalidates any reset already run on the other guide, so `setTabletOs` clears `resetGuideSeen` + `resetConfirmed` (re-gating the confirm checkbox).
+One renderer for every guide. Props: `{ guideId, mode, facts: { variant, chip? }, initialView, skipDone, onDone, onClose }`.
 
-This is the **only** manual device input in the whole flow.
+1. **Intro** — device art (`GuideIntroArt`: the legacy CSS-art device where one exists, else an icon coin), a mode-aware title, step count, and the G4 chip question. Start is never disabled: an unanswered chip lights an inline error.
+2. **Steps** — one per screen. The screen art is:
+   - the existing CSS-art mock when `step.mock` resolves through the `MOCKS` registry (iOS / iPadOS / One UI / macOS screens from `resetGuideMocks.jsx`);
+   - otherwise a plain `PathFrame` (`resetGuideFrames.jsx`: phone / tablet / laptop / browser / watch / box) with the menu path written as numbered tap rows.
 
-## 4. The Step 3 surface — `Step3DevicePrep.jsx`
+   Notes render as "**when:** text" chips, and `revibe` steps get a *Revibe check* tag. The BIOS row shows only the active brand's line. Carousel mocks (`.screens`) still walk screen by screen.
+3. **Done** — mode-aware copy (Return: "at the setup screen"; Repair: "ready for repair"; single: "ready to send").
+4. **I can't use my device** — a link on the intro and every step. It asks *where is the device?*:
+   - **Still with me** → `cantUse.withYou` fixes, mode-filtered.
+   - **Already sent to Revibe** → `cantUse.sent` account actions.
 
-Layout, top to bottom: a warn **`Callout`** (reset before refund — also warns that a device arriving still locked may have its refund delayed and a fee deducted), the **`TabletPicker`** (ambiguous only), the **`HeroLauncher`**, the **`ResetOffRamps`** disclosure, a **`SafetyNote`** (your iCloud/Google backup stays safe — the screen's emotional crux), and the **`ConfirmGate`**.
+   Under either, a *Can't sign in to your …?* disclosure lists each of the guide's `account` recoveries, then *If nothing works*. **Continue with this** finishes via `via: 'cant_use'`, which counts as done (the doc's gate rule).
 
-- **`HeroLauncher`** has three tones: `default` (brand purple, meta chips `~10 min` · `{stepCount} simple steps`, where `stepCount` is 4 for Android else 3), `done` (green, "Guided reset completed", tap to re-run), and `error` (red + `animate-shakeX`). It also dims (`opacity-55 grayscale`) when the never-set-up skip is checked.
-- **`ResetOffRamps`** — a single collapsed-by-default **"Can't run the guided reset?"** disclosure (bordered button row, `HelpCircle` + chevron) that folds away the two off-ramps from the normal on-device reset, replacing what used to be two always-on text blocks (see §5). Expanding reveals, in order:
-  1. **"Never set up this device?"** — change-of-mind only (§5): an attestation checkbox that skips the reset.
-  2. **"Broken, or can't unlock it?"** — informational (all flows): points the customer into the guide's remote route (the route itself is picked inside the guide intro, not here).
-- **`ConfirmGate`** — the checkbox is **locked until `resetGuideSeen`** (guide opened and finished via `Done`). The card border/fill tracks locked → error → checked → default. The old always-on "Run the guide and tap Done" hint under it is gone — it now appears **only** in the red error state. Hidden entirely when the never-set-up skip is checked (§5).
-- **Soft validation** (the flow-wide model — Continue is never disabled): `stepError` returns `'resetGuide'` first (guide not yet completed → launcher goes red + shakes) then `'resetConfirm'` (guide done but box unticked → gate goes red, scrolls into view). The error flag is reducer-owned and cleared by every step-changing action.
+`onDone({ via: 'guide' | 'cant_use', passcodeProvided })`. `initialView` (`'with_you' | 'sent' | 'recovery'`) opens the branch directly. `ResetFailedCard` uses `initialView="sent"` + `skipDone`, because the device is already at Revibe.
 
-## 5. The never-set-up skip (change_of_mind only)
+## 5. Repair-mode passcode field — `PasscodeField.jsx`
 
-A device that was never set up has no account linked and nothing to erase, so the guided reset is moot. The customer can attest to that instead of running it — but **only on the change-of-mind flow** (`state.claimType === 'change_of_mind'`). On issue / warranty the device is presumed used, so the `ResetOffRamps` disclosure shows only the informational remote-route row.
+Only on steps carrying `passcode`, and only in Repair mode:
 
-- **State** — `devicePrep.neverSetUp` (boolean). Set true when the attestation checkbox inside `ResetOffRamps` is ticked. `ROUTE_FROM_REASON` clears it back to `false` whenever the resolved track isn't `change_of_mind`, so a back-nav out of change-of-mind can't carry a skip the UI never offered.
-- **Gate** — `stepError`'s `deviceprep` case short-circuits to `null` (step satisfied) at the top when `claimType === 'change_of_mind' && dp.neverSetUp`, before the `resetGuide` / `resetConfirm` checks. No new error key: if the box is left unticked the normal reset error still applies, since reset stays the default expectation.
-- **UI when checked** — the `HeroLauncher` dims, and the `SafetyNote` + reset `ConfirmGate` are hidden (the attestation is now the gate). The disclosure stays force-expanded so the ticked attestation is visible. Unticking restores the reset path.
-- **Downstream** — `neverSetUp` rides into the seeded claim (`devicePrep` is spread in `ClaimFlow.jsx`). It's checked **before** the `option === 'reset'` branch in `devicePrepText` (`lib/claims.js`, → "Not set up — no reset needed"), `Step6Review` (summary + ack card), and `Step7Confirmation`.
-- **Charge caveat on the Review acks** — the Step 6 device-prep ack subtitles carry an amber (`text-warn`) warning that a device arriving still locked may be delayed and charged a fee, on **both** the factory-reset ack and this never-set-up ack (the latter's neutral "no account is linked…" lead-in was dropped, leaving only the amber line). The seeded unlink/passcode ack stays neutral. Mirrors the Step 3 `Callout` (§4).
+- G3 `windows_pin`: a temporary Windows Hello PIN, at least 4 characters.
+- G4 `mac_login`: the login or a temporary admin password.
+
+It is optional (a fallback) and masked, with show/hide. `passcodeError` rejects anything containing `@` (an account email must never land here) and blocks "next" on that screen until it's fixed or cleared. Beside it: the storage line and the fixed `NEVER_ASK` copy. Never offered for Apple mobile (Apple advises against sharing) or Android (Samsung says turn the lock off). Only the boolean `passcodeProvided` leaves the sheet — the value is never stored on the claim in this prototype.
+
+## 6. The Step 3 surface — `Step3DevicePrep.jsx`
+
+`flowReducer` seeds `devicePrep.{ guideId, variant }` from the mapping. When the guide finishes, `devicePrep` also gets `mode`, `guideVia` and `passcodeProvided`.
+
+- **Copy is mode-aware**: heading ("…for return" / "…for repair"), the warn `Callout`, the launcher label (*Start the guided reset* / *Start the repair prep guide*) and the confirm-gate wording. The backup `SafetyNote` shows in Return mode only (Repair keeps the data).
+- **Launcher step count** comes from `stepsFor`.
+- **`TabletPicker`** shows only when `needsChooser` (a Tablet with no title). Switching resets `resetGuideSeen` / `resetConfirmed` / `passcodeProvided`.
+- **No-reset items** render a single `NoResetCard` instead of the launcher + gate, and `stepError` passes (`dp.guideId === 'no_reset'`).
+- **Unchanged:** the confirm gate stays locked until `resetGuideSeen`, soft validation (`resetGuide` → `resetConfirm`), the `ResetOffRamps` disclosure (now *Can't run the guide?*) and the change-of-mind never-set-up skip.
+- **Downstream**: `devicePrepText` (`lib/claims.js`), `Step6Review` (summary + ack) and `Step7Confirmation` distinguish no-reset, `cant_use`, Repair (+ "passcode shared securely") and Return.
+
+## 7. Dev sandbox — `?journey=guided_reset`
+
+`kind: 'reset_sandbox'`, `nodes: []`. `useResetGuideSandbox` (`lib/resetGuideSandbox.js`) owns guide / variant / mode / open-at. It also synthesises a delivered order carrying the variant's catalogue `category` + `title`, so **I need help with this device** on the card behind reaches the same guide through the real Step 3. `ResetGuidePanel` offers:
+
+- guide chips (with claim share) and device chips;
+- a Return/Repair toggle (labelled single-mode where relevant);
+- open-at chips: Start / Can't use › with me / › sent / Account recovery;
+- **Open guide**;
+- a debug strip that re-runs `resetGuideForOrder` on the synthesised order (✓ maps back / ✗ mismatch), plus mode · step count · passcode kind and the last finish result.
+
+It replaced the old `ResetGuidePicker` chip row in `JourneyDevPanel`.
 
 ## Mocked vs production
 
-The mapping and all five guide variants are real and exercised through the live `Raise a claim` → Step 3 path; pick any delivered order whose category resolves to the variant you want to see. The Windows `Laptop` fallback to the iPhone guide is a known gap (no Windows guide built). Device mockups in `resetGuideMocks.jsx` are CSS-art placeholders of the real OS screens.
-
-In **journey mode** (`?journey=`), `JourneyDevPanel`'s **Reset guide** chip row (`src/components/ResetGuidePicker.jsx`) opens any variant at its intro directly — running the same `deviceTypeForCategory` resolution (Tablet → Apple/Android chooser, Laptop → iPhone fallback), so the guides are previewable without walking the claim flow.
+The content is transcribed from the vendor-checked doc but has **not been run on real devices**. QA in EN and AR is still a launch requirement. PathFrames are placeholders, not OS screenshots. Not built: Arabic/RTL + the device-language toggle, the shared opening steps, "Before you start" notes, saving progress on the claim, the post-submit placement + pickup gate, analytics events, and passcode storage/encryption (the field only reports `passcodeProvided`).
 
 ## See also
 
-- **Returns flow** mechanics (steps, reducer, soft validation): `docs/output/returns/change_of_mind.md`, `issue.md`.
-- **Reset-failed takeover** (QC hits Activation Lock post-pickup → `ResetFailedCard`): `docs/output/returns/claim_tracking.md` §3.4.
+- Returns flow mechanics: `docs/output/returns/change_of_mind.md`, `issue.md`.
+- Reset-failed takeover (`ResetFailedCard`): `docs/output/returns/claim_tracking.md` §3.4.
