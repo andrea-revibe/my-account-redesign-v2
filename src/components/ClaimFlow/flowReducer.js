@@ -191,10 +191,12 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       guideId: resetGuide.guideId,
       variant: resetGuide.variant,
       // Set when the guide finishes: the mode it ran in, whether it ended via
-      // "I can't use my device", and whether a repair passcode was given.
+      // "I can't use my device", whether a repair passcode was given, and the
+      // Repair data choice ('keep' | 'erase' | 'maintenance', null if none).
       mode: null,
       guideVia: null,
       passcodeProvided: false,
+      dataChoice: null,
       resetConfirmed: false,
       resetGuideSeen: false,
       // Change-of-mind escape hatch: a device that was never set up has no

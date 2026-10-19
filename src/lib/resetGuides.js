@@ -40,15 +40,30 @@ const fits = (item, mode, facts) => {
   if (!w) return true
   if (w.variant && !w.variant.includes(facts.variant)) return false
   if (w.chip && !w.chip.includes(facts.chip)) return false
+  // Repair-mode data choice: Return mode always erases, so it ignores `data`.
+  if (w.data && mode === 'repair' && !w.data.includes(facts.data)) return false
   return true
 }
 
-// facts = { variant, chip } — the catalogue variant and the G4 chip answer.
-// An unanswered chip counts as the majority path (2012–2017 Intel).
+// facts = { variant, chip, data } — the catalogue variant, the G4 chip answer
+// and the Repair-mode data choice ('keep' | 'private'). An unanswered chip
+// counts as the majority path (2012–2017 Intel); data defaults to keep.
 export function stepsFor(guide, mode, facts = {}) {
   const m = effectiveMode(guide, mode)
-  const f = { variant: variantFor(guide, facts.variant).id, chip: facts.chip ?? 'intel_old' }
+  const f = {
+    variant: variantFor(guide, facts.variant).id,
+    chip: facts.chip ?? 'intel_old',
+    data: facts.data ?? 'keep',
+  }
   return guide.steps.filter((s) => fits(s, m, f))
+}
+
+// Repair mode can keep the customer's data (default) or protect it first:
+// 'erase' runs the Return-style erase, 'maintenance' is Samsung's Maintenance
+// mode (hides the data without erasing). null = no choice for this guide.
+export function privacyFor(guide, variantId) {
+  if (!guide.privacy) return null
+  return variantFor(guide, variantId).privacy ?? 'erase'
 }
 
 // "I can't use my device" as a small graph: symptoms open nodes, a node either

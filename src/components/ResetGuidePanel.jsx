@@ -162,6 +162,7 @@ export default function ResetGuidePanel({
           <div>
             last finish: via {lastResult.via}
             {lastResult.passcodeProvided ? ' · passcode given' : ''}
+            {lastResult.dataChoice ? ` · data: ${lastResult.dataChoice}` : ''}
           </div>
         )}
       </div>

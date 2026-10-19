@@ -6,6 +6,7 @@ export default {
   label: 'Windows laptop',
   share: '16%',
   modes: ['return', 'repair'],
+  privacy: true,
   account: ['microsoft'],
   variants: [
     { id: 'dell', label: 'Dell', noun: 'laptop', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'Dell Latitude 5420' },
@@ -39,7 +40,8 @@ export default {
     },
     {
       id: 'reset_pc',
-      modes: ['return'],
+      modes: ['return', 'repair'],
+      when: { data: ['private'] },
       title: 'Reset this PC',
       body: 'Choose Remove everything › Cloud download, and under Change settings turn Clean data on. It can take an hour or two, and the screen can stay black for 15 minutes or more. Plug in the charger and don’t turn it off.',
       path: ['Settings', 'System', 'Recovery', 'Reset PC'],
@@ -48,6 +50,7 @@ export default {
     {
       id: 'repair_pin',
       modes: ['repair'],
+      when: { data: ['keep'] },
       title: 'Set a temporary PIN',
       body: 'Back up first. Then set a temporary Windows Hello PIN and enter it below. A PIN only unlocks this one laptop — it isn’t your Microsoft account password. Change it back after the repair.',
       path: ['Settings', 'Accounts', 'Sign-in options', 'PIN (Windows Hello)', 'Change PIN'],
@@ -62,7 +65,8 @@ export default {
     },
     {
       id: 'setup_screen',
-      modes: ['return'],
+      modes: ['return', 'repair'],
+      when: { data: ['private'] },
       revibe: true,
       title: 'Stop at the setup screen',
       body: 'You’re done on the laptop when it shows the region / language setup screen. Turn it off there — don’t sign in.',

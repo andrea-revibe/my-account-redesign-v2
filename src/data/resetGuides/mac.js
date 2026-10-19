@@ -9,6 +9,7 @@ export default {
   label: 'MacBook',
   share: '3%',
   modes: ['return', 'repair'],
+  privacy: true,
   account: ['apple'],
   variants: [
     { id: 'macbook', label: 'MacBook', noun: 'MacBook', frame: 'laptop', os: 'macos', category: 'Macbook', title: 'MacBook Air 13″' },
@@ -26,7 +27,8 @@ export default {
   steps: [
     {
       id: 'sign_out',
-      modes: ['return'],
+      modes: ['return', 'repair'],
+      when: { data: ['private'] },
       title: 'Sign out of your Apple Account',
       body: 'Back up with Time Machine first. Then sign out, and sign out of iMessage too: Messages › Settings › iMessage › Sign Out.',
       path: ['System Settings', 'your name', 'Sign Out'],
@@ -38,8 +40,8 @@ export default {
     },
     {
       id: 'erase_modern',
-      modes: ['return'],
-      when: { chip: MODERN },
+      modes: ['return', 'repair'],
+      when: { chip: MODERN, data: ['private'] },
       title: 'Erase All Content and Settings',
       body: 'When it finishes, press and hold the power button until the Mac turns off.',
       path: ['System Settings', 'General', 'Transfer or Reset', 'Erase All Content and Settings'],
@@ -51,30 +53,31 @@ export default {
     },
     {
       id: 'erase_recovery',
-      modes: ['return'],
-      when: { chip: ['intel_old'] },
+      modes: ['return', 'repair'],
+      when: { chip: ['intel_old'], data: ['private'] },
       title: 'Erase in macOS Recovery',
       body: 'Shut down, press the power button and immediately hold Command-R until the Apple logo or a spinning globe appears. Then Disk Utility › Macintosh HD › Erase (APFS or Mac OS Extended (Journaled)) › quit Disk Utility › Reinstall macOS. Use home Wi-Fi or Ethernet. The Mac can restart several times.',
       path: ['Command-R', 'Disk Utility', 'Erase', 'Reinstall macOS'],
     },
     {
       id: 'firmware',
-      modes: ['return'],
-      when: { chip: ['intel_t2', 'intel_old'] },
+      modes: ['return', 'repair'],
+      when: { chip: ['intel_t2', 'intel_old'], data: ['private'] },
       title: 'Turn off any firmware password',
       body: 'Only if one is set. If it’s forgotten, only Apple or an authorised provider can remove it, with proof of purchase.',
       path: ['Recovery', 'Utilities', 'Startup Security Utility'],
     },
     {
       id: 'nvram',
-      modes: ['return'],
-      when: { chip: ['intel_t2', 'intel_old'] },
+      modes: ['return', 'repair'],
+      when: { chip: ['intel_t2', 'intel_old'], data: ['private'] },
       title: 'Reset NVRAM',
       body: 'Shut down, then turn on holding Option-Command-P-R for about 20 seconds.',
     },
     {
       id: 'setup_assistant',
-      modes: ['return'],
+      modes: ['return', 'repair'],
+      when: { data: ['private'] },
       final: true,
       title: 'Stop at the setup assistant',
       body: 'You’re done when the setup assistant appears. Press Command-Q to shut down.',
@@ -83,6 +86,7 @@ export default {
     {
       id: 'find_my_mac_off',
       modes: ['repair'],
+      when: { data: ['keep'] },
       title: 'Turn off Find My Mac',
       body: 'Back up first. Turn off Find My Mac, then enter your Apple Account password.',
       path: ['System Settings', 'your name', 'iCloud', 'See All', 'Find My Mac', 'Off'],
@@ -91,7 +95,7 @@ export default {
     {
       id: 'repair_firmware',
       modes: ['repair'],
-      when: { chip: ['intel_t2', 'intel_old'] },
+      when: { chip: ['intel_t2', 'intel_old'], data: ['keep'] },
       title: 'Turn off any firmware password',
       body: 'Only if one is set: start up in Recovery and turn it off. If it’s forgotten, only Apple or an authorised provider can remove it, with proof of purchase.',
       path: ['Recovery', 'Utilities', 'Startup Security Utility'],
@@ -99,6 +103,7 @@ export default {
     {
       id: 'repair_login',
       modes: ['repair'],
+      when: { data: ['keep'] },
       final: true,
       revibe: true,
       title: 'Share a login for the repair',

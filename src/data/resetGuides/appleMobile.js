@@ -7,6 +7,7 @@ export default {
   label: 'iPhone & iPad',
   share: '64%',
   modes: ['return', 'repair'],
+  privacy: true,
   account: ['apple'],
   variants: [
     { id: 'iphone', label: 'iPhone', noun: 'iPhone', frame: 'phone', os: 'ios', category: 'iPhone', title: 'iPhone 13' },
@@ -15,7 +16,8 @@ export default {
   steps: [
     {
       id: 'sign_out',
-      modes: ['return'],
+      modes: ['return', 'repair'],
+      when: { data: ['private'] },
       title: 'Sign out of your Apple Account',
       body: 'Open Settings, tap your name, then Sign Out.',
       path: ['Settings', '[your name]', 'Sign Out'],
@@ -31,7 +33,8 @@ export default {
     },
     {
       id: 'erase',
-      modes: ['return'],
+      modes: ['return', 'repair'],
+      when: { data: ['private'] },
       title: 'Erase all content and settings',
       body: 'Enter your passcode, then tap Erase {noun}. If asked about an eSIM, choose to erase the eSIM profile — your carrier reactivates the plan on your new device.',
       path: ['Settings', 'General', 'Transfer or Reset {noun}', 'Erase All Content and Settings'],
@@ -40,7 +43,8 @@ export default {
     },
     {
       id: 'hello',
-      modes: ['return'],
+      modes: ['return', 'repair'],
+      when: { data: ['private'] },
       final: true,
       revibe: true,
       title: 'Check for the “Hello” screen',
@@ -50,6 +54,7 @@ export default {
     {
       id: 'repair_prep',
       modes: ['repair'],
+      when: { data: ['keep'] },
       title: 'Back up and clear Wallet',
       body: 'Back up your {noun}. Turn off Apple Cash and remove your cards from Wallet. If Settings shows a “Finish Repair” item from an earlier repair, complete it first.',
       path: ['Settings', 'Wallet & Apple Pay'],
@@ -58,6 +63,7 @@ export default {
     {
       id: 'find_my_off',
       modes: ['repair'],
+      when: { data: ['keep'] },
       title: 'Turn off Find My',
       body: 'This lifts Activation Lock so the repairer can test the device. Your data stays on it.',
       path: ['Settings', '[your name]', 'Find My', 'Find My {noun}', 'Off'],
@@ -73,6 +79,7 @@ export default {
     {
       id: 'passcode_off',
       modes: ['repair'],
+      when: { data: ['keep'] },
       final: true,
       revibe: true,
       title: 'Turn your passcode off',

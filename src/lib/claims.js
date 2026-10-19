@@ -593,6 +593,10 @@ export function devicePrepText(claim) {
   if (dp?.guideId === 'no_reset') return 'No reset needed for this item'
   if (dp?.option === 'reset' && dp.guideVia === 'cant_use')
     return "Couldn't use the device — remote steps followed"
+  if (dp?.option === 'reset' && dp.mode === 'repair' && dp.dataChoice === 'erase')
+    return 'Erased before repair'
+  if (dp?.option === 'reset' && dp.mode === 'repair' && dp.dataChoice === 'maintenance')
+    return 'Locks off for repair · Maintenance mode on'
   if (dp?.option === 'reset' && dp.mode === 'repair')
     return dp.passcodeProvided
       ? 'Locks off for repair · passcode shared securely'

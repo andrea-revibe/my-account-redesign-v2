@@ -12,6 +12,7 @@ import {
   Truck,
   KeyRound,
   Info,
+  AlertTriangle,
   Lock,
   PowerOff,
   Disc,
@@ -44,6 +45,8 @@ import {
   SamsungLockSwipe,
   AndroidTabletLockSwipe,
   WindowsSetup,
+  SamsungMaintenance,
+  AndroidTabletMaintenance,
   PathScreen,
 } from './resetGuideMocks'
 import { StepIllustration, GuideIntroArt } from './resetGuideFrames'
@@ -57,6 +60,7 @@ import {
   symptomsFor,
   cantUseEntry,
   resolveNode,
+  privacyFor,
   fillNoun,
   passcodeError,
   RESET_MODES,
@@ -67,7 +71,7 @@ import {
 // screen; "I can't use my device" is reachable from every screen: the customer
 // picks what's stopping them, answers at most a question or two, and lands on
 // one self-contained numbered fix (lib/resetGuides resolveNode).
-// Finishing either path fires onDone({ via, passcodeProvided }) — the caller
+// Finishing either path fires onDone({ via, passcodeProvided, dataChoice }) — the caller
 // (Step 3 / ResetFailedCard / the sandbox) decides what that unlocks.
 
 // step.mock keys → the hand-drawn CSS-art screens. Steps without one render
@@ -101,6 +105,8 @@ const MOCKS = {
   sam_lock_swipe: SamsungLockSwipe,
   tab_lock_swipe: AndroidTabletLockSwipe,
   win_setup: WindowsSetup,
+  sam_maintenance: SamsungMaintenance,
+  tab_maintenance: AndroidTabletMaintenance,
 }
 
 function mockFor(step, variantId) {
@@ -141,6 +147,17 @@ export default function ResetGuideSheet({
   const [passcode, setPasscode] = useState('')
   const [passcodeShown, setPasscodeShown] = useState(false)
   const [doneVia, setDoneVia] = useState('guide')
+  // Repair only: keep the data (default) or protect it first — `privacy` says
+  // how ('erase' | 'maintenance'), null when the guide offers no choice.
+  const privacy = m === 'repair' ? privacyFor(guide, variant.id) : null
+  const [dataChoice, setDataChoice] = useState('keep')
+  const [backupAck, setBackupAck] = useState(false)
+  const [backupError, setBackupError] = useState(false)
+  const erasing = privacy === 'erase' && dataChoice === 'private'
+  // Someone erasing for a repair is on the Return erase path, so "I can't use
+  // my device" offers them the Return fixes rather than "don't erase it".
+  const cuMode = erasing ? 'return' : m
+  const dataResult = privacy ? (dataChoice === 'private' ? privacy : 'keep') : null
 
   useEffect(() => {
     setCarouselIdx(0)
@@ -161,27 +178,28 @@ export default function ResetGuideSheet({
     }
   }, [onClose])
 
-  const steps = stepsFor(guide, m, { variant: variant.id, chip })
+  const steps = stepsFor(guide, m, { variant: variant.id, chip, data: dataChoice })
   const step = steps[i]
   const screens = view === 'steps' ? mockFor(step, variant.id)?.screens : null
   const isCarousel = Array.isArray(screens)
   const atCarouselEnd = !isCarousel || carouselIdx >= screens.length - 1
   const showFinish = atCarouselEnd && i === steps.length - 1
   const pcError = step?.passcode ? passcodeError(passcode, step.passcode) : null
-  const node = view === 'cant_use' && trail.length ? resolveNode(guide, m, trail[trail.length - 1], { variant: variant.id }) : null
+  const node = view === 'cant_use' && trail.length ? resolveNode(guide, cuMode, trail[trail.length - 1], { variant: variant.id }) : null
   const passcodeProvided = !!passcode.trim() && !passcodeError(passcode, guide.steps.find((s) => s.passcode)?.passcode)
 
   const finish = (via) => {
-    const result = { via, passcodeProvided }
+    const result = { via, passcodeProvided, dataChoice: dataResult }
     if (skipDone) return onDone(result)
     setDoneVia(via)
     setView('done')
   }
   const start = () => {
-    if (guide.branch && !chip) {
-      setChipError(true)
-      return
-    }
+    const chipMissing = guide.branch && !chip
+    const backupMissing = erasing && !backupAck
+    setChipError(!!chipMissing)
+    setBackupError(backupMissing)
+    if (chipMissing || backupMissing) return
     setI(0)
     setDir(1)
     setView('steps')
@@ -281,6 +299,18 @@ export default function ResetGuideSheet({
                 setChip(id)
                 setChipError(false)
               }}
+              privacy={privacy}
+              dataChoice={dataChoice}
+              onData={(v) => {
+                setDataChoice(v)
+                setBackupError(false)
+              }}
+              backupAck={backupAck}
+              onBackup={(v) => {
+                setBackupAck(v)
+                setBackupError(false)
+              }}
+              backupError={backupError}
             />
           )}
 
@@ -308,7 +338,7 @@ export default function ResetGuideSheet({
             <CantUseFlow
               key={trail.join('/')}
               guide={guide}
-              mode={m}
+              mode={cuMode}
               variantId={variant.id}
               fill={fill}
               node={node}
@@ -317,7 +347,14 @@ export default function ResetGuideSheet({
           )}
 
           {view === 'done' && (
-            <Done guide={guide} mode={m} fill={fill} via={doneVia} passcodeProvided={passcodeProvided} />
+            <Done
+              guide={guide}
+              mode={m}
+              fill={fill}
+              via={doneVia}
+              passcodeProvided={passcodeProvided}
+              dataChoice={dataResult}
+            />
           )}
         </div>
 
@@ -355,7 +392,7 @@ export default function ResetGuideSheet({
           )}
           {view === 'done' && (
             <button
-              onClick={() => onDone({ via: doneVia, passcodeProvided })}
+              onClick={() => onDone({ via: doneVia, passcodeProvided, dataChoice: dataResult })}
               className="w-full h-[48px] rounded-[12px] bg-success text-white font-semibold text-[14.5px] inline-flex items-center justify-center gap-1.5"
             >
               <Check size={16} strokeWidth={2.6} />
@@ -410,7 +447,7 @@ const INTRO_COPY = {
   },
   repair: {
     title: 'Prepare your {noun} for repair',
-    sub: 'We’ll lift the locks so the repairer can test it. Your data stays on the device, and you never share an account password.',
+    sub: 'We’ll lift the locks so the repairer can test it, and you never share an account password.',
   },
   single: {
     title: 'Prepare your {noun}',
@@ -418,13 +455,39 @@ const INTRO_COPY = {
   },
 }
 
-function Intro({ guide, variant, mode, stepCount, chip, chipError, onChip }) {
+const DATA_OPTIONS = {
+  erase: {
+    label: 'Erase it before I send it',
+    sub: 'For privacy · you’ll restore it from a backup afterwards',
+  },
+  maintenance: {
+    label: 'Hide it with Maintenance mode',
+    sub: 'For privacy · nothing is erased, it’s locked away while the repairer works',
+  },
+}
+
+function Intro({
+  guide,
+  variant,
+  mode,
+  stepCount,
+  chip,
+  chipError,
+  onChip,
+  privacy,
+  dataChoice,
+  onData,
+  backupAck,
+  onBackup,
+  backupError,
+}) {
   const copy = INTRO_COPY[mode]
+  const noun = variant.noun
   return (
     <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center animate-fadeIn">
       <GuideIntroArt variant={variant} />
       <h2 className="mt-3 text-[21px] font-bold text-ink leading-tight">
-        {fillNoun(copy.title, variant.noun)}
+        {fillNoun(copy.title, noun)}
       </h2>
       <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">{copy.sub}</p>
       <div className="mt-3 flex items-center gap-1.5">
@@ -441,35 +504,16 @@ function Intro({ guide, variant, mode, stepCount, chip, chipError, onChip }) {
           <div className="text-[13px] font-semibold text-ink">{guide.branch.question}</div>
           <p className="mt-1 text-[11.5px] text-muted leading-snug">{guide.branch.hint}</p>
           <div className="mt-2.5 flex flex-col gap-2">
-            {guide.branch.options.map((o) => {
-              const active = chip === o.id
-              return (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => onChip(o.id)}
-                  className={`flex items-center gap-2.5 rounded-[12px] border-[1.5px] px-3 py-2.5 text-left transition-colors ${
-                    active
-                      ? 'border-brand bg-brand-bg/50'
-                      : chipError
-                        ? 'border-danger bg-surface'
-                        : 'border-line bg-surface hover:border-brand/40'
-                  }`}
-                >
-                  <span
-                    className={`w-[15px] h-[15px] rounded-full border-2 grid place-items-center shrink-0 ${
-                      active ? 'border-brand' : 'border-line'
-                    }`}
-                  >
-                    {active && <span className="w-[7px] h-[7px] rounded-full bg-brand" />}
-                  </span>
-                  <span className="flex-1">
-                    <span className="block text-[13px] font-semibold text-ink">{o.label}</span>
-                    <span className="block text-[11.5px] text-muted">{o.sub}</span>
-                  </span>
-                </button>
-              )
-            })}
+            {guide.branch.options.map((o) => (
+              <ChoiceCard
+                key={o.id}
+                active={chip === o.id}
+                error={chipError}
+                label={o.label}
+                sub={o.sub}
+                onClick={() => onChip(o.id)}
+              />
+            ))}
           </div>
           {chipError && (
             <p className="mt-1.5 ml-1 text-[11.5px] font-medium text-danger">
@@ -478,7 +522,86 @@ function Intro({ guide, variant, mode, stepCount, chip, chipError, onChip }) {
           )}
         </div>
       )}
+
+      {privacy && (
+        <div className="mt-5 w-full text-left">
+          <div className="text-[13px] font-semibold text-ink">What should happen to your data?</div>
+          <div className="mt-2.5 flex flex-col gap-2">
+            <ChoiceCard
+              active={dataChoice === 'keep'}
+              label={`Keep it on the ${noun}`}
+              sub="Recommended · it comes back as you left it"
+              onClick={() => onData('keep')}
+            />
+            <ChoiceCard
+              active={dataChoice === 'private'}
+              label={DATA_OPTIONS[privacy].label}
+              sub={DATA_OPTIONS[privacy].sub}
+              onClick={() => onData('private')}
+            />
+          </div>
+          {privacy === 'erase' && dataChoice === 'private' && (
+            <div
+              className={`mt-2 rounded-[12px] border px-3 py-2.5 animate-slideDown ${
+                backupError ? 'border-danger bg-danger-bg/50' : 'border-warn/30 bg-warn-bg/60'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+                <AlertTriangle size={14} strokeWidth={2.2} className="text-warn" />
+                Before you erase
+              </div>
+              <p className="mt-1 text-[12px] text-ink-2 leading-snug">
+                Everything on the {noun} is deleted.
+              </p>
+              <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupAck}
+                  onChange={(e) => onBackup(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-brand shrink-0"
+                />
+                <span className="text-[12px] text-ink leading-snug">
+                  I’ve backed it up, or I don’t need anything on it
+                </span>
+              </label>
+              {backupError && (
+                <p className="mt-1.5 text-[11.5px] font-medium text-danger">
+                  Confirm your backup before you erase.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  )
+}
+
+function ChoiceCard({ active, error, label, sub, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2.5 rounded-[12px] border-[1.5px] px-3 py-2.5 text-left transition-colors ${
+        active
+          ? 'border-brand bg-brand-bg/50'
+          : error
+            ? 'border-danger bg-surface'
+            : 'border-line bg-surface hover:border-brand/40'
+      }`}
+    >
+      <span
+        className={`w-[15px] h-[15px] rounded-full border-2 grid place-items-center shrink-0 ${
+          active ? 'border-brand' : 'border-line'
+        }`}
+      >
+        {active && <span className="w-[7px] h-[7px] rounded-full bg-brand" />}
+      </span>
+      <span className="flex-1">
+        <span className="block text-[13px] font-semibold text-ink">{label}</span>
+        <span className="block text-[11.5px] text-muted">{sub}</span>
+      </span>
+    </button>
   )
 }
 
@@ -728,13 +851,21 @@ const DONE_COPY = {
     title: 'Your {noun} {is} ready for repair',
     sub: 'The locks are off and your data stays on it.',
   },
+  repair_erase: {
+    title: 'Your {noun} {is} erased and ready for repair',
+    sub: 'It’s unlinked from your accounts. Restore it from your backup when it’s back.',
+  },
+  repair_maintenance: {
+    title: 'Your {noun} {is} ready for repair',
+    sub: 'Maintenance mode keeps your data locked away. Turn it off when it’s back.',
+  },
   single: {
     title: 'Your {noun} {is} ready to send',
     sub: 'It’s removed from your Apple Account, so it won’t lock again.',
   },
 }
 
-function Done({ guide, mode, fill, via, passcodeProvided }) {
+function Done({ guide, mode, fill, via, passcodeProvided, dataChoice }) {
   const copy =
     via === 'cant_use'
       ? {
@@ -743,7 +874,9 @@ function Done({ guide, mode, fill, via, passcodeProvided }) {
         }
       : guide.id === 'no_reset'
         ? { title: 'All set', sub: 'Pack everything that came in the box.' }
-        : DONE_COPY[mode]
+        : mode === 'repair' && dataChoice && dataChoice !== 'keep'
+          ? DONE_COPY[`repair_${dataChoice}`]
+          : DONE_COPY[mode]
   return (
     <div className="min-h-full px-5 py-8 flex flex-col items-center justify-center text-center animate-fadeIn">
       <div className="relative w-16 h-16">

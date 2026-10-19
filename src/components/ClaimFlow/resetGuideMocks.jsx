@@ -29,6 +29,7 @@ import {
   CreditCard,
   MapPin,
   Gamepad2,
+  Wrench,
 } from 'lucide-react'
 import { stepAnim } from './resetGuideAnim'
 
@@ -1828,6 +1829,40 @@ function AndroidTabletLockSwipe() {
   return <SamsungLockSwipe Frame={MiniTabletAndroid} />
 }
 
+// Repair (privacy) · One UI Maintenance mode — hides the owner's data in a
+// separate profile while the repairer works; Turn on glowing.
+function SamsungMaintenance({ Frame = MiniPhone }) {
+  return (
+    <Frame camera="hole">
+      <StatusBar />
+      <OneUiHeader title="Maintenance mode" />
+      <div className="mt-4 flex flex-col items-center px-4 text-center">
+        <span className="w-[54px] h-[54px] rounded-full grid place-items-center text-white" style={{ background: ANDROID_BLUE }}>
+          <Wrench size={24} strokeWidth={2} />
+        </span>
+        <div className="mt-3 text-[9.5px] text-ink-2 leading-snug">
+          Keep your personal data private while your phone is being repaired. Your photos, messages and
+          accounts can’t be accessed.
+        </div>
+      </div>
+      <div className="px-2.5 mt-3">
+        <div className="bg-white rounded-[14px] overflow-hidden shadow-sm2">
+          <ToggleRow label="Create logs" sub="Help the repairer find the fault" on={false} />
+        </div>
+      </div>
+      <div className="absolute bottom-[18px] inset-x-0 flex flex-col items-center">
+        <div className="relative rounded-full px-8 h-[28px] grid place-items-center text-white text-[10.5px] font-semibold" style={{ background: ANDROID_BLUE, boxShadow: `0 0 0 3px rgb(${BRAND} / 0.25)` }}>
+          Turn on
+        </div>
+        <Hint>it restarts into an empty profile</Hint>
+      </div>
+    </Frame>
+  )
+}
+function AndroidTabletMaintenance() {
+  return <SamsungMaintenance Frame={MiniTabletAndroid} />
+}
+
 /* ------------------------------------------------------ Path-driven screens */
 // Steps without a hand-drawn mock render their menu path as a screen in the
 // device's own OS style: title = the screen you're on, the last segment = the
@@ -2173,5 +2208,7 @@ export {
   SamsungLockSwipe,
   AndroidTabletLockSwipe,
   WindowsSetup,
+  SamsungMaintenance,
+  AndroidTabletMaintenance,
   PathScreen,
 }

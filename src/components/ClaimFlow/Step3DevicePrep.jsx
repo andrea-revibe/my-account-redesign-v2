@@ -57,7 +57,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
     if (next.guideId === guideId) return
     dispatch({
       type: 'SET_DEVICE_PREP',
-      value: { ...next, resetGuideSeen: false, resetConfirmed: false, passcodeProvided: false },
+      value: { ...next, resetGuideSeen: false, resetConfirmed: false, passcodeProvided: false, dataChoice: null },
     })
   }
 
@@ -110,7 +110,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
         title={isRepair ? 'Prepare your device for repair' : 'Prepare your device for return'}
         subtitle={
           isRepair
-            ? 'Repairs are delayed when the device is locked. The guide turns the locks off — your data stays on the device, and you never share an account password.'
+            ? 'Repairs are delayed when the device is locked. The guide turns the locks off, lets you keep or protect your data, and you never share an account password.'
             : "Returns are delayed when this step is skipped. The guided reset walks you through it — even if the device is broken or you can't unlock it."
         }
       />
@@ -150,7 +150,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
             guideId={guideId}
             mode={mode}
             facts={{ variant }}
-            onDone={({ via, passcodeProvided }) => {
+            onDone={({ via, passcodeProvided, dataChoice }) => {
               dispatch({
                 type: 'SET_DEVICE_PREP',
                 value: {
@@ -158,6 +158,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
                   mode,
                   guideVia: via,
                   passcodeProvided,
+                  dataChoice,
                 },
               })
               setGuideOpen(false)

@@ -42,10 +42,19 @@ Guides are grouped by what locks the device, not by brand. Brand and model diffe
 `modeForClaimType` (`lib/resetGuides.js`):
 
 - `change_of_mind` / `issue` → **Return**: remove every account, then factory reset. Ends at the setup screen.
-- `warranty` (incl. Care accidental) → **Repair**: lift the account lock and turn the screen lock off. The data stays, and no account password is shared.
+- `warranty` (incl. Care accidental) → **Repair**: lift the account lock and turn the screen lock off. By default the data stays, and no account password is shared (see §2.1).
 - `compensation` → no guide.
 
-Single-mode guides (`modes: ['single']`, G5/G6/no-reset) ignore the mode. `stepsFor(guide, mode, { variant, chip })` does all the filtering. An unanswered Mac chip counts as the majority Intel 2012–17 path, so step counts are stable before the question is answered.
+Single-mode guides (`modes: ['single']`, G5/G6/no-reset) ignore the mode. `stepsFor(guide, mode, { variant, chip, data })` does all the filtering. An unanswered Mac chip counts as the majority Intel 2012–17 path, so step counts are stable before the question is answered.
+
+### 2.1 Repair data choice
+
+Guides with `privacy: true` (G1 iPhone/iPad, G2 Android, G3 Windows, G4 Mac) ask on the Repair intro **What should happen to your data?**:
+
+- **Keep it on the device** — preselected, recommended; runs the steps tagged `when: { data: ['keep'] }` (today's Repair path, incl. the Mac/Windows passcode step).
+- **Protect it first** — `privacyFor(guide, variant)` says how. `'erase'` (default) reuses the Return erase steps, which carry `modes: ['return', 'repair']` + `when: { data: ['private'] }`; the passcode step drops out. Samsung variants set `privacy: 'maintenance'` instead: remove accounts → **Maintenance mode** (hides the data in a separate profile, nothing erased).
+
+`data` only filters in Repair mode, so Return is untouched. Erase is gated on an inline back-up checkbox (Start never disabled; unticked → error). While erasing, *I can't use my device* runs in Return mode so it offers erase fixes, not "don't erase". The sheet reports `dataChoice` (`'keep' | 'erase' | 'maintenance'`, null without a choice) in `onDone`; it lands on `devicePrep.dataChoice` and drives the Done, Review (`devicePrepText`) and Confirmation copy. PlayStation (Sony resets repaired consoles anyway) and the single-mode guides offer no choice. **Held for ops:** a warning that software faults may not reproduce after erasing ("no fault found"), and whether repair partners accept erased devices.
 
 ## 3. Mapping an order line — `resetGuideForOrder(order)` (`lib/devices.js`)
 
@@ -80,7 +89,7 @@ One renderer for every guide. Props: `{ guideId, mode, facts: { variant, chip? }
    **One frame per platform, never shared across brands:** iPhone (Dynamic Island, `9:41`), Android phone (dark body, punch-hole, `12:45` + battery %), iPad (light bezel), Android tablet (dark, squarer), MacBook (silver deck), Windows laptop (dark deck + taskbar), TV for PlayStation. The OS travels by context (`OsContext`), so shared pieces — status bar, toggle colour — follow the frame. Every drawn screen shows the path caption under the title.
 
    Notes render as "**when:** text" chips, and `revibe` steps get a *Revibe check* tag. The BIOS row shows only the active brand's line. Carousel mocks (`.screens`) still walk screen by screen.
-3. **Done** — mode-aware copy (Return: "at the setup screen"; Repair: "ready for repair"; single: "ready to send").
+3. **Done** — mode-aware copy (Return: "at the setup screen"; Repair: "ready for repair", or "erased and ready for repair" / Maintenance mode per §2.1; single: "ready to send").
 4. **I can't use my device** — a link on the intro and every step. It is symptom-first and never sends the customer to another section:
    - **Picker** — *What's stopping you?* lists `cantUse.symptoms` (filtered by mode + variant via `symptomsFor`): typically the lock / passcode, a broken or dead device, can't sign in to the account, and already sent to Revibe.
    - **Questions** — a node with `ask` + `options` (e.g. *changed the passcode in the last 3 days?*, *which iPhone?*, *PIN or password?*) routes to the one fix that applies.
