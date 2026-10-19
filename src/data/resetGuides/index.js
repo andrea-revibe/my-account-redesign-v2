@@ -7,7 +7,7 @@ import airpods from './airpods'
 import playstation from './playstation'
 import noReset from './noReset'
 
-export { ACCOUNT_RECOVERY, NEVER_ASK } from './recovery'
+export { ACCOUNT_RECOVERY, RECOVERY_NODES, NEVER_ASK } from './recovery'
 
 // Ordered by claim share — the sandbox panel lists them in this order.
 export const RESET_GUIDES = [

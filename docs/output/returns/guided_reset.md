@@ -78,13 +78,16 @@ One renderer for every guide. Props: `{ guideId, mode, facts: { variant, chip? }
 
    Notes render as "**when:** text" chips, and `revibe` steps get a *Revibe check* tag. The BIOS row shows only the active brand's line. Carousel mocks (`.screens`) still walk screen by screen.
 3. **Done** — mode-aware copy (Return: "at the setup screen"; Repair: "ready for repair"; single: "ready to send").
-4. **I can't use my device** — a link on the intro and every step. It asks *where is the device?*:
-   - **Still with me** → `cantUse.withYou` fixes, mode-filtered.
-   - **Already sent to Revibe** → `cantUse.sent` account actions.
+4. **I can't use my device** — a link on the intro and every step. It is symptom-first and never sends the customer to another section:
+   - **Picker** — *What's stopping you?* lists `cantUse.symptoms` (filtered by mode + variant via `symptomsFor`): typically the lock / passcode, a broken or dead device, can't sign in to the account, and already sent to Revibe.
+   - **Questions** — a node with `ask` + `options` (e.g. *changed the passcode in the last 3 days?*, *which iPhone?*, *PIN or password?*) routes to the one fix that applies.
+   - **Fix** — a node with numbered `steps` (`text`, optional `path` rendered as tap chips, `note`, and a `help` link that jumps to another node such as account recovery). `then` appends another fix's steps with continuous numbering (e.g. computer restore → Find My removal), so a fix is always self-contained. A `lead` labels the join.
+   - Any node field can be per-mode (`{ return, repair }`); steps and options filter by `modes` / `when: { variant }`. `resolveNode` (`lib/resetGuides.js`) does all of it, so the sheet only renders.
+   - **Account recovery** is shared: `RECOVERY_NODES` in `data/resetGuides/recovery.js` (`account_apple` / `_google` / `_samsung` / `_microsoft` / `_playstation`), reached from the account symptom or any step's `help` link.
 
-   Under either, a *Can't sign in to your …?* disclosure lists each of the guide's `account` recoveries, then *If nothing works*. **Continue with this** finishes via `via: 'cant_use'`, which counts as done (the doc's gate rule).
+   Fix screens end with an *If nothing works* fold-out (each `account`'s `nothingWorks` + continue anyway). **Continue with this** finishes via `via: 'cant_use'`, which counts as done (the doc's gate rule). A `resume` node (the problem is solved: old passcode, recovered password) shows **Back to the guide** instead.
 
-`onDone({ via: 'guide' | 'cant_use', passcodeProvided })`. `initialView` (`'with_you' | 'sent' | 'recovery'`) opens the branch directly. `ResetFailedCard` uses `initialView="sent"` + `skipDone`, because the device is already at Revibe.
+`onDone({ via: 'guide' | 'cant_use', passcodeProvided })`. `initialView` opens the branch directly: `'with_you'` at the picker, `'sent'` / `'recovery'` at that symptom's node (`cantUseEntry`); Back from there closes the sheet. `ResetFailedCard` uses `initialView="sent"` + `skipDone`, because the device is already at Revibe.
 
 ## 5. Repair-mode passcode field — `PasscodeField.jsx`
 
@@ -112,7 +115,7 @@ It is optional (a fallback) and masked, with show/hide. `passcodeError` rejects 
 
 - guide chips (with claim share) and device chips;
 - a Return/Repair toggle (labelled single-mode where relevant);
-- open-at chips: Start / Can't use › with me / › sent / Account recovery;
+- open-at chips: Start / Can't use › picker / › sent / Account recovery;
 - **Open guide**;
 - a debug strip that re-runs `resetGuideForOrder` on the synthesised order (✓ maps back / ✗ mismatch), plus mode · step count · passcode kind and the last finish result.
 

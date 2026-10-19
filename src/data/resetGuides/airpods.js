@@ -43,12 +43,21 @@ export default {
     },
   ],
   cantUse: {
-    withYou: [
-      { modes: ['single'], title: 'Lost or broken', body: 'Use the “already sent” steps — they don’t need to be nearby.' },
+    symptoms: [
+      { id: 'lost', icon: 'power', title: 'They’re lost or broken', sub: 'They don’t need to be nearby', to: 'remote' },
+      { id: 'account', icon: 'key', title: 'I can’t sign in to my Apple Account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_apple' },
+      { id: 'sent', icon: 'truck', title: 'I’ve already sent them to Revibe', sub: 'They don’t need to be nearby', to: 'remote' },
     ],
-    sent: [
-      { modes: ['single'], title: 'Remove them from Find My', body: 'Find My app › Devices (or Items) › your AirPods › Remove This Device › Remove, or icloud.com/find › the AirPods › Remove This Device. This also lifts Find My Lock, which Apple can’t remove for you.' },
-      { modes: ['single'], title: 'Then forget them', body: 'Forget them in Bluetooth on your iPhone: AirPods still paired to it can reappear and lock again.' },
-    ],
+    nodes: {
+      remote: {
+        title: 'Remove them from Find My',
+        steps: [
+          { text: 'On your iPhone, open Find My and select your AirPods.', path: ['Find My', 'Devices', '[your AirPods]'], note: 'No iPhone to hand? Sign in at icloud.com/find in any browser.', help: { label: 'Can’t sign in?', to: 'account_apple' } },
+          { text: 'Choose Remove This Device, then Remove.', path: ['Remove This Device', 'Remove'] },
+          { text: 'On your iPhone, forget them in Bluetooth so they can’t reconnect and lock again.', path: ['Settings', 'Bluetooth', 'ⓘ', 'Forget This Device'] },
+        ],
+        tip: 'This also lifts Find My Lock, which Apple can’t remove for you.',
+      },
+    },
   },
 }

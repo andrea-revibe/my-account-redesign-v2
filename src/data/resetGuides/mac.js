@@ -108,14 +108,50 @@ export default {
     },
   ],
   cantUse: {
-    withYou: [
-      { modes: ['return', 'repair'], title: 'Forgot the login password', body: 'Restart, click the ? at the login window › Reset Password (or Restart and show password reset options), then use your Apple Account or FileVault recovery key. From macOS Recovery: Forgot all passwords?' },
-      { modes: ['return'], title: 'Nothing else works', body: 'Start up in macOS Recovery › Recovery Assistant › Erase Mac › Erase Mac. Afterwards an Activate Mac window asks for the Apple Account: Activation Lock stays until you sign in or remove the Mac remotely.' },
+    symptoms: [
+      { id: 'password', icon: 'lock', title: 'I forgot my login password', sub: 'I can’t get past the login window', to: 'mac_password' },
+      { id: 'dead', icon: 'power', title: 'It won’t start, or nothing else works', to: { return: 'mac_erase', repair: 'mac_repair' } },
+      { id: 'account', icon: 'key', title: 'I can’t sign in to my Apple Account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_apple' },
+      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Fix it from a browser', to: 'remote' },
     ],
-    sent: [
-      { modes: ['return'], title: 'Erase and remove it', body: 'icloud.com/find › All Devices › the Mac › Erase This Device › Remove This Device.' },
-      { modes: ['repair'], title: 'Remove it', body: 'icloud.com/find › All Devices › the Mac › Remove This Device. Skip Erase.' },
-      { modes: ['return', 'repair'], title: 'What this does', body: 'An offline Mac is removed and Activation Lock comes off at once; an online one can only be marked Ready for Repair or Trade In for 30 days.' },
-    ],
+    nodes: {
+      mac_password: {
+        title: 'Reset your login password',
+        steps: [
+          { text: 'Restart the Mac. At the login window, click the ? next to the password box.' },
+          { text: 'Click Reset Password, or Restart and show password reset options.', path: ['Reset Password'], note: 'Starting from macOS Recovery instead? Choose Forgot all passwords?' },
+          { text: 'Sign in with your Apple Account, or enter your FileVault recovery key.', help: { label: 'Can’t sign in?', to: 'account_apple' } },
+          { text: 'Set a new password, log in and carry on with the guide.' },
+        ],
+        more: [{ label: 'No ? or reset option?', to: { return: 'mac_erase', repair: 'mac_repair' } }],
+        resume: true,
+      },
+      mac_erase: {
+        title: 'Erase it from macOS Recovery',
+        steps: [
+          { text: 'Start up in macOS Recovery.', note: 'Apple silicon: hold the power button until “Loading startup options” appears. Intel: hold Command-R while it starts.' },
+          { text: 'Open Recovery Assistant, then choose Erase Mac.', path: ['Recovery Assistant', 'Erase Mac'] },
+          { text: 'Click Erase Mac again to confirm.', path: ['Erase Mac'] },
+          { text: 'When it restarts, an Activate Mac window asks for your Apple Account. Sign in to finish.', help: { label: 'Can’t sign in?', to: 'account_apple' } },
+        ],
+        tip: 'Activation Lock stays on until you sign in at that window or remove the Mac remotely.',
+        more: [{ label: 'Remove it remotely instead', to: 'remote' }],
+      },
+      mac_repair: {
+        title: 'Don’t erase your {noun}',
+        body: 'Erasing it would delete your data. Continue, and we’ll tell you the next step before pickup.',
+      },
+      remote: {
+        title: { return: 'Erase it and remove it from Find My', repair: 'Remove it from Find My' },
+        steps: [
+          { text: 'In any browser, go to icloud.com/find and sign in.', help: { label: 'Can’t sign in?', to: 'account_apple' } },
+          { text: 'Choose All Devices, then your Mac.', path: ['All Devices', '[your Mac]'] },
+          { modes: ['return'], text: 'Choose Erase This Device and confirm.', path: ['Erase This Device'] },
+          { modes: ['return'], text: 'Then choose Remove This Device.', path: ['Remove This Device'] },
+          { modes: ['repair'], text: 'Choose Remove This Device. Don’t erase it — your data stays on it.', path: ['Remove This Device'] },
+        ],
+        tip: 'If the Mac is offline, Activation Lock comes off straight away. If it’s online, it’s only marked Ready for Repair or Trade In for 30 days.',
+      },
+    },
   },
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
@@ -9,11 +9,12 @@ import {
   ChevronLeft,
   ChevronDown,
   HelpCircle,
-  Home,
   Truck,
   KeyRound,
-  LifeBuoy,
   Info,
+  Lock,
+  PowerOff,
+  Disc,
 } from 'lucide-react'
 import { STEP_ANIM_CSS, stepAnim } from './resetGuideAnim'
 import {
@@ -43,7 +44,9 @@ import {
   effectiveMode,
   variantFor,
   stepsFor,
-  cantUseFor,
+  symptomsFor,
+  cantUseEntry,
+  resolveNode,
   fillNoun,
   passcodeError,
   RESET_MODES,
@@ -51,9 +54,9 @@ import {
 
 // Guided reset — one engine that renders any guide definition from
 // data/resetGuides/* (G1–G7 + no-reset) in Return or Repair mode. One step per
-// screen; "I can't use my device" is reachable from every screen and asks
-// where the device is (still with you → on-device fixes; already sent →
-// account actions only), with the vendor's account recovery behind it.
+// screen; "I can't use my device" is reachable from every screen: the customer
+// picks what's stopping them, answers at most a question or two, and lands on
+// one self-contained numbered fix (lib/resetGuides resolveNode).
 // Finishing either path fires onDone({ via, passcodeProvided }) — the caller
 // (Step 3 / ResetFailedCard / the sandbox) decides what that unlocks.
 
@@ -84,14 +87,13 @@ function mockFor(step, variantId) {
   return key ? MOCKS[key] : null
 }
 
-const INITIAL_WHERE = { with_you: 'withYou', sent: 'sent', recovery: 'withYou' }
-
 export default function ResetGuideSheet({
   guideId = 'apple_mobile',
   mode = 'return',
   facts = {},
-  // 'start' | 'with_you' | 'sent' | 'recovery' — opens the can't-use branch
-  // directly (ResetFailedCard: the device is already at Revibe → 'sent').
+  // 'start' | 'with_you' | 'sent' | 'recovery' — opens "I can't use my device"
+  // at the symptom picker, the guide's sent fix, or account recovery
+  // (ResetFailedCard: the device is already at Revibe → 'sent').
   initialView = 'start',
   // Close via onDone on finish instead of showing the done screen.
   skipDone = false,
@@ -112,8 +114,9 @@ export default function ResetGuideSheet({
   const [i, setI] = useState(0)
   const [dir, setDir] = useState(1)
   const [carouselIdx, setCarouselIdx] = useState(0)
-  const [where, setWhere] = useState(INITIAL_WHERE[initialView] ?? null)
-  const [recoveryOpen, setRecoveryOpen] = useState(initialView === 'recovery')
+  const [trail, setTrail] = useState(() => (direct ? cantUseEntry(guide, m, initialView, { variant: variant.id }) : []))
+  const [trailBase, setTrailBase] = useState(trail.length)
+  const scrollRef = useRef(null)
   const [passcode, setPasscode] = useState('')
   const [passcodeShown, setPasscodeShown] = useState(false)
   const [doneVia, setDoneVia] = useState('guide')
@@ -121,6 +124,10 @@ export default function ResetGuideSheet({
   useEffect(() => {
     setCarouselIdx(0)
   }, [i])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [trail, view])
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -140,6 +147,7 @@ export default function ResetGuideSheet({
   const atCarouselEnd = !isCarousel || carouselIdx >= screens.length - 1
   const showFinish = atCarouselEnd && i === steps.length - 1
   const pcError = step?.passcode ? passcodeError(passcode, step.passcode) : null
+  const node = view === 'cant_use' && trail.length ? resolveNode(guide, m, trail[trail.length - 1], { variant: variant.id }) : null
   const passcodeProvided = !!passcode.trim() && !passcodeError(passcode, guide.steps.find((s) => s.passcode)?.passcode)
 
   const finish = (via) => {
@@ -172,7 +180,7 @@ export default function ResetGuideSheet({
   }
   const back = () => {
     if (view === 'cant_use') {
-      if (where && !direct) return setWhere(null)
+      if (trail.length > trailBase) return setTrail((t) => t.slice(0, -1))
       if (returnTo) return setView(returnTo)
       return onClose()
     }
@@ -183,7 +191,8 @@ export default function ResetGuideSheet({
   }
   const openCantUse = () => {
     setReturnTo(view)
-    setWhere(null)
+    setTrail([])
+    setTrailBase(0)
     setView('cant_use')
   }
 
@@ -238,7 +247,7 @@ export default function ResetGuideSheet({
           )}
         </header>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
           {view === 'intro' && (
             <Intro
               guide={guide}
@@ -275,15 +284,14 @@ export default function ResetGuideSheet({
           )}
 
           {view === 'cant_use' && (
-            <CantUse
+            <CantUseFlow
+              key={trail.join('/')}
               guide={guide}
               mode={m}
+              variantId={variant.id}
               fill={fill}
-              noun={noun}
-              where={where}
-              setWhere={setWhere}
-              recoveryOpen={recoveryOpen}
-              setRecoveryOpen={setRecoveryOpen}
+              node={node}
+              onPick={(to) => setTrail((t) => [...t, to])}
             />
           )}
 
@@ -311,9 +319,17 @@ export default function ResetGuideSheet({
               )}
             </PrimaryButton>
           )}
-          {view === 'cant_use' && where && (
-            <PrimaryButton onClick={() => finish('cant_use')}>
-              Continue with this <ArrowRight size={16} strokeWidth={2.4} />
+          {node && !node.ask && (
+            <PrimaryButton onClick={() => (node.resume ? setView(returnTo ?? 'intro') : finish('cant_use'))}>
+              {node.resume ? (
+                <>
+                  <ChevronLeft size={16} strokeWidth={2.4} /> Back to the guide
+                </>
+              ) : (
+                <>
+                  Continue with this <ArrowRight size={16} strokeWidth={2.4} />
+                </>
+              )}
             </PrimaryButton>
           )}
           {view === 'done' && (
@@ -513,108 +529,148 @@ function StepScreen({
   )
 }
 
-function CantUse({ guide, mode, fill, noun, where, setWhere, recoveryOpen, setRecoveryOpen }) {
-  if (!where) {
+const SYMPTOM_ICONS = { lock: Lock, power: PowerOff, key: KeyRound, truck: Truck, disc: Disc }
+
+function CantUseFlow({ guide, mode, variantId, fill, node, onPick }) {
+  if (!node) {
     return (
-      <div className="px-5 pt-6 pb-4 animate-fadeIn">
-        <h2 className="text-[20px] font-bold text-ink leading-tight text-center">
-          Where is your {noun} now?
-        </h2>
+      <div className="px-5 pt-6 pb-5 animate-fadeIn">
+        <h2 className="text-[20px] font-bold text-ink leading-tight text-center">What’s stopping you?</h2>
         <p className="mt-2 text-[13px] text-ink-2 leading-[1.5] text-center">
-          The fixes are different, so tell us first.
+          Pick the one that fits and we’ll walk you through it.
         </p>
         <div className="mt-5 flex flex-col gap-2.5">
-          <WhereButton
-            icon={Home}
-            title="Still with me"
-            sub="Forgot the passcode, broken screen, or it won’t turn on"
-            onClick={() => setWhere('withYou')}
-          />
-          <WhereButton
-            icon={Truck}
-            title="Already sent to Revibe"
-            sub="Only account actions from another device or a browser work"
-            onClick={() => setWhere('sent')}
-          />
+          {symptomsFor(guide, mode, { variant: variantId }).map((s) => (
+            <WhereButton
+              key={s.id}
+              icon={SYMPTOM_ICONS[s.icon] ?? HelpCircle}
+              title={fill(s.title)}
+              sub={fill(s.sub)}
+              onClick={() => onPick(s.to)}
+            />
+          ))}
+        </div>
+        <p className="mt-5 text-center text-[11.5px] font-semibold text-ink-2 leading-snug">{NEVER_ASK}</p>
+      </div>
+    )
+  }
+
+  if (node.ask) {
+    return (
+      <div className="px-5 pt-6 pb-5 animate-fadeIn">
+        <h2 className="text-[20px] font-bold text-ink leading-tight text-center">{fill(node.ask)}</h2>
+        {node.sub && (
+          <p className="mt-2 text-[13px] text-ink-2 leading-[1.5] text-center">{fill(node.sub)}</p>
+        )}
+        <div className="mt-5 flex flex-col gap-2.5">
+          {node.options.map((o) => (
+            <WhereButton key={o.label} title={fill(o.label)} sub={fill(o.sub)} onClick={() => onPick(o.to)} />
+          ))}
         </div>
       </div>
     )
   }
 
-  const items = cantUseFor(guide, mode, where)
-  const accounts = guide.account.map((a) => ACCOUNT_RECOVERY[a]).filter(Boolean)
-  const lastResort = accounts.map((a) => a.nothingWorks).filter(Boolean)
+  let n = 0
+  const lastResort = node.resume
+    ? []
+    : guide.account.map((a) => ACCOUNT_RECOVERY[a]?.nothingWorks).filter(Boolean)
   return (
     <div className="px-5 pt-5 pb-5 animate-fadeIn">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
-          {where === 'withYou' ? `${noun} is still with you` : 'Already sent to Revibe'}
-        </span>
-        <button
-          onClick={() => setWhere(where === 'withYou' ? 'sent' : 'withYou')}
-          className="text-[11.5px] font-semibold text-brand"
-        >
-          {where === 'withYou' ? 'Already sent?' : 'Still with you?'}
-        </button>
-      </div>
-      <ul className="mt-3 flex flex-col gap-2">
-        {items.map((it) => (
-          <li key={it.title} className="rounded-[12px] border border-line bg-surface px-3.5 py-3">
-            <div className="text-[13.5px] font-semibold text-ink">{fill(it.title)}</div>
-            <p className="mt-1 text-[12.5px] text-ink-2 leading-[1.5]">{fill(it.body)}</p>
-          </li>
-        ))}
-      </ul>
-
-      {accounts.length > 0 && (
-        <div className="mt-3">
-          <button
-            onClick={() => setRecoveryOpen((v) => !v)}
-            aria-expanded={recoveryOpen}
-            className={`flex w-full items-center gap-2 rounded-[12px] border px-3.5 py-3 text-[13px] font-semibold text-ink transition-colors ${
-              recoveryOpen ? 'border-brand/40 bg-brand-bg/30' : 'border-line bg-surface hover:border-brand/40'
-            }`}
-          >
-            <KeyRound size={16} strokeWidth={2.2} className="text-brand shrink-0" />
-            <span className="text-left">
-              Can’t sign in to your {accounts.map((a) => a.name).join(' or ')}?
-            </span>
-            <ChevronDown
-              size={16}
-              strokeWidth={2.2}
-              className={`ml-auto shrink-0 text-muted transition-transform ${recoveryOpen ? 'rotate-180' : ''}`}
-            />
-          </button>
-          {recoveryOpen && (
-            <div className="mt-2 flex flex-col gap-2 animate-slideDown">
-              {accounts.map((a) => (
-                <div key={a.name} className="rounded-[12px] border border-line bg-line-2/40 px-3.5 py-3">
-                  <div className="text-[12.5px] font-semibold text-ink">Recover your {a.name}</div>
-                  <p className="mt-1 text-[12px] text-ink-2 leading-[1.5]">{a.recover}</p>
-                  <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] text-muted leading-snug">
-                    <Info size={12} strokeWidth={2} className="shrink-0 mt-px" />
-                    {a.limits}
-                  </p>
-                </div>
-              ))}
-              <div className="rounded-[12px] border border-warn-bg bg-warn-bg/60 px-3.5 py-3">
-                <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
-                  <LifeBuoy size={14} strokeWidth={2.2} className="text-warn" />
-                  If nothing works
-                </div>
-                <ul className="mt-1 flex flex-col gap-1 text-[12px] text-ink-2 leading-[1.5]">
-                  {lastResort.map((t) => (
-                    <li key={t}>{t}</li>
-                  ))}
-                  <li>Continue anyway — if it still reaches us locked, we’ll contact you with the next step.</li>
-                </ul>
-              </div>
-            </div>
+      <h2 className="text-[20px] font-bold text-ink leading-tight">{fill(node.title)}</h2>
+      {node.body && <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.55]">{fill(node.body)}</p>}
+      {node.steps.length > 0 && (
+        <ol className="mt-4 flex flex-col">
+          {node.steps.map((st, idx) =>
+            st.section ? (
+              <li
+                key={`s${idx}`}
+                className="mt-1 mb-3 rounded-[10px] bg-warn-bg/60 px-3 py-2 text-[12px] font-semibold text-ink leading-snug"
+              >
+                {fill(st.section)}
+              </li>
+            ) : (
+              <FixStep key={idx} n={++n} step={st} fill={fill} onPick={onPick} />
+            ),
           )}
+        </ol>
+      )}
+      {node.tip && (
+        <p className="mt-1 flex items-start gap-1.5 rounded-[10px] bg-brand-bg/60 px-3 py-2 text-[12px] text-ink-2 leading-snug">
+          <Info size={13} strokeWidth={2} className="shrink-0 mt-px text-brand" />
+          {fill(node.tip)}
+        </p>
+      )}
+      {node.more.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1">
+          {node.more.map((o) => (
+            <button
+              key={o.label}
+              onClick={() => onPick(o.to)}
+              className="inline-flex items-center gap-1.5 self-start text-[12.5px] font-semibold text-brand py-1"
+            >
+              <HelpCircle size={14} strokeWidth={2.2} />
+              {fill(o.label)}
+              <ArrowRight size={13} strokeWidth={2.4} />
+            </button>
+          ))}
         </div>
       )}
+      {!node.resume && (
+        <Trouble
+          trouble={{
+            label: 'If nothing works',
+            body: [...lastResort, 'Continue anyway — if it still reaches us locked, we’ll contact you with the next step.'].join(' '),
+          }}
+        />
+      )}
+      <p className="mt-5 text-center text-[11.5px] font-semibold text-ink-2 leading-snug">{NEVER_ASK}</p>
+    </div>
+  )
+}
 
-      <p className="mt-4 text-center text-[11.5px] font-semibold text-ink-2 leading-snug">{NEVER_ASK}</p>
+function FixStep({ n, step, fill, onPick }) {
+  return (
+    <li className="relative flex gap-3 pb-4 last:pb-3">
+      <span className="w-6 h-6 rounded-full bg-brand text-white text-[12px] font-bold grid place-items-center shrink-0">
+        {n}
+      </span>
+      <div className="flex-1 min-w-0 pt-0.5">
+        <p className="text-[13.5px] text-ink leading-[1.5]">{fill(step.text)}</p>
+        {step.path && <PathChips path={step.path.map(fill)} />}
+        {step.note && <p className="mt-1.5 text-[12px] text-muted leading-snug">{fill(step.note)}</p>}
+        {step.help && (
+          <button
+            onClick={() => onPick(step.help.to)}
+            className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-brand"
+          >
+            {step.help.label}
+            <ArrowRight size={12} strokeWidth={2.4} />
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function PathChips({ path }) {
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+      {path.map((p, idx) => {
+        const placeholder = /^\[.*\]$/.test(p)
+        return (
+          <span key={idx} className="inline-flex items-center gap-1">
+            {idx > 0 && <span className="text-[11px] text-muted">›</span>}
+            <span
+              className={`inline-flex items-center rounded-[6px] px-1.5 h-[22px] text-[11.5px] font-semibold ${
+                placeholder ? 'border border-dashed border-brand/40 text-brand italic' : 'bg-brand-bg text-brand'
+              }`}
+            >
+              {placeholder ? p.slice(1, -1) : p}
+            </span>
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -625,12 +681,14 @@ function WhereButton({ icon: Icon, title, sub, onClick }) {
       onClick={onClick}
       className="w-full text-left rounded-[16px] border-2 border-line bg-surface px-4 py-3.5 flex items-center gap-3 hover:border-brand/50 transition-colors"
     >
-      <span className="w-10 h-10 rounded-full bg-brand-bg text-brand grid place-items-center shrink-0">
-        <Icon size={19} strokeWidth={2} />
-      </span>
+      {Icon && (
+        <span className="w-10 h-10 rounded-full bg-brand-bg text-brand grid place-items-center shrink-0">
+          <Icon size={19} strokeWidth={2} />
+        </span>
+      )}
       <span className="flex-1 min-w-0">
         <span className="block text-[14.5px] font-semibold text-ink">{title}</span>
-        <span className="block text-[12px] text-muted leading-snug">{sub}</span>
+        {sub && <span className="block text-[12px] text-muted leading-snug">{sub}</span>}
       </span>
       <ArrowRight size={18} strokeWidth={2.2} className="text-muted shrink-0" />
     </button>

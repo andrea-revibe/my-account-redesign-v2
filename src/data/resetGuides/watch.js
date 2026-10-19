@@ -35,11 +35,21 @@ export default {
     },
   ],
   cantUse: {
-    withYou: [
-      { modes: ['single'], title: 'Broken, or lost access to the iPhone', body: 'Use the “already sent” steps from any browser or another iPhone.' },
+    symptoms: [
+      { id: 'broken', icon: 'power', title: 'It’s broken, or I don’t have the paired iPhone', sub: 'Fix it from another device or a browser', to: 'remote' },
+      { id: 'account', icon: 'key', title: 'I can’t sign in to my Apple Account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_apple' },
+      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Fix it from another device or a browser', to: 'remote' },
     ],
-    sent: [
-      { modes: ['single'], title: 'Erase and remove it', body: 'icloud.com/find › All Devices › the watch › Erase › Next › Erase › then Remove under the watch › Continue. Or on another iPhone: Find My › Devices › the watch › More › Erase › Remove This Device. This turns off Activation Lock.' },
-    ],
+    nodes: {
+      remote: {
+        title: 'Erase it and remove it from Find My',
+        steps: [
+          { text: 'On any iPhone signed in to your Apple Account, open Find My and select the watch.', path: ['Find My', 'Devices', '[your Apple Watch]'], note: 'No iPhone? Sign in at icloud.com/find in any browser and choose All Devices.', help: { label: 'Can’t sign in?', to: 'account_apple' } },
+          { text: 'Choose Erase This Device, then Erase.', path: ['Erase This Device', 'Erase'] },
+          { text: 'Once it’s erased, choose Remove This Device.', path: ['Remove This Device'] },
+        ],
+        tip: 'This turns off Activation Lock.',
+      },
+    },
   },
 }

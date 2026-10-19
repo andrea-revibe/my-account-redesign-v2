@@ -78,13 +78,28 @@ export default {
     },
   ],
   cantUse: {
-    withYou: [
-      { modes: ['return', 'repair'], title: 'Forgot the password', body: 'Account Management › Trouble Signing in? › Recover Your Account, then use the “already sent” steps.' },
-      { modes: ['return', 'repair'], title: 'Disc stuck?', body: 'Tell us before pickup.' },
+    symptoms: [
+      { id: 'account', icon: 'key', title: 'I forgot my PlayStation password', sub: 'I can’t sign in to deactivate it', to: 'account_playstation' },
+      { id: 'broken', icon: 'power', title: 'It won’t turn on', sub: 'Deactivate it from a browser', to: 'ps_deactivate' },
+      { id: 'disc', icon: 'disc', title: 'A disc is stuck inside', to: 'ps_disc' },
+      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Deactivate it from a browser', to: 'ps_deactivate' },
     ],
-    sent: [
-      { modes: ['return', 'repair'], title: 'Deactivate all devices', body: 'On playstation.com: Account Management › Device Management › PlayStation Consoles › Deactivate All Devices. You can’t deactivate one console on its own, and this works only once every six months. It doesn’t delete data.' },
-      { modes: ['return', 'repair'], title: 'Sign out everywhere', body: 'Change your password, or use Security › Sign Out on All Devices.' },
-    ],
+    nodes: {
+      ps_deactivate: {
+        title: 'Deactivate it from a browser',
+        lead: 'Then deactivate your consoles',
+        steps: [
+          { text: 'Go to playstation.com and sign in.' },
+          { text: 'Open Account Management, then Device Management.', path: ['Account Management', 'Device Management'] },
+          { text: 'Choose PlayStation Consoles, then Deactivate All Devices.', path: ['PlayStation Consoles', 'Deactivate All Devices'] },
+          { text: 'To sign out everywhere, open Security and choose Sign Out on All Devices.', path: ['Security', 'Sign Out on All Devices'] },
+        ],
+        tip: 'You can’t deactivate just one console, and this only works once every six months. It doesn’t delete anything.',
+      },
+      ps_disc: {
+        title: 'Leave the disc where it is',
+        body: 'Don’t try to force it out. Continue, and tell us about it before pickup.',
+      },
+    },
   },
 }

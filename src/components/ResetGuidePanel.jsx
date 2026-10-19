@@ -11,7 +11,7 @@ import { stepsFor, RESET_MODES } from '../lib/resetGuides'
 
 const OPEN_AT = [
   { id: 'start', label: 'Start' },
-  { id: 'with_you', label: 'Can’t use › with me' },
+  { id: 'with_you', label: 'Can’t use › picker' },
   { id: 'sent', label: 'Can’t use › sent' },
   { id: 'recovery', label: 'Account recovery' },
 ]

@@ -80,18 +80,108 @@ export default {
     },
   ],
   cantUse: {
-    withYou: [
-      { modes: ['return', 'repair'], title: 'Changed the passcode in the last 72 hours?', body: 'iOS 17 or later: tap Forgot Passcode? › Enter Previous Passcode, then set a new one.' },
-      { modes: ['return'], title: 'Forgot the passcode', body: 'On the “{noun} Unavailable” screen tap Forgot Passcode? › Start {noun} Reset › enter your Apple Account password › Erase {noun}. Needs iOS 15.2 or later, Find My on, and Wi-Fi or mobile data.' },
-      { modes: ['return'], title: 'No “Forgot Passcode?” option', body: 'Reset with a computer: turn the {noun} off, connect it, and hold the side button (Face ID models, iPhone 8, SE 2nd/3rd gen), volume down (iPhone 7) or Home (iPhone 6s and earlier) until the recovery screen appears › Mac: Finder › Restore; Windows: Apple Devices app › Restore. A computer restore doesn’t remove Activation Lock — also do the “already sent” steps.' },
-      { modes: ['repair'], title: 'Forgot the passcode', body: 'Don’t erase it — your data would be lost. Continue and we’ll advise on the next step.' },
-      { modes: ['return', 'repair'], title: 'Broken screen, or it won’t turn on', body: 'Use the “already sent” steps from another device. A device that won’t turn on is offline, so removing it clears Activation Lock at once.' },
+    symptoms: [
+      { id: 'passcode', icon: 'lock', title: 'I forgot my passcode', sub: 'Locked out, or “{noun} Unavailable” is showing', to: 'pc_recent' },
+      { id: 'broken', icon: 'power', title: 'The screen’s broken or it won’t turn on', sub: 'Fix it from another device or a browser', to: 'remote' },
+      { id: 'account', icon: 'key', title: 'I can’t sign in to my Apple Account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_apple' },
+      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Fix it from another device or a browser', to: 'remote' },
     ],
-    sent: [
-      { modes: ['return'], title: 'Erase and remove it from Find My', body: 'On another iPhone or iPad: Find My › Devices › the {noun} › More › Erase (no phone number or message) › when erased, Remove This Device › Remove. Or at icloud.com/find › All Devices › the {noun} › Erase This Device › Remove This Device.' },
-      { modes: ['repair'], title: 'Remove it from Find My', body: 'At icloud.com/find or in the Find My app, choose Remove This Device only — skip Erase. It works while the device is offline.' },
-      { modes: ['return', 'repair'], title: 'What this does', body: 'Erased and removed: Activation Lock is off at once. Online and not erased: it can only be marked Ready for Repair or Trade In for 30 days.' },
-      { modes: ['return'], title: 'Then change your password', body: 'Change your Apple Account password once the device is removed.' },
-    ],
+    nodes: {
+      pc_recent: {
+        ask: 'Did you change your passcode in the last 3 days?',
+        sub: 'If you still remember the old one, you can use it to get back in.',
+        options: [
+          { label: 'Yes, and I remember the old one', to: 'pc_previous' },
+          { label: 'No', to: { return: 'pc_erase', repair: 'pc_repair' } },
+        ],
+      },
+      pc_previous: {
+        title: 'Get back in with your old passcode',
+        steps: [
+          { text: 'Enter a passcode until “{noun} Unavailable” appears.' },
+          { text: 'Tap these at the bottom of the screen.', path: ['Forgot Passcode?', 'Enter Previous Passcode'] },
+          { text: 'Enter your old passcode, then set a new one.' },
+          { text: 'Unlock your {noun} and carry on with the guide.' },
+        ],
+        tip: 'Needs iOS 17 or later.',
+        more: [{ label: 'Don’t see “Enter Previous Passcode”?', to: { return: 'pc_erase', repair: 'pc_repair' } }],
+        resume: true,
+      },
+      pc_erase: {
+        title: 'Erase your {noun} from the lock screen',
+        steps: [
+          { text: 'Enter a passcode until “{noun} Unavailable” appears.' },
+          { text: 'Tap these at the bottom of the screen.', path: ['Forgot Passcode?', 'Start {noun} Reset'] },
+          { text: 'Enter your Apple Account password to sign out.', help: { label: 'Don’t know it?', to: 'account_apple' } },
+          { text: 'Tap Erase {noun} and wait while it erases.', path: ['Erase {noun}'] },
+          { text: 'You’re done when the “Hello” setup screen appears. Leave it there — don’t set it up again.' },
+        ],
+        tip: 'Needs Wi-Fi or mobile data, and iOS 15.2 or later.',
+        more: [{ label: 'No “Forgot Passcode?” button?', to: 'restore_model' }],
+      },
+      pc_repair: {
+        title: 'Don’t erase your {noun}',
+        body: 'Erasing it would delete your data. Continue, and we’ll tell you the next step before pickup.',
+      },
+      restore_model: {
+        ask: 'Which {noun} do you have?',
+        sub: 'Each model starts recovery mode with a different button.',
+        options: [
+          { when: { variant: ['iphone'] }, label: 'iPhone 8 or newer', sub: 'Includes iPhone SE (2nd and 3rd generation)', to: 'restore_side' },
+          { when: { variant: ['iphone'] }, label: 'iPhone 7 or 7 Plus', to: 'restore_volume' },
+          { when: { variant: ['iphone'] }, label: 'iPhone 6s or older', sub: 'Includes iPhone SE (1st generation)', to: 'restore_home' },
+          { when: { variant: ['ipad'] }, label: 'No Home button', sub: 'Face ID, or Touch ID in the top button', to: 'restore_top' },
+          { when: { variant: ['ipad'] }, label: 'Has a Home button', to: 'restore_home' },
+        ],
+      },
+      restore_side: {
+        title: 'Restore it with a computer',
+        steps: [{ text: 'Turn the {noun} off. Then hold the side button and keep holding while you plug it into a Mac or PC.' }],
+        then: 'restore',
+      },
+      restore_volume: {
+        title: 'Restore it with a computer',
+        steps: [{ text: 'Turn the {noun} off. Then hold the volume down button and keep holding while you plug it into a Mac or PC.' }],
+        then: 'restore',
+      },
+      restore_home: {
+        title: 'Restore it with a computer',
+        steps: [{ text: 'Turn the {noun} off. Then hold the Home button and keep holding while you plug it into a Mac or PC.' }],
+        then: 'restore',
+      },
+      restore_top: {
+        title: 'Restore it with a computer',
+        steps: [{ text: 'Turn the {noun} off. Then hold the top button and keep holding while you plug it into a Mac or PC.' }],
+        then: 'restore',
+      },
+      restore: {
+        steps: [
+          { text: 'Let go when the recovery screen (a computer and a cable) appears.' },
+          { text: 'On the computer, open your {noun} and choose Restore.', path: ['Restore'], note: 'Mac: in Finder. Windows PC: in the Apple Devices app.' },
+          { text: 'Wait until the restore finishes and the {noun} restarts.' },
+        ],
+        then: 'remote',
+      },
+      remote: {
+        title: { return: 'Erase it and remove it from Find My', repair: 'Remove it from Find My' },
+        lead: 'A restore doesn’t remove Activation Lock. Finish with these steps',
+        steps: [
+          {
+            text: 'On another iPhone or iPad, open Find My and select your {noun}.',
+            path: ['Find My', 'Devices', '[your {noun}]'],
+            note: 'No other Apple device? Sign in at icloud.com/find in any browser and choose All Devices.',
+            help: { label: 'Can’t sign in?', to: 'account_apple' },
+          },
+          { modes: ['return'], text: 'Choose Erase This Device. Skip the phone number and message.', path: ['Erase This Device'] },
+          { modes: ['return'], text: 'Once it shows as erased, choose Remove This Device, then Remove.', path: ['Remove This Device', 'Remove'] },
+          { modes: ['repair'], text: 'Choose Remove This Device, then Remove. Don’t erase it — your data stays on it.', path: ['Remove This Device', 'Remove'] },
+          { modes: ['return'], text: 'To be safe, change your Apple Account password afterwards.' },
+        ],
+        tip: {
+          return: 'Once it’s erased and removed, Activation Lock is off straight away.',
+          repair: 'If the {noun} is off or offline, removing it lifts Activation Lock straight away.',
+        },
+      },
+    },
   },
 }

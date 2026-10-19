@@ -98,16 +98,70 @@ export default {
     },
   ],
   cantUse: {
-    withYou: [
-      { modes: ['return', 'repair'], title: 'Changed the screen lock in the last 72 hours?', body: 'One UI 6.1 or later: after 5 wrong tries tap Forgot PIN/password/pattern? › enter the previous lock › set a new one. Works once per lock type.' },
-      { modes: ['return'], title: 'Forgot the lock', body: 'The {noun} has to be erased. Samsung: smartthingsfind.samsung.com › the device › Erase data › Erase. Or Google Find Hub › the device › Factory reset. Setup then asks for your Google Account — sign in once to finish, then remove the account and reset from Settings.' },
-      { modes: ['repair'], title: 'Forgot the lock and the previous one', body: 'Don’t erase it. Samsung says to have the reset done at a service centre — continue and we’ll arrange it.' },
-      { modes: ['return', 'repair'], title: 'Broken screen, or it won’t turn on', body: 'Use the “already sent” steps.' },
+    symptoms: [
+      { id: 'lock', icon: 'lock', when: { variant: SAMSUNG }, title: 'I forgot my screen lock', sub: 'PIN, pattern or password', to: 'lk_recent' },
+      { id: 'lock', icon: 'lock', when: { variant: ['other_android'] }, title: 'I forgot my screen lock', sub: 'PIN, pattern or password', to: { return: 'lk_erase', repair: 'lk_repair' } },
+      { id: 'broken', icon: 'power', title: 'The screen’s broken or it won’t turn on', sub: 'Fix it from a browser', to: 'remote' },
+      { id: 'account', icon: 'key', when: { variant: SAMSUNG }, title: 'I can’t sign in to my Google or Samsung account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account' },
+      { id: 'account', icon: 'key', when: { variant: ['other_android'] }, title: 'I can’t sign in to my Google Account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_google' },
+      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Fix it from a browser', to: 'remote' },
     ],
-    sent: [
-      { modes: ['return', 'repair'], title: 'Sign it out of your Google Account', body: 'Google Account › Security › Your devices › Manage all devices › the device › Sign out (every session with that device name).' },
-      { modes: ['return', 'repair'], title: 'Samsung: erase it remotely', body: 'smartthingsfind.samsung.com › the device › Erase data, if it will come online.' },
-      { modes: ['return', 'repair'], title: 'Good to know', body: 'Google doesn’t say either step lifts device protection, so a device still locked at inspection usually needs your Google sign-in, or a Samsung service centre with proof of purchase.' },
-    ],
+    nodes: {
+      lk_recent: {
+        ask: 'Did you change your screen lock in the last 3 days?',
+        sub: 'If you still remember the old one, you can use it to get back in.',
+        options: [
+          { label: 'Yes, and I remember the old one', to: 'lk_previous' },
+          { label: 'No', to: { return: 'lk_erase', repair: 'lk_repair' } },
+        ],
+      },
+      lk_previous: {
+        title: 'Get back in with your old screen lock',
+        steps: [
+          { text: 'Enter a wrong PIN, pattern or password 5 times.' },
+          { text: 'Tap Forgot PIN (or pattern, or password) at the bottom of the screen.', path: ['Forgot PIN?'] },
+          { text: 'Enter your previous screen lock.' },
+          { text: 'Set a new one, unlock your {noun} and carry on with the guide.' },
+        ],
+        tip: 'Needs One UI 6.1 or later, and works once per lock type.',
+        more: [{ label: 'Didn’t work?', to: { return: 'lk_erase', repair: 'lk_repair' } }],
+        resume: true,
+      },
+      lk_erase: {
+        title: 'Erase your {noun} remotely',
+        steps: [
+          { when: { variant: SAMSUNG }, text: 'On a computer or another phone, go to smartthingsfind.samsung.com and sign in.', help: { label: 'Can’t sign in?', to: 'account_samsung' } },
+          { when: { variant: SAMSUNG }, text: 'Select your {noun}, then Erase data and Erase.', path: ['Erase data', 'Erase'] },
+          { when: { variant: ['other_android'] }, text: 'On a computer or another phone, go to google.com/android/find and sign in.', help: { label: 'Can’t sign in?', to: 'account_google' } },
+          { when: { variant: ['other_android'] }, text: 'Select your {noun}, then Factory reset.', path: ['Factory reset'] },
+          { text: 'Wait for it to restart. Setup asks for your Google Account — sign in once to finish setup.', help: { label: 'Don’t know the password?', to: 'account_google' } },
+          { when: { variant: SAMSUNG }, text: 'Open Settings and remove your Google and Samsung accounts.', path: ['Settings', 'Accounts and backup', 'Manage accounts'] },
+          { when: { variant: ['other_android'] }, text: 'Open Settings and remove your Google Account.', path: ['Settings', 'Passwords & accounts', '[your account]', 'Remove account'] },
+          { when: { variant: SAMSUNG }, text: 'Factory reset from Settings, and stop at the first setup screen.', path: ['Settings', 'General management', 'Reset', 'Factory data reset'] },
+          { when: { variant: ['other_android'] }, text: 'Factory reset from Settings, and stop at the first setup screen.', path: ['Settings', 'System', 'Reset options', 'Erase all data (factory reset)'] },
+        ],
+        tip: 'The {noun} needs to be on and connected to the internet.',
+      },
+      lk_repair: {
+        title: 'Don’t erase your {noun}',
+        body: 'Erasing it would delete your data. Continue, and we’ll arrange a service-centre reset with you before pickup.',
+      },
+      remote: {
+        title: 'Sign it out of your accounts remotely',
+        steps: [
+          { text: 'In any browser, go to myaccount.google.com and open Security.', path: ['Security', 'Your devices', 'Manage all devices'], help: { label: 'Can’t sign in?', to: 'account_google' } },
+          { text: 'Select the {noun} and choose Sign out. If it’s listed more than once, sign out of each one.', path: ['Sign out'] },
+          { modes: ['return'], when: { variant: SAMSUNG }, text: 'Then go to smartthingsfind.samsung.com, select the {noun}, and choose Erase data.', path: ['Erase data'], note: 'This only works if the {noun} can come online.' },
+        ],
+        tip: 'If it still reaches us locked, we’ll need your Google sign-in, or a Samsung service centre visit with proof of purchase.',
+      },
+      account: {
+        ask: 'Which account can’t you sign in to?',
+        options: [
+          { label: 'Google Account', sub: 'Your Gmail address', to: 'account_google' },
+          { label: 'Samsung account', to: 'account_samsung' },
+        ],
+      },
+    },
   },
 }

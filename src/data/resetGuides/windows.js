@@ -86,16 +86,82 @@ export default {
     },
   ],
   cantUse: {
-    withYou: [
-      { modes: ['return', 'repair'], title: 'Forgot the PIN', body: 'Select I forgot my PIN under the PIN box (Microsoft accounts only; with a local account, sign in with the password).' },
-      { modes: ['return', 'repair'], title: 'Forgot the password', body: 'Microsoft account: I forgot my password. Local account: the arrow next to the password box › OK › Reset password › answer your security questions.' },
-      { modes: ['return'], title: 'Can’t sign in at all', body: 'On the sign-in screen hold Shift while you select Power › Restart › Troubleshoot › Reset this PC › Remove everything. An encrypted drive asks for the BitLocker key.' },
-      { modes: ['return'], title: 'Won’t start', body: 'After several failed starts Windows opens its recovery screen by itself (or interrupt startup twice) › Troubleshoot › Reset this PC.' },
-      { modes: ['repair'], title: 'Won’t start', body: 'Don’t reset it. Continue and we’ll advise on the next step.' },
+    symptoms: [
+      { id: 'signin', icon: 'lock', title: 'I can’t sign in to Windows', sub: 'Forgot the PIN or password', to: 'win_signin' },
+      { id: 'dead', icon: 'power', title: 'It won’t start', to: { return: 'win_wont_start', repair: 'win_repair' } },
+      { id: 'account', icon: 'key', title: 'I can’t sign in to my Microsoft account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_microsoft' },
+      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Fix it from a browser', to: 'remote' },
     ],
-    sent: [
-      { modes: ['return', 'repair'], title: 'Remove it from your Microsoft account', body: 'account.microsoft.com/devices › the laptop › Show details › More actions › Remove › tick “I’m ready to remove this device” › Remove.' },
-      { modes: ['return', 'repair'], title: 'Share your BitLocker key if asked', body: 'Windows has no account lock that blocks a reset, so our partner can reset it — but an encrypted drive still needs the key from aka.ms/myrecoverykey.' },
-    ],
+    nodes: {
+      win_signin: {
+        ask: 'How do you sign in to Windows?',
+        options: [
+          { label: 'With a PIN', sub: 'A short number', to: 'win_pin' },
+          { label: 'With a Microsoft account password', sub: 'An email address shows on the sign-in screen', to: 'account_microsoft' },
+          { label: 'With a local account password', sub: 'Just a name, no email address', to: 'win_local' },
+        ],
+      },
+      win_pin: {
+        title: 'Reset your PIN',
+        steps: [
+          { text: 'On the sign-in screen, select I forgot my PIN under the PIN box.', path: ['I forgot my PIN'], note: 'Only shows for Microsoft accounts. With a local account, sign in with your password instead.' },
+          { text: 'Confirm it’s you with your Microsoft account password or a code.', help: { label: 'Can’t sign in?', to: 'account_microsoft' } },
+          { text: 'Set a new PIN, sign in and carry on with the guide.' },
+        ],
+        more: [{ modes: ['return'], label: 'Still can’t sign in?', to: 'win_reset' }],
+        resume: true,
+      },
+      win_local: {
+        title: 'Reset your local password',
+        steps: [
+          { text: 'Enter any password once, then select OK.' },
+          { text: 'Select Reset password.', path: ['Reset password'] },
+          { text: 'Answer your security questions and set a new password.' },
+          { text: 'Sign in and carry on with the guide.' },
+        ],
+        more: [{ modes: ['return'], label: 'Still can’t sign in?', to: 'win_reset' }],
+        resume: true,
+      },
+      win_reset: {
+        title: 'Reset it from the sign-in screen',
+        steps: [
+          { text: 'On the sign-in screen, hold Shift while you select Power, then Restart.', path: ['Power', 'Restart'] },
+          { text: 'Choose Troubleshoot, then Reset this PC.', path: ['Troubleshoot', 'Reset this PC'] },
+        ],
+        then: 'win_reset_tail',
+      },
+      win_wont_start: {
+        title: 'Reset it from the recovery screen',
+        steps: [
+          { text: 'Turn it on, and hold the power button to switch it off as soon as the logo appears. Do this twice.' },
+          { text: 'Turn it on a third time — Windows opens its recovery screen by itself.' },
+          { text: 'Choose Troubleshoot, then Reset this PC.', path: ['Troubleshoot', 'Reset this PC'] },
+        ],
+        then: 'win_reset_tail',
+      },
+      win_reset_tail: {
+        steps: [
+          { text: 'Choose Remove everything and follow the prompts.', path: ['Remove everything'] },
+          { text: 'Stop when the region / language setup screen appears, and turn it off there.' },
+        ],
+        tip: 'If the drive is encrypted, it asks for a BitLocker recovery key. Find it at aka.ms/myrecoverykey.',
+        then: 'remote',
+      },
+      win_repair: {
+        title: 'Don’t reset your {noun}',
+        body: 'Resetting it would delete your data. Continue, and we’ll tell you the next step before pickup.',
+      },
+      remote: {
+        title: 'Remove it from your Microsoft account',
+        lead: 'Then remove it from your Microsoft account',
+        steps: [
+          { text: 'In any browser, go to account.microsoft.com/devices and sign in.', help: { label: 'Can’t sign in?', to: 'account_microsoft' } },
+          { text: 'Find the {noun} and select Show details.', path: ['Show details'] },
+          { text: 'Select More actions, then Remove.', path: ['More actions', 'Remove'] },
+          { text: 'Tick “I’m ready to remove this device”, then select Remove.', path: ['Remove'] },
+        ],
+        tip: 'If the drive is encrypted, our partner may also need the BitLocker key — find it at aka.ms/myrecoverykey.',
+      },
+    },
   },
 }
