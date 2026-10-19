@@ -28,7 +28,7 @@ Guides are grouped by what locks the device, not by brand. Brand and model diffe
 |---|---|---|---|---|
 | G1 | iPhone & iPad (`apple_mobile`) | `iphone`, `ipad` | Return · Repair | `{noun}` wording; iOS-version notes |
 | G2 | Android (`android`) | `samsung_phone`, `samsung_tablet`, `other_android` | Return · Repair | Samsung-only steps via `when.variant` |
-| G3 | Windows laptop (`windows`) | `dell`, `ideapad`, `thinkpad`, `hp`, `acer`, `surface` | Return · Repair | one BIOS-key line per brand (`guide.bios`) |
+| G3 | Windows laptop (`windows`) | `laptop` (brand-neutral) | Return · Repair | BIOS step lists the common setup keys (F2 / F1 / F10 / Del / Esc) + a no-F-keys note |
 | G4 | MacBook (`mac`) | `macbook` | Return · Repair | intro chip question (`branch.chip`: Apple silicon / Intel+T2 / Intel 2012–17) |
 | G5 | Apple Watch (`watch`) | `apple_watch` | single | — |
 | G6 | AirPods (`airpods`) | `airpods`, `airpods_max` | single | Max reset step via variant |
@@ -67,7 +67,7 @@ Catalogue `category_name` first, then `product.name` (title). Returns `{ guideId
 | `Tablet` | title starts "iPad" → G1 `ipad`; "Samsung"/"Galaxy" → G2 `samsung_tablet`; any other title → G2 `other_android`; **no title** → G1 `ipad` + `needsChooser` |
 | `Samsung phone` | G2 `samsung_phone` |
 | `Smartphone` / Android | G2, Samsung by title else `other_android` |
-| `Laptop` | G3, brand from the title (ThinkPad / Lenovo→IdeaPad / Dell / HP / Acer / Surface; default Dell) |
+| `Laptop` | G3 `laptop` — one brand-neutral variant, no title parsing |
 | `Watch` | title "Apple…" → G5, else no-reset |
 | `Audio` | "AirPods Max" / "AirPods" → G6, else no-reset |
 | `Gaming` | PS3–PS5 / PlayStation 3–5 and not a controller → G7, else no-reset |
@@ -88,7 +88,7 @@ One renderer for every guide. Props: `{ guideId, mode, facts: { variant, chip? }
 
    **One frame per platform, never shared across brands:** iPhone (Dynamic Island, `9:41`), Android phone (dark body, punch-hole, `12:45` + battery %), iPad (light bezel), Android tablet (dark, squarer), MacBook (silver deck), Windows laptop (dark deck + taskbar), TV for PlayStation. The OS travels by context (`OsContext`), so shared pieces — status bar, toggle colour — follow the frame. Every drawn screen shows the path caption under the title.
 
-   Notes render as "**when:** text" chips, and `revibe` steps get a *Revibe check* tag. The BIOS row shows only the active brand's line. Carousel mocks (`.screens`) still walk screen by screen.
+   Notes render as "**when:** text" chips, and `revibe` steps get a *Revibe check* tag. Carousel mocks (`.screens`) still walk screen by screen.
 3. **Done** — mode-aware copy (Return: "at the setup screen"; Repair: "ready for repair", or "erased and ready for repair" / Maintenance mode per §2.1; single: "ready to send").
 4. **I can't use my device** — a link on the intro and every step. It is symptom-first and never sends the customer to another section:
    - **Picker** — *What's stopping you?* lists `cantUse.symptoms` (filtered by mode + variant via `symptomsFor`): typically the lock / passcode, a broken or dead device, can't sign in to the account, and already sent to Revibe.

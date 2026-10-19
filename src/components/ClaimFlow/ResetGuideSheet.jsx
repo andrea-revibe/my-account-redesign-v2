@@ -318,7 +318,6 @@ export default function ResetGuideSheet({
             <StepScreen
               key={`${step.id}-${i}`}
               step={step}
-              guide={guide}
               variant={variant}
               mode={m}
               dir={dir}
@@ -607,7 +606,6 @@ function ChoiceCard({ active, error, label, sub, onClick }) {
 
 function StepScreen({
   step,
-  guide,
   variant,
   mode,
   dir,
@@ -622,7 +620,6 @@ function StepScreen({
   const isCarousel = Array.isArray(Mock?.screens)
   const path = step.path?.map(fill)
   const os = step.frame === 'phone' ? 'ios' : variant.os
-  const biosLine = step.bios ? guide.bios?.[variant.id] : null
   return (
     <div
       className="px-5 pt-5 pb-5 flex flex-col items-center text-center"
@@ -650,14 +647,6 @@ function StepScreen({
         <span className="mt-2 inline-flex items-center rounded-full bg-brand/10 text-brand px-2 h-5 text-[10px] font-bold uppercase tracking-[0.05em]">
           Revibe check
         </span>
-      )}
-      {biosLine && (
-        <div className="mt-3 w-full max-w-[320px] rounded-[12px] border border-line bg-line-2/40 px-3 py-2.5 text-left">
-          <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-muted">
-            {variant.label} · open BIOS / UEFI
-          </div>
-          <p className="mt-0.5 text-[12.5px] text-ink leading-snug">{biosLine}</p>
-        </div>
       )}
       {step.notes?.length > 0 && (
         <ul className="mt-3 w-full max-w-[320px] flex flex-col gap-1.5 text-left">

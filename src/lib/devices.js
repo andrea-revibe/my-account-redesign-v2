@@ -69,14 +69,6 @@ export function isOsAmbiguous(order) {
 // can't tell iPad from Android (Step 3 then asks). Care+ lines never reach
 // here: a Care+ claim carries its covered device's product.
 const SAMSUNG_RE = /^(samsung|galaxy)/i
-const WINDOWS_BRANDS = [
-  [/thinkpad/i, 'thinkpad'],
-  [/lenovo|ideapad/i, 'ideapad'],
-  [/^dell/i, 'dell'],
-  [/^hp\b/i, 'hp'],
-  [/^acer/i, 'acer'],
-  [/surface|^microsoft/i, 'surface'],
-]
 
 export function resetGuideForOrder(order) {
   const category = order?.product?.category_name ?? order?.category_name
@@ -100,10 +92,7 @@ export function resetGuideForOrder(order) {
   if (/smartphone|android/i.test(category)) {
     return g('android', SAMSUNG_RE.test(title) ? 'samsung_phone' : 'other_android')
   }
-  if (/laptop/i.test(category)) {
-    const hit = WINDOWS_BRANDS.find(([re]) => re.test(title))
-    return g('windows', hit ? hit[1] : 'dell')
-  }
+  if (/laptop/i.test(category)) return g('windows', 'laptop')
   if (/watch/i.test(category)) {
     return /^apple/i.test(title) ? g('watch', 'apple_watch') : g('no_reset', 'accessory')
   }

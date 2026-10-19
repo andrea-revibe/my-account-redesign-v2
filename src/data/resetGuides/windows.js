@@ -1,5 +1,5 @@
-// G3 — Windows laptop (Microsoft account + BitLocker). One guide for every
-// brand: the brand only changes the BIOS key line (`bios`).
+// G3 — Windows laptop (Microsoft account + BitLocker). One brand-neutral guide:
+// the BIOS step names the common setup keys instead of one per manufacturer.
 export default {
   id: 'windows',
   code: 'G3',
@@ -9,21 +9,8 @@ export default {
   privacy: true,
   account: ['microsoft'],
   variants: [
-    { id: 'dell', label: 'Dell', noun: 'laptop', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'Dell Latitude 5420' },
-    { id: 'ideapad', label: 'IdeaPad', noun: 'laptop', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'Lenovo IdeaPad 5' },
-    { id: 'thinkpad', label: 'ThinkPad', noun: 'laptop', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'Lenovo ThinkPad T14' },
-    { id: 'hp', label: 'HP', noun: 'laptop', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'HP EliteBook 840' },
-    { id: 'acer', label: 'Acer', noun: 'laptop', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'Acer Swift 3' },
-    { id: 'surface', label: 'Surface', noun: 'Surface', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'Microsoft Surface Laptop 4' },
+    { id: 'laptop', label: 'Windows laptop', noun: 'laptop', frame: 'laptop', os: 'windows', category: 'Laptop', title: 'Windows laptop' },
   ],
-  bios: {
-    dell: 'Tap F2 about once a second as soon as the Dell logo appears.',
-    ideapad: 'Press F2 (or Fn+F2) repeatedly at power-on, or, shut down, press the Novo button › BIOS Setup.',
-    thinkpad: 'Tap F1 at the logo (some models: Enter, then F1).',
-    hp: 'Press Esc repeatedly until the Startup Menu opens, then F10.',
-    acer: 'Shut down fully, then press F2 at the first logo.',
-    surface: 'Shut down and wait 10 seconds. Hold volume-up, press and release Power, and keep holding volume-up until the UEFI screen appears. Microsoft can’t reset or retrieve a forgotten UEFI password.',
-  },
   steps: [
     {
       id: 'find_my_device',
@@ -59,9 +46,9 @@ export default {
     {
       id: 'bios',
       modes: ['return', 'repair'],
-      bios: true,
       title: 'Remove any BIOS / UEFI password',
-      body: 'Only if you set one. Open BIOS / UEFI setup and clear it. Forgotten it? Contact the manufacturer.',
+      body: 'Only if you set one. Restart the laptop and tap its setup key as soon as the logo appears — usually F2, F1, F10, Del or Esc, and the logo screen often says which. Clear the password there. Forgotten it? Contact the manufacturer.',
+      notes: [{ when: 'No F-keys', text: 'Hold volume-up while you press and release Power, and keep holding until the setup screen appears.' }],
     },
     {
       id: 'setup_screen',
