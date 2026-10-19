@@ -11,7 +11,7 @@ export default {
   modes: ['return', 'repair'],
   account: ['apple'],
   variants: [
-    { id: 'macbook', label: 'MacBook', noun: 'MacBook', frame: 'laptop', category: 'Macbook', title: 'MacBook Air 13″' },
+    { id: 'macbook', label: 'MacBook', noun: 'MacBook', frame: 'laptop', os: 'macos', category: 'Macbook', title: 'MacBook Air 13″' },
   ],
   branch: {
     key: 'chip',
@@ -87,7 +87,6 @@ export default {
       body: 'Back up first. Turn off Find My Mac, then enter your Apple Account password.',
       path: ['System Settings', 'your name', 'iCloud', 'See All', 'Find My Mac', 'Off'],
       notes: [{ when: 'macOS 27 or later', text: 'Turn on Ready for Repair or Trade-In instead.' }],
-      mock: 'mac_signout',
     },
     {
       id: 'repair_firmware',

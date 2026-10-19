@@ -2,7 +2,7 @@
 // step happens on (iOS / iPadOS / macOS / Android One UI) + the device frames.
 // Pure presentation. Acyclic: imports only the shared anim primitives, nothing
 // from the sheet. Consumed by ResetGuideSheet.jsx + its tables. See docs/code_map.md.
-import { useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import {
   X,
   CheckCircle2,
@@ -24,6 +24,11 @@ import {
   Globe,
   Menu,
   ChevronUp,
+  Wifi,
+  Battery,
+  CreditCard,
+  MapPin,
+  Gamepad2,
 } from 'lucide-react'
 import { stepAnim } from './resetGuideAnim'
 
@@ -37,37 +42,47 @@ const HILITE = {
   boxShadow: `inset 3px 0 0 rgb(${BRAND})`,
 }
 
+// Which OS the surrounding frame is, so shared pieces (StatusBar, toggles,
+// path screens) draw the right platform without every screen passing it down.
+const OsContext = createContext('ios')
+const isAndroidOs = (os) => os === 'android'
+
 // Base screen is 190×384 (tall enough that the densest step — Sign out of
 // iCloud — fits without clipping), then scaled up so the illustration reads
 // clearly inside the sheet.
-function MiniPhone({ children, dark = false, camera = 'island' }) {
+function MiniPhone({ children, dark = false, camera = 'island', os }) {
+  const android = isAndroidOs(os) || camera === 'hole'
   const W = 190
   const H = 384
   const S = 1.32
-  const outerW = W + 14
-  const outerH = H + 14
+  const bezel = android ? 5 : 7
+  const outerW = W + bezel * 2
+  const outerH = H + bezel * 2
   return (
     <div
       className="mx-auto"
       style={{ width: outerW * S, height: outerH * S }}
     >
       <div
-        className="relative rounded-[34px] p-[7px]"
+        className={`relative ${android ? 'rounded-[24px]' : 'rounded-[34px]'}`}
         style={{
           width: outerW,
           height: outerH,
+          padding: bezel,
           transform: `scale(${S})`,
           transformOrigin: 'top left',
           background: dark
             ? 'linear-gradient(160deg,#2a2a30,#0a0a0c)'
-            : 'linear-gradient(160deg,#efecf5,#c9c2da)',
+            : android
+              ? 'linear-gradient(160deg,#4a4852,#1d1c22)'
+              : 'linear-gradient(160deg,#efecf5,#c9c2da)',
           boxShadow:
             '0 18px 40px -16px rgba(40,20,80,0.45), 0 2px 6px rgba(40,20,80,0.18), inset 0 1px 1px rgba(255,255,255,0.5)',
         }}
       >
         <div
-          className={`relative rounded-[28px] overflow-hidden ${
-            dark ? '' : 'bg-[#f1f1f6]'
+          className={`relative ${android ? 'rounded-[19px]' : 'rounded-[28px]'} overflow-hidden ${
+            dark ? '' : android ? 'bg-[#f4f4f6]' : 'bg-[#f1f1f6]'
           }`}
           style={{
             width: W,
@@ -80,14 +95,14 @@ function MiniPhone({ children, dark = false, camera = 'island' }) {
               : {}),
           }}
         >
-          {camera === 'hole' ? (
-            <div className="absolute top-[9px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] bg-black rounded-full z-20" />
+          {android ? (
+            <div className="absolute top-[7px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] bg-black rounded-full z-20" />
           ) : (
             <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[54px] h-[15px] bg-black rounded-full z-20" />
           )}
-          {children}
+          <OsContext.Provider value={android ? 'android' : 'ios'}>{children}</OsContext.Provider>
           <div
-            className={`absolute bottom-[5px] left-1/2 -translate-x-1/2 w-[66px] h-[3.5px] rounded-full z-20 ${
+            className={`absolute bottom-[5px] left-1/2 -translate-x-1/2 ${android ? 'w-[46px] h-[3px]' : 'w-[66px] h-[3.5px]'} rounded-full z-20 ${
               dark ? 'bg-white/55' : 'bg-ink/25'
             }`}
           />
@@ -97,7 +112,24 @@ function MiniPhone({ children, dark = false, camera = 'island' }) {
   )
 }
 
+// Android puts the clock on the left in regular weight with wifi + battery
+// percentage on the right — the cue that tells the two phones apart at a glance.
+function AndroidStatusBar() {
+  return (
+    <div className="flex items-center justify-between px-3.5 pt-[7px] pb-1 text-ink/80">
+      <span className="text-[8.5px] font-medium">12:45</span>
+      <div className="flex items-center gap-[3px]">
+        <Wifi size={8} strokeWidth={2.4} />
+        <span className="text-[7.5px] font-medium">85%</span>
+        <Battery size={10} strokeWidth={2} />
+      </div>
+    </div>
+  )
+}
+
 function StatusBar({ light }) {
+  const os = useContext(OsContext)
+  if (isAndroidOs(os) && !light) return <AndroidStatusBar />
   const c = light ? 'bg-white/90' : 'bg-ink/80'
   return (
     <div className="flex items-center justify-between px-4 pt-[8px] pb-1">
@@ -677,6 +709,8 @@ function AcctRemove({ noun = 'iPhone' }) {
 // Google's FRP and Samsung's Reactivation Lock.
 
 const ANDROID_BLUE = '#2b6ef2'
+const IOS_GREEN = '#34c759'
+const WINDOWS_BLUE = '#0067c0'
 
 function OneUiHeader({ title, back = true }) {
   return (
@@ -694,10 +728,12 @@ function OneUiHeader({ title, back = true }) {
 }
 
 function Toggle({ on }) {
+  const os = useContext(OsContext)
+  const onColor = isAndroidOs(os) ? ANDROID_BLUE : os === 'windows' ? WINDOWS_BLUE : IOS_GREEN
   return (
     <span
       className="relative w-[30px] h-[17px] rounded-full shrink-0 transition-colors"
-      style={{ background: on ? ANDROID_BLUE : 'rgb(0 0 0 / 0.18)' }}
+      style={{ background: on ? onColor : 'rgb(0 0 0 / 0.18)' }}
     >
       <span
         className={`absolute top-[2px] w-[13px] h-[13px] rounded-full bg-white shadow ${
@@ -1032,31 +1068,34 @@ function SamsungRemoveRemote({ Frame = MiniPhone, tablet = false }) {
 // Android-tablet mocks — the same Samsung One UI screens as the phone guide,
 // rendered in the wider MiniTablet shell. The two remote screens also flip to
 // the Tablet icon + "This tablet" wording via the `tablet` flag.
+function MiniTabletAndroid(props) {
+  return <MiniTablet {...props} os="android" />
+}
 function AndroidTabletRemoveGoogle() {
-  return <SamsungRemoveGoogle Frame={MiniTablet} />
+  return <SamsungRemoveGoogle Frame={MiniTabletAndroid} />
 }
 function AndroidTabletSignOutCarousel(props) {
   return (
     <MockCarousel
       screens={SAMSUNG_SIGNOUT_SCREENS}
       camera="hole"
-      Frame={MiniTablet}
+      Frame={MiniTabletAndroid}
       {...props}
     />
   )
 }
 AndroidTabletSignOutCarousel.screens = SAMSUNG_SIGNOUT_SCREENS
 function AndroidTabletFactoryReset() {
-  return <SamsungFactoryReset Frame={MiniTablet} />
+  return <SamsungFactoryReset Frame={MiniTabletAndroid} />
 }
 function AndroidTabletWelcome() {
-  return <SamsungWelcome Frame={MiniTablet} />
+  return <SamsungWelcome Frame={MiniTabletAndroid} />
 }
 function AndroidTabletGoogleRemoveRemote() {
-  return <GoogleRemoveRemote Frame={MiniTablet} tablet />
+  return <GoogleRemoveRemote Frame={MiniTabletAndroid} tablet />
 }
 function AndroidTabletSamsungRemoveRemote() {
-  return <SamsungRemoveRemote Frame={MiniTablet} tablet />
+  return <SamsungRemoveRemote Frame={MiniTabletAndroid} tablet />
 }
 
 // Intro illustration — the iPhone PNG, or an asset-free CSS slab for each
@@ -1197,32 +1236,37 @@ function IntroLaptop() {
 // in without clipping, but a proper ~3:4 portrait-tablet width (the phone's
 // 1.32× upscale otherwise leaves the two frames near-identical in width, so a
 // narrower slab reads as a chunky phone rather than a tablet).
-function MiniTablet({ children }) {
+function MiniTablet({ children, os }) {
+  const android = isAndroidOs(os)
   const W = 300
   const H = 384
   const S = 1.0
-  const outerW = W + 18
-  const outerH = H + 18
+  const bezel = android ? 7 : 9
+  const outerW = W + bezel * 2
+  const outerH = H + bezel * 2
   return (
     <div className="mx-auto" style={{ width: outerW * S, height: outerH * S }}>
       <div
-        className="relative rounded-[30px] p-[9px]"
+        className={`relative ${android ? 'rounded-[18px]' : 'rounded-[30px]'}`}
         style={{
           width: outerW,
           height: outerH,
+          padding: bezel,
           transform: `scale(${S})`,
           transformOrigin: 'top left',
-          background: 'linear-gradient(160deg,#e9e6f0,#c6bfd6)',
+          background: android
+            ? 'linear-gradient(160deg,#4a4852,#1d1c22)'
+            : 'linear-gradient(160deg,#e9e6f0,#c6bfd6)',
           boxShadow:
             '0 18px 40px -16px rgba(40,20,80,0.45), 0 2px 6px rgba(40,20,80,0.18), inset 0 1px 1px rgba(255,255,255,0.5)',
         }}
       >
         <div
-          className="relative rounded-[22px] overflow-hidden bg-[#f1f1f6]"
+          className={`relative ${android ? 'rounded-[12px] bg-[#f4f4f6]' : 'rounded-[22px] bg-[#f1f1f6]'} overflow-hidden`}
           style={{ width: W, height: H }}
         >
           <div className="absolute top-[7px] left-1/2 -translate-x-1/2 w-[6px] h-[6px] bg-black/70 rounded-full z-20" />
-          {children}
+          <OsContext.Provider value={android ? 'android' : 'ios'}>{children}</OsContext.Provider>
         </div>
       </div>
     </div>
@@ -1244,7 +1288,8 @@ function IpadHelloScreen() {
 // landscape screen — so the Mac guide gets its own laptop shell + screens.
 
 // Laptop shell — a landscape lid over a thin keyboard deck wedge.
-function MiniLaptop({ children }) {
+function MiniLaptop({ children, os = 'macos' }) {
+  const windows = os === 'windows'
   const W = 320
   const H = 196
   const S = 1.02
@@ -1262,10 +1307,10 @@ function MiniLaptop({ children }) {
         >
           <div className="absolute top-[3px] left-1/2 -translate-x-1/2 w-[4px] h-[4px] rounded-full bg-white/30" />
           <div
-            className="relative rounded-[5px] overflow-hidden bg-[#edeaf2]"
+            className={`relative ${windows ? 'rounded-[2px] bg-[#f3f3f6]' : 'rounded-[5px] bg-[#edeaf2]'} overflow-hidden`}
             style={{ width: W, height: H }}
           >
-            {children}
+            <OsContext.Provider value={os}>{children}</OsContext.Provider>
           </div>
         </div>
         <div
@@ -1273,7 +1318,9 @@ function MiniLaptop({ children }) {
           style={{
             width: W + 56,
             height: 11,
-            background: 'linear-gradient(180deg,#d3d0db,#a9a3b8)',
+            background: windows
+              ? 'linear-gradient(180deg,#5a5862,#2c2b32)'
+              : 'linear-gradient(180deg,#d3d0db,#a9a3b8)',
             borderBottomLeftRadius: 11,
             borderBottomRightRadius: 11,
             boxShadow: '0 9px 16px -7px rgba(40,20,80,0.42)',
@@ -1617,6 +1664,473 @@ function MacAccountRemove() {
   )
 }
 
+/* ---------------------------------------------------- Repair-mode screens */
+// iOS / iPadOS + One UI screens for the Repair guides (data kept, locks off).
+
+function IosNav({ back, title }) {
+  return (
+    <div className="px-2.5 pt-1.5">
+      {back && (
+        <div className="flex items-center gap-0.5 text-[#007aff]">
+          <ChevronLeft size={13} strokeWidth={2.4} />
+          <span className="text-[9px] font-medium">{back}</span>
+        </div>
+      )}
+      <div className="text-[13px] font-bold text-ink px-1 mt-1 leading-tight text-left">{title}</div>
+    </div>
+  )
+}
+
+function Group({ children, className = '' }) {
+  return (
+    <div className={`bg-white rounded-[11px] overflow-hidden divide-y divide-line-2 shadow-sm2 ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+function Hint({ children }) {
+  return (
+    <div className="mt-1.5 flex items-center justify-center gap-1 text-[8.5px] font-semibold text-brand">
+      <ArrowRight size={9} strokeWidth={2.6} /> {children}
+    </div>
+  )
+}
+
+// Repair 1 · Wallet & Apple Pay — Apple Cash off, then each card › Remove Card.
+function IosWallet({ Frame = MiniPhone }) {
+  return (
+    <Frame>
+      <StatusBar />
+      <IosNav back="Settings" title="Wallet & Apple Pay" />
+      <div className="px-2.5 mt-2.5">
+        <Group>
+          <ToggleRow label="Apple Cash" sub="Turn off for the repair" on highlight />
+        </Group>
+      </div>
+      <div className="px-3.5 mt-2.5 text-[8px] font-semibold uppercase tracking-wide text-muted text-left">
+        Payment cards
+      </div>
+      <div className="px-2.5 mt-1">
+        <Group>
+          <Row Icon={CreditCard} iconBg="#1a1f71" label="Visa •••• 4821" highlight />
+          <Row Icon={CreditCard} iconBg="#eb5b25" label="Mastercard •••• 0937" />
+        </Group>
+        <Hint>open each card › Remove Card</Hint>
+      </div>
+    </Frame>
+  )
+}
+
+// Repair 2 · Find My — the switch itself, glowing, instead of Sign Out.
+function IosFindMyOff({ Frame = MiniPhone, noun = 'iPhone' }) {
+  return (
+    <Frame>
+      <StatusBar />
+      <IosNav back="Find My" title={`Find My ${noun}`} />
+      <div className="px-2.5 mt-2.5">
+        <Group>
+          <ToggleRow label={`Find My ${noun}`} sub="Turn off — enter your password" on highlight />
+          <ToggleRow label="Find My network" on />
+          <ToggleRow label="Send Last Location" on />
+        </Group>
+        <div className="mt-2 px-1 text-[8px] text-muted leading-snug text-left">
+          Turning it off lifts Activation Lock. Your data stays on the {noun}.
+        </div>
+      </div>
+    </Frame>
+  )
+}
+
+// Repair 3 · Face ID & Passcode — Turn Passcode Off glowing.
+function IosPasscodeOff({ Frame = MiniPhone }) {
+  return (
+    <Frame>
+      <StatusBar />
+      <IosNav back="Settings" title="Face ID & Passcode" />
+      <div className="px-2.5 mt-2.5">
+        <Group>
+          <ToggleRow label="iPhone Unlock" on />
+          <ToggleRow label="Apple Pay" on />
+        </Group>
+      </div>
+      <div className="px-2.5 mt-2.5">
+        <Group>
+          <div className="relative px-2.5 py-[9px] text-[10.5px] font-semibold text-[#007aff] text-left" style={HILITE}>
+            Turn Passcode Off
+          </div>
+          <div className="px-2.5 py-[9px] text-[10.5px] text-[#007aff]/60 text-left">Change Passcode</div>
+        </Group>
+        <Hint>turn it back on when it’s returned</Hint>
+      </div>
+    </Frame>
+  )
+}
+
+function IpadWallet() {
+  return <IosWallet Frame={MiniTablet} />
+}
+function IpadFindMyOff() {
+  return <IosFindMyOff Frame={MiniTablet} noun="iPad" />
+}
+function IpadPasscodeOff() {
+  return <IosPasscodeOff Frame={MiniTablet} />
+}
+
+function Radio({ on }) {
+  return (
+    <span
+      className="w-[13px] h-[13px] rounded-full border-[1.5px] grid place-items-center shrink-0"
+      style={{ borderColor: on ? ANDROID_BLUE : 'rgb(0 0 0 / 0.3)' }}
+    >
+      {on && <span className="w-[7px] h-[7px] rounded-full" style={{ background: ANDROID_BLUE }} />}
+    </span>
+  )
+}
+
+// Repair · Screen lock type — Swipe glowing, the current PIN still ticked.
+function SamsungLockSwipe({ Frame = MiniPhone }) {
+  const rows = [
+    { label: 'Swipe', sub: 'No security', target: true },
+    { label: 'Pattern' },
+    { label: 'PIN', sub: 'Current lock', on: true },
+    { label: 'Password' },
+    { label: 'None' },
+  ]
+  return (
+    <Frame camera="hole">
+      <StatusBar />
+      <OneUiHeader title="Screen lock type" />
+      <div className="px-2.5 mt-2.5">
+        <div className="bg-white rounded-[14px] overflow-hidden divide-y divide-line-2 shadow-sm2">
+          {rows.map((r) => (
+            <div
+              key={r.label}
+              className="relative flex items-center gap-2 px-2.5 py-[8px] text-left"
+              style={r.target ? HILITE : undefined}
+            >
+              <Radio on={r.on} />
+              <span className="flex-1 min-w-0">
+                <span className={`block text-[10.5px] leading-tight ${r.target ? 'font-semibold text-ink' : 'text-ink'}`}>
+                  {r.label}
+                </span>
+                {r.sub && <span className="block text-[8.5px] text-muted leading-tight mt-0.5">{r.sub}</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+        <Hint>enter your PIN, then pick Swipe</Hint>
+      </div>
+    </Frame>
+  )
+}
+function AndroidTabletLockSwipe() {
+  return <SamsungLockSwipe Frame={MiniTabletAndroid} />
+}
+
+/* ------------------------------------------------------ Path-driven screens */
+// Steps without a hand-drawn mock render their menu path as a screen in the
+// device's own OS style: title = the screen you're on, the last segment = the
+// row to tap (glowing), neutral skeleton rows standing in for the rest so no
+// menu labels are invented. `Off` as the last segment becomes a switch.
+
+const cleanSeg = (seg) => {
+  const t = seg.replace(/^\[(.*)\]$/, '$1')
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+function pathParts(path) {
+  // ⓘ and See All are buttons, not screens — never a screen title.
+  const segs = path.filter((seg) => seg !== 'ⓘ' && seg !== 'See All').map(cleanSeg)
+  const toggle = segs.length > 1 && /^(off)$/i.test(segs[segs.length - 1])
+  const items = toggle ? segs.slice(0, -1) : segs
+  const target = items[items.length - 1]
+  return {
+    target,
+    toggle,
+    title: items.length > 1 ? items[items.length - 2] : 'Settings',
+    back: items.length > 2 ? items[items.length - 3] : null,
+  }
+}
+
+function Skeleton({ icon = true, w = '55%', dark = false }) {
+  const tone = dark ? 'bg-white/15' : 'bg-black/[0.08]'
+  return (
+    <div className="flex items-center gap-2 px-2.5 py-[9px]">
+      {icon && <span className={`w-[17px] h-[17px] rounded-[5px] shrink-0 ${tone}`} />}
+      <span className={`h-[6px] rounded-full ${tone}`} style={{ width: w }} />
+    </div>
+  )
+}
+
+function TargetRow({ target, toggle }) {
+  return toggle ? (
+    <ToggleRow label={target} sub="Turn this off" on highlight />
+  ) : (
+    <div className="relative flex items-center gap-2 px-2.5 py-[9px] text-left" style={HILITE}>
+      <span className="flex-1 text-[10.5px] font-semibold text-ink leading-tight">{target}</span>
+      <ChevronRight size={11} strokeWidth={2.2} className="text-brand shrink-0" />
+    </div>
+  )
+}
+
+function PhonePathScreen({ path, Frame, os }) {
+  const { title, back, target, toggle } = pathParts(path)
+  const android = isAndroidOs(os)
+  return (
+    <Frame os={os} camera={android ? 'hole' : 'island'}>
+      <StatusBar />
+      {android ? <OneUiHeader title={title} back={!!back} /> : <IosNav back={back} title={title} />}
+      <div className="px-2.5 mt-2.5">
+        <div className={`bg-white ${android ? 'rounded-[14px]' : 'rounded-[11px]'} overflow-hidden divide-y divide-line-2 shadow-sm2`}>
+          <Skeleton w="48%" />
+          <Skeleton w="62%" />
+        </div>
+      </div>
+      <div className="px-2.5 mt-2.5">
+        <div className={`bg-white ${android ? 'rounded-[14px]' : 'rounded-[11px]'} overflow-hidden divide-y divide-line-2 shadow-sm2`}>
+          <TargetRow target={target} toggle={toggle} />
+          <Skeleton w="40%" />
+        </div>
+      </div>
+    </Frame>
+  )
+}
+
+function MacPathScreen({ path }) {
+  const { title, back, target, toggle } = pathParts(path)
+  const settings = path[0] === 'System Settings'
+  return (
+    <MiniLaptop>
+      <MacMenuBar app={settings ? 'System Settings' : 'macOS Recovery'} />
+      <div className="flex" style={{ height: 181 }}>
+        {settings && (
+          <div className="w-[96px] shrink-0 bg-black/[0.04] border-r border-black/10 p-1.5 space-y-[5px]">
+            <div className="h-[13px] rounded-[5px] bg-black/5" />
+            {[60, 72, 50, 66].map((w, i) => (
+              <div key={i} className="h-[5px] rounded-full bg-black/[0.08]" style={{ width: `${w}%` }} />
+            ))}
+          </div>
+        )}
+        <div className={`flex-1 min-w-0 p-2 ${settings ? '' : 'flex items-center justify-center'}`}>
+          <div className={settings ? '' : 'w-[200px] rounded-[8px] bg-white/80 border border-black/10 shadow-sm2 p-2'}>
+            {back && (
+              <div className="flex items-center gap-0.5 text-[#0071e3]">
+                <ChevronLeft size={9} strokeWidth={2.4} />
+                <span className="text-[7px] font-medium">{back}</span>
+              </div>
+            )}
+            <div className="text-[9px] font-bold text-ink mt-1 text-left">{title}</div>
+            <div className="mt-1.5 rounded-[6px] bg-white border border-black/10 overflow-hidden divide-y divide-black/5 shadow-sm2">
+              <Skeleton icon={false} w="50%" />
+              <div className="[&>div]:py-[6px] [&_span]:text-[8px]">
+                <TargetRow target={target} toggle={toggle} />
+              </div>
+              <Skeleton icon={false} w="38%" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </MiniLaptop>
+  )
+}
+
+function WindowsLogo({ size = 8 }) {
+  const c = 'bg-[#0078d4]'
+  return (
+    <span className="grid grid-cols-2 gap-[1px] shrink-0" style={{ width: size, height: size }}>
+      <span className={c} />
+      <span className={c} />
+      <span className={c} />
+      <span className={c} />
+    </span>
+  )
+}
+
+function WindowsTaskbar() {
+  return (
+    <div className="absolute bottom-0 inset-x-0 h-[15px] bg-white/85 border-t border-black/10 flex items-center justify-center gap-[6px] backdrop-blur">
+      <WindowsLogo />
+      {[0, 1, 2, 3].map((i) => (
+        <span key={i} className="w-[8px] h-[8px] rounded-[2px] bg-black/15" />
+      ))}
+    </div>
+  )
+}
+
+function WindowsPathScreen({ path }) {
+  const { title, target, toggle } = pathParts(path)
+  const section = path.length > 2 ? cleanSeg(path[1]) : null
+  return (
+    <MiniLaptop os="windows">
+      <div className="flex h-full pb-[15px]">
+        <div className="w-[96px] shrink-0 p-1.5 space-y-[4px]">
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="w-[14px] h-[14px] rounded-full bg-black/10" />
+            <span className="h-[5px] w-[40px] rounded-full bg-black/10" />
+          </div>
+          {section && (
+            <div className="relative rounded-[4px] bg-black/[0.06] px-2 py-[4px] text-[7px] font-semibold text-ink text-left">
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[8px] rounded-full bg-[#0067c0]" />
+              {section}
+            </div>
+          )}
+          {[58, 70, 46].map((w, i) => (
+            <div key={i} className="h-[5px] mx-2 rounded-full bg-black/[0.08]" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+        <div className="flex-1 min-w-0 p-2 pt-2.5">
+          <div className="text-[10px] font-semibold text-ink text-left">{title}</div>
+          <div className="mt-2 space-y-[3px]">
+            <div className="rounded-[4px] bg-white border border-black/5">
+              <Skeleton w="45%" />
+            </div>
+            <div className="rounded-[4px] bg-white border border-black/5 overflow-hidden [&>div]:py-[7px]">
+              <TargetRow target={target} toggle={toggle} />
+            </div>
+            <div className="rounded-[4px] bg-white border border-black/5">
+              <Skeleton w="35%" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <WindowsTaskbar />
+    </MiniLaptop>
+  )
+}
+
+function BrowserPathScreen({ path, os = 'windows' }) {
+  const [url, ...rest] = path
+  const segs = rest.map(cleanSeg)
+  const target = segs[segs.length - 1]
+  const trail = segs.slice(0, -1)
+  return (
+    <MiniLaptop os={os}>
+      <div className="absolute inset-0 pb-[15px] flex flex-col">
+        <div className="flex items-center gap-1 px-2 h-[16px] bg-[#e9e9ee] border-b border-black/10">
+          <span className="w-[60px] h-[10px] rounded-t-[4px] bg-white mt-[6px]" />
+        </div>
+        <div className="flex items-center gap-1.5 px-2 h-[18px] bg-white border-b border-black/10">
+          <ChevronLeft size={8} strokeWidth={2.2} className="text-muted" />
+          <div className="flex-1 flex items-center gap-1 h-[12px] rounded-full bg-black/5 px-1.5">
+            <Lock size={6} strokeWidth={2.4} className="text-muted" />
+            <span className="text-[6.5px] text-ink-2 truncate">{url}</span>
+          </div>
+        </div>
+        <div className="flex-1 bg-white px-3 py-2.5 text-left">
+          {trail.length > 0 && <div className="text-[9px] font-bold text-ink">{trail[0]}</div>}
+          <div className="mt-1.5 space-y-[3px]">
+            {trail.slice(1).map((t) => (
+              <div key={t} className="rounded-[4px] border border-black/10 px-2 py-[5px] text-[7.5px] text-ink">
+                {t}
+              </div>
+            ))}
+            <div className="rounded-[4px] border border-black/10 overflow-hidden [&>div]:py-[6px] [&_span]:text-[8px]">
+              <TargetRow target={target} />
+            </div>
+            <Skeleton icon={false} w="40%" />
+          </div>
+        </div>
+      </div>
+      {os === 'windows' && <WindowsTaskbar />}
+    </MiniLaptop>
+  )
+}
+
+// TV shell for console guides — the menus live on the TV, not the console.
+function MiniTV({ children }) {
+  const W = 320
+  const H = 180
+  return (
+    <div className="mx-auto flex flex-col items-center" style={{ width: W + 16 }}>
+      <div
+        className="rounded-[8px] p-[6px]"
+        style={{
+          background: 'linear-gradient(160deg,#2a2a30,#0a0a0c)',
+          boxShadow: '0 16px 34px -16px rgba(40,20,80,0.5), inset 0 1px 1px rgba(255,255,255,0.18)',
+        }}
+      >
+        <div
+          className="relative rounded-[3px] overflow-hidden"
+          style={{ width: W, height: H, background: 'radial-gradient(120% 120% at 20% 0%, #1b2a55 0%, #060a18 70%)' }}
+        >
+          {children}
+        </div>
+      </div>
+      <div className="w-[70px] h-[14px]" style={{ background: 'linear-gradient(180deg,#2a2a30,#4a4852)' }} />
+      <div className="w-[130px] h-[4px] rounded-full bg-[#2a2a30]" />
+    </div>
+  )
+}
+
+function ConsolePathScreen({ path }) {
+  const { title, target } = pathParts(path)
+  return (
+    <MiniTV>
+      <div className="flex items-center gap-1.5 px-3 pt-2.5 text-white/70">
+        <Gamepad2 size={9} strokeWidth={2} />
+        <span className="text-[7px] font-medium">{cleanSeg(path[0])}</span>
+      </div>
+      <div className="px-4 mt-2 text-[11px] font-semibold text-white text-left">{title}</div>
+      <div className="px-4 mt-2 w-[220px] space-y-[4px]">
+        <Skeleton icon={false} w="45%" dark />
+        <div className="relative rounded-[4px] border border-white/80 bg-white/15 px-2.5 py-[6px] text-[8.5px] font-semibold text-white text-left shadow-[0_0_12px_rgba(255,255,255,0.25)]">
+          {target}
+        </div>
+        <Skeleton icon={false} w="35%" dark />
+      </div>
+    </MiniTV>
+  )
+}
+
+// Windows' region / language setup screen — where the Return guide stops.
+function WindowsSetup() {
+  return (
+    <MiniLaptop os="windows">
+      <div className="absolute inset-0 flex" style={{ background: 'linear-gradient(135deg,#dfe8f5,#eef0f8)' }}>
+        <div className="w-[120px] grid place-items-center">
+          <span className="w-[60px] h-[60px] rounded-full bg-white/70 grid place-items-center text-[#0067c0]">
+            <MapPin size={24} strokeWidth={1.6} />
+          </span>
+        </div>
+        <div className="flex-1 bg-white/90 px-3 py-3 text-left">
+          <div className="text-[9.5px] font-semibold text-ink leading-tight">Is this the right country or region?</div>
+          <div className="mt-2 space-y-[2px]">
+            {['United Arab Emirates', 'United Kingdom', 'United States'].map((c, i) => (
+              <div
+                key={c}
+                className={`rounded-[3px] px-1.5 py-[4px] text-[7.5px] ${i === 0 ? 'bg-[#0067c0]/10 text-ink font-semibold' : 'text-ink-2'}`}
+              >
+                {c}
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex justify-end">
+            <span className="rounded-[3px] bg-[#0067c0] text-white text-[7.5px] font-semibold px-3 py-[3px]">Yes</span>
+          </div>
+          <div className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-success-bg border border-success/30 px-2 h-[16px] text-[7px] font-semibold text-success">
+            <CheckCircle2 size={8} strokeWidth={2.4} />
+            Stop here — turn it off
+          </div>
+        </div>
+      </div>
+    </MiniLaptop>
+  )
+}
+
+// One entry point for path-driven screens, keyed by the variant's OS.
+function PathScreen({ os, frame, path }) {
+  if (frame === 'browser') return <BrowserPathScreen path={path} os={os === 'macos' ? 'macos' : 'windows'} />
+  if (os === 'ios') return <PhonePathScreen path={path} Frame={MiniPhone} os="ios" />
+  if (os === 'ipados') return <PhonePathScreen path={path} Frame={MiniTablet} os="ipados" />
+  if (os === 'android') return <PhonePathScreen path={path} Frame={MiniPhone} os="android" />
+  if (os === 'android_tablet') return <PhonePathScreen path={path} Frame={MiniTabletAndroid} os="android" />
+  if (os === 'macos') return <MacPathScreen path={path} />
+  if (os === 'windows') return <WindowsPathScreen path={path} />
+  if (os === 'playstation') return <ConsolePathScreen path={path} />
+  return null
+}
+
 export {
   MiniPhone,
   SettingsSignOut,
@@ -1650,4 +2164,14 @@ export {
   MacWelcome,
   MacICloudRemove,
   MacAccountRemove,
+  IosWallet,
+  IosFindMyOff,
+  IosPasscodeOff,
+  IpadWallet,
+  IpadFindMyOff,
+  IpadPasscodeOff,
+  SamsungLockSwipe,
+  AndroidTabletLockSwipe,
+  WindowsSetup,
+  PathScreen,
 }

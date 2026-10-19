@@ -72,9 +72,12 @@ Care+ lines never reach the mapper: a Care+ claim carries its covered device's p
 One renderer for every guide. Props: `{ guideId, mode, facts: { variant, chip? }, initialView, skipDone, onDone, onClose }`.
 
 1. **Intro** — device art (`GuideIntroArt`: the legacy CSS-art device where one exists, else an icon coin), a mode-aware title, step count, and the G4 chip question. Start is never disabled: an unanswered chip lights an inline error.
-2. **Steps** — one per screen. The screen art is:
-   - the existing CSS-art mock when `step.mock` resolves through the `MOCKS` registry (iOS / iPadOS / One UI / macOS screens from `resetGuideMocks.jsx`);
-   - otherwise a plain `PathFrame` (`resetGuideFrames.jsx`: phone / tablet / laptop / browser / watch / box) with the menu path written as numbered tap rows.
+2. **Steps** — one per screen. The screen art is, in order:
+   - a **hand-drawn CSS-art mock** when `step.mock` resolves through the `MOCKS` registry (`resetGuideMocks.jsx`): iOS / iPadOS Return + Repair (Wallet, Find My switch, Passcode off), One UI Return + Repair (Swipe screen lock), macOS sign-out / erase / setup, and Windows' region setup screen;
+   - otherwise a **`PathScreen`** built from `step.path` in the variant's own OS (`variant.os`: `ios` / `ipados` / `android` / `android_tablet` / `macos` / `windows` / `playstation`; `frame: 'phone'` steps on Watch / AirPods run on the iPhone, `frame: 'browser'` draws a browser in the laptop). The screen title is the second-to-last segment, the last segment is the glowing row (`Off` becomes a switch), and neutral skeleton rows stand in for the rest so no menu labels are invented;
+   - otherwise (no path — a physical action: BIOS key, NVRAM, pairing screen, AirPods reset, console restart, packing) a **`StepIllustration`** card (`resetGuideFrames.jsx`), pending the product-photo review.
+
+   **One frame per platform, never shared across brands:** iPhone (Dynamic Island, `9:41`), Android phone (dark body, punch-hole, `12:45` + battery %), iPad (light bezel), Android tablet (dark, squarer), MacBook (silver deck), Windows laptop (dark deck + taskbar), TV for PlayStation. The OS travels by context (`OsContext`), so shared pieces — status bar, toggle colour — follow the frame. Every drawn screen shows the path caption under the title.
 
    Notes render as "**when:** text" chips, and `revibe` steps get a *Revibe check* tag. The BIOS row shows only the active brand's line. Carousel mocks (`.screens`) still walk screen by screen.
 3. **Done** — mode-aware copy (Return: "at the setup screen"; Repair: "ready for repair"; single: "ready to send").
@@ -123,7 +126,7 @@ It replaced the old `ResetGuidePicker` chip row in `JourneyDevPanel`.
 
 ## Mocked vs production
 
-The content is transcribed from the vendor-checked doc but has **not been run on real devices**. QA in EN and AR is still a launch requirement. PathFrames are placeholders, not OS screenshots. Not built: Arabic/RTL + the device-language toggle, the shared opening steps, "Before you start" notes, saving progress on the claim, the post-submit placement + pickup gate, analytics events, and passcode storage/encryption (the field only reports `passcodeProvided`).
+The content is transcribed from the vendor-checked doc but has **not been run on real devices**. QA in EN and AR is still a launch requirement. Path-driven screens and mocks are illustrations, not OS screenshots; physical steps still use a placeholder card. Not built: Arabic/RTL + the device-language toggle, the shared opening steps, "Before you start" notes, saving progress on the claim, the post-submit placement + pickup gate, analytics events, and passcode storage/encryption (the field only reports `passcodeProvided`).
 
 ## See also
 

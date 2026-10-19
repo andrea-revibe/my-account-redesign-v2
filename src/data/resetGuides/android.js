@@ -11,9 +11,9 @@ export default {
   modes: ['return', 'repair'],
   account: ['google', 'samsung'],
   variants: [
-    { id: 'samsung_phone', label: 'Samsung phone', noun: 'phone', frame: 'phone', category: 'Samsung phone', title: 'Samsung Galaxy S21' },
-    { id: 'samsung_tablet', label: 'Samsung tablet', noun: 'tablet', frame: 'tablet', category: 'Tablet', title: 'Samsung Galaxy Tab S8' },
-    { id: 'other_android', label: 'Other Android', noun: 'phone', frame: 'phone', category: 'Smartphone', title: 'Google Pixel 7' },
+    { id: 'samsung_phone', label: 'Samsung phone', noun: 'phone', frame: 'phone', os: 'android', category: 'Samsung phone', title: 'Samsung Galaxy S21' },
+    { id: 'samsung_tablet', label: 'Samsung tablet', noun: 'tablet', frame: 'tablet', os: 'android_tablet', category: 'Tablet', title: 'Samsung Galaxy Tab S8' },
+    { id: 'other_android', label: 'Other Android', noun: 'phone', frame: 'phone', os: 'android', category: 'Smartphone', title: 'Google Pixel 7' },
   ],
   steps: [
     {
@@ -82,19 +82,38 @@ export default {
     {
       id: 'repair_accounts',
       modes: ['repair'],
+      when: { variant: SAMSUNG },
       title: 'Back up, then remove your accounts',
       body: 'Back up, then remove your Google and Samsung accounts, so a reset during the repair won’t lock the {noun}.',
       path: ['Settings', 'Accounts and backup', 'Manage accounts'],
-      notes: [{ when: 'Other brands', text: 'Settings › Passwords & accounts › the account › Remove account.' }],
       mock: { samsung_phone: 'sam_remove_google', samsung_tablet: 'tab_remove_google' },
+    },
+    {
+      id: 'other_repair_accounts',
+      modes: ['repair'],
+      when: { variant: ['other_android'] },
+      title: 'Back up, then remove your accounts',
+      body: 'Back up, then remove your Google Account, so a reset during the repair won’t lock the {noun}. Menus differ by brand.',
+      path: ['Settings', 'Passwords & accounts', '[your account]', 'Remove account'],
     },
     {
       id: 'repair_lock_off',
       modes: ['repair'],
+      when: { variant: SAMSUNG },
       final: true,
       title: 'Turn the screen lock off',
       body: 'Enter your PIN, pattern or password, then choose Swipe. Samsung’s repair advice: no passcode needs to be shared.',
       path: ['Settings', 'Lock screen and AOD', 'Screen lock and biometrics', 'Swipe'],
+      mock: { samsung_phone: 'sam_lock_swipe', samsung_tablet: 'tab_lock_swipe' },
+    },
+    {
+      id: 'other_repair_lock_off',
+      modes: ['repair'],
+      when: { variant: ['other_android'] },
+      final: true,
+      title: 'Turn the screen lock off',
+      body: 'Enter your PIN, pattern or password, then choose None or Swipe. Menus differ by brand.',
+      path: ['Settings', 'Security & privacy', 'Device unlock', 'Screen lock', 'Swipe'],
     },
   ],
   cantUse: {

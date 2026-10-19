@@ -9,8 +9,8 @@ export default {
   modes: ['return', 'repair'],
   account: ['apple'],
   variants: [
-    { id: 'iphone', label: 'iPhone', noun: 'iPhone', frame: 'phone', category: 'iPhone', title: 'iPhone 13' },
-    { id: 'ipad', label: 'iPad', noun: 'iPad', frame: 'tablet', category: 'Tablet', title: 'iPad Pro 11″' },
+    { id: 'iphone', label: 'iPhone', noun: 'iPhone', frame: 'phone', os: 'ios', category: 'iPhone', title: 'iPhone 13' },
+    { id: 'ipad', label: 'iPad', noun: 'iPad', frame: 'tablet', os: 'ipados', category: 'Tablet', title: 'iPad Pro 11″' },
   ],
   steps: [
     {
@@ -53,6 +53,7 @@ export default {
       title: 'Back up and clear Wallet',
       body: 'Back up your {noun}. Turn off Apple Cash and remove your cards from Wallet. If Settings shows a “Finish Repair” item from an earlier repair, complete it first.',
       path: ['Settings', 'Wallet & Apple Pay'],
+      mock: { iphone: 'ios_wallet', ipad: 'ipad_wallet' },
     },
     {
       id: 'find_my_off',
@@ -63,7 +64,7 @@ export default {
       notes: [
         { when: 'iOS 27 or later', text: 'You can instead open the Find My app › select the device › More › Repair or Trade In › Enable. Find My stays on during the repair.' },
       ],
-      mock: { iphone: 'ios_signout', ipad: 'ipad_signout' },
+      mock: { iphone: 'ios_findmy_off', ipad: 'ipad_findmy_off' },
       trouble: {
         label: 'It won’t let me turn it off',
         body: 'Stolen Device Protection needs Face ID or Touch ID, a one-hour delay, then Face ID or Touch ID again away from a familiar location. Do it at home before pickup day.',
@@ -77,6 +78,7 @@ export default {
       title: 'Turn your passcode off',
       body: 'Apple says not to share your passcode, and its repairers won’t ask for it. Turn it off for the repair instead, and turn it back on when the device is back.',
       path: ['Settings', 'Face ID & Passcode', 'Turn Passcode Off'],
+      mock: { iphone: 'ios_passcode_off', ipad: 'ipad_passcode_off' },
     },
   ],
   cantUse: {

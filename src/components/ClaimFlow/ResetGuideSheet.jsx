@@ -35,8 +35,18 @@ import {
   MacSignOut,
   MacErase,
   MacWelcome,
+  IosWallet,
+  IosFindMyOff,
+  IosPasscodeOff,
+  IpadWallet,
+  IpadFindMyOff,
+  IpadPasscodeOff,
+  SamsungLockSwipe,
+  AndroidTabletLockSwipe,
+  WindowsSetup,
+  PathScreen,
 } from './resetGuideMocks'
-import { PathFrame, GuideIntroArt } from './resetGuideFrames'
+import { StepIllustration, GuideIntroArt } from './resetGuideFrames'
 import PasscodeField from './PasscodeField'
 import { ACCOUNT_RECOVERY, NEVER_ASK } from '../../data/resetGuides'
 import {
@@ -60,8 +70,10 @@ import {
 // Finishing either path fires onDone({ via, passcodeProvided }) — the caller
 // (Step 3 / ResetFailedCard / the sandbox) decides what that unlocks.
 
-// step.mock keys → the existing CSS-art screens. Steps without a match render
-// a PathFrame with the menu path instead.
+// step.mock keys → the hand-drawn CSS-art screens. Steps without one render
+// their menu path as a PathScreen in the variant's OS style (`variant.os`;
+// `frame: 'phone'` steps on Watch / AirPods happen on the iPhone), and steps
+// with no path get a StepIllustration.
 const MOCKS = {
   ios_signout: SettingsSignOut,
   ios_erase: SettingsErase,
@@ -80,6 +92,15 @@ const MOCKS = {
   mac_signout: MacSignOut,
   mac_erase: MacErase,
   mac_welcome: MacWelcome,
+  ios_wallet: IosWallet,
+  ios_findmy_off: IosFindMyOff,
+  ios_passcode_off: IosPasscodeOff,
+  ipad_wallet: IpadWallet,
+  ipad_findmy_off: IpadFindMyOff,
+  ipad_passcode_off: IpadPasscodeOff,
+  sam_lock_swipe: SamsungLockSwipe,
+  tab_lock_swipe: AndroidTabletLockSwipe,
+  win_setup: WindowsSetup,
 }
 
 function mockFor(step, variantId) {
@@ -477,6 +498,7 @@ function StepScreen({
   const Mock = mockFor(step, variant.id)
   const isCarousel = Array.isArray(Mock?.screens)
   const path = step.path?.map(fill)
+  const os = step.frame === 'phone' ? 'ios' : variant.os
   const biosLine = step.bios ? guide.bios?.[variant.id] : null
   return (
     <div
@@ -489,11 +511,13 @@ function StepScreen({
         ) : (
           <Mock noun={variant.noun} />
         )
+      ) : path ? (
+        <PathScreen os={os} frame={step.frame} path={path} />
       ) : (
-        <PathFrame frame={step.frame ?? variant.frame} path={path} label={variant.label} />
+        <StepIllustration frame={step.frame ?? variant.frame} label={variant.label} />
       )}
       <h2 className="mt-4 text-[20px] font-bold text-ink leading-tight">{fill(step.title)}</h2>
-      {Mock && path && (
+      {path && (
         <p className="mt-1.5 text-[11.5px] font-semibold text-brand leading-snug max-w-[320px]">
           {path.join(' › ')}
         </p>

@@ -8,9 +8,9 @@ export default {
   modes: ['return', 'repair'],
   account: ['playstation'],
   variants: [
-    { id: 'ps5', label: 'PS5', noun: 'PS5', frame: 'console', category: 'Gaming', title: 'PlayStation 5' },
-    { id: 'ps4', label: 'PS4', noun: 'PS4', frame: 'console', category: 'Gaming', title: 'PlayStation 4 Pro' },
-    { id: 'ps3', label: 'PS3', noun: 'PS3', frame: 'console', category: 'Gaming', title: 'PlayStation 3' },
+    { id: 'ps5', label: 'PS5', noun: 'PS5', frame: 'console', os: 'playstation', category: 'Gaming', title: 'PlayStation 5' },
+    { id: 'ps4', label: 'PS4', noun: 'PS4', frame: 'console', os: 'playstation', category: 'Gaming', title: 'PlayStation 4 Pro' },
+    { id: 'ps3', label: 'PS3', noun: 'PS3', frame: 'console', os: 'playstation', category: 'Gaming', title: 'PlayStation 3' },
   ],
   steps: [
     {
