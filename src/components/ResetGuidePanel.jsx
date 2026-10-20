@@ -14,8 +14,7 @@ import { stepsFor, RESET_MODES } from '../lib/resetGuides'
 
 const OPEN_AT = [
   { id: 'start', label: 'Start' },
-  { id: 'with_you', label: 'Can’t use › picker' },
-  { id: 'sent', label: 'Can’t use › sent' },
+  { id: 'remote', label: 'Remote unlink' },
   { id: 'recovery', label: 'Account recovery' },
 ]
 
@@ -43,11 +42,10 @@ export default function ResetGuidePanel({
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   const [lastResult, setLastResult] = useState(null)
-  const mode = single ? 'single' : inputs.mode
+  const mode = inputs.mode
   const steps = stepsFor(guide, mode, { variant: variant.id })
   const mapped = resetGuideForOrder(order)
-  const passcodeKind = mode === 'repair' ? guide.steps.find((s) => s.passcode)?.passcode : null
-  const noCantUse = !guide.cantUse
+  const noCantUse = !guide.remote
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[380px] bg-surface border border-line rounded-2xl shadow-lg p-4 max-h-[90vh] overflow-y-auto">
@@ -120,11 +118,9 @@ export default function ResetGuidePanel({
         {guide.variants.length > 1 && <span className="text-ink-2"> · {variant.label}</span>}
       </div>
 
-      <Label>Mode</Label>
+      <Label>Claim type (copy only — same steps)</Label>
       {single ? (
-        <div className="mb-3 text-[11.5px] text-muted">
-          {guide.id === 'no_reset' ? 'No guide — packing note only' : RESET_MODES.single.sub}
-        </div>
+        <div className="mb-3 text-[11.5px] text-muted">No guide — packing note only</div>
       ) : (
         <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-ink/[0.05] mb-3">
           {['return', 'repair'].map((m) => (
@@ -174,19 +170,18 @@ export default function ResetGuidePanel({
           → {mapped.needsChooser ? `asks · pre-selects ${mapped.device ?? 'nothing'}` : `${mapped.guideId}/${mapped.variant}`}
         </div>
         <div>
-          {mode} · {steps.length} steps · passcode: {passcodeKind ?? 'none'}
+          {mode} · {steps.length} steps · erase: {guide.erase ?? 'none'}
         </div>
         {lastResult && (
           <div>
             last finish: via {lastResult.via}
-            {lastResult.passcodeProvided ? ' · passcode given' : ''}
-            {lastResult.dataChoice ? ` · data: ${lastResult.dataChoice}` : ''}
+            {lastResult.erased != null ? ` · erased: ${lastResult.erased}` : ''}
           </div>
         )}
       </div>
       <p className="mt-2 text-[10.5px] text-muted leading-snug">
         The card behind is this device — Raise a claim to reach the guide through Step 3
-        (change of mind / issue → Return, warranty → Repair).
+        (every claim type runs the same steps; warranty only changes the backup copy).
       </p>
 
       <button

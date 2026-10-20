@@ -56,16 +56,12 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
     ? 'You indicated the device was never set up, so no reset was needed.'
     : state.devicePrep.guideId === 'no_reset'
       ? 'No reset was needed for this item.'
-    : state.devicePrep.mode === 'repair' && state.devicePrep.dataChoice === 'erase'
-      ? 'You erased the device before sending it for repair.'
-    : state.devicePrep.mode === 'repair' && state.devicePrep.dataChoice === 'maintenance'
-      ? 'You turned the locks off and switched on Maintenance mode for the repair.'
-    : state.devicePrep.mode === 'repair'
-      ? state.devicePrep.passcodeProvided
-        ? 'You turned the locks off and shared a passcode securely for the repair.'
-        : 'You turned the locks off for the repair.'
+    : state.devicePrep.guideVia === 'cant_use'
+      ? 'You followed the steps for a device you couldn’t use.'
+    : state.devicePrep.erased
+      ? 'You unlinked and erased the device.'
     : state.devicePrep.option === 'reset'
-      ? 'You confirmed the device is factory reset.'
+      ? 'You unlinked the device and turned its locks off.'
       : 'Thanks for unlinking the device and sharing your passcode.'
 
   const claimRef = formatClaimRef(state.claimRef, state.claimType)

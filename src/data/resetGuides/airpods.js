@@ -1,3 +1,5 @@
+import { APPLE_REMOTE } from './remote'
+
 // G6 — AirPods. One flow: they belong to one Apple Account at a time, so
 // removing them from Find My is the step that frees them; a reset alone
 // doesn't.
@@ -5,7 +7,6 @@ export default {
   id: 'airpods',
   code: 'G6',
   label: 'AirPods',
-  modes: ['single'],
   account: ['apple'],
   variants: [
     { id: 'airpods', label: 'AirPods / Pro', noun: 'AirPods', plural: true, frame: 'earbuds', category: 'Audio', title: 'AirPods Pro (2nd generation)' },
@@ -41,22 +42,5 @@ export default {
       body: 'Clean them, and return both earbuds and the case.',
     },
   ],
-  cantUse: {
-    symptoms: [
-      { id: 'lost', icon: 'power', title: 'They’re lost or broken', sub: 'They don’t need to be nearby', to: 'remote' },
-      { id: 'account', icon: 'key', title: 'I can’t sign in to my Apple Account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_apple' },
-      { id: 'sent', icon: 'truck', title: 'I’ve already sent them to Revibe', sub: 'They don’t need to be nearby', to: 'remote' },
-    ],
-    nodes: {
-      remote: {
-        title: 'Remove them from Find My',
-        steps: [
-          { text: 'On your iPhone, open Find My and select your AirPods.', path: ['Find My', 'Devices', '[your AirPods]'], note: 'No iPhone to hand? Sign in at icloud.com/find in any browser.', help: { label: 'Can’t sign in?', to: 'account_apple' } },
-          { text: 'Choose Remove This Device, then Remove.', path: ['Remove This Device', 'Remove'] },
-          { text: 'On your iPhone, forget them in Bluetooth so they can’t reconnect and lock again.', path: ['Settings', 'Bluetooth', 'ⓘ', 'Forget This Device'] },
-        ],
-        tip: 'This also lifts Find My Lock, which Apple can’t remove for you.',
-      },
-    },
-  },
+  remote: APPLE_REMOTE,
 }

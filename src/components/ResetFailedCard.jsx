@@ -151,7 +151,7 @@ export default function ResetFailedCard({
               guideId={resetGuide.guideId}
               facts={{ variant: resetGuide.variant }}
               mode={modeForClaimType(claim.type) ?? 'return'}
-              initialView="sent"
+              initialView="remote"
               skipDone
               onDone={() => {
                 setGuideDone(true)

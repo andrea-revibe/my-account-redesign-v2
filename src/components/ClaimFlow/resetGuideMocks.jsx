@@ -26,10 +26,11 @@ import {
   ChevronUp,
   Wifi,
   Battery,
-  CreditCard,
   MapPin,
   Gamepad2,
-  Wrench,
+  User,
+  Watch,
+  Headphones,
 } from 'lucide-react'
 import { stepAnim } from './resetGuideAnim'
 
@@ -1507,40 +1508,54 @@ function MacBrowserBar({ url }) {
   )
 }
 
-// Remote 1 · Mac — iCloud Find Devices in Safari, This Mac picked out and
-// Remove This Device glowing as the correct choice.
-function MacICloudRemove() {
+// Remote unlink in a browser — icloud.com/find in Safari on a laptop:
+// sign in → the device's panel with Remove This Device → the Remove dialog.
+function IcloudWebSignIn() {
   return (
     <MiniLaptop>
       <MacBrowserBar url="icloud.com/find" />
-      <div className="flex bg-white" style={{ height: 180 }}>
+      <div className="flex flex-col items-center justify-center bg-white" style={{ height: 180 }}>
+        <Apple size={18} strokeWidth={1.5} className="text-ink fill-ink" />
+        <div className="mt-1.5 text-[9.5px] font-bold text-ink">Find Devices</div>
+        <div className="mt-0.5 text-[6.5px] text-muted">Sign in with your Apple Account</div>
+        <div className="mt-2.5 w-[130px] rounded-[6px] border border-line px-2 py-[5px] text-[7px] text-muted text-left">
+          Email or phone number
+        </div>
+        <div className="relative mt-1.5 w-[130px] rounded-[6px] px-2 py-[5px] text-[7.5px] font-bold text-brand text-center" style={HILITE}>
+          Sign In
+        </div>
+        <div className="mt-2 text-[6.5px] font-semibold text-brand">then choose All Devices</div>
+      </div>
+    </MiniLaptop>
+  )
+}
+
+function IcloudWebPanel({ noun, children }) {
+  const Icon = FM_ICON[noun] ?? Smartphone
+  return (
+    <MiniLaptop>
+      <MacBrowserBar url="icloud.com/find" />
+      <div className="relative flex bg-white" style={{ height: 180 }}>
         <div className="w-[124px] shrink-0 border-r border-black/10 bg-black/[0.03] p-1.5 space-y-1">
           <div className="flex items-center gap-1 mb-0.5">
             <Apple size={9} strokeWidth={1.5} className="text-ink fill-ink" />
-            <span className="text-[8px] font-bold text-ink">Find Devices</span>
+            <span className="text-[8px] font-bold text-ink">All Devices</span>
           </div>
-          <div
-            className="relative rounded-[6px] bg-white border border-line shadow-sm2 px-1.5 py-1 flex items-center gap-1.5"
-            style={HILITE}
-          >
-            <Laptop size={13} strokeWidth={1.6} className="text-ink/70 shrink-0" />
+          <div className="relative rounded-[6px] bg-white border border-line shadow-sm2 px-1.5 py-1 flex items-center gap-1.5">
+            <Icon size={13} strokeWidth={1.6} className="text-ink/70 shrink-0" />
             <span className="min-w-0">
-              <span className="block text-[7.5px] font-bold text-ink leading-tight">
-                This Mac
-              </span>
+              <span className="block text-[7.5px] font-bold text-ink leading-tight">Your {noun}</span>
               <span className="block text-[6px] text-muted">Offline</span>
             </span>
           </div>
           <div className="rounded-[6px] px-1.5 py-1 flex items-center gap-1.5">
-            <Smartphone size={13} strokeWidth={1.6} className="text-ink/45 shrink-0" />
-            <span className="text-[7.5px] text-ink/70">Your iPhone</span>
+            <Laptop size={13} strokeWidth={1.6} className="text-ink/45 shrink-0" />
+            <span className="text-[7.5px] text-ink/70">This Mac</span>
           </div>
         </div>
         <div className="flex-1 p-2 min-w-0">
-          <div className="text-[9px] font-bold text-ink leading-tight">This Mac</div>
-          <div className="text-[6.5px] text-muted mt-0.5">
-            MacBook Air 13″ · Offline
-          </div>
+          <div className="text-[9px] font-bold text-ink leading-tight">Your {noun}</div>
+          <div className="text-[6.5px] text-muted mt-0.5">Offline · 6 min ago</div>
           <div className="mt-2 flex gap-1.5">
             <div className="rounded-[6px] bg-white border border-line shadow-sm2 px-1.5 py-1 flex items-center gap-1 text-[7px] font-semibold text-ink">
               <Volume2 size={9} strokeWidth={2.2} />
@@ -1552,20 +1567,42 @@ function MacICloudRemove() {
             </div>
           </div>
           <div className="mt-2 w-[140px] rounded-[6px] overflow-hidden border border-line bg-white shadow-sm2">
-            <div className="px-2 py-[6px] text-[7.5px] text-muted">Erase Mac</div>
+            <div className="px-2 py-[6px] text-[7.5px] text-muted">Erase This Device</div>
             <div className="relative border-t border-line-2" style={HILITE}>
-              <div className="px-2 py-[6px] text-[7.5px] font-bold text-brand">
-                Remove This Device
-              </div>
+              <div className="px-2 py-[6px] text-[7.5px] font-bold text-brand">Remove This Device</div>
             </div>
           </div>
-          <div className="mt-1.5 text-[6.5px] text-muted leading-snug">
-            Click <span className="font-semibold text-ink-2">Remove This Device</span>{' '}
-            — not Erase.
+        </div>
+        {children}
+      </div>
+    </MiniLaptop>
+  )
+}
+
+function IcloudWebDevice({ noun = 'iPhone' }) {
+  return <IcloudWebPanel noun={noun} />
+}
+
+function IcloudWebConfirm({ noun = 'iPhone' }) {
+  return (
+    <IcloudWebPanel noun={noun}>
+      <div className="absolute inset-0 bg-black/35 grid place-items-center">
+        <div className="w-[170px] rounded-[8px] bg-white shadow-lg overflow-hidden text-center">
+          <div className="px-2.5 pt-2.5 pb-2">
+            <div className="text-[8.5px] font-bold text-ink">Remove this device?</div>
+            <div className="mt-0.5 text-[6.5px] text-ink-2 leading-snug">
+              Your {noun} will be removed from your account and Activation Lock turned off.
+            </div>
+          </div>
+          <div className="flex gap-1.5 justify-center pb-2.5">
+            <span className="rounded-[5px] border border-line px-2.5 py-[3px] text-[7px] text-ink">Cancel</span>
+            <span className="relative rounded-[5px] px-2.5 py-[3px] text-[7px] font-bold text-brand" style={HILITE}>
+              Remove
+            </span>
           </div>
         </div>
       </div>
-    </MiniLaptop>
+    </IcloudWebPanel>
   )
 }
 
@@ -1663,52 +1700,71 @@ function Hint({ children }) {
   )
 }
 
-// Repair 1 · Wallet & Apple Pay — Apple Cash off, then each card › Remove Card.
-function IosWallet({ Frame = MiniPhone }) {
+// Stolen Device Protection — the switch glowing on the Face ID & Passcode
+// screen; it has to be off before Find My will let go.
+function IosStolenOff({ Frame = MiniPhone }) {
   return (
     <Frame>
       <StatusBar />
-      <IosNav back="Settings" title="Wallet & Apple Pay" />
+      <IosNav back="Settings" title="Face ID & Passcode" />
       <div className="px-2.5 mt-2.5">
         <Group>
-          <ToggleRow label="Apple Cash" sub="Turn off for the repair" on highlight />
+          <ToggleRow label="iPhone Unlock" on />
+          <ToggleRow label="Apple Pay" on />
         </Group>
       </div>
       <div className="px-3.5 mt-2.5 text-[8px] font-semibold uppercase tracking-wide text-muted text-left">
-        Payment cards
+        Stolen Device Protection
       </div>
       <div className="px-2.5 mt-1">
         <Group>
-          <Row Icon={CreditCard} iconBg="#1a1f71" label="Visa •••• 4821" highlight />
-          <Row Icon={CreditCard} iconBg="#eb5b25" label="Mastercard •••• 0937" />
+          <ToggleRow label="Stolen Device Protection" sub="Turn off at a familiar location" on highlight />
         </Group>
-        <Hint>open each card › Remove Card</Hint>
+        <Hint>away from home it adds an hour’s delay</Hint>
       </div>
     </Frame>
   )
 }
 
-// Repair 2 · Find My — the switch itself, glowing, instead of Sign Out.
-function IosFindMyOff({ Frame = MiniPhone, noun = 'iPhone' }) {
+// The signed-out check — Settings with the grey “Sign in to your iPhone” card:
+// no name, no photo, no email.
+function IosSignedOut({ Frame = MiniPhone, noun = 'iPhone' }) {
   return (
     <Frame>
       <StatusBar />
-      <IosNav back="Find My" title={`Find My ${noun}`} />
-      <div className="px-2.5 mt-2.5">
-        <Group>
-          <ToggleRow label={`Find My ${noun}`} sub="Turn off — enter your password" on highlight />
-          <ToggleRow label="Find My network" on />
-          <ToggleRow label="Send Last Location" on />
-        </Group>
-        <div className="mt-2 px-1 text-[8px] text-muted leading-snug text-left">
-          Turning it off lifts Activation Lock. Your data stays on the {noun}.
+      <div className="px-2.5 pt-1.5">
+        <div className="text-[15px] font-bold text-ink px-1">Settings</div>
+        <div className="mt-1.5 flex items-center gap-1.5 bg-black/5 rounded-[9px] px-2 h-[22px]">
+          <Search size={10} strokeWidth={2.2} className="text-muted" />
+          <span className="text-[9px] text-muted">Search</span>
         </div>
+      </div>
+      <div className="px-2.5 mt-2">
+        <div className="relative flex items-center gap-2 bg-white rounded-[11px] px-2 py-2 shadow-sm2" style={HILITE}>
+          <span className="w-[28px] h-[28px] rounded-full grid place-items-center bg-black/15 text-white">
+            <User size={16} strokeWidth={2.2} />
+          </span>
+          <span className="flex-1 min-w-0 text-left">
+            <span className="block text-[10.5px] font-semibold text-[#007aff] leading-tight">
+              Sign in to your {noun}
+            </span>
+            <span className="block text-[8.5px] text-muted">Set up iCloud, the App Store and more.</span>
+          </span>
+          <ChevronRight size={11} strokeWidth={2.2} className="text-muted/50" />
+        </div>
+        <Hint>no name, no photo, no email</Hint>
+      </div>
+      <div className="px-2.5 mt-2">
+        <Group>
+          <Row Icon={Wifi} iconBg="#3478f6" label="Wi-Fi" />
+          <Row Icon={Lock} iconBg="#34c759" label="Face ID & Passcode" value="Off" />
+        </Group>
       </div>
     </Frame>
   )
 }
 
-// Repair 3 · Face ID & Passcode — Turn Passcode Off glowing.
+// Face ID & Passcode — Turn Passcode Off glowing.
 function IosPasscodeOff({ Frame = MiniPhone }) {
   return (
     <Frame>
@@ -1727,17 +1783,17 @@ function IosPasscodeOff({ Frame = MiniPhone }) {
           </div>
           <div className="px-2.5 py-[9px] text-[10.5px] text-[#007aff]/60 text-left">Change Passcode</div>
         </Group>
-        <Hint>turn it back on when it’s returned</Hint>
+        <Hint>turns off Face ID or Touch ID too</Hint>
       </div>
     </Frame>
   )
 }
 
-function IpadWallet() {
-  return <IosWallet Frame={MiniTablet} />
+function IpadStolenOff() {
+  return <IosStolenOff Frame={MiniTablet} />
 }
-function IpadFindMyOff() {
-  return <IosFindMyOff Frame={MiniTablet} noun="iPad" />
+function IpadSignedOut() {
+  return <IosSignedOut Frame={MiniTablet} noun="iPad" />
 }
 function IpadPasscodeOff() {
   return <IosPasscodeOff Frame={MiniTablet} />
@@ -1791,34 +1847,130 @@ function SamsungLockSwipe({ Frame = MiniPhone }) {
   )
 }
 
-// Repair (privacy) · One UI Maintenance mode — hides the owner's data in a
-// separate profile while the repairer works; Turn on glowing.
-function SamsungMaintenance({ Frame = MiniPhone }) {
+// The Samsung check — Manage accounts with nothing left but Add account.
+function SamsungAccountsEmpty({ Frame = MiniPhone }) {
   return (
     <Frame camera="hole">
       <StatusBar />
-      <OneUiHeader title="Maintenance mode" />
-      <div className="mt-4 flex flex-col items-center px-4 text-center">
-        <span className="w-[54px] h-[54px] rounded-full grid place-items-center text-white" style={{ background: ANDROID_BLUE }}>
-          <Wrench size={24} strokeWidth={2} />
+      <OneUiHeader title="Manage accounts" />
+      <div className="mt-5 flex flex-col items-center px-4 text-center">
+        <span className="w-[44px] h-[44px] rounded-full grid place-items-center bg-black/10 text-white">
+          <User size={22} strokeWidth={2} />
         </span>
-        <div className="mt-3 text-[9.5px] text-ink-2 leading-snug">
-          Keep your personal data private while your phone is being repaired. Your photos, messages and
-          accounts can’t be accessed.
-        </div>
+        <div className="mt-2 text-[10px] font-semibold text-ink">No accounts</div>
+        <div className="mt-0.5 text-[8.5px] text-muted leading-snug">No Samsung account, no Google account</div>
       </div>
       <div className="px-2.5 mt-3">
-        <div className="bg-white rounded-[14px] overflow-hidden shadow-sm2">
-          <ToggleRow label="Create logs" sub="Help the repairer find the fault" on={false} />
+        <div className="relative bg-white rounded-[14px] overflow-hidden shadow-sm2" style={HILITE}>
+          <div className="px-2.5 py-[9px] text-[10.5px] font-medium text-left" style={{ color: ANDROID_BLUE }}>
+            + Add account
+          </div>
         </div>
-      </div>
-      <div className="absolute bottom-[18px] inset-x-0 flex flex-col items-center">
-        <div className="relative rounded-full px-8 h-[28px] grid place-items-center text-white text-[10.5px] font-semibold" style={{ background: ANDROID_BLUE, boxShadow: `0 0 0 3px rgb(${BRAND} / 0.25)` }}>
-          Turn on
-        </div>
-        <Hint>it restarts into an empty profile</Hint>
+        <Hint>an empty list means you’re done</Hint>
       </div>
     </Frame>
+  )
+}
+
+/* ------------------------------------------------------ Remote unlink (Find My) */
+// The Find My app on another iPhone: device list → the device's card →
+// the Remove confirmation. `noun` names the device being unlinked.
+
+const FM_ICON = { iPad: Tablet, MacBook: Laptop, 'Apple Watch': Watch, AirPods: Headphones, 'AirPods Max': Headphones }
+
+function FmDeviceRow({ noun, name = `Your ${noun}`, Icon, sub, highlight }) {
+  return (
+    <div className="relative flex items-center gap-2 px-2.5 py-[8px] text-left" style={highlight ? HILITE : undefined}>
+      <span className="w-[24px] h-[24px] rounded-full grid place-items-center bg-black/[0.06] text-ink/75 shrink-0">
+        <Icon size={13} strokeWidth={1.8} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[10.5px] font-semibold text-ink leading-tight truncate">{name}</span>
+        <span className="block text-[8.5px] text-muted leading-tight mt-0.5">{sub}</span>
+      </span>
+      <ChevronRight size={11} strokeWidth={2.2} className="text-muted/50 shrink-0" />
+    </div>
+  )
+}
+
+function FindMyDevices({ noun = 'iPhone' }) {
+  return (
+    <MiniPhone>
+      <StatusBar />
+      <div className="relative h-[78px] mt-1 mx-2.5 rounded-[11px] overflow-hidden bg-[#dfe9d8]">
+        <span className="absolute left-[30%] top-[22%] w-[60px] h-[30px] rounded-full bg-[#c9dcbf]" />
+        <span className="absolute right-[18%] bottom-[18%] w-[40px] h-[18px] rounded-full bg-[#cfe0f3]" />
+        <MapPin size={16} strokeWidth={2.2} className="absolute left-[48%] top-[34%] text-[#007aff]" />
+      </div>
+      <div className="px-2.5 pt-2 flex gap-3 text-[9px] font-semibold">
+        <span className="text-muted">People</span>
+        <span className="text-[#007aff] border-b-2 border-[#007aff] pb-0.5">Devices</span>
+        <span className="text-muted">Items</span>
+      </div>
+      <div className="px-2.5 mt-2">
+        <Group>
+          <FmDeviceRow noun={noun} Icon={FM_ICON[noun] ?? Smartphone} sub="Offline · 6 min ago" highlight />
+          <FmDeviceRow name="This iPhone" Icon={Smartphone} sub="The one you’re holding" />
+        </Group>
+        <Hint>tap the {noun} you’re sending</Hint>
+      </div>
+    </MiniPhone>
+  )
+}
+
+function FindMyDevice({ noun = 'iPhone' }) {
+  const Icon = FM_ICON[noun] ?? Smartphone
+  return (
+    <MiniPhone>
+      <StatusBar />
+      <div className="px-2.5 pt-2 flex items-center gap-2">
+        <span className="w-[26px] h-[26px] rounded-full grid place-items-center bg-black/[0.06] text-ink/75">
+          <Icon size={14} strokeWidth={1.8} />
+        </span>
+        <span className="text-left">
+          <span className="block text-[12px] font-bold text-ink leading-tight">Your {noun}</span>
+          <span className="block text-[8.5px] text-muted">Offline · 6 min ago</span>
+        </span>
+      </div>
+      <div className="px-2.5 mt-2.5">
+        <Group>
+          <Row Icon={Volume2} iconBg="#5856d6" label="Play Sound" chevron={false} />
+          <Row Icon={Lock} iconBg="#ff9500" label="Mark As Lost" />
+        </Group>
+      </div>
+      <div className="px-2.5 mt-2">
+        <Group>
+          <div className="px-2.5 py-[9px] text-[10.5px] text-danger/50 text-left">Erase This Device</div>
+          <div className="relative px-2.5 py-[9px] text-[10.5px] font-semibold text-danger text-left" style={HILITE}>
+            Remove This Device
+          </div>
+        </Group>
+        <Hint>at the very bottom of the card</Hint>
+      </div>
+    </MiniPhone>
+  )
+}
+
+function FindMyConfirm({ noun = 'iPhone' }) {
+  return (
+    <MiniPhone>
+      <StatusBar />
+      <div className="absolute inset-0 bg-black/30" />
+      <div className="absolute inset-x-[14px] top-[34%] rounded-[13px] bg-white/95 overflow-hidden shadow-lg text-center">
+        <div className="px-3 pt-3 pb-2.5">
+          <div className="text-[11px] font-bold text-ink">Remove This Device?</div>
+          <div className="mt-1 text-[8.5px] text-ink-2 leading-snug">
+            Your {noun} will be removed from your account and Activation Lock will be turned off.
+          </div>
+        </div>
+        <div className="grid grid-cols-2 border-t border-line-2 text-[10.5px]">
+          <div className="py-[8px] text-[#007aff] border-r border-line-2">Cancel</div>
+          <div className="relative py-[8px] font-semibold text-danger" style={HILITE}>
+            Remove
+          </div>
+        </div>
+      </div>
+    </MiniPhone>
   )
 }
 
@@ -2149,16 +2301,21 @@ export {
   MacSignOut,
   MacErase,
   MacWelcome,
-  MacICloudRemove,
+  IcloudWebSignIn,
+  IcloudWebDevice,
+  IcloudWebConfirm,
   MacAccountRemove,
-  IosWallet,
-  IosFindMyOff,
+  IosStolenOff,
+  IosSignedOut,
   IosPasscodeOff,
-  IpadWallet,
-  IpadFindMyOff,
+  IpadStolenOff,
+  IpadSignedOut,
   IpadPasscodeOff,
   SamsungLockSwipe,
+  SamsungAccountsEmpty,
+  FindMyDevices,
+  FindMyDevice,
+  FindMyConfirm,
   WindowsSetup,
-  SamsungMaintenance,
   PathScreen,
 }

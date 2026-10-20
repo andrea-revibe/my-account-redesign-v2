@@ -191,13 +191,12 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
       device: resetGuide.device,
       guideId: resetGuide.guideId,
       variant: resetGuide.variant,
-      // Set when the guide finishes: the mode it ran in, whether it ended via
-      // "I can't use my device", whether a repair passcode was given, and the
-      // Repair data choice ('keep' | 'erase' | 'maintenance', null if none).
+      // Set when the guide finishes: the claim-type copy it ran with, whether
+      // it ended via "I can't use my device", and whether the device was
+      // erased (null when unknown — a fix route, or a guide with no erase).
       mode: null,
       guideVia: null,
-      passcodeProvided: false,
-      dataChoice: null,
+      erased: null,
       resetConfirmed: false,
       resetGuideSeen: false,
       // Change-of-mind escape hatch: a device that was never set up has no
