@@ -1,6 +1,7 @@
 // Remote unlink for every Apple device, two parallel routes the customer
-// switches between: Find My on another iPhone or iPad, or icloud.com/find in
-// a computer's browser. Same three steps either way — unlink only; removing
+// switches between: icloud.com/find in any browser (the default — it only
+// needs the Apple Account password, so nearly everyone can start it), or Find
+// My on another iPhone or iPad signed in to the same account. Same three steps either way — unlink only; removing
 // an offline device lifts Activation Lock straight away, and erasing stays the
 // customer's own call.
 const ERASE_NOTE = {
@@ -10,6 +11,34 @@ const ERASE_NOTE = {
 
 export const APPLE_REMOTE = {
   routes: [
+    {
+      id: 'web',
+      label: 'In a browser',
+      steps: [
+        {
+          id: 'web_open',
+          title: 'Sign in at icloud.com/find',
+          body: 'In any browser — on this phone or a computer — go to icloud.com/find, sign in with your Apple Account and choose All Devices. If the {noun} is with you, turn it off first.',
+          notes: [{ when: 'Have another iPhone or iPad', text: 'Switch to “On another iPhone” above — Find My is already signed in, so it’s quicker.' }],
+          help: { label: 'Can’t sign in to your Apple Account?', to: 'account_apple' },
+          mock: 'web_signin',
+        },
+        {
+          id: 'web_remove',
+          title: 'Choose Remove This Device',
+          body: 'Select your {noun} in the list, then Remove This Device. It may show as offline — that’s fine.',
+          notes: [ERASE_NOTE],
+          mock: 'web_device',
+        },
+        {
+          id: 'web_confirm',
+          revibe: true,
+          title: 'Confirm Remove',
+          body: 'Select Remove. The {noun} is off your Apple Account and Activation Lock is lifted. To be safe, change your Apple Account password afterwards.',
+          mock: 'web_confirm',
+        },
+      ],
+    },
     {
       id: 'device',
       label: 'On another iPhone',
@@ -34,33 +63,6 @@ export const APPLE_REMOTE = {
           title: 'Confirm Remove',
           body: 'Tap Remove. The {noun} is off your Apple Account and Activation Lock is lifted. To be safe, change your Apple Account password afterwards.',
           mock: 'fm_confirm',
-        },
-      ],
-    },
-    {
-      id: 'web',
-      label: 'In a browser',
-      steps: [
-        {
-          id: 'web_open',
-          title: 'Sign in at icloud.com/find',
-          body: 'On any computer, go to icloud.com/find, sign in with your Apple Account and choose All Devices. If the {noun} is with you, turn it off first.',
-          help: { label: 'Can’t sign in to your Apple Account?', to: 'account_apple' },
-          mock: 'web_signin',
-        },
-        {
-          id: 'web_remove',
-          title: 'Choose Remove This Device',
-          body: 'Select your {noun} in the list, then Remove This Device. It may show as offline — that’s fine.',
-          notes: [ERASE_NOTE],
-          mock: 'web_device',
-        },
-        {
-          id: 'web_confirm',
-          revibe: true,
-          title: 'Confirm Remove',
-          body: 'Select Remove. The {noun} is off your Apple Account and Activation Lock is lifted. To be safe, change your Apple Account password afterwards.',
-          mock: 'web_confirm',
         },
       ],
     },

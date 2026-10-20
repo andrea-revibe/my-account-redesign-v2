@@ -15,7 +15,6 @@ const DEFAULT_INPUTS = {
   categoryId: 2,
   device: 'iphone',
   titleGuess: false,
-  mode: 'return',
   openAt: 'start',
 }
 

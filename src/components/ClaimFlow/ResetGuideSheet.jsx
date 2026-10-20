@@ -10,7 +10,6 @@ import {
   ChevronDown,
   HelpCircle,
   Info,
-  AlertTriangle,
   Lock,
   Eraser,
   Smartphone,
@@ -57,7 +56,6 @@ import {
   variantFor,
   stepsFor,
   eraseFor,
-  pick,
   remoteStepsFor,
   remoteRoutesFor,
   resolveNode,
@@ -65,8 +63,8 @@ import {
 } from '../../lib/resetGuides'
 
 // Guided reset — one engine that renders any guide definition from
-// data/resetGuides/* (G1–G7 + no-reset). Every claim type runs the same steps;
-// `mode` ('return' | 'repair') only tunes copy. The intro asks whether the
+// data/resetGuides/* (G1–G7 + no-reset). Every claim type runs the same steps,
+// word for word. The intro asks whether the
 // customer can use the device: Yes runs the on-device steps (one per screen;
 // guides with an optional erase ask after the must-dos), No runs the guide's
 // remote-unlink carousel in the same layout. "I can't use my device" under
@@ -119,7 +117,6 @@ function mockFor(step, variantId) {
 
 export default function ResetGuideSheet({
   guideId = 'apple_mobile',
-  mode = 'return',
   facts = {},
   // 'start' | 'remote' | 'recovery' — open on the intro, the remote-unlink
   // carousel (Step 3's off-ramp, ClaimCard, ResetFailedCard), or the guide's
@@ -179,7 +176,7 @@ export default function ResetGuideSheet({
     }
   }, [onClose])
 
-  const steps = stepsFor(guide, mode, { variant: variant.id, erase: eraseChoice === 'erase' })
+  const steps = stepsFor(guide, { variant: variant.id, erase: eraseChoice === 'erase' })
   const inRemote = view === 'remote'
   const list = inRemote ? remoteSteps : steps
   const idx = inRemote ? ri : i
@@ -349,7 +346,6 @@ export default function ResetGuideSheet({
               step={inRemote && idx === list.length - 1 && !step.trouble ? { ...step, trouble: remoteTrouble } : step}
               onHelp={openRecovery}
               variant={variant}
-              mode={mode}
               dir={dir}
               fill={fill}
               carouselIdx={carouselIdx}
@@ -512,12 +508,9 @@ function Intro({ guide, variant, fill, stepCount, eraseMode, onStart, onCantUse 
         </div>
       )}
       {isDevice && (
-        <p className="mt-4 w-full flex items-start gap-2 rounded-[12px] border border-warn/30 bg-warn-bg/60 px-3 py-2.5 text-left text-[12px] text-ink-2 leading-snug">
-          <AlertTriangle size={14} strokeWidth={2.2} className="shrink-0 mt-px text-warn" />
-          <span>
-            <span className="font-semibold text-ink">Your data is your responsibility.</span> Back up
-            anything you want to keep — we can’t recover it.
-          </span>
+        <p className="mt-4 flex items-start gap-1.5 text-left text-[11.5px] text-muted leading-snug max-w-[320px]">
+          <Info size={13} strokeWidth={2} className="shrink-0 mt-px" />
+          <span>Your data is your responsibility — back up anything you want to keep.</span>
         </p>
       )}
     </div>
@@ -609,7 +602,7 @@ function ChoiceCard({ active, error, label, sub, onClick }) {
   )
 }
 
-function StepScreen({ step, variant, mode, dir, fill, carouselIdx, setCarouselIdx, onHelp }) {
+function StepScreen({ step, variant, dir, fill, carouselIdx, setCarouselIdx, onHelp }) {
   const Mock = mockFor(step, variant.id)
   const isCarousel = Array.isArray(Mock?.screens)
   const path = step.path?.map(fill)
@@ -630,13 +623,13 @@ function StepScreen({ step, variant, mode, dir, fill, carouselIdx, setCarouselId
       ) : (
         <StepIllustration frame={step.frame ?? variant.frame} label={variant.label} />
       )}
-      <h2 className="mt-4 text-[20px] font-bold text-ink leading-tight">{fill(pick(step.title, mode))}</h2>
+      <h2 className="mt-4 text-[20px] font-bold text-ink leading-tight">{fill(step.title)}</h2>
       {path && (
         <p className="mt-1.5 text-[11.5px] font-semibold text-brand leading-snug max-w-[320px]">
           {path.join(' › ')}
         </p>
       )}
-      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.55] max-w-[320px]">{fill(pick(step.body, mode))}</p>
+      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.55] max-w-[320px]">{fill(step.body)}</p>
       {step.notes?.length > 0 && (
         <ul className="mt-3 w-full max-w-[320px] flex flex-col gap-1.5 text-left">
           {step.notes.map((n) => (

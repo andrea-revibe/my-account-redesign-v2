@@ -435,6 +435,103 @@ export const CLAIM_ORDERS = [
       },
     },
   },
+  // ----- Same reset-failed takeover on a MacBook warranty claim: exercises
+  // ResetFailedCard's per-device field (free-text Mac login password) and the
+  // claim-type label.
+  {
+    id: '89814',
+    phone: '+971 50 559 5034',
+    email: 'andrea.grossi@example.com',
+    address: 'Ontario Tower, Office 103, Business Bay Dubai',
+    country: 'AE',
+    placedAt: '12/04/2026 09:40 AM',
+    placedAtFull: '12 Apr 2026 · 9:40 AM',
+    deliveredOn: '2026-04-18',
+    deliveredOnLong: 'Saturday, 18 April',
+    quantity: 1,
+    unitPrice: 909,
+    subtotal: 909,
+    warranty: 80,
+    total: 989,
+    currency: 'AED',
+    statusId: 'delivered',
+    state: 'close',
+    courier: 'DHL Express',
+    trackingNumber: '25193488',
+    trackingUrl: 'https://www.dhl.com/track',
+    customerName: 'Andrea Grossi',
+    paymentMethod: { type: 'card', brand: 'Visa', last4: '4242' },
+    deviceOs: 'macos',
+    timeline: {
+      created: '12 Apr · 9:40 AM',
+      quality_check: '13 Apr · 10:18 AM',
+      shipped: '15 Apr · 4:45 PM',
+      delivered: '18 Apr · 12:32 PM',
+    },
+    product: {
+      name: 'MacBook Air 13″',
+      variant: 'Midnight · M2 · 256 GB · Good',
+      category_name: 'Macbook',
+      image: '/iphone-cutout.png',
+    },
+    claim: {
+      claimRef: 'Wm4kQz',
+      claimStatusId: 'qc',
+      subStatusId: 'reset_failed',
+      type: 'warranty',
+      submittedAt: '08 May 2026 · 9:15 AM',
+      milestones: {
+        createdAt: '2026-05-08',
+        docsClearedAt: '2026-05-08',
+        pickedUpAt: '2026-05-11',
+        qcAt: '2026-05-14',
+        asOf: '2026-05-18',
+      },
+      units: 1,
+      issueDetails: {
+        category: 'keyboard',
+        description: 'Several keys on the top row stop responding after the laptop wakes from sleep.',
+        attachmentName: 'IMG_0744.jpg',
+      },
+      reason: { value: 'other', otherText: '' },
+      devicePrep: { option: 'reset', guideId: 'mac', variant: 'macbook' },
+      pickupDetails: {
+        address: {
+          area: 'Business Bay',
+          building: 'Ontario Tower',
+          unit: 'Office 103',
+          street: 'Marasi Drive',
+          city: 'Dubai',
+          emirate: 'Dubai',
+        },
+        email: 'andrea.grossi@example.com',
+        phone: '+971 50 559 5034',
+      },
+      scheduledPickup: {
+        courier: 'DHL Express',
+        date: 'Monday, 11 May',
+        slot: '10 AM – 12 PM',
+      },
+      timeline: {
+        initiated: '8 May · 9:15 AM',
+        pickup: '11 May · 10:42 AM',
+        qc: '14 May · 11:05 AM',
+      },
+      detailedTimeline: {
+        qc: { startedAt: '14 May · 11:05 AM' },
+        reset_failed: { startedAt: '14 May · 11:32 AM' },
+      },
+      resetFailed: {
+        failedAt: '14 May · 11:32 AM',
+        autoCancelAt: '17 May · 11:32 AM',
+        timeLeftLabel: '2 days, 22 hours left',
+        opsName: 'Marwa',
+        opsRole: 'Revibe Quality',
+        opsMessage:
+          "Hi Andrea — the MacBook Air is still linked to your Apple Account, so Activation Lock stopped us from starting the repair checks. Please remove it from Find My (icloud.com/find → All Devices → Remove This Device) and share the Mac's login password so we can carry on.",
+      },
+    },
+  },
   // ----- Layered mock: cancellation rejected → delivered → claim in transit.
   // Exercises the HistoryThread on the in-progress ClaimCard and the
   // `See detailed tracking` dropdown driven by `claim.transitSubStatusId`

@@ -8,6 +8,9 @@ import {
   KeyRound,
   Lock,
   ShieldCheck,
+  Eye,
+  EyeOff,
+  RotateCcw,
 } from 'lucide-react'
 
 import { ProductSummary } from './ProductSummary'
@@ -15,17 +18,25 @@ import TapToFixCta from './TapToFixCta'
 import ResetGuideSheet from './ClaimFlow/ResetGuideSheet'
 import OrderClaimLink from './OrderClaimLink'
 import { resetGuideForOrder } from '../lib/devices'
-import { modeForClaimType } from '../lib/resetGuides'
-import { formatClaimRef } from '../lib/claims'
-
-const PASSCODE_LEN = 6
+import {
+  guideById,
+  variantFor,
+  fillNoun,
+  unlockFieldFor,
+  unlockError,
+  unlinkAckLabel,
+} from '../lib/resetGuides'
+import { formatClaimRef, claimTypeLabel } from '../lib/claims'
 
 // Routed in App.jsx when `claim.resetFailed` is set on a claim. Mirrors the
 // DocsRejectedCard / PickupFailedCard pattern: a danger-tone takeover for a
 // claim blocked on a single customer action — here, Activation Lock is still
 // on the device, so QC can't wipe it. Customer removes the device from their
 // iCloud account remotely and shares the device passcode, then the card flips
-// to a warn-tone confirmation while ops attempt the reset.
+// to a warn-tone confirmation while ops attempt the reset. The code field is
+// per device (UNLOCK_FIELDS in lib/resetGuides): numeric passcode, Android
+// PIN / password / pattern, Mac login password, optional Windows PIN or
+// local password; none for AirPods / PlayStation.
 export default function ResetFailedCard({
   order,
   defaultExpanded = false,
@@ -37,6 +48,7 @@ export default function ResetFailedCard({
   const [guideDone, setGuideDone] = useState(false)
   const [unlinked, setUnlinked] = useState(false)
   const [passcode, setPasscode] = useState('')
+  const [kindId, setKindId] = useState(null)
   // The "details received" view is driven by the order data when journey mode
   // advances the unlock-details node (resetFailed.submittedAt), read live so
   // dev-panel Back/Next stay in sync (mirrors PickupFailedCard's rescheduledAt).
@@ -57,7 +69,8 @@ export default function ResetFailedCard({
       <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
         <ResetDetailsReceivedCard
           order={order}
-          passcode={passcode}
+          field={unlockFieldFor(guideById(resetGuideForOrder(order).guideId).id)}
+          sent={!!passcode}
           expanded={expanded}
           onToggle={() => setExpanded((v) => !v)}
         />
@@ -67,7 +80,12 @@ export default function ResetFailedCard({
   // The guide opens straight onto its "already sent" branch (device locked +
   // already at Revibe), picked from the order line like Step 3 does.
   const resetGuide = resetGuideForOrder(order)
-  const canSubmit = unlinked && passcode.length === PASSCODE_LEN
+  const guide = guideById(resetGuide.guideId)
+  const variant = variantFor(guide, resetGuide.variant)
+  const field = unlockFieldFor(guide.id)
+  const kind = field ? field.kinds.find((k) => k.id === kindId) ?? field.kinds[0] : null
+  const codeError = field ? unlockError(passcode, field, kind) : null
+  const canSubmit = unlinked && !codeError
 
   return (
     <OrderClaimLink order={order} onReveal={() => setExpanded(true)}>
@@ -101,7 +119,7 @@ export default function ResetFailedCard({
         <div className="rounded-[14px] border border-[#f6c5cc] bg-danger-bg p-3.5 flex flex-col gap-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {claimTypeLabel(claim)} claim
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-danger whitespace-nowrap shrink-0">
               <Lock size={11} strokeWidth={2.2} />
@@ -150,7 +168,6 @@ export default function ResetFailedCard({
             <ResetGuideSheet
               guideId={resetGuide.guideId}
               facts={{ variant: resetGuide.variant }}
-              mode={modeForClaimType(claim.type) ?? 'return'}
               initialView="remote"
               skipDone
               onDone={() => {
@@ -162,14 +179,28 @@ export default function ResetFailedCard({
           )}
 
           <AckToggle
+            label={unlinkAckLabel(guide, variant.id)}
             checked={unlinked}
             locked={!guideDone}
             onChange={() => guideDone && setUnlinked((v) => !v)}
           />
 
-          <PasscodeField value={passcode} onChange={setPasscode} />
+          {field && (
+            <UnlockField
+              field={field}
+              kind={kind}
+              onKind={(id) => {
+                setKindId(id)
+                setPasscode('')
+              }}
+              value={passcode}
+              onChange={setPasscode}
+              error={passcode ? codeError : null}
+              hint={fillNoun(field.hint, variant.noun)}
+            />
+          )}
 
-          <SecurityNote />
+          {field && <SecurityNote />}
 
           <div className="flex gap-2 pt-1">
             <button
@@ -195,7 +226,7 @@ export default function ResetFailedCard({
               }`}
             >
               <ShieldCheck size={14} strokeWidth={2} />
-              {canSubmit ? 'Submit details' : 'Confirm unlink + passcode'}
+              {canSubmit ? 'Submit details' : field?.required ? `Confirm unlink + ${field.short}` : 'Confirm unlink'}
             </button>
           </div>
 
@@ -209,13 +240,14 @@ export default function ResetFailedCard({
   )
 }
 
-function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle }) {
+function ResetDetailsReceivedCard({ order, field, sent, expanded, onToggle }) {
   const claim = order.claim
   const r = claim.resetFailed
-  // On a journey-replayed submission (Back/Next, no local entry) there's no
-  // passcode in component state — show a representative masked value so the
-  // "What you sent" summary isn't blank.
-  const masked = maskPasscode(passcode) || '••••42'
+  const guide = guideById(resetGuideForOrder(order).guideId)
+  // Never echo the code back: fixed-length dots. A journey replay (no local
+  // entry) still shows dots so the summary isn't blank; an optional field
+  // left empty says so.
+  const masked = field ? (sent || field.required ? '••••••••' : 'Not shared') : null
 
   return (
     <article className="bg-surface rounded-card border border-line overflow-hidden relative shadow-sm2 animate-fadeIn">
@@ -248,7 +280,7 @@ function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle }) {
         <div className="rounded-[14px] border border-[#ffe3b8] bg-warn-bg p-3.5 flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
             <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink-2 whitespace-nowrap truncate min-w-0">
-              Return claim
+              {claimTypeLabel(claim)} claim
             </div>
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] inline-flex items-center gap-1 text-warn whitespace-nowrap shrink-0">
               <CheckCircle2 size={11} strokeWidth={2.2} />
@@ -269,9 +301,13 @@ function ResetDetailsReceivedCard({ order, passcode, expanded, onToggle }) {
 
       {expanded && (
         <div className="border-t border-line bg-canvas pl-4 pr-3.5 py-4 flex flex-col gap-3 animate-slideDown">
-          <DetailsSummary masked={masked} />
+          <DetailsSummary
+            unlinkLabel={guide.id === 'playstation' ? 'Deactivated' : 'Account unlink'}
+            codeLabel={field?.label}
+            masked={masked}
+          />
 
-          <SecurityNote tone="warn" />
+          {field && <SecurityNote tone="warn" />}
         </div>
       )}
     </article>
@@ -367,7 +403,7 @@ function RemoteResetLauncher({ done, onOpen }) {
   )
 }
 
-function AckToggle({ checked, locked, onChange }) {
+function AckToggle({ label, checked, locked, onChange }) {
   return (
     <button
       type="button"
@@ -395,7 +431,7 @@ function AckToggle({ checked, locked, onChange }) {
       </span>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-semibold text-ink leading-snug">
-          I’ve removed this device from my iCloud account
+          {label}
         </div>
         <div className="text-[11.5px] text-muted leading-snug mt-0.5">
           {locked
@@ -407,41 +443,126 @@ function AckToggle({ checked, locked, onChange }) {
   )
 }
 
-function PasscodeField({ value, onChange }) {
-  const handleChange = (e) => {
-    const digits = e.target.value.replace(/\D/g, '').slice(0, PASSCODE_LEN)
-    onChange(digits)
+function UnlockField({ field, kind, onKind, value, onChange, error, hint }) {
+  const [shown, setShown] = useState(false)
+  const handleText = (e) => {
+    const v = kind.input === 'numeric' ? e.target.value.replace(/\D/g, '').slice(0, kind.max) : e.target.value
+    onChange(v)
   }
-  const complete = value.length === PASSCODE_LEN
-
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5">
-          <KeyRound size={12} strokeWidth={2.2} className="text-muted" />
-          Device passcode
-        </span>
-        <span
-          className={`text-[10.5px] tabular-nums font-medium ${
-            complete ? 'text-success' : 'text-muted'
-          }`}
-        >
-          {value.length}/{PASSCODE_LEN}
-        </span>
+      <label className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink inline-flex items-center gap-1.5">
+        <KeyRound size={12} strokeWidth={2.2} className="text-muted" />
+        {field.label}
+        {!field.required && <span className="normal-case tracking-normal font-medium text-muted">· optional</span>}
       </label>
-      <input
-        type="password"
-        inputMode="numeric"
-        autoComplete="off"
-        value={value}
-        onChange={handleChange}
-        placeholder="6-digit passcode"
-        className={`w-full h-[46px] rounded-[10px] border bg-surface px-3.5 text-[15px] text-ink tracking-[0.4em] font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 ${
-          complete ? 'border-success/50' : 'border-line focus:border-brand'
-        }`}
-      />
-      <div className="text-[11px] text-muted leading-snug">
-        Enter the passcode you set on this device. If it’s 4 digits, pad with zeros at the end.
+
+      {field.kinds.length > 1 && (
+        <div className="grid grid-flow-col auto-cols-fr gap-1 p-1 rounded-[10px] bg-line-2/70" role="tablist">
+          {field.kinds.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              role="tab"
+              aria-selected={kind.id === k.id}
+              onClick={() => onKind(k.id)}
+              className={`h-8 rounded-[8px] text-[12.5px] font-semibold transition ${
+                kind.id === k.id ? 'bg-surface text-ink shadow-sm2' : 'text-ink-2 hover:text-ink'
+              }`}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {kind.input === 'pattern' ? (
+        <PatternGrid value={value} onChange={onChange} />
+      ) : (
+        <div className="relative">
+          <input
+            type={shown ? 'text' : 'password'}
+            inputMode={kind.input === 'numeric' ? 'numeric' : 'text'}
+            autoComplete="off"
+            value={value}
+            onChange={handleText}
+            placeholder={kind.placeholder}
+            className={`w-full h-[46px] rounded-[10px] border bg-surface pl-3.5 pr-11 text-[15px] text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 ${
+              kind.input === 'numeric' ? 'tracking-[0.3em]' : ''
+            } ${error ? 'border-danger' : 'border-line focus:border-brand'}`}
+          />
+          <button
+            type="button"
+            onClick={() => setShown((v) => !v)}
+            aria-label={shown ? 'Hide' : 'Show'}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center rounded-full text-muted hover:bg-line-2/60"
+          >
+            {shown ? <EyeOff size={15} strokeWidth={2} /> : <Eye size={15} strokeWidth={2} />}
+          </button>
+        </div>
+      )}
+
+      {error ? (
+        <div className="text-[11px] font-medium text-danger leading-snug">{error}</div>
+      ) : (
+        <div className="text-[11px] text-muted leading-snug">{hint}</div>
+      )}
+    </div>
+  )
+}
+
+// Android pattern: tap the dots in the order they're drawn. Stored as the dot
+// order ('14789'); a dot can't repeat.
+const DOT_XY = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [((n - 1) % 3) * 50 + 25, Math.floor((n - 1) / 3) * 50 + 25])
+
+function PatternGrid({ value, onChange }) {
+  const seq = value.split('').map(Number)
+  const tap = (n) => !seq.includes(n) && onChange(value + n)
+  return (
+    <div className="rounded-[12px] border border-line bg-surface px-3 py-3 flex items-center gap-4">
+      <svg viewBox="0 0 150 150" className="w-[132px] h-[132px] shrink-0" role="group" aria-label="Pattern grid">
+        {seq.length > 1 && (
+          <polyline
+            points={seq.map((n) => DOT_XY[n - 1].join(',')).join(' ')}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-brand/50"
+          />
+        )}
+        {DOT_XY.map(([x, y], k) => {
+          const n = k + 1
+          const order = seq.indexOf(n)
+          const on = order >= 0
+          return (
+            <g key={n} onClick={() => tap(n)} className="cursor-pointer" aria-label={`Dot ${n}`}>
+              <circle cx={x} cy={y} r="20" fill="transparent" />
+              <circle cx={x} cy={y} r={on ? 11 : 7} className={on ? 'fill-brand' : 'fill-line'} />
+              {on && (
+                <text x={x} y={y + 3.5} textAnchor="middle" className="fill-white text-[10px] font-bold">
+                  {order + 1}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] text-ink-2 leading-snug">Tap the dots in the order you draw your pattern.</div>
+        <div className="mt-1.5 text-[13px] font-semibold text-ink tabular-nums min-h-[18px]">
+          {seq.length ? `${seq.length} dots connected` : <span className="text-muted font-normal">No dots yet</span>}
+        </div>
+        {seq.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-brand"
+          >
+            <RotateCcw size={12} strokeWidth={2.2} /> Clear
+          </button>
+        )}
       </div>
     </div>
   )
@@ -458,14 +579,14 @@ function SecurityNote({ tone = 'danger' }) {
     >
       <ShieldCheck size={13} strokeWidth={2} className="text-ink-2 mt-0.5 shrink-0" />
       <div>
-        Your passcode is encrypted and used only by our technician during the reset. It’s
-        deleted once the device is wiped.
+        What you share is encrypted and used only by our technician during the reset. It’s
+        deleted once the device is wiped, and we never show it back to you.
       </div>
     </div>
   )
 }
 
-function DetailsSummary({ masked }) {
+function DetailsSummary({ unlinkLabel, codeLabel, masked }) {
   return (
     <div className="rounded-[12px] border border-line bg-surface overflow-hidden">
       <div className="px-3.5 py-2.5 bg-line-2/30 border-b border-line">
@@ -476,28 +597,22 @@ function DetailsSummary({ masked }) {
       <dl className="px-3.5 py-3 flex flex-col gap-2 text-[12.5px]">
         <div className="flex items-start justify-between gap-3">
           <dt className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted shrink-0 pt-0.5">
-            iCloud unlink
+            {unlinkLabel}
           </dt>
           <dd className="text-[12.5px] font-semibold text-ink text-right leading-snug inline-flex items-center gap-1">
             <CheckCircle2 size={12} strokeWidth={2.2} className="text-success" />
             Confirmed by you
           </dd>
         </div>
-        <div className="flex items-start justify-between gap-3">
-          <dt className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted shrink-0 pt-0.5">
-            Passcode
-          </dt>
-          <dd className="text-[13px] font-semibold text-ink text-right leading-snug tabular-nums tracking-[0.3em]">
-            {masked}
-          </dd>
-        </div>
+        {masked && (
+          <div className="flex items-start justify-between gap-3">
+            <dt className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted shrink-0 pt-0.5">
+              {codeLabel}
+            </dt>
+            <dd className="text-[13px] font-semibold text-ink text-right leading-snug tracking-[0.2em]">{masked}</dd>
+          </div>
+        )}
       </dl>
     </div>
   )
-}
-
-function maskPasscode(value) {
-  if (!value) return ''
-  if (value.length <= 2) return '•'.repeat(value.length)
-  return '•'.repeat(value.length - 2) + value.slice(-2)
 }

@@ -18,10 +18,7 @@ export default {
     {
       id: 'backup',
       title: 'Back up your {noun}',
-      body: {
-        return: 'Your data is your responsibility. Back up anything you want to keep now — the next steps erase the {noun}, and we can’t recover it.',
-        repair: 'You’ll get this {noun} back, but the next steps erase it. Back up now so you can restore everything — your data is your responsibility.',
-      },
+      body: 'The next steps erase the {noun}. Back up anything you want to keep now — your data is your responsibility, and we can’t recover it.',
       path: ['Settings', 'Accounts', 'Windows backup', 'Back up'],
       notes: [{ when: 'Large files', text: 'Copy them to an external drive or OneDrive too — Windows backup doesn’t keep everything.' }],
     },

@@ -239,7 +239,6 @@ function RemoteUnlink({ order, claim }) {
       {open && (
         <ResetGuideSheet
           guideId={guideId}
-          mode={mode}
           facts={{ variant }}
           initialView="remote"
           skipDone

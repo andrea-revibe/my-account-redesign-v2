@@ -46,7 +46,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const guide = guideById(guideId)
   const mode = modeForClaimType(state.claimType) ?? 'return'
   const isRepair = mode === 'repair'
-  const stepCount = picked ? stepsFor(guide, mode, { variant }).length : null
+  const stepCount = picked ? stepsFor(guide, { variant }).length : null
 
   // Switching device invalidates any reset already run on the other guide,
   // so re-gate the confirm checkbox.
@@ -150,7 +150,6 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
         {guideOpen && (
           <ResetGuideSheet
             guideId={guideId}
-            mode={mode}
             facts={{ variant }}
             initialView={guideOpen}
             onDone={({ via, erased }) => {

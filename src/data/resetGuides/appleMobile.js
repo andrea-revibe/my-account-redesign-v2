@@ -18,10 +18,7 @@ export default {
     {
       id: 'backup',
       title: 'Back up your {noun}',
-      body: {
-        return: 'Your data is your responsibility. Back up anything you want to keep now — once the {noun} leaves you, we can’t recover it.',
-        repair: 'You’ll get this {noun} back, but a repair can wipe it. Back up now so you can restore everything — your data is your responsibility.',
-      },
+      body: 'Back up anything you want to keep now. Whether it’s a return or a repair, the {noun} may be wiped — your data is your responsibility, and we can’t recover it.',
       path: ['Settings', '[your name]', 'iCloud', 'iCloud Backup', 'Back Up Now'],
       notes: [{ when: 'Not enough iCloud space', text: 'Back up to a Mac (Finder) or a Windows PC (Apple Devices app) instead.' }],
     },
