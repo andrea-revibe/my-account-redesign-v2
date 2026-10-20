@@ -26,10 +26,6 @@ import {
   SamsungSignOutCarousel,
   SamsungFactoryReset,
   SamsungWelcome,
-  AndroidTabletRemoveGoogle,
-  AndroidTabletSignOutCarousel,
-  AndroidTabletFactoryReset,
-  AndroidTabletWelcome,
   IpadSettingsSignOut,
   IpadSettingsErase,
   IpadHelloScreen,
@@ -43,10 +39,8 @@ import {
   IpadFindMyOff,
   IpadPasscodeOff,
   SamsungLockSwipe,
-  AndroidTabletLockSwipe,
   WindowsSetup,
   SamsungMaintenance,
-  AndroidTabletMaintenance,
   PathScreen,
 } from './resetGuideMocks'
 import { StepIllustration, GuideIntroArt } from './resetGuideFrames'
@@ -89,10 +83,6 @@ const MOCKS = {
   sam_signout: SamsungSignOutCarousel,
   sam_reset: SamsungFactoryReset,
   sam_welcome: SamsungWelcome,
-  tab_remove_google: AndroidTabletRemoveGoogle,
-  tab_signout: AndroidTabletSignOutCarousel,
-  tab_reset: AndroidTabletFactoryReset,
-  tab_welcome: AndroidTabletWelcome,
   mac_signout: MacSignOut,
   mac_erase: MacErase,
   mac_welcome: MacWelcome,
@@ -103,10 +93,8 @@ const MOCKS = {
   ipad_findmy_off: IpadFindMyOff,
   ipad_passcode_off: IpadPasscodeOff,
   sam_lock_swipe: SamsungLockSwipe,
-  tab_lock_swipe: AndroidTabletLockSwipe,
   win_setup: WindowsSetup,
   sam_maintenance: SamsungMaintenance,
-  tab_maintenance: AndroidTabletMaintenance,
 }
 
 function mockFor(step, variantId) {

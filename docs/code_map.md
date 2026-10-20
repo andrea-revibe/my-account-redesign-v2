@@ -95,7 +95,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 
 | Module | LOC | In | Exports (line) |
 |---|--:|--:|---|
-| `App.jsx` | 1042 | 1 | `App`·93 |
+| `App.jsx` | 1043 | 1 | `App`·93 |
 | `components/AddressForm.jsx` | 89 | 2 | `AddressForm`·11 |
 | `components/AwbFailedCard.jsx` | 318 | 1 | `AwbFailedCard`·28 |
 | `components/AwbLink.jsx` | 40 | 2 | `AwbLink`·11 |
@@ -115,7 +115,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimFlow/IssueEvidence.jsx` | 556 | 1 | `IssueEvidence`·83 |
 | `components/ClaimFlow/PasscodeField.jsx` | 52 | 1 | `PasscodeField`·10 |
 | `components/ClaimFlow/ProgressBar.jsx` | 38 | 1 | `ProgressBar`·6 |
-| `components/ClaimFlow/ResetGuideSheet.jsx` | 895 | 3 | `ResetGuideSheet`·117 |
+| `components/ClaimFlow/ResetGuideSheet.jsx` | 883 | 3 | `ResetGuideSheet`·105 |
 | `components/ClaimFlow/Step1Situation.jsx` | 91 | 1 | `Step1Situation`·36 |
 | `components/ClaimFlow/Step2Compensation.jsx` | 238 | 1 | `Step2Compensation`·23 |
 | `components/ClaimFlow/Step2Reason.jsx` | 163 | 2 | `REASONS`·13, `REASON_TRIPWIRES`·24, `REASON_LABELS`·42, `tripwireFor`·49, `Step2Reason`·53 |
@@ -137,8 +137,8 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `components/ClaimFlow/flowReducer.js` | 434 | 2 | `BRANCH_ENTRY`·30, `sequenceFor`·60, `claimTypeFor`·68, `progressFor`·120, `initialState`·138, `flowReducer`·255, `stepError`·362, `canAdvance`·431 |
 | `components/ClaimFlow/issueTaxonomy.js` | 438 | 6 | `PROOF_GUIDE_LABEL`·22, `DEFAULT_PROOF_GUIDE_URL`·25, `ISSUE_CATEGORIES`·116, `WRONG_ITEM_DETAILS`·317, `SOMETHING_ELSE_ID`·346, `categoryById`·361, `findSpecificIssue`·365, `categoryForIssue`·373, `scopeForIssue`·379, `visibleIssuesFor`·391, `labelForIssue`·399, `resolveNeed`·410, `evidenceSubFor`·425 |
 | `components/ClaimFlow/resetGuideAnim.js` | 10 | 2 | `STEP_ANIM_CSS`·3, `stepAnim`·8 |
-| `components/ClaimFlow/resetGuideFrames.jsx` | 68 | 1 | `StepIllustration`·29, `GuideIntroArt`·55 |
-| `components/ClaimFlow/resetGuideMocks.jsx` | 2215 | 2 | _(none)_ |
+| `components/ClaimFlow/resetGuideFrames.jsx` | 67 | 1 | `StepIllustration`·29, `GuideIntroArt`·54 |
+| `components/ClaimFlow/resetGuideMocks.jsx` | 2165 | 2 | _(none)_ |
 | `components/ClosedClaimCard.jsx` | 164 | 1 | `ClosedClaimCard`·47 |
 | `components/ConditionReportChip.jsx` | 30 | 3 | `ConditionReportChip`·10 |
 | `components/CountryPicker.jsx` | 37 | 3 | `CountryPicker`·8 |
@@ -198,7 +198,7 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `data/orders/compensation.js` | 204 | 1 | `COMPENSATION_ORDERS`·3 |
 | `data/orders/warranty.js` | 616 | 1 | `WARRANTY_ORDERS`·10 |
 | `data/resetGuides/airpods.js` | 63 | 1 | `default`·4 |
-| `data/resetGuides/android.js` | 199 | 1 | `default`·6 |
+| `data/resetGuides/android.js` | 198 | 1 | `default`·6 |
 | `data/resetGuides/appleMobile.js` | 156 | 1 | `default`·4 |
 | `data/resetGuides/index.js` | 27 | 4 | `ACCOUNT_RECOVERY`·10, `RECOVERY_NODES`·10, `NEVER_ASK`·10, `RESET_GUIDES`·13, `RESET_GUIDE_BY_ID`·24 |
 | `data/resetGuides/mac.js` | 124 | 1 | `default`·10 |
@@ -214,13 +214,13 @@ _Concept → file → symbol → line. Read the file + jump to the line; do not 
 | `lib/claims.js` | 858 | 19 | `CLAIM_STATUSES`·20, `COMPENSATION_CLAIM_STATUSES`·66, `claimStatusesFor`·100, `CLAIM_EXPLANATIONS`·110, `COMPENSATION_EXPLANATIONS`·122, `claimExplanation`·134, `claimToneFor`·144, `claimProgressIndex`·150, `RETURN_CLAIM_STATUSES`·160, `returnClaimProgressIndex`·173, `CLAIM_TRANSIT_SUB_STATUSES`·182, `transitSubProgressIndex`·189, `hasActiveClaim`·198, `isClaimRefunded`·207, `isClaimClosed`·218, `CLAIM_CLOSURE_REASONS`·224, `closureCopyFor`·263, `canCancelClaim`·278, `cancelNeedsShipBack`·289, `cancelReturnGate`·301, `repairQuotePending`·331, `repairDeclined`·339, `isWarrantyDelivered`·345, `isReturnDelivered`·358, `claimPhaseTag`·364, `claimStatusHeadline`·381, `claimStatusSubline`·386, `WARRANTY_CLAIM_STATUSES`·404, `warrantyClaimToneFor`·454, `warrantyStepsFor`·469, `warrantyClaimProgressIndex`·476, `warrantyClaimPhaseTag`·482, `warrantyClaimStatusHeadline`·511, `warrantyClaimStatusSubline`·520, `WARRANTY_EXPLANATIONS`·529, `warrantyClaimExplanation`·552, `REASON_LABELS`·570, `reasonText`·582, `devicePrepText`·590, `CLAIM_TYPE_LABELS`·610, `claimTypeLabel`·617, `CLAIM_REF_PREFIXES`·629, `formatClaimRef`·637, `claimRequiresProof`·650, `refundMethodLabel`·656, `CLAIM_SLAS`·675, `expectedCompletionFor`·705, `SUB_STATUS_LABELS`·735, `actionGateCopy`·796 |
 | `lib/countries.js` | 46 | 13 | `DEFAULT_COUNTRY`·29, `COUNTRIES`·31, `COUNTRY_CODES`·38, `countryConfig`·42 |
 | `lib/coverage.js` | 255 | 8 | `STANDARD_WARRANTY_MONTHS`·33, `EXTENDED_WARRANTY_MONTHS`·34, `ACCIDENTAL_DAMAGE_CAPS`·41, `ACCIDENTAL_DAMAGE_CAP`·47, `accidentalDamageCap`·49, `hasExtendedWarranty`·55, `careAccidentalUsed`·63, `coverageFor`·101, `remedyOptionsFor`·158, `coverageSummary`·177, `repairQuoteSplit`·211, `coverageArmLabel`·228, `coverageStripFor`·244 |
-| `lib/devices.js` | 98 | 7 | `osForCategory`·9, `deviceOsForOrder`·16, `DEVICE_OPTIONS`·27, `PRODUCT_CATEGORIES`·50, `productCategoryFor`·73, `guessDevice`·79, `resetGuideForOrder`·88 |
+| `lib/devices.js` | 100 | 7 | `osForCategory`·9, `deviceOsForOrder`·16, `DEVICE_OPTIONS`·29, `PRODUCT_CATEGORIES`·52, `productCategoryFor`·70, `guessDevice`·76, `asksCustomer`·82, `resetGuideForOrder`·89 |
 | `lib/edd.js` | 245 | 2 | `MARKETS`·24, `STAGE_ORDER_CREATED`·60, `STAGE_QC`·61, `STAGE_SHIPPED`·62, `SLA_ON_TIME`·64, `SLA_LATE`·65, `MSG_ORDER_LATE`·72, `MSG_QC_BACK_ON_TRACK`·74, `MSG_QC_LATE`·76, `MSG_SHIPPED_LATE`·78, `workdayIntl`·100, `currentStage`·117, `calculateEdd`·125, `buildCustomerMessage`·161, `orderStatus`·185 |
 | `lib/eddSandbox.js` | 259 | 1 | `useEddSandbox`·191 |
 | `lib/events.js` | 152 | 3 | `getHistoryEvents`·119 |
 | `lib/journey.js` | 123 | 1 | `useJourney`·25 |
 | `lib/notifications.js` | 93 | 2 | `NOTIFICATIONS`·14, `NOTIFICATION_STATUSES`·26, `notificationStatus`·39, `notificationFor`·53, `journeyNotificationCoverage`·83 |
-| `lib/resetGuideSandbox.js` | 91 | 1 | `useResetGuideSandbox`·51 |
+| `lib/resetGuideSandbox.js` | 92 | 1 | `useResetGuideSandbox`·51 |
 | `lib/resetGuides.js` | 153 | 6 | `RESET_MODES`·7, `guideById`·13, `modeForClaimType`·19, `isSingleMode`·25, `effectiveMode`·29, `variantFor`·33, `stepsFor`·49, `privacyFor`·61, `symptomsFor`·74, `cantUseEntry`·84, `resolveNode`·93, `fillNoun`·131, `PASSCODE_KINDS`·135, `passcodeError`·143 |
 | `lib/returns.js` | 362 | 20 | `RETURN_WINDOW_DAYS`·5, `RESTOCKING_FEE_RATE`·6, `CANCELLATION_FEE_RATE`·11, `ISSUE_WALLET_BONUS`·15, `SHIPPED_CANCEL_WINDOW_DAYS`·18, `parsePlacedAtDate`·24, `addDays`·47, `journeyAsOfDate`·66, `orderAsOf`·77, `startOfDay`·83, `canCancelShipped`·105, `eligibilityFor`·114, `groupOrdersByEligibility`·139, `refundBreakdown`·157, `isSplitPaid`·207, `refundDestinations`·218, `formatMoney`·227, `formatLongDate`·232, `formatShortDate`·241, `generateClaimRef`·253, `BATTERY_BASELINE_BY_GRADE`·261, `conditionGradeOf`·270, `batteryBaselineFor`·277, `daysSinceDelivery`·288, `assessBattery`·305 |
 | `lib/statuses.js` | 451 | 6 | `STATUSES`·4, `CANCELLATION_STATUSES`·32, `SHIPPING_SUB_STATUSES`·56, `ORDER_STATES`·81, `progressIndex`·95, `subProgressIndex`·100, `cancellationProgressIndex`·109, `cancellationStepsFor`·124, `statusDescription`·137, `STATUS_EXPLANATIONS`·294, `statusExplanation`·325, `pickActiveOrderId`·359, `statusHeadline`·378, `statusSubline`·398, `statusIconFor`·427 |
@@ -392,6 +392,6 @@ graph LR
   lib_wallet_js --> data_wallet_js
 ```
 
-_Generated by `scripts/codemap.mjs` — 131 modules, 35050 LOC. Re-run after structural changes; do not hand-edit between the markers._
+_Generated by `scripts/codemap.mjs` — 131 modules, 34990 LOC. Re-run after structural changes; do not hand-edit between the markers._
 
 <!-- codemap:generated:end -->

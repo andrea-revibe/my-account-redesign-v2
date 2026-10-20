@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { JOURNEYS } from '../data/journey'
 import { RESET_GUIDES } from '../data/resetGuides'
 import { guideById, variantFor, isSingleMode } from './resetGuides'
-import { DEVICE_OPTIONS, PRODUCT_CATEGORIES, guessDevice } from './devices'
+import { DEVICE_OPTIONS, PRODUCT_CATEGORIES, asksCustomer, guessDevice } from './devices'
 
 // Third sandbox (kind 'reset_sandbox'): previews guided reset the way
 // production allocates it — pick the order line's product category
@@ -14,7 +14,7 @@ import { DEVICE_OPTIONS, PRODUCT_CATEGORIES, guessDevice } from './devices'
 const DEFAULT_INPUTS = {
   categoryId: 2,
   device: 'iphone',
-  titleGuess: true,
+  titleGuess: false,
   mode: 'return',
   openAt: 'start',
 }
@@ -22,7 +22,7 @@ const DEFAULT_INPUTS = {
 const categoryById = (id) => PRODUCT_CATEGORIES.find((c) => c.id === id) ?? PRODUCT_CATEGORIES[0]
 
 function buildOrder(initialOrder, category, device, titleGuess) {
-  const needsChooser = category.options.length > 1
+  const multi = category.options.length > 1
   return {
     ...initialOrder,
     statusId: 'delivered',
@@ -41,7 +41,7 @@ function buildOrder(initialOrder, category, device, titleGuess) {
     deviceOs: DEVICE_OPTIONS[device].guideId === 'android' ? 'android' : 'ios',
     product: {
       ...initialOrder.product,
-      name: needsChooser && !titleGuess ? 'Unknown model' : DEVICE_OPTIONS[device].sample,
+      name: multi && !titleGuess ? 'Unknown model' : DEVICE_OPTIONS[device].sample,
       variant: 'Sandbox device · Good',
       category_name: category.name,
     },
@@ -79,6 +79,7 @@ export function useResetGuideSandbox(journey) {
     categories: PRODUCT_CATEGORIES.filter((c) => c.device !== false),
     category,
     guess,
+    asks: asksCustomer(category, guess),
     inputs,
     setInput,
     reset,
