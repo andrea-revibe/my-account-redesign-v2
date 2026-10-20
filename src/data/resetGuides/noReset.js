@@ -5,7 +5,6 @@ export default {
   id: 'no_reset',
   code: '—',
   label: 'No reset',
-  share: '1.5%',
   modes: ['single'],
   account: [],
   variants: [

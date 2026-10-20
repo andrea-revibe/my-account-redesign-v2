@@ -4,7 +4,6 @@ export default {
   id: 'watch',
   code: 'G5',
   label: 'Apple Watch',
-  share: '0.3%',
   modes: ['single'],
   account: ['apple'],
   variants: [

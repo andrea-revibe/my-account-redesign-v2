@@ -5,7 +5,6 @@ export default {
   id: 'apple_mobile',
   code: 'G1',
   label: 'iPhone & iPad',
-  share: '64%',
   modes: ['return', 'repair'],
   privacy: true,
   account: ['apple'],
@@ -126,54 +125,14 @@ export default {
           { text: 'You’re done when the “Hello” setup screen appears. Leave it there — don’t set it up again.' },
         ],
         tip: 'Needs Wi-Fi or mobile data, and iOS 15.2 or later.',
-        more: [{ label: 'No “Forgot Passcode?” button?', to: 'restore_model' }],
+        more: [{ label: 'No “Forgot Passcode?” button?', to: 'remote' }],
       },
       pc_repair: {
         title: 'Don’t erase your {noun}',
         body: 'Erasing it would delete your data. Continue, and we’ll tell you the next step before pickup.',
       },
-      restore_model: {
-        ask: 'Which {noun} do you have?',
-        sub: 'Each model starts recovery mode with a different button.',
-        options: [
-          { when: { variant: ['iphone'] }, label: 'iPhone 8 or newer', sub: 'Includes iPhone SE (2nd and 3rd generation)', to: 'restore_side' },
-          { when: { variant: ['iphone'] }, label: 'iPhone 7 or 7 Plus', to: 'restore_volume' },
-          { when: { variant: ['iphone'] }, label: 'iPhone 6s or older', sub: 'Includes iPhone SE (1st generation)', to: 'restore_home' },
-          { when: { variant: ['ipad'] }, label: 'No Home button', sub: 'Face ID, or Touch ID in the top button', to: 'restore_top' },
-          { when: { variant: ['ipad'] }, label: 'Has a Home button', to: 'restore_home' },
-        ],
-      },
-      restore_side: {
-        title: 'Restore it with a computer',
-        steps: [{ text: 'Turn the {noun} off. Then hold the side button and keep holding while you plug it into a Mac or PC.' }],
-        then: 'restore',
-      },
-      restore_volume: {
-        title: 'Restore it with a computer',
-        steps: [{ text: 'Turn the {noun} off. Then hold the volume down button and keep holding while you plug it into a Mac or PC.' }],
-        then: 'restore',
-      },
-      restore_home: {
-        title: 'Restore it with a computer',
-        steps: [{ text: 'Turn the {noun} off. Then hold the Home button and keep holding while you plug it into a Mac or PC.' }],
-        then: 'restore',
-      },
-      restore_top: {
-        title: 'Restore it with a computer',
-        steps: [{ text: 'Turn the {noun} off. Then hold the top button and keep holding while you plug it into a Mac or PC.' }],
-        then: 'restore',
-      },
-      restore: {
-        steps: [
-          { text: 'Let go when the recovery screen (a computer and a cable) appears.' },
-          { text: 'On the computer, open your {noun} and choose Restore.', path: ['Restore'], note: 'Mac: in Finder. Windows PC: in the Apple Devices app.' },
-          { text: 'Wait until the restore finishes and the {noun} restarts.' },
-        ],
-        then: 'remote',
-      },
       remote: {
         title: { return: 'Erase it and remove it from Find My', repair: 'Remove it from Find My' },
-        lead: 'A restore doesn’t remove Activation Lock. Finish with these steps',
         steps: [
           {
             text: 'On another iPhone or iPad, open Find My and select your {noun}.',

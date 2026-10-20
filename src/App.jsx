@@ -992,7 +992,9 @@ export default function App() {
       )}
       {journeyMode && sandboxKind === 'reset' && (
         <ResetGuidePanel
-          guides={sandbox.guides}
+          categories={sandbox.categories}
+          category={sandbox.category}
+          guess={sandbox.guess}
           inputs={sandbox.inputs}
           setInput={sandbox.setInput}
           reset={sandbox.reset}

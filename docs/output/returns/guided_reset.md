@@ -24,18 +24,20 @@ Step 3 of every device claim flow (`change_of_mind` / `issue` / `warranty`; `com
 
 Guides are grouped by what locks the device, not by brand. Brand and model differences are a variant, a branch question or a one-line note inside the guide.
 
+**What the customer must do vs. what Revibe does.** Revibe erases every returned device on arrival, so a guide only *requires* what Revibe can't undo: removing the account lock (sign-out / account removal). Erasing protects the customer's privacy and stays in the guides where it needs no key combinations; on Mac it is optional (Erase All Content and Settings, skipped where macOS doesn't offer it). No guide uses keyboard shortcuts or hardware-button sequences (no Recovery / Command-R, NVRAM, BIOS keys, Shift-restart, recovery-mode restore). A firmware/BIOS password — rare, and only the owner or the manufacturer can clear it — is a one-line "tell us" fold-out on the last Mac/Windows step, not a step.
+
 | # | Guide (`id`) | Variants | Modes | Brand/model handled by |
 |---|---|---|---|---|
 | G1 | iPhone & iPad (`apple_mobile`) | `iphone`, `ipad` | Return · Repair | `{noun}` wording; iOS-version notes |
 | G2 | Android (`android`) | `samsung_phone`, `samsung_tablet`, `other_android` | Return · Repair | Samsung-only steps via `when.variant` |
-| G3 | Windows laptop (`windows`) | `laptop` (brand-neutral) | Return · Repair | BIOS step lists the common setup keys (F2 / F1 / F10 / Del / Esc) + a no-F-keys note |
-| G4 | MacBook (`mac`) | `macbook` | Return · Repair | intro chip question (`branch.chip`: Apple silicon / Intel+T2 / Intel 2012–17) |
+| G3 | Windows laptop (`windows`) | `laptop` (brand-neutral) | Return · Repair | no BIOS step — a startup-password fold-out on the last step |
+| G4 | MacBook (`mac`) | `macbook` | Return · Repair | no chip question — sign-out is the must-do; erase is optional (Return) |
 | G5 | Apple Watch (`watch`) | `apple_watch` | single | — |
 | G6 | AirPods (`airpods`) | `airpods`, `airpods_max` | single | Max reset step via variant |
 | G7 | PlayStation (`playstation`) | `ps5`, `ps4`, `ps3` | Return · Repair | per-console steps via variant |
 | — | No reset (`no_reset`) | accessory / audio / controller | single | packing note only |
 
-**Content as data.** Each guide is one file in `src/data/resetGuides/*`. The barrel `index.js` exports `RESET_GUIDES` / `RESET_GUIDE_BY_ID`. Account recovery and "if nothing works" are shared in `recovery.js` (`ACCOUNT_RECOVERY`, `NEVER_ASK`). Step shape: `{ id, modes?, when?: { variant | chip }, title, body, path?, notes?: [{ when, text }], mock?, frame?, revibe?, bios?, passcode?, trouble? }`. `{noun}` / `{is}` are filled from the variant. Step order is array order after filtering, so a step shared by both modes sits where *both* sequences want it.
+**Content as data.** Each guide is one file in `src/data/resetGuides/*`. The barrel `index.js` exports `RESET_GUIDES` / `RESET_GUIDE_BY_ID`. Account recovery and "if nothing works" are shared in `recovery.js` (`ACCOUNT_RECOVERY`, `NEVER_ASK`). Step shape: `{ id, modes?, when?: { variant | data }, title, body, path?, notes?: [{ when, text }], mock?, frame?, revibe?, passcode?, trouble? }`. `{noun}` / `{is}` are filled from the variant. Step order is array order after filtering, so a step shared by both modes sits where *both* sequences want it.
 
 ## 2. Mode from claim type
 
@@ -45,46 +47,49 @@ Guides are grouped by what locks the device, not by brand. Brand and model diffe
 - `warranty` (incl. Care accidental) → **Repair**: lift the account lock and turn the screen lock off. By default the data stays, and no account password is shared (see §2.1).
 - `compensation` → no guide.
 
-Single-mode guides (`modes: ['single']`, G5/G6/no-reset) ignore the mode. `stepsFor(guide, mode, { variant, chip, data })` does all the filtering. An unanswered Mac chip counts as the majority Intel 2012–17 path, so step counts are stable before the question is answered.
+Single-mode guides (`modes: ['single']`, G5/G6/no-reset) ignore the mode. `stepsFor(guide, mode, { variant, data })` does all the filtering.
 
 ### 2.1 Repair data choice
 
 Guides with `privacy: true` (G1 iPhone/iPad, G2 Android, G3 Windows, G4 Mac) ask on the Repair intro **What should happen to your data?**:
 
 - **Keep it on the device** — preselected, recommended; runs the steps tagged `when: { data: ['keep'] }` (today's Repair path, incl. the Mac/Windows passcode step).
-- **Protect it first** — `privacyFor(guide, variant)` says how. `'erase'` (default) reuses the Return erase steps, which carry `modes: ['return', 'repair']` + `when: { data: ['private'] }`; the passcode step drops out. Samsung variants set `privacy: 'maintenance'` instead: remove accounts → **Maintenance mode** (hides the data in a separate profile, nothing erased).
+- **Protect it first** — `privacyFor(guide, variant)` says how. `'erase'` (default) reuses the Return erase steps, which carry `modes: ['return', 'repair']` + `when: { data: ['private'] }` (Mac has its own `repair_erase`, since its Return erase is optional — where macOS lacks Erase All Content and Settings, a note sends the customer back to Keep); the passcode step drops out. Samsung variants set `privacy: 'maintenance'` instead: remove accounts → **Maintenance mode** (hides the data in a separate profile, nothing erased).
 
 `data` only filters in Repair mode, so Return is untouched. Erase is gated on an inline back-up checkbox (Start never disabled; unticked → error). While erasing, *I can't use my device* runs in Return mode so it offers erase fixes, not "don't erase". The sheet reports `dataChoice` (`'keep' | 'erase' | 'maintenance'`, null without a choice) in `onDone`; it lands on `devicePrep.dataChoice` and drives the Done, Review (`devicePrepText`) and Confirmation copy. PlayStation (Sony resets repaired consoles anyway) and the single-mode guides offer no choice. **Held for ops:** a warning that software faults may not reproduce after erasing ("no fault found"), and whether repair partners accept erased devices.
 
-## 3. Mapping an order line — `resetGuideForOrder(order)` (`lib/devices.js`)
+## 3. Allocating a guide — production category + the customer's answer (`lib/devices.js`)
 
-Catalogue `category_name` first, then `product.name` (title). Returns `{ guideId, variant, needsChooser }`.
+The guide is allocated from the order line's **production category** (`order_products.category_id` → `product_categories`, 13 rows, no subcategory). `PRODUCT_CATEGORIES` mirrors that table; each row lists the device options it can be, and each option in `DEVICE_OPTIONS` names its guide + variant. A category with one option needs no input; a category spanning several guides **asks the customer** (`DevicePicker`). The product title only **pre-selects** an answer (`guessDevice`, a positive match per option) — the customer has the final say, and with no match nothing is pre-selected.
 
-| Category | Rule |
-|---|---|
-| `iPhone` | G1 `iphone` |
-| `Macbook` | G4 |
-| `Tablet` | title starts "iPad" → G1 `ipad`; "Samsung"/"Galaxy" → G2 `samsung_tablet`; any other title → G2 `other_android`; **no title** → G1 `ipad` + `needsChooser` |
-| `Samsung phone` | G2 `samsung_phone` |
-| `Smartphone` / Android | G2, Samsung by title else `other_android` |
-| `Laptop` | G3 `laptop` — one brand-neutral variant, no title parsing |
-| `Watch` | title "Apple…" → G5, else no-reset |
-| `Audio` | "AirPods Max" / "AirPods" → G6, else no-reset |
-| `Gaming` | PS3–PS5 / PlayStation 3–5 and not a controller → G7, else no-reset |
-| anything else | no-reset |
-| *(no category)* | legacy `deviceOs` fallback: android → G2 Samsung phone, else G1 iPhone |
+| `product_categories` (id) | Customer is asked | Options → guide |
+|---|---|---|
+| iPhone (2) | — | G1 `iphone` |
+| Samsung phone (1) | — | G2 `samsung_phone` |
+| Smartphone (11) | Which phone is it? | Samsung Galaxy → G2 `samsung_phone` · Other Android → G2 `other_android` · iPhone → G1 |
+| Tablet (6) | Which tablet is it? | iPad → G1 `ipad` · Samsung Galaxy Tab → G2 `samsung_tablet` · Other Android tablet → G2 `other_android` |
+| Macbook (5) | — | G4 |
+| Laptop (4) | — | G3 `laptop` |
+| Watch (8) | Which watch is it? | Apple Watch → G5 · Another watch → no-reset |
+| Audio (10) | Which headphones or speaker is it? | AirPods / Pro → G6 · AirPods Max → G6 · Other → no-reset |
+| Gaming (9) | Which console is it? | PS5 / PS4 / PS3 → G7 · Controller or other console → no-reset |
+| Accessories (7), TV (13) | — | no-reset |
+| Not found (12), or an unknown name | What kind of device is it? | every device type |
+| Warranty (3) | — | not a device (Care+ line; a Care+ claim carries its covered device's product) |
 
-Care+ lines never reach the mapper: a Care+ claim carries its covered device's product. Production should key this on a controlled `reset_guide` catalogue column, and these rules are its migration seed. The older `osForCategory` / `deviceTypeFor*` exports stay because `issueTaxonomy.js` reads the OS.
+`resetGuideForOrder(order)` returns `{ category, device, guideId, variant, needsChooser }`; with `needsChooser` and no title match, `device` / `guideId` / `variant` are `null` until the customer picks. Orders with no category fall back on legacy `deviceOs` (android → Samsung phone, else iPhone). `osForCategory` / `deviceOsForOrder` stay because `issueTaxonomy.js` reads the OS.
+
+**Gaps:** "Other Android tablet" reuses the `other_android` variant, so its copy says "phone"; Xbox / Switch fall under "other console" (no guide); a Chromebook in `Laptop` would get the Windows guide. Real per-guide claim shares need a production query (the old hard-coded percentages were unsourced and are gone).
 
 ## 4. The engine — `ResetGuideSheet.jsx`
 
-One renderer for every guide. Props: `{ guideId, mode, facts: { variant, chip? }, initialView, skipDone, onDone, onClose }`.
+One renderer for every guide. Props: `{ guideId, mode, facts: { variant }, initialView, skipDone, onDone, onClose }`.
 
-1. **Intro** — device art (`GuideIntroArt`: the legacy CSS-art device where one exists, else an icon coin), a mode-aware title, step count, and the G4 chip question. Start is never disabled: an unanswered chip lights an inline error.
+1. **Intro** — device art (`GuideIntroArt`: the legacy CSS-art device where one exists, else an icon coin), a mode-aware title, step count, and (Repair, where offered) the data choice. Start is never disabled: an unticked backup box lights an inline error.
 2. **Steps** — one per screen. The screen art is, in order:
    - a **hand-drawn CSS-art mock** when `step.mock` resolves through the `MOCKS` registry (`resetGuideMocks.jsx`): iOS / iPadOS Return + Repair (Wallet, Find My switch, Passcode off), One UI Return + Repair (Swipe screen lock), macOS sign-out / erase / setup, and Windows' region setup screen;
    - otherwise a **`PathScreen`** built from `step.path` in the variant's own OS (`variant.os`: `ios` / `ipados` / `android` / `android_tablet` / `macos` / `windows` / `playstation`; `frame: 'phone'` steps on Watch / AirPods run on the iPhone, `frame: 'browser'` draws a browser in the laptop). The screen title is the second-to-last segment, the last segment is the glowing row (`Off` becomes a switch), and neutral skeleton rows stand in for the rest so no menu labels are invented;
-   - otherwise (no path — a physical action: BIOS key, NVRAM, pairing screen, AirPods reset, console restart, packing) a **`StepIllustration`** card (`resetGuideFrames.jsx`), pending the product-photo review.
+   - otherwise (no path — a physical action: pairing screen, AirPods reset, console restart, packing) a **`StepIllustration`** card (`resetGuideFrames.jsx`), pending the product-photo review.
 
    **One frame per platform, never shared across brands:** iPhone (Dynamic Island, `9:41`), Android phone (dark body, punch-hole, `12:45` + battery %), iPad (light bezel), Android tablet (dark, squarer), MacBook (silver deck), Windows laptop (dark deck + taskbar), TV for PlayStation. The OS travels by context (`OsContext`), so shared pieces — status bar, toggle colour — follow the frame. Every drawn screen shows the path caption under the title.
 
@@ -93,7 +98,7 @@ One renderer for every guide. Props: `{ guideId, mode, facts: { variant, chip? }
 4. **I can't use my device** — a link on the intro and every step. It is symptom-first and never sends the customer to another section:
    - **Picker** — *What's stopping you?* lists `cantUse.symptoms` (filtered by mode + variant via `symptomsFor`): typically the lock / passcode, a broken or dead device, can't sign in to the account, and already sent to Revibe.
    - **Questions** — a node with `ask` + `options` (e.g. *changed the passcode in the last 3 days?*, *which iPhone?*, *PIN or password?*) routes to the one fix that applies.
-   - **Fix** — a node with numbered `steps` (`text`, optional `path` rendered as tap chips, `note`, and a `help` link that jumps to another node such as account recovery). `then` appends another fix's steps with continuous numbering (e.g. computer restore → Find My removal), so a fix is always self-contained. A `lead` labels the join.
+   - **Fix** — a node with numbered `steps` (`text`, optional `path` rendered as tap chips, `note`, and a `help` link that jumps to another node such as account recovery). `then` appends another fix's steps with continuous numbering (e.g. Windows "send it as it is" → Microsoft account removal), so a fix is always self-contained. A `lead` labels the join.
    - Any node field can be per-mode (`{ return, repair }`); steps and options filter by `modes` / `when: { variant }`. `resolveNode` (`lib/resetGuides.js`) does all of it, so the sheet only renders.
    - **Account recovery** is shared: `RECOVERY_NODES` in `data/resetGuides/recovery.js` (`account_apple` / `_google` / `_samsung` / `_microsoft` / `_playstation`), reached from the account symptom or any step's `help` link.
 
@@ -112,24 +117,24 @@ It is optional (a fallback) and masked, with show/hide. `passcodeError` rejects 
 
 ## 6. The Step 3 surface — `Step3DevicePrep.jsx`
 
-`flowReducer` seeds `devicePrep.{ guideId, variant }` from the mapping. When the guide finishes, `devicePrep` also gets `mode`, `guideVia` and `passcodeProvided`.
+`flowReducer` seeds `devicePrep.{ device, guideId, variant }` from the mapping (null when the customer must pick). When the guide finishes, `devicePrep` also gets `mode`, `guideVia` and `passcodeProvided`.
 
 - **Copy is mode-aware**: heading ("…for return" / "…for repair"), the warn `Callout`, the launcher label (*Start the guided reset* / *Start the repair prep guide*) and the confirm-gate wording. The backup `SafetyNote` shows in Return mode only (Repair keeps the data).
 - **Launcher step count** comes from `stepsFor`.
-- **`TabletPicker`** shows only when `needsChooser` (a Tablet with no title). Switching resets `resetGuideSeen` / `resetConfirmed` / `passcodeProvided`.
+- **`DevicePicker`** (`ClaimFlow/DevicePicker.jsx`) shows the category's question when `needsChooser`, also above the `NoResetCard`, with a *From your order* tag on the title's guess. Switching resets `resetGuideSeen` / `resetConfirmed` / `passcodeProvided` / `dataChoice`. Unpicked: the launcher reads *A few simple steps* and tapping it, or Continue (`stepError` → `devicePick`), lights the picker error.
 - **No-reset items** render a single `NoResetCard` instead of the launcher + gate, and `stepError` passes (`dp.guideId === 'no_reset'`).
 - **Unchanged:** the confirm gate stays locked until `resetGuideSeen`, soft validation (`resetGuide` → `resetConfirm`), the `ResetOffRamps` disclosure (now *Can't run the guide?*) and the change-of-mind never-set-up skip.
 - **Downstream**: `devicePrepText` (`lib/claims.js`), `Step6Review` (summary + ack) and `Step7Confirmation` distinguish no-reset, `cant_use`, Repair (+ "passcode shared securely") and Return.
 
 ## 7. Dev sandbox — `?journey=guided_reset`
 
-`kind: 'reset_sandbox'`, `nodes: []`. `useResetGuideSandbox` (`lib/resetGuideSandbox.js`) owns guide / variant / mode / open-at. It also synthesises a delivered order carrying the variant's catalogue `category` + `title`, so **I need help with this device** on the card behind reaches the same guide through the real Step 3. `ResetGuidePanel` offers:
+`kind: 'reset_sandbox'`, `nodes: []`. `useResetGuideSandbox` (`lib/resetGuideSandbox.js`) owns product category / device / title-guess / mode / open-at. It also synthesises a delivered order carrying the category name + the device's sample title (or `Unknown model` with title-guess off), so **I need help with this device** on the card behind reaches the same guide through the real Step 3. `ResetGuidePanel` offers:
 
-- guide chips (with claim share) and device chips;
+- **product category** chips (`product_categories` name + id), then the **customer is asked** chips for the device (when the category spans guides) and a *Pre-select from title* toggle, then the derived guide (read-only);
 - a Return/Repair toggle (labelled single-mode where relevant);
 - open-at chips: Start / Can't use › picker / › sent / Account recovery;
-- **Open guide**;
-- a debug strip that re-runs `resetGuideForOrder` on the synthesised order (✓ maps back / ✗ mismatch), plus mode · step count · passcode kind and the last finish result.
+- **Open guide** — shows the customer's `DevicePicker` first when the category asks, then the guide;
+- a debug strip that re-runs `resetGuideForOrder` on the synthesised order (what it asks / pre-selects, or the guide it maps to), plus mode · step count · passcode kind and the last finish result.
 
 It replaced the old `ResetGuidePicker` chip row in `JourneyDevPanel`.
 

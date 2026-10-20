@@ -1,10 +1,14 @@
-// G3 — Windows laptop (Microsoft account + BitLocker). One brand-neutral guide:
-// the BIOS step names the common setup keys instead of one per manufacturer.
+// G3 — Windows laptop (Microsoft account + BitLocker). One brand-neutral guide.
+// Windows has no Activation Lock and Revibe erases every returned laptop, so a
+// customer who can't get in only removes it from their Microsoft account.
+const STARTUP_PASSWORD = {
+  label: 'Ever set a startup (BIOS) password?',
+  body: 'Most people never do. If you did, tell us before pickup — we can’t remove it ourselves. Work laptops: ask your IT team.',
+}
 export default {
   id: 'windows',
   code: 'G3',
   label: 'Windows laptop',
-  share: '16%',
   modes: ['return', 'repair'],
   privacy: true,
   account: ['microsoft'],
@@ -44,13 +48,6 @@ export default {
       passcode: 'windows_pin',
     },
     {
-      id: 'bios',
-      modes: ['return', 'repair'],
-      title: 'Remove any BIOS / UEFI password',
-      body: 'Only if you set one. Restart the laptop and tap its setup key as soon as the logo appears — usually F2, F1, F10, Del or Esc, and the logo screen often says which. Clear the password there. Forgotten it? Contact the manufacturer.',
-      notes: [{ when: 'No F-keys', text: 'Hold volume-up while you press and release Power, and keep holding until the setup screen appears.' }],
-    },
-    {
       id: 'setup_screen',
       modes: ['return', 'repair'],
       when: { data: ['private'] },
@@ -67,6 +64,7 @@ export default {
       body: 'From any device: open account.microsoft.com/devices, pick the laptop, then More actions › Remove › tick “I’m ready to remove this device” › Remove.',
       path: ['account.microsoft.com/devices', 'the laptop', 'More actions', 'Remove'],
       frame: 'browser',
+      trouble: STARTUP_PASSWORD,
     },
     {
       id: 'repair_bitlocker',
@@ -76,12 +74,13 @@ export default {
       body: 'If the drive is encrypted, a board or firmware change can trigger BitLocker recovery, and the repairer will need the key. Find it at aka.ms/myrecoverykey.',
       path: ['aka.ms/myrecoverykey', 'BitLocker recovery keys', 'Key for this laptop'],
       frame: 'browser',
+      trouble: STARTUP_PASSWORD,
     },
   ],
   cantUse: {
     symptoms: [
       { id: 'signin', icon: 'lock', title: 'I can’t sign in to Windows', sub: 'Forgot the PIN or password', to: 'win_signin' },
-      { id: 'dead', icon: 'power', title: 'It won’t start', to: { return: 'win_wont_start', repair: 'win_repair' } },
+      { id: 'dead', icon: 'power', title: 'It won’t start', to: { return: 'win_as_is', repair: 'win_repair' } },
       { id: 'account', icon: 'key', title: 'I can’t sign in to my Microsoft account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_microsoft' },
       { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Fix it from a browser', to: 'remote' },
     ],
@@ -101,7 +100,7 @@ export default {
           { text: 'Confirm it’s you with your Microsoft account password or a code.', help: { label: 'Can’t sign in?', to: 'account_microsoft' } },
           { text: 'Set a new PIN, sign in and carry on with the guide.' },
         ],
-        more: [{ modes: ['return'], label: 'Still can’t sign in?', to: 'win_reset' }],
+        more: [{ modes: ['return'], label: 'Still can’t sign in?', to: 'win_as_is' }],
         resume: true,
       },
       win_local: {
@@ -112,32 +111,12 @@ export default {
           { text: 'Answer your security questions and set a new password.' },
           { text: 'Sign in and carry on with the guide.' },
         ],
-        more: [{ modes: ['return'], label: 'Still can’t sign in?', to: 'win_reset' }],
+        more: [{ modes: ['return'], label: 'Still can’t sign in?', to: 'win_as_is' }],
         resume: true,
       },
-      win_reset: {
-        title: 'Reset it from the sign-in screen',
-        steps: [
-          { text: 'On the sign-in screen, hold Shift while you select Power, then Restart.', path: ['Power', 'Restart'] },
-          { text: 'Choose Troubleshoot, then Reset this PC.', path: ['Troubleshoot', 'Reset this PC'] },
-        ],
-        then: 'win_reset_tail',
-      },
-      win_wont_start: {
-        title: 'Reset it from the recovery screen',
-        steps: [
-          { text: 'Turn it on, and hold the power button to switch it off as soon as the logo appears. Do this twice.' },
-          { text: 'Turn it on a third time — Windows opens its recovery screen by itself.' },
-          { text: 'Choose Troubleshoot, then Reset this PC.', path: ['Troubleshoot', 'Reset this PC'] },
-        ],
-        then: 'win_reset_tail',
-      },
-      win_reset_tail: {
-        steps: [
-          { text: 'Choose Remove everything and follow the prompts.', path: ['Remove everything'] },
-          { text: 'Stop when the region / language setup screen appears, and turn it off there.' },
-        ],
-        tip: 'If the drive is encrypted, it asks for a BitLocker recovery key. Find it at aka.ms/myrecoverykey.',
+      win_as_is: {
+        title: 'Send it as it is',
+        body: 'You don’t need to get into it — we erase every laptop when it arrives.',
         then: 'remote',
       },
       win_repair: {

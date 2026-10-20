@@ -7,7 +7,6 @@ export default {
   id: 'android',
   code: 'G2',
   label: 'Android',
-  share: '15%',
   modes: ['return', 'repair'],
   privacy: true,
   account: ['google', 'samsung'],

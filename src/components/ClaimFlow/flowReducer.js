@@ -144,9 +144,9 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
   const order =
     initialOrder ??
     (initialOrderId ? ORDERS.find((o) => o.id === initialOrderId) : null)
-  // Reset guide (data/resetGuides/*) from the order line. A Tablet whose title
-  // can't tell iPad from Android is preselected to iPad; Step 3 lets the
-  // customer switch.
+  // Reset guide (data/resetGuides/*) from the order's product category. A
+  // category spanning several guides seeds the title's guess (or nothing);
+  // Step 3 asks the customer.
   const resetGuide = resetGuideForOrder(order)
   return {
     step: 'situation',
@@ -188,6 +188,7 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     // and `devicePrepText` keep rendering the reset branch.
     devicePrep: {
       option: 'reset',
+      device: resetGuide.device,
       guideId: resetGuide.guideId,
       variant: resetGuide.variant,
       // Set when the guide finishes: the mode it ran in, whether it ended via
@@ -400,6 +401,7 @@ export function stepError(state) {
       // Change-of-mind only: attesting the device was never set up satisfies
       // the step in place of the guided reset.
       if (state.claimType === 'change_of_mind' && dp.neverSetUp) return null
+      if (!dp.guideId) return 'devicePick'
       if (dp.guideId === 'no_reset') return null
       if (!dp.resetGuideSeen) return 'resetGuide'
       if (dp.resetConfirmed !== true) return 'resetConfirm'

@@ -5,7 +5,6 @@ export default {
   id: 'airpods',
   code: 'G6',
   label: 'AirPods',
-  share: '0.6%',
   modes: ['single'],
   account: ['apple'],
   variants: [

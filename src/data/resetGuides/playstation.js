@@ -4,7 +4,6 @@ export default {
   id: 'playstation',
   code: 'G7',
   label: 'PlayStation',
-  share: '0.3%',
   modes: ['return', 'repair'],
   account: ['playstation'],
   variants: [

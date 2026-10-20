@@ -136,8 +136,6 @@ export default function ResetGuideSheet({
 
   const [view, setView] = useState(direct ? 'cant_use' : 'intro')
   const [returnTo, setReturnTo] = useState(null)
-  const [chip, setChip] = useState(facts.chip ?? null)
-  const [chipError, setChipError] = useState(false)
   const [i, setI] = useState(0)
   const [dir, setDir] = useState(1)
   const [carouselIdx, setCarouselIdx] = useState(0)
@@ -178,7 +176,7 @@ export default function ResetGuideSheet({
     }
   }, [onClose])
 
-  const steps = stepsFor(guide, m, { variant: variant.id, chip, data: dataChoice })
+  const steps = stepsFor(guide, m, { variant: variant.id, data: dataChoice })
   const step = steps[i]
   const screens = view === 'steps' ? mockFor(step, variant.id)?.screens : null
   const isCarousel = Array.isArray(screens)
@@ -195,11 +193,9 @@ export default function ResetGuideSheet({
     setView('done')
   }
   const start = () => {
-    const chipMissing = guide.branch && !chip
     const backupMissing = erasing && !backupAck
-    setChipError(!!chipMissing)
     setBackupError(backupMissing)
-    if (chipMissing || backupMissing) return
+    if (backupMissing) return
     setI(0)
     setDir(1)
     setView('steps')
@@ -293,12 +289,6 @@ export default function ResetGuideSheet({
               variant={variant}
               mode={m}
               stepCount={steps.length}
-              chip={chip}
-              chipError={chipError}
-              onChip={(id) => {
-                setChip(id)
-                setChipError(false)
-              }}
               privacy={privacy}
               dataChoice={dataChoice}
               onData={(v) => {
@@ -470,9 +460,6 @@ function Intro({
   variant,
   mode,
   stepCount,
-  chip,
-  chipError,
-  onChip,
   privacy,
   dataChoice,
   onData,
@@ -497,30 +484,6 @@ function Intro({
           {stepCount} {stepCount === 1 ? 'step' : 'steps'}
         </span>
       </div>
-
-      {guide.branch && (
-        <div className="mt-5 w-full text-left">
-          <div className="text-[13px] font-semibold text-ink">{guide.branch.question}</div>
-          <p className="mt-1 text-[11.5px] text-muted leading-snug">{guide.branch.hint}</p>
-          <div className="mt-2.5 flex flex-col gap-2">
-            {guide.branch.options.map((o) => (
-              <ChoiceCard
-                key={o.id}
-                active={chip === o.id}
-                error={chipError}
-                label={o.label}
-                sub={o.sub}
-                onClick={() => onChip(o.id)}
-              />
-            ))}
-          </div>
-          {chipError && (
-            <p className="mt-1.5 ml-1 text-[11.5px] font-medium text-danger">
-              Pick your Mac’s chip — the erase steps depend on it.
-            </p>
-          )}
-        </div>
-      )}
 
       {privacy && (
         <div className="mt-5 w-full text-left">

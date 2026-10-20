@@ -17,7 +17,8 @@ import {
 import StepHeading from './StepHeading'
 import InlineError from './InlineError'
 import ResetGuideSheet from './ResetGuideSheet'
-import { deviceOsForOrder, resetGuideForOrder } from '../../lib/devices'
+import DevicePicker from './DevicePicker'
+import { DEVICE_OPTIONS, deviceOsForOrder, resetGuideForOrder } from '../../lib/devices'
 import { guideById, modeForClaimType, stepsFor } from '../../lib/resetGuides'
 
 // Step 3 — a single, mandatory path: run the guided reset, then confirm it.
@@ -36,30 +37,41 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
   const dp = state.devicePrep
   // Guide + variant are seeded in the reducer from the order line
   // (resetGuideForOrder); mode follows the claim type (warranty → repair).
-  // The only manual input is a Tablet whose title can't tell iPad from
-  // Android (`needsChooser`). `os` only drives the backup reassurance copy.
+  // A product category that spans several guides asks the customer which
+  // device it is (`needsChooser`); the title only pre-selects an answer, and
+  // with no guess guideId stays null until they pick. `os` only drives the
+  // backup reassurance copy.
   const resolved = resetGuideForOrder(order)
-  const guideId = dp.guideId || resolved.guideId
-  const variant = dp.variant || resolved.variant
+  const guideId = dp.guideId
+  const variant = dp.variant
+  const picked = !!guideId
   const guide = guideById(guideId)
   const mode = modeForClaimType(state.claimType) ?? 'return'
   const isRepair = mode === 'repair'
   const os = guideId === 'android' ? 'android' : guideId === 'apple_mobile' || guideId === 'mac' ? 'ios' : deviceOsForOrder(order)
-  const stepCount = stepsFor(guide, mode, { variant }).length
+  const stepCount = picked ? stepsFor(guide, mode, { variant }).length : null
 
-  // Switching tablet OS invalidates any reset already run on the other guide,
+  // Switching device invalidates any reset already run on the other guide,
   // so re-gate the confirm checkbox.
-  const setTabletOs = (pick) => {
-    const next =
-      pick === 'android'
-        ? { guideId: 'android', variant: 'samsung_tablet' }
-        : { guideId: 'apple_mobile', variant: 'ipad' }
-    if (next.guideId === guideId) return
+  const [pickError, setPickError] = useState(false)
+  const setDevice = (id) => {
+    if (id === dp.device) return
+    const o = DEVICE_OPTIONS[id]
+    setPickError(false)
     dispatch({
       type: 'SET_DEVICE_PREP',
-      value: { ...next, resetGuideSeen: false, resetConfirmed: false, passcodeProvided: false, dataChoice: null },
+      value: { device: id, guideId: o.guideId, variant: o.variant, resetGuideSeen: false, resetConfirmed: false, passcodeProvided: false, dataChoice: null },
     })
   }
+  const picker = resolved.needsChooser && (
+    <DevicePicker
+      category={resolved.category}
+      value={dp.device}
+      guess={resolved.device}
+      onChange={setDevice}
+      error={!picked && (pickError || error === 'devicePick' || error === 'resetGuide')}
+    />
+  )
 
   const [guideOpen, setGuideOpen] = useState(false)
   const guideSeen = dp.resetGuideSeen
@@ -97,7 +109,8 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
           title={isRepair ? 'Prepare your item for repair' : 'Prepare your item for return'}
           subtitle="This item has no account lock, so there's nothing to reset."
         />
-        <div className="px-4">
+        <div className="px-4 flex flex-col gap-3">
+          {picker}
           <NoResetCard />
         </div>
       </>
@@ -118,12 +131,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
       <div className="px-4 flex flex-col gap-3">
         <Callout isRepair={isRepair} />
 
-        {resolved.needsChooser && (
-          <TabletPicker
-            value={guideId === 'android' ? 'android' : 'ipad'}
-            onChange={setTabletOs}
-          />
-        )}
+        {picker}
 
         <HeroLauncher
           isRepair={isRepair}
@@ -131,7 +139,7 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
           showError={showGuideError}
           stepCount={stepCount}
           dimmed={neverSetUp}
-          onOpen={() => setGuideOpen(true)}
+          onOpen={() => (picked ? setGuideOpen(true) : setPickError(true))}
         />
 
         <ResetOffRamps
@@ -196,52 +204,6 @@ export default function Step3DevicePrep({ state, dispatch, order, error }) {
 // Shown only for the OS-ambiguous `Tablet` category: a two-option segmented
 // control that resolves the guide to the iPad or the Samsung/Android
 // walkthrough. Preselected to iPad in the reducer.
-function TabletPicker({ value, onChange }) {
-  const opts = [
-    { id: 'ipad', label: 'Apple' },
-    { id: 'android', label: 'Android' },
-  ]
-  return (
-    <div>
-      <div className="mb-1.5 px-0.5 text-[12.5px] font-semibold text-ink">
-        What kind of tablet is this?
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        {opts.map((o) => {
-          const active = value === o.id
-          return (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => onChange(o.id)}
-              className={`rounded-[12px] border-[1.5px] px-3 py-2.5 text-left transition-colors ${
-                active
-                  ? 'border-brand bg-brand-bg/50'
-                  : 'border-line bg-surface hover:border-brand/40'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <span
-                  className={`w-[15px] h-[15px] rounded-full border-2 grid place-items-center shrink-0 ${
-                    active ? 'border-brand' : 'border-line'
-                  }`}
-                >
-                  {active && (
-                    <span className="w-[7px] h-[7px] rounded-full bg-brand" />
-                  )}
-                </span>
-                <span className="text-[13px] font-semibold text-ink">
-                  {o.label}
-                </span>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function Callout({ isRepair }) {
   return (
     <div className="flex items-start gap-3 rounded-[14px] border border-warn-bg bg-warn-bg/70 px-3.5 py-3">
@@ -371,7 +333,7 @@ function HeroLauncher({ isRepair, guideSeen, showError, stepCount = 3, dimmed = 
                 <Clock size={11} strokeWidth={2.2} /> ~10 min
               </span>
               <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-surface/80 border border-line px-2 h-[22px] text-[11px] font-semibold text-ink-2">
-                {stepCount} simple {stepCount === 1 ? 'step' : 'steps'}
+                {stepCount == null ? 'A few simple steps' : `${stepCount} simple ${stepCount === 1 ? 'step' : 'steps'}`}
               </span>
             </span>
           )}

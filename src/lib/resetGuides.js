@@ -2,7 +2,7 @@ import { RESET_GUIDE_BY_ID, RECOVERY_NODES } from '../data/resetGuides'
 
 // Pure selectors over the guide definitions in data/resetGuides/*. The sheet,
 // Step 3 and the sandbox all go through these, so filtering (mode, variant,
-// Mac chip) lives in one place.
+// data choice) lives in one place.
 
 export const RESET_MODES = {
   return: { label: 'Return', sub: 'change of mind · issue' },
@@ -39,20 +39,17 @@ const fits = (item, mode, facts) => {
   const w = item.when
   if (!w) return true
   if (w.variant && !w.variant.includes(facts.variant)) return false
-  if (w.chip && !w.chip.includes(facts.chip)) return false
   // Repair-mode data choice: Return mode always erases, so it ignores `data`.
   if (w.data && mode === 'repair' && !w.data.includes(facts.data)) return false
   return true
 }
 
-// facts = { variant, chip, data } — the catalogue variant, the G4 chip answer
-// and the Repair-mode data choice ('keep' | 'private'). An unanswered chip
-// counts as the majority path (2012–2017 Intel); data defaults to keep.
+// facts = { variant, data } — the catalogue variant and the Repair-mode data
+// choice ('keep' | 'private'); data defaults to keep.
 export function stepsFor(guide, mode, facts = {}) {
   const m = effectiveMode(guide, mode)
   const f = {
     variant: variantFor(guide, facts.variant).id,
-    chip: facts.chip ?? 'intel_old',
     data: facts.data ?? 'keep',
   }
   return guide.steps.filter((s) => fits(s, m, f))
