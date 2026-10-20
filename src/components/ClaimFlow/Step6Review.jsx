@@ -74,7 +74,6 @@ export default function Step6Review({
 
   const isUnlinkPath = state.devicePrep.option === 'credentials'
   const isNeverSetUp = state.devicePrep.neverSetUp
-  const isRepairPrep = state.devicePrep.mode === 'repair'
   const isNoReset = state.devicePrep.guideId === 'no_reset'
   const devicePrep = devicePrepText({ devicePrep: state.devicePrep })
   const devicePrepAck = isNeverSetUp
@@ -98,23 +97,13 @@ export default function Step6Review({
             title: 'My item is packed with everything from the box.',
             subtitle: 'No reset needed for this item.',
           }
-      : isRepairPrep
-        ? {
-            title: "I've turned off the account lock and screen lock.",
-            subtitle: (
-              <span className="text-warn">
-                A locked device can't be tested, so the repair{' '}
-                <span className="font-semibold">may be delayed</span>.
-              </span>
-            ),
-          }
       : {
-          title: 'I have factory reset my device.',
+          title: "I've unlinked my accounts and turned off the screen lock.",
           subtitle: (
             <span className="text-warn">
-              Required before pickup. Unreset devices{' '}
+              Required before pickup. Locked devices{' '}
               <span className="font-semibold">may be delayed and charged a fee</span>
-              .
+              . Your data is your responsibility.
             </span>
           ),
         }

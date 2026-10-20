@@ -7,6 +7,9 @@ import {
   CreditCard,
   CalendarClock,
   MapPin,
+  KeyRound,
+  ArrowRight,
+  CheckCircle2,
 } from 'lucide-react'
 import {
   CLAIM_TRANSIT_SUB_STATUSES,
@@ -39,6 +42,14 @@ import ClaimErdStrip from './ClaimErdStrip'
 import Timeline from './Timeline'
 import { TrackingDropdown } from './ReturnShipmentTracking'
 import { countryConfig } from '../lib/countries'
+import { resetGuideForOrder } from '../lib/devices'
+import { guideById, modeForClaimType } from '../lib/resetGuides'
+import ResetGuideSheet from './ClaimFlow/ResetGuideSheet'
+
+// While the device is in transit or at QC, a customer who skipped the unlink
+// can still do it remotely before QC finds the lock (ResetFailedCard is the
+// fallback once it has).
+const REMOTE_UNLINK_STATES = ['pickup', 'qc']
 
 // Card chrome is the refund-hero family (see PastOrderCard cancelled
 // branch): left accent strip, eyebrow, state pill, tinted hero, compact
@@ -134,6 +145,8 @@ export default function ClaimCard({
               />
             )}
 
+          <RemoteUnlink order={order} claim={claim} />
+
           {(() => {
             const history = getHistoryEvents(order, 'claim')
             return history.length > 0 ? <HistoryThread events={history} /> : null
@@ -178,6 +191,65 @@ export default function ClaimCard({
         />
       </article>
     </OrderClaimLink>
+  )
+}
+
+// "Forgot to remove your account?" — opens the guide straight on its
+// remote-unlink carousel. Device claims only; a no-reset item or
+// a compensation claim (device stays with the customer) never shows it.
+function RemoteUnlink({ order, claim }) {
+  const [open, setOpen] = useState(false)
+  const [done, setDone] = useState(false)
+  if (!REMOTE_UNLINK_STATES.includes(claim.claimStatusId)) return null
+  const mode = modeForClaimType(claim.type)
+  const mapped = resetGuideForOrder(order)
+  const guideId = claim.devicePrep?.guideId ?? mapped.guideId
+  const variant = claim.devicePrep?.variant ?? mapped.variant
+  if (!mode || !guideId || !guideById(guideId).remote) return null
+
+  if (done) {
+    return (
+      <div className="flex items-start gap-2 rounded-[12px] border border-success/30 bg-success-bg/60 px-3 py-2.5 text-[12px] text-ink-2 leading-snug">
+        <CheckCircle2 size={14} strokeWidth={2.2} className="shrink-0 mt-px text-success" />
+        <span>
+          <span className="font-semibold text-ink">Thanks — noted.</span> We’ll check it’s unlinked when it
+          reaches our team.
+        </span>
+      </div>
+    )
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-2.5 rounded-[12px] border border-line bg-surface px-3 py-2.5 text-left hover:border-brand/40 transition-colors"
+      >
+        <span className="w-7 h-7 rounded-full grid place-items-center shrink-0 bg-brand-bg text-brand">
+          <KeyRound size={14} strokeWidth={2.2} />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[12.5px] font-semibold text-ink">Forgot to remove your account?</span>
+          <span className="block text-[11.5px] text-muted leading-snug">
+            Unlink it remotely now, so the claim isn’t held up
+          </span>
+        </span>
+        <ArrowRight size={15} strokeWidth={2.4} className="shrink-0 text-brand" />
+      </button>
+      {open && (
+        <ResetGuideSheet
+          guideId={guideId}
+          facts={{ variant }}
+          initialView="remote"
+          skipDone
+          onDone={() => {
+            setOpen(false)
+            setDone(true)
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   )
 }
 

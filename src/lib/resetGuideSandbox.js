@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { JOURNEYS } from '../data/journey'
 import { RESET_GUIDES } from '../data/resetGuides'
-import { guideById, variantFor, isSingleMode } from './resetGuides'
+import { guideById, variantFor } from './resetGuides'
 import { DEVICE_OPTIONS, PRODUCT_CATEGORIES, asksCustomer, guessDevice } from './devices'
 
 // Third sandbox (kind 'reset_sandbox'): previews guided reset the way
@@ -15,7 +15,6 @@ const DEFAULT_INPUTS = {
   categoryId: 2,
   device: 'iphone',
   titleGuess: false,
-  mode: 'return',
   openAt: 'start',
 }
 
@@ -85,7 +84,7 @@ export function useResetGuideSandbox(journey) {
     reset,
     guide,
     variant,
-    single: isSingleMode(guide),
+    single: guide.id === 'no_reset',
     order,
   }
 }

@@ -1,12 +1,14 @@
+import { APPLE_REMOTE } from './remote'
+
 // G1 — iPhone & iPad (Apple Find My / Activation Lock). Copy from the
 // "Guided resets for returns and warranties" doc; menu names as Apple writes
-// them. `{noun}` is filled from the variant (iPhone / iPad).
+// them. `{noun}` is filled from the variant (iPhone / iPad). The same steps for
+// a return and a warranty; erasing is the customer's choice, at the end.
 export default {
   id: 'apple_mobile',
   code: 'G1',
   label: 'iPhone & iPad',
-  modes: ['return', 'repair'],
-  privacy: true,
+  erase: 'optional',
   account: ['apple'],
   variants: [
     { id: 'iphone', label: 'iPhone', noun: 'iPhone', frame: 'phone', os: 'ios', category: 'iPhone', title: 'iPhone 13' },
@@ -14,142 +16,63 @@ export default {
   ],
   steps: [
     {
+      id: 'backup',
+      title: 'Back up your {noun}',
+      body: 'Back up anything you want to keep now. Whether it’s a return or a repair, the {noun} may be wiped — your data is your responsibility, and we can’t recover it.',
+      path: ['Settings', '[your name]', 'iCloud', 'iCloud Backup', 'Back Up Now'],
+      notes: [{ when: 'Not enough iCloud space', text: 'Back up to a Mac (Finder) or a Windows PC (Apple Devices app) instead.' }],
+    },
+    {
+      id: 'stolen_off',
+      title: 'Turn off Stolen Device Protection',
+      body: 'Do this at home or another familiar place. Anywhere else it asks for Face ID or Touch ID, waits an hour, then asks again. Already off? Go to the next step.',
+      path: ['Settings', 'Face ID & Passcode', 'Stolen Device Protection'],
+      notes: [{ when: 'iOS 17.2 or earlier', text: 'It isn’t there — go to the next step.' }],
+      mock: { iphone: 'ios_stolen_off', ipad: 'ipad_stolen_off' },
+    },
+    {
       id: 'sign_out',
-      modes: ['return', 'repair'],
-      when: { data: ['private'] },
       title: 'Sign out of your Apple Account',
-      body: 'Open Settings, tap your name, then Sign Out.',
+      body: 'Open Settings, tap your name, then Sign Out. This turns off Find My and Activation Lock.',
       path: ['Settings', '[your name]', 'Sign Out'],
       notes: [
-        { when: 'iOS 26 or later', text: 'Choose Erase this {noun}. This signs out and erases in one go — skip the next step.' },
+        { when: 'iOS 26 or later', text: 'If it offers to erase the {noun} as well, that’s optional — only choose it if you’ve backed up.' },
         { when: 'iOS 18 or earlier', text: 'Enter your Apple Account password, then tap Turn Off.' },
       ],
       mock: { iphone: 'ios_signout', ipad: 'ipad_signout' },
-      trouble: {
-        label: 'It won’t let me turn off Find My',
-        body: 'Stolen Device Protection blocks it away from a familiar location: Face ID or Touch ID, a one-hour security delay, then Face ID or Touch ID again. Turn it off at home under Settings › Face ID & Passcode › Stolen Device Protection.',
-      },
+    },
+    {
+      id: 'passcode_off',
+      title: 'Turn off Face ID and your passcode',
+      body: 'Tap Turn Passcode Off and confirm. This turns off Face ID or Touch ID too, so there’s no passcode to share with us.',
+      path: ['Settings', 'Face ID & Passcode', 'Turn Passcode Off'],
+      notes: [{ when: 'Home button models', text: 'Settings › Touch ID & Passcode › Turn Passcode Off.' }],
+      mock: { iphone: 'ios_passcode_off', ipad: 'ipad_passcode_off' },
+    },
+    {
+      id: 'signed_out',
+      revibe: true,
+      title: 'Check you’re signed out',
+      body: 'Open Settings. The top should say “Sign in to your {noun}” — no name, no photo, no email. Still see your name? Go back and sign out again.',
+      mock: { iphone: 'ios_signed_out', ipad: 'ipad_signed_out' },
     },
     {
       id: 'erase',
-      modes: ['return', 'repair'],
-      when: { data: ['private'] },
+      erase: true,
       title: 'Erase all content and settings',
-      body: 'Enter your passcode, then tap Erase {noun}. If asked about an eSIM, choose to erase the eSIM profile — your carrier reactivates the plan on your new device.',
+      body: 'Tap Erase {noun}. If asked about an eSIM, choose to erase the eSIM profile — your carrier reactivates the plan on your new device.',
       path: ['Settings', 'General', 'Transfer or Reset {noun}', 'Erase All Content and Settings'],
       notes: [{ when: 'iOS 14 or earlier', text: 'Settings › General › Reset › Erase All Content and Settings.' }],
       mock: { iphone: 'ios_erase', ipad: 'ipad_erase' },
     },
     {
       id: 'hello',
-      modes: ['return', 'repair'],
-      when: { data: ['private'] },
-      final: true,
+      erase: true,
       revibe: true,
       title: 'Check for the “Hello” screen',
       body: 'You’re done when the setup screen (“Hello”) appears. Leave it there — don’t set it up again.',
       mock: { iphone: 'ios_hello', ipad: 'ipad_hello' },
     },
-    {
-      id: 'repair_prep',
-      modes: ['repair'],
-      when: { data: ['keep'] },
-      title: 'Back up and clear Wallet',
-      body: 'Back up your {noun}. Turn off Apple Cash and remove your cards from Wallet. If Settings shows a “Finish Repair” item from an earlier repair, complete it first.',
-      path: ['Settings', 'Wallet & Apple Pay'],
-      mock: { iphone: 'ios_wallet', ipad: 'ipad_wallet' },
-    },
-    {
-      id: 'find_my_off',
-      modes: ['repair'],
-      when: { data: ['keep'] },
-      title: 'Turn off Find My',
-      body: 'This lifts Activation Lock so the repairer can test the device. Your data stays on it.',
-      path: ['Settings', '[your name]', 'Find My', 'Find My {noun}', 'Off'],
-      notes: [
-        { when: 'iOS 27 or later', text: 'You can instead open the Find My app › select the device › More › Repair or Trade In › Enable. Find My stays on during the repair.' },
-      ],
-      mock: { iphone: 'ios_findmy_off', ipad: 'ipad_findmy_off' },
-      trouble: {
-        label: 'It won’t let me turn it off',
-        body: 'Stolen Device Protection needs Face ID or Touch ID, a one-hour delay, then Face ID or Touch ID again away from a familiar location. Do it at home before pickup day.',
-      },
-    },
-    {
-      id: 'passcode_off',
-      modes: ['repair'],
-      when: { data: ['keep'] },
-      final: true,
-      revibe: true,
-      title: 'Turn your passcode off',
-      body: 'Apple says not to share your passcode, and its repairers won’t ask for it. Turn it off for the repair instead, and turn it back on when the device is back.',
-      path: ['Settings', 'Face ID & Passcode', 'Turn Passcode Off'],
-      mock: { iphone: 'ios_passcode_off', ipad: 'ipad_passcode_off' },
-    },
   ],
-  cantUse: {
-    symptoms: [
-      { id: 'passcode', icon: 'lock', title: 'I forgot my passcode', sub: 'Locked out, or “{noun} Unavailable” is showing', to: 'pc_recent' },
-      { id: 'broken', icon: 'power', title: 'The screen’s broken or it won’t turn on', sub: 'Fix it from another device or a browser', to: 'remote' },
-      { id: 'account', icon: 'key', title: 'I can’t sign in to my Apple Account', sub: 'Forgot the password, or the code isn’t reaching me', to: 'account_apple' },
-      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Fix it from another device or a browser', to: 'remote' },
-    ],
-    nodes: {
-      pc_recent: {
-        ask: 'Did you change your passcode in the last 3 days?',
-        sub: 'If you still remember the old one, you can use it to get back in.',
-        options: [
-          { label: 'Yes, and I remember the old one', to: 'pc_previous' },
-          { label: 'No', to: { return: 'pc_erase', repair: 'pc_repair' } },
-        ],
-      },
-      pc_previous: {
-        title: 'Get back in with your old passcode',
-        steps: [
-          { text: 'Enter a passcode until “{noun} Unavailable” appears.' },
-          { text: 'Tap these at the bottom of the screen.', path: ['Forgot Passcode?', 'Enter Previous Passcode'] },
-          { text: 'Enter your old passcode, then set a new one.' },
-          { text: 'Unlock your {noun} and carry on with the guide.' },
-        ],
-        tip: 'Needs iOS 17 or later.',
-        more: [{ label: 'Don’t see “Enter Previous Passcode”?', to: { return: 'pc_erase', repair: 'pc_repair' } }],
-        resume: true,
-      },
-      pc_erase: {
-        title: 'Erase your {noun} from the lock screen',
-        steps: [
-          { text: 'Enter a passcode until “{noun} Unavailable” appears.' },
-          { text: 'Tap these at the bottom of the screen.', path: ['Forgot Passcode?', 'Start {noun} Reset'] },
-          { text: 'Enter your Apple Account password to sign out.', help: { label: 'Don’t know it?', to: 'account_apple' } },
-          { text: 'Tap Erase {noun} and wait while it erases.', path: ['Erase {noun}'] },
-          { text: 'You’re done when the “Hello” setup screen appears. Leave it there — don’t set it up again.' },
-        ],
-        tip: 'Needs Wi-Fi or mobile data, and iOS 15.2 or later.',
-        more: [{ label: 'No “Forgot Passcode?” button?', to: 'remote' }],
-      },
-      pc_repair: {
-        title: 'Don’t erase your {noun}',
-        body: 'Erasing it would delete your data. Continue, and we’ll tell you the next step before pickup.',
-      },
-      remote: {
-        title: { return: 'Erase it and remove it from Find My', repair: 'Remove it from Find My' },
-        steps: [
-          {
-            text: 'On another iPhone or iPad, open Find My and select your {noun}.',
-            path: ['Find My', 'Devices', '[your {noun}]'],
-            note: 'No other Apple device? Sign in at icloud.com/find in any browser and choose All Devices.',
-            help: { label: 'Can’t sign in?', to: 'account_apple' },
-          },
-          { modes: ['return'], text: 'Choose Erase This Device. Skip the phone number and message.', path: ['Erase This Device'] },
-          { modes: ['return'], text: 'Once it shows as erased, choose Remove This Device, then Remove.', path: ['Remove This Device', 'Remove'] },
-          { modes: ['repair'], text: 'Choose Remove This Device, then Remove. Don’t erase it — your data stays on it.', path: ['Remove This Device', 'Remove'] },
-          { modes: ['return'], text: 'To be safe, change your Apple Account password afterwards.' },
-        ],
-        tip: {
-          return: 'Once it’s erased and removed, Activation Lock is off straight away.',
-          repair: 'If the {noun} is off or offline, removing it lifts Activation Lock straight away.',
-        },
-      },
-    },
-  },
+  remote: APPLE_REMOTE,
 }

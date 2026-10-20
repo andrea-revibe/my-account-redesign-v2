@@ -9,13 +9,11 @@ import {
   ChevronLeft,
   ChevronDown,
   HelpCircle,
-  Truck,
-  KeyRound,
   Info,
-  AlertTriangle,
   Lock,
-  PowerOff,
-  Disc,
+  Eraser,
+  Smartphone,
+  Globe,
 } from 'lucide-react'
 import { STEP_ANIM_CSS, stepAnim } from './resetGuideAnim'
 import {
@@ -32,41 +30,48 @@ import {
   MacSignOut,
   MacErase,
   MacWelcome,
-  IosWallet,
-  IosFindMyOff,
+  IosStolenOff,
+  IosSignedOut,
   IosPasscodeOff,
-  IpadWallet,
-  IpadFindMyOff,
+  IpadStolenOff,
+  IpadSignedOut,
   IpadPasscodeOff,
   SamsungLockSwipe,
+  SamsungAccountsEmpty,
+  GoogleRemoveRemote,
+  SamsungRemoveRemote,
+  FindMyDevices,
+  FindMyDevice,
+  FindMyConfirm,
+  IcloudWebSignIn,
+  IcloudWebDevice,
+  IcloudWebConfirm,
   WindowsSetup,
-  SamsungMaintenance,
   PathScreen,
 } from './resetGuideMocks'
 import { StepIllustration, GuideIntroArt } from './resetGuideFrames'
-import PasscodeField from './PasscodeField'
 import { ACCOUNT_RECOVERY, NEVER_ASK } from '../../data/resetGuides'
 import {
   guideById,
-  effectiveMode,
   variantFor,
   stepsFor,
-  symptomsFor,
-  cantUseEntry,
+  eraseFor,
+  remoteStepsFor,
+  remoteRoutesFor,
   resolveNode,
-  privacyFor,
   fillNoun,
-  passcodeError,
-  RESET_MODES,
 } from '../../lib/resetGuides'
 
 // Guided reset — one engine that renders any guide definition from
-// data/resetGuides/* (G1–G7 + no-reset) in Return or Repair mode. One step per
-// screen; "I can't use my device" is reachable from every screen: the customer
-// picks what's stopping them, answers at most a question or two, and lands on
-// one self-contained numbered fix (lib/resetGuides resolveNode).
-// Finishing either path fires onDone({ via, passcodeProvided, dataChoice }) — the caller
-// (Step 3 / ResetFailedCard / the sandbox) decides what that unlocks.
+// data/resetGuides/* (G1–G7 + no-reset). Every claim type runs the same steps,
+// word for word. The intro asks whether the
+// customer can use the device: Yes runs the on-device steps (one per screen;
+// guides with an optional erase ask after the must-dos), No runs the guide's
+// remote-unlink carousel in the same layout. "I can't use my device" under
+// every on-device step jumps to that carousel; a step's `help` link opens
+// account recovery (lib/resetGuides resolveNode) and comes back.
+// Finishing either path fires onDone({ via, erased }) — the caller (Step 3 /
+// ClaimCard / ResetFailedCard / the sandbox) decides what that unlocks.
 
 // step.mock keys → the hand-drawn CSS-art screens. Steps without one render
 // their menu path as a PathScreen in the variant's OS style (`variant.os`;
@@ -86,15 +91,23 @@ const MOCKS = {
   mac_signout: MacSignOut,
   mac_erase: MacErase,
   mac_welcome: MacWelcome,
-  ios_wallet: IosWallet,
-  ios_findmy_off: IosFindMyOff,
+  ios_stolen_off: IosStolenOff,
+  ios_signed_out: IosSignedOut,
   ios_passcode_off: IosPasscodeOff,
-  ipad_wallet: IpadWallet,
-  ipad_findmy_off: IpadFindMyOff,
+  ipad_stolen_off: IpadStolenOff,
+  ipad_signed_out: IpadSignedOut,
   ipad_passcode_off: IpadPasscodeOff,
   sam_lock_swipe: SamsungLockSwipe,
+  sam_accounts_empty: SamsungAccountsEmpty,
   win_setup: WindowsSetup,
-  sam_maintenance: SamsungMaintenance,
+  fm_devices: FindMyDevices,
+  fm_device: FindMyDevice,
+  fm_confirm: FindMyConfirm,
+  web_signin: IcloudWebSignIn,
+  web_device: IcloudWebDevice,
+  web_confirm: IcloudWebConfirm,
+  google_remote: GoogleRemoveRemote,
+  samsung_remote: SamsungRemoveRemote,
 }
 
 function mockFor(step, variantId) {
@@ -104,11 +117,10 @@ function mockFor(step, variantId) {
 
 export default function ResetGuideSheet({
   guideId = 'apple_mobile',
-  mode = 'return',
   facts = {},
-  // 'start' | 'with_you' | 'sent' | 'recovery' — opens "I can't use my device"
-  // at the symptom picker, the guide's sent fix, or account recovery
-  // (ResetFailedCard: the device is already at Revibe → 'sent').
+  // 'start' | 'remote' | 'recovery' — open on the intro, the remote-unlink
+  // carousel (Step 3's off-ramp, ClaimCard, ResetFailedCard), or the guide's
+  // first account recovery.
   initialView = 'start',
   // Close via onDone on finish instead of showing the done screen.
   skipDone = false,
@@ -116,38 +128,38 @@ export default function ResetGuideSheet({
   onClose,
 }) {
   const guide = guideById(guideId)
-  const m = effectiveMode(guide, mode)
   const variant = variantFor(guide, facts.variant)
   const noun = variant.noun
   const fill = (t) => fillNoun(t, noun, variant.plural)
-  const direct = initialView !== 'start'
+  const eraseMode = eraseFor(guide)
+  const remoteRoutes = remoteRoutesFor(guide)
+  const recoveryEntry = guide.account[0] ? `account_${guide.account[0]}` : null
 
-  const [view, setView] = useState(direct ? 'cant_use' : 'intro')
-  const [returnTo, setReturnTo] = useState(null)
+  const [view, setView] = useState(initialView === 'remote' ? 'remote' : initialView === 'recovery' ? 'recovery' : 'intro')
+  // Where Back from the remote carousel goes (null = close: opened directly).
+  const [remoteFrom, setRemoteFrom] = useState(null)
   const [i, setI] = useState(0)
+  const [ri, setRi] = useState(0)
+  // Parallel remote routes (Apple: Find My app vs icloud.com) share step
+  // positions, so switching keeps the customer on the same step.
+  const [route, setRoute] = useState(remoteRoutes[0]?.id ?? null)
+  const remoteSteps = remoteStepsFor(guide, { variant: variant.id, route })
   const [dir, setDir] = useState(1)
   const [carouselIdx, setCarouselIdx] = useState(0)
-  const [trail, setTrail] = useState(() => (direct ? cantUseEntry(guide, m, initialView, { variant: variant.id }) : []))
-  const [trailBase, setTrailBase] = useState(trail.length)
+  // Account recovery trail; Back past its first node returns to `recoveryFrom`.
+  const [trail, setTrail] = useState(() => (initialView === 'recovery' && recoveryEntry ? [recoveryEntry] : []))
+  const [recoveryFrom, setRecoveryFrom] = useState(null)
   const scrollRef = useRef(null)
-  const [passcode, setPasscode] = useState('')
-  const [passcodeShown, setPasscodeShown] = useState(false)
   const [doneVia, setDoneVia] = useState('guide')
-  // Repair only: keep the data (default) or protect it first — `privacy` says
-  // how ('erase' | 'maintenance'), null when the guide offers no choice.
-  const privacy = m === 'repair' ? privacyFor(guide, variant.id) : null
-  const [dataChoice, setDataChoice] = useState('keep')
+  // Optional erase: null until the customer picks; 'erase' needs the backup
+  // + responsibility tick (never disabled — an unticked Start shows the error).
+  const [eraseChoice, setEraseChoice] = useState(null)
   const [backupAck, setBackupAck] = useState(false)
-  const [backupError, setBackupError] = useState(false)
-  const erasing = privacy === 'erase' && dataChoice === 'private'
-  // Someone erasing for a repair is on the Return erase path, so "I can't use
-  // my device" offers them the Return fixes rather than "don't erase it".
-  const cuMode = erasing ? 'return' : m
-  const dataResult = privacy ? (dataChoice === 'private' ? privacy : 'keep') : null
+  const [choiceError, setChoiceError] = useState(null)
 
   useEffect(() => {
     setCarouselIdx(0)
-  }, [i])
+  }, [i, ri])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 })
@@ -164,67 +176,85 @@ export default function ResetGuideSheet({
     }
   }, [onClose])
 
-  const steps = stepsFor(guide, m, { variant: variant.id, data: dataChoice })
-  const step = steps[i]
-  const screens = view === 'steps' ? mockFor(step, variant.id)?.screens : null
+  const steps = stepsFor(guide, { variant: variant.id, erase: eraseChoice === 'erase' })
+  const inRemote = view === 'remote'
+  const list = inRemote ? remoteSteps : steps
+  const idx = inRemote ? ri : i
+  const setIdx = inRemote ? setRi : setI
+  const step = list[idx]
+  const onChoice = view === 'steps' && !!step?.choice
+  const screens = (view === 'steps' && !onChoice) || inRemote ? mockFor(step, variant.id)?.screens : null
   const isCarousel = Array.isArray(screens)
   const atCarouselEnd = !isCarousel || carouselIdx >= screens.length - 1
-  const showFinish = atCarouselEnd && i === steps.length - 1
-  const pcError = step?.passcode ? passcodeError(passcode, step.passcode) : null
-  const node = view === 'cant_use' && trail.length ? resolveNode(guide, cuMode, trail[trail.length - 1], { variant: variant.id }) : null
-  const passcodeProvided = !!passcode.trim() && !passcodeError(passcode, guide.steps.find((s) => s.passcode)?.passcode)
+  const showFinish = atCarouselEnd && idx === list.length - 1
+  const node = view === 'recovery' && trail.length ? resolveNode(guide, trail[trail.length - 1], { variant: variant.id }) : null
+  // The last remote step carries the vendor's last resort + continue anyway.
+  const lastResort = guide.account.map((a) => ACCOUNT_RECOVERY[a]?.nothingWorks).filter(Boolean)
+  const remoteTrouble = {
+    label: 'If nothing works',
+    body: [...lastResort, 'Continue anyway — if it still reaches us locked, we’ll contact you with the next step.'].join(' '),
+  }
+  // Whether the device ends up erased; null when the customer took a fix route.
+  const erasedFor = (via) =>
+    via !== 'guide' ? null : eraseMode === 'required' ? true : eraseMode === 'optional' ? eraseChoice === 'erase' : null
 
   const finish = (via) => {
-    const result = { via, passcodeProvided, dataChoice: dataResult }
+    const result = { via, erased: erasedFor(via) }
     if (skipDone) return onDone(result)
     setDoneVia(via)
     setView('done')
   }
   const start = () => {
-    const backupMissing = erasing && !backupAck
-    setBackupError(backupMissing)
-    if (backupMissing) return
     setI(0)
     setDir(1)
     setView('steps')
   }
   const next = () => {
+    if (onChoice) {
+      if (!eraseChoice) return setChoiceError('choose')
+      if (eraseChoice === 'erase' && !backupAck) return setChoiceError('backup')
+      if (eraseChoice === 'skip') return finish('guide')
+    }
     if (isCarousel && carouselIdx < screens.length - 1) {
       setCarouselIdx((n) => n + 1)
       return
     }
-    if (pcError) {
-      setPasscodeShown(true)
-      return
-    }
     setDir(1)
-    if (i < steps.length - 1) setI(i + 1)
-    else finish('guide')
+    if (idx < list.length - 1) setIdx(idx + 1)
+    else finish(inRemote ? 'cant_use' : 'guide')
   }
   const back = () => {
-    if (view === 'cant_use') {
-      if (trail.length > trailBase) return setTrail((t) => t.slice(0, -1))
-      if (returnTo) return setView(returnTo)
+    if (view === 'recovery') {
+      if (trail.length > 1) return setTrail((t) => t.slice(0, -1))
+      if (recoveryFrom) return setView(recoveryFrom)
       return onClose()
     }
     if (isCarousel && carouselIdx > 0) return setCarouselIdx((n) => n - 1)
     setDir(-1)
-    if (i > 0) setI(i - 1)
-    else setView('intro')
+    if (idx > 0) return setIdx(idx - 1)
+    if (inRemote) return remoteFrom ? setView(remoteFrom) : onClose()
+    setView('intro')
   }
-  const openCantUse = () => {
-    setReturnTo(view)
-    setTrail([])
-    setTrailBase(0)
-    setView('cant_use')
+  const openRemote = () => {
+    setRemoteFrom(view)
+    setRi(0)
+    setDir(1)
+    setView('remote')
+  }
+  const openRecovery = (to) => {
+    setRecoveryFrom(view)
+    setTrail([to])
+    setView('recovery')
   }
 
   const headerTitle =
     view === 'done'
       ? ''
-      : view === 'cant_use'
-        ? 'I can’t use my device'
-        : guide.label
+      : inRemote
+        ? 'Unlink it remotely'
+        : view === 'recovery'
+          ? 'Account recovery'
+          : guide.label
 
   return createPortal(
     <div
@@ -243,7 +273,7 @@ export default function ResetGuideSheet({
         <header className="shrink-0 px-4 pt-4 pb-3 border-b border-line">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              {(view === 'steps' || view === 'cant_use') && (
+              {(view === 'steps' || inRemote || view === 'recovery') && (
                 <button
                   onClick={back}
                   className="w-8 h-8 -ml-1 rounded-full grid place-items-center text-ink hover:bg-line-2/60 shrink-0"
@@ -253,7 +283,6 @@ export default function ResetGuideSheet({
                 </button>
               )}
               <span className="text-[13px] font-bold text-ink truncate">{headerTitle}</span>
-              {view !== 'done' && guide.id !== 'no_reset' && <ModeBadge mode={m} />}
             </div>
             <button
               onClick={onClose}
@@ -263,9 +292,19 @@ export default function ResetGuideSheet({
               <X size={18} strokeWidth={2} />
             </button>
           </div>
-          {view === 'steps' && (
+          {inRemote && remoteRoutes.length > 1 && (
+            <RouteSwitch
+              routes={remoteRoutes}
+              value={route}
+              onChange={(r) => {
+                setRoute(r)
+                setCarouselIdx(0)
+              }}
+            />
+          )}
+          {(view === 'steps' || inRemote) && (
             <div className="mt-3">
-              <Progress current={i + 1} total={steps.length} />
+              <Progress current={idx + 1} total={list.length} />
             </div>
           )}
         </header>
@@ -275,75 +314,73 @@ export default function ResetGuideSheet({
             <Intro
               guide={guide}
               variant={variant}
-              mode={m}
+              fill={fill}
               stepCount={steps.length}
-              privacy={privacy}
-              dataChoice={dataChoice}
-              onData={(v) => {
-                setDataChoice(v)
-                setBackupError(false)
+              eraseMode={eraseMode}
+              onStart={start}
+              onCantUse={openRemote}
+            />
+          )}
+
+          {view === 'steps' && step && onChoice && (
+            <EraseChoice
+              noun={noun}
+              dir={dir}
+              choice={eraseChoice}
+              onChoice={(v) => {
+                setEraseChoice(v)
+                setChoiceError(null)
               }}
               backupAck={backupAck}
               onBackup={(v) => {
                 setBackupAck(v)
-                setBackupError(false)
+                setChoiceError(null)
               }}
-              backupError={backupError}
+              error={choiceError}
             />
           )}
 
-          {view === 'steps' && step && (
+          {(view === 'steps' || inRemote) && step && !onChoice && (
             <StepScreen
-              key={`${step.id}-${i}`}
-              step={step}
+              key={`${view}-${step.id}-${idx}`}
+              step={inRemote && idx === list.length - 1 && !step.trouble ? { ...step, trouble: remoteTrouble } : step}
+              onHelp={openRecovery}
               variant={variant}
-              mode={m}
               dir={dir}
               fill={fill}
               carouselIdx={carouselIdx}
               setCarouselIdx={setCarouselIdx}
-              passcode={passcode}
-              setPasscode={(v) => {
-                setPasscode(v)
-                setPasscodeShown(false)
-              }}
-              passcodeErr={passcodeShown ? pcError : null}
             />
           )}
 
-          {view === 'cant_use' && (
-            <CantUseFlow
-              key={trail.join('/')}
-              guide={guide}
-              mode={cuMode}
-              variantId={variant.id}
-              fill={fill}
-              node={node}
-              onPick={(to) => setTrail((t) => [...t, to])}
-            />
+          {view === 'recovery' && node && (
+            <RecoveryNode key={trail.join('/')} fill={fill} node={node} onPick={(to) => setTrail((t) => [...t, to])} />
           )}
 
-          {view === 'done' && (
-            <Done
-              guide={guide}
-              mode={m}
-              fill={fill}
-              via={doneVia}
-              passcodeProvided={passcodeProvided}
-              dataChoice={dataResult}
-            />
-          )}
+          {view === 'done' && <Done guide={guide} fill={fill} via={doneVia} erased={erasedFor(doneVia)} />}
         </div>
 
         <footer className="shrink-0 px-4 py-3 border-t border-line">
-          {view === 'intro' && (
+          {view === 'intro' && !guide.remote && (
             <PrimaryButton onClick={start}>
               Start <ArrowRight size={16} strokeWidth={2.4} />
             </PrimaryButton>
           )}
-          {view === 'steps' && (
+          {(view === 'steps' || inRemote) && (
             <PrimaryButton onClick={next}>
-              {showFinish ? (
+              {onChoice && eraseChoice === 'skip' ? (
+                <>
+                  Finish — send it as it is <Check size={16} strokeWidth={2.6} />
+                </>
+              ) : onChoice && eraseChoice === 'erase' ? (
+                <>
+                  Start erasing <ArrowRight size={16} strokeWidth={2.4} />
+                </>
+              ) : onChoice ? (
+                <>
+                  Continue <ArrowRight size={16} strokeWidth={2.4} />
+                </>
+              ) : showFinish ? (
                 <>
                   I’ve done this — finish <Check size={16} strokeWidth={2.6} />
                 </>
@@ -355,30 +392,22 @@ export default function ResetGuideSheet({
             </PrimaryButton>
           )}
           {node && !node.ask && (
-            <PrimaryButton onClick={() => (node.resume ? setView(returnTo ?? 'intro') : finish('cant_use'))}>
-              {node.resume ? (
-                <>
-                  <ChevronLeft size={16} strokeWidth={2.4} /> Back to the guide
-                </>
-              ) : (
-                <>
-                  Continue with this <ArrowRight size={16} strokeWidth={2.4} />
-                </>
-              )}
+            <PrimaryButton onClick={() => (recoveryFrom ? setView(recoveryFrom) : onClose())}>
+              <ChevronLeft size={16} strokeWidth={2.4} /> Back to the guide
             </PrimaryButton>
           )}
           {view === 'done' && (
             <button
-              onClick={() => onDone({ via: doneVia, passcodeProvided, dataChoice: dataResult })}
+              onClick={() => onDone({ via: doneVia, erased: erasedFor(doneVia) })}
               className="w-full h-[48px] rounded-[12px] bg-success text-white font-semibold text-[14.5px] inline-flex items-center justify-center gap-1.5"
             >
               <Check size={16} strokeWidth={2.6} />
               Done
             </button>
           )}
-          {(view === 'intro' || view === 'steps') && guide.cantUse && (
+          {view === 'steps' && guide.remote && (
             <button
-              onClick={openCantUse}
+              onClick={openRemote}
               className="mt-2 w-full inline-flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-brand py-1"
             >
               <HelpCircle size={14} strokeWidth={2.2} />
@@ -389,6 +418,36 @@ export default function ResetGuideSheet({
       </div>
     </div>,
     document.body,
+  )
+}
+
+const ROUTE_ICONS = { device: Smartphone, web: Globe }
+
+function RouteSwitch({ routes, value, onChange }) {
+  return (
+    <div className="mt-3">
+      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">How do you want to do it?</div>
+      <div className="mt-1.5 grid grid-flow-col auto-cols-fr gap-2" role="tablist">
+        {routes.map((r) => {
+          const Icon = ROUTE_ICONS[r.id] ?? Globe
+          const active = value === r.id
+          return (
+            <button
+              key={r.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange(r.id)}
+              className={`h-11 rounded-[12px] border-[1.5px] inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold transition ${
+                active ? 'border-brand bg-brand text-white shadow-sm2' : 'border-line bg-surface text-ink hover:border-brand/50'
+              }`}
+            >
+              <Icon size={15} strokeWidth={2.2} />
+              {r.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -403,123 +462,111 @@ function PrimaryButton({ onClick, children }) {
   )
 }
 
-function ModeBadge({ mode }) {
-  const tone =
-    mode === 'repair'
-      ? 'bg-accent/10 text-accent'
-      : mode === 'single'
-        ? 'bg-line-2 text-ink-2'
-        : 'bg-brand/10 text-brand'
-  return (
-    <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-[0.06em] ${tone}`}>
-      {mode === 'single' ? 'Return & repair' : RESET_MODES[mode].label}
-    </span>
-  )
+const INTRO_SUB = {
+  optional: 'We’ll unlink it from your accounts and take the locks off. Erasing it is up to you, at the end.',
+  required: 'We’ll unlink it from your accounts and erase it.',
+  none: 'A few steps that free it from your account, so it won’t lock again.',
 }
 
-const INTRO_COPY = {
-  return: {
-    title: 'Reset your {noun}',
-    sub: 'We’ll unlink it from your accounts and erase it, one step at a time. Back up anything you want to keep first.',
-  },
-  repair: {
-    title: 'Prepare your {noun} for repair',
-    sub: 'We’ll lift the locks so the repairer can test it, and you never share an account password.',
-  },
-  single: {
-    title: 'Prepare your {noun}',
-    sub: 'The same few steps for a return or a repair — they free it from your Apple Account.',
-  },
-}
-
-const DATA_OPTIONS = {
-  erase: {
-    label: 'Erase it before I send it',
-    sub: 'For privacy · you’ll restore it from a backup afterwards',
-  },
-  maintenance: {
-    label: 'Hide it with Maintenance mode',
-    sub: 'For privacy · nothing is erased, it’s locked away while the repairer works',
-  },
-}
-
-function Intro({
-  guide,
-  variant,
-  mode,
-  stepCount,
-  privacy,
-  dataChoice,
-  onData,
-  backupAck,
-  onBackup,
-  backupError,
-}) {
-  const copy = INTRO_COPY[mode]
-  const noun = variant.noun
+// First screen: the fork the guide has always opened with — can the customer
+// use the device? Yes runs the on-device steps; No goes to "I can't use my
+// device" (the remote-unlink carousel). Guides without one just
+// get Start in the footer.
+function Intro({ guide, variant, fill, stepCount, eraseMode, onStart, onCantUse }) {
+  const isDevice = guide.id !== 'no_reset' && guide.account.length > 0
   return (
     <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center animate-fadeIn">
       <GuideIntroArt variant={variant} />
-      <h2 className="mt-3 text-[21px] font-bold text-ink leading-tight">
-        {fillNoun(copy.title, noun)}
-      </h2>
-      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">{copy.sub}</p>
-      <div className="mt-3 flex items-center gap-1.5">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-line-2/70 text-ink-2 px-2.5 h-6 text-[11px] font-semibold">
-          <Clock size={12} strokeWidth={2} /> ~10 min
-        </span>
-        <span className="inline-flex items-center rounded-full bg-line-2/70 text-ink-2 px-2.5 h-6 text-[11px] font-semibold">
-          {stepCount} {stepCount === 1 ? 'step' : 'steps'}
-        </span>
-      </div>
+      <h2 className="mt-3 text-[21px] font-bold text-ink leading-tight">{fill('Prepare your {noun}')}</h2>
+      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">
+        {INTRO_SUB[eraseMode ?? 'none']}
+        {guide.remote && <> First — can you still use {fill('your {noun}')}?</>}
+      </p>
+      {guide.remote ? (
+        <div className="mt-5 w-full flex flex-col gap-2.5">
+          <WhereButton
+            icon={CheckCircle2}
+            title="Yes, I can unlock and use it"
+            sub={`Do it on the device · ${stepCount} ${stepCount === 1 ? 'step' : 'steps'} · ~10 min`}
+            onClick={onStart}
+          />
+          <WhereButton
+            icon={Lock}
+            title="No — it’s locked, broken or not with me"
+            sub="Unlink it remotely instead"
+            onClick={onCantUse}
+          />
+        </div>
+      ) : (
+        <div className="mt-3 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-line-2/70 text-ink-2 px-2.5 h-6 text-[11px] font-semibold">
+            <Clock size={12} strokeWidth={2} /> ~10 min
+          </span>
+          <span className="inline-flex items-center rounded-full bg-line-2/70 text-ink-2 px-2.5 h-6 text-[11px] font-semibold">
+            {stepCount} {stepCount === 1 ? 'step' : 'steps'}
+          </span>
+        </div>
+      )}
+      {isDevice && (
+        <p className="mt-4 flex items-start gap-1.5 text-left text-[11.5px] text-muted leading-snug max-w-[320px]">
+          <Info size={13} strokeWidth={2} className="shrink-0 mt-px" />
+          <span>Your data is your responsibility — back up anything you want to keep.</span>
+        </p>
+      )}
+    </div>
+  )
+}
 
-      {privacy && (
-        <div className="mt-5 w-full text-left">
-          <div className="text-[13px] font-semibold text-ink">What should happen to your data?</div>
-          <div className="mt-2.5 flex flex-col gap-2">
-            <ChoiceCard
-              active={dataChoice === 'keep'}
-              label={`Keep it on the ${noun}`}
-              sub="Recommended · it comes back as you left it"
-              onClick={() => onData('keep')}
+// The optional-erase fork, after every must-do step. Erasing needs the backup
+// + responsibility tick; sending it as it is finishes the guide.
+function EraseChoice({ noun, dir, choice, onChoice, backupAck, onBackup, error }) {
+  return (
+    <div className="px-5 pt-5 pb-5 flex flex-col items-center text-center" style={{ animation: stepAnim(dir) }}>
+      <span className="w-14 h-14 rounded-full bg-brand-bg text-brand grid place-items-center">
+        <Eraser size={26} strokeWidth={1.9} />
+      </span>
+      <h2 className="mt-4 text-[20px] font-bold text-ink leading-tight">Erase it — optional</h2>
+      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.55] max-w-[320px]">
+        Your {noun} is unlinked and unlocked, so it’s ready to send. Erasing it as well is your choice.
+      </p>
+      <div className="mt-4 w-full flex flex-col gap-2 text-left">
+        <ChoiceCard
+          active={choice === 'skip'}
+          error={error === 'choose'}
+          label="Send it as it is"
+          sub="Your data stays on it"
+          onClick={() => onChoice('skip')}
+        />
+        <ChoiceCard
+          active={choice === 'erase'}
+          error={error === 'choose'}
+          label={`Erase the ${noun} first`}
+          sub="Everything on it is deleted"
+          onClick={() => onChoice('erase')}
+        />
+      </div>
+      {error === 'choose' && (
+        <p className="mt-2 self-start text-[11.5px] font-medium text-danger">Choose one to continue.</p>
+      )}
+      {choice === 'erase' && (
+        <div
+          className={`mt-2 w-full text-left rounded-[12px] border px-3 py-2.5 animate-slideDown ${
+            error === 'backup' ? 'border-danger bg-danger-bg/50' : 'border-warn/30 bg-warn-bg/60'
+          }`}
+        >
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={backupAck}
+              onChange={(e) => onBackup(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-brand shrink-0"
             />
-            <ChoiceCard
-              active={dataChoice === 'private'}
-              label={DATA_OPTIONS[privacy].label}
-              sub={DATA_OPTIONS[privacy].sub}
-              onClick={() => onData('private')}
-            />
-          </div>
-          {privacy === 'erase' && dataChoice === 'private' && (
-            <div
-              className={`mt-2 rounded-[12px] border px-3 py-2.5 animate-slideDown ${
-                backupError ? 'border-danger bg-danger-bg/50' : 'border-warn/30 bg-warn-bg/60'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
-                <AlertTriangle size={14} strokeWidth={2.2} className="text-warn" />
-                Before you erase
-              </div>
-              <p className="mt-1 text-[12px] text-ink-2 leading-snug">
-                Everything on the {noun} is deleted.
-              </p>
-              <label className="mt-2 flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={backupAck}
-                  onChange={(e) => onBackup(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-brand shrink-0"
-                />
-                <span className="text-[12px] text-ink leading-snug">
-                  I’ve backed it up, or I don’t need anything on it
-                </span>
-              </label>
-              {backupError && (
-                <p className="mt-1.5 text-[11.5px] font-medium text-danger">
-                  Confirm your backup before you erase.
-                </p>
-              )}
-            </div>
+            <span className="text-[12px] text-ink leading-snug">
+              I’ve backed up what I need, and I’m responsible for my data
+            </span>
+          </label>
+          {error === 'backup' && (
+            <p className="mt-1.5 text-[11.5px] font-medium text-danger">Confirm your backup before you erase.</p>
           )}
         </div>
       )}
@@ -555,18 +602,7 @@ function ChoiceCard({ active, error, label, sub, onClick }) {
   )
 }
 
-function StepScreen({
-  step,
-  variant,
-  mode,
-  dir,
-  fill,
-  carouselIdx,
-  setCarouselIdx,
-  passcode,
-  setPasscode,
-  passcodeErr,
-}) {
+function StepScreen({ step, variant, dir, fill, carouselIdx, setCarouselIdx, onHelp }) {
   const Mock = mockFor(step, variant.id)
   const isCarousel = Array.isArray(Mock?.screens)
   const path = step.path?.map(fill)
@@ -594,11 +630,6 @@ function StepScreen({
         </p>
       )}
       <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.55] max-w-[320px]">{fill(step.body)}</p>
-      {step.revibe && (
-        <span className="mt-2 inline-flex items-center rounded-full bg-brand/10 text-brand px-2 h-5 text-[10px] font-bold uppercase tracking-[0.05em]">
-          Revibe check
-        </span>
-      )}
       {step.notes?.length > 0 && (
         <ul className="mt-3 w-full max-w-[320px] flex flex-col gap-1.5 text-left">
           {step.notes.map((n) => (
@@ -608,47 +639,27 @@ function StepScreen({
           ))}
         </ul>
       )}
-      {step.passcode && mode === 'repair' && (
-        <PasscodeField kind={step.passcode} value={passcode} onChange={setPasscode} error={passcodeErr} />
+      {step.help && (
+        <button
+          onClick={() => onHelp(step.help.to)}
+          className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-semibold text-brand"
+        >
+          {step.help.label}
+          <ArrowRight size={13} strokeWidth={2.4} />
+        </button>
       )}
       {step.trouble && <Trouble trouble={step.trouble} />}
     </div>
   )
 }
 
-const SYMPTOM_ICONS = { lock: Lock, power: PowerOff, key: KeyRound, truck: Truck, disc: Disc }
-
-function CantUseFlow({ guide, mode, variantId, fill, node, onPick }) {
-  if (!node) {
-    return (
-      <div className="px-5 pt-6 pb-5 animate-fadeIn">
-        <h2 className="text-[20px] font-bold text-ink leading-tight text-center">What’s stopping you?</h2>
-        <p className="mt-2 text-[13px] text-ink-2 leading-[1.5] text-center">
-          Pick the one that fits and we’ll walk you through it.
-        </p>
-        <div className="mt-5 flex flex-col gap-2.5">
-          {symptomsFor(guide, mode, { variant: variantId }).map((s) => (
-            <WhereButton
-              key={s.id}
-              icon={SYMPTOM_ICONS[s.icon] ?? HelpCircle}
-              title={fill(s.title)}
-              sub={fill(s.sub)}
-              onClick={() => onPick(s.to)}
-            />
-          ))}
-        </div>
-        <p className="mt-5 text-center text-[11.5px] font-semibold text-ink-2 leading-snug">{NEVER_ASK}</p>
-      </div>
-    )
-  }
-
+// Account recovery: a question (`ask` + `options`) or a numbered fix.
+function RecoveryNode({ fill, node, onPick }) {
   if (node.ask) {
     return (
       <div className="px-5 pt-6 pb-5 animate-fadeIn">
         <h2 className="text-[20px] font-bold text-ink leading-tight text-center">{fill(node.ask)}</h2>
-        {node.sub && (
-          <p className="mt-2 text-[13px] text-ink-2 leading-[1.5] text-center">{fill(node.sub)}</p>
-        )}
+        {node.sub && <p className="mt-2 text-[13px] text-ink-2 leading-[1.5] text-center">{fill(node.sub)}</p>}
         <div className="mt-5 flex flex-col gap-2.5">
           {node.options.map((o) => (
             <WhereButton key={o.label} title={fill(o.label)} sub={fill(o.sub)} onClick={() => onPick(o.to)} />
@@ -657,11 +668,7 @@ function CantUseFlow({ guide, mode, variantId, fill, node, onPick }) {
       </div>
     )
   }
-
   let n = 0
-  const lastResort = node.resume
-    ? []
-    : guide.account.map((a) => ACCOUNT_RECOVERY[a]?.nothingWorks).filter(Boolean)
   return (
     <div className="px-5 pt-5 pb-5 animate-fadeIn">
       <h2 className="text-[20px] font-bold text-ink leading-tight">{fill(node.title)}</h2>
@@ -687,29 +694,6 @@ function CantUseFlow({ guide, mode, variantId, fill, node, onPick }) {
           <Info size={13} strokeWidth={2} className="shrink-0 mt-px text-brand" />
           {fill(node.tip)}
         </p>
-      )}
-      {node.more.length > 0 && (
-        <div className="mt-3 flex flex-col gap-1">
-          {node.more.map((o) => (
-            <button
-              key={o.label}
-              onClick={() => onPick(o.to)}
-              className="inline-flex items-center gap-1.5 self-start text-[12.5px] font-semibold text-brand py-1"
-            >
-              <HelpCircle size={14} strokeWidth={2.2} />
-              {fill(o.label)}
-              <ArrowRight size={13} strokeWidth={2.4} />
-            </button>
-          ))}
-        </div>
-      )}
-      {!node.resume && (
-        <Trouble
-          trouble={{
-            label: 'If nothing works',
-            body: [...lastResort, 'Continue anyway — if it still reaches us locked, we’ll contact you with the next step.'].join(' '),
-          }}
-        />
       )}
       <p className="mt-5 text-center text-[11.5px] font-semibold text-ink-2 leading-snug">{NEVER_ASK}</p>
     </div>
@@ -783,40 +767,30 @@ function WhereButton({ icon: Icon, title, sub, onClick }) {
 }
 
 const DONE_COPY = {
-  return: {
-    title: 'Your {noun} {is} at the setup screen',
-    sub: 'Leave it there — don’t set it up again. It’s unlinked, erased and ready for pickup.',
+  erased: {
+    title: 'Your {noun} {is} erased and unlinked',
+    sub: 'Leave it at the setup screen — don’t set it up again. It’s ready for pickup.',
   },
-  repair: {
-    title: 'Your {noun} {is} ready for repair',
-    sub: 'The locks are off and your data stays on it.',
-  },
-  repair_erase: {
-    title: 'Your {noun} {is} erased and ready for repair',
-    sub: 'It’s unlinked from your accounts. Restore it from your backup when it’s back.',
-  },
-  repair_maintenance: {
-    title: 'Your {noun} {is} ready for repair',
-    sub: 'Maintenance mode keeps your data locked away. Turn it off when it’s back.',
-  },
-  single: {
+  kept: {
     title: 'Your {noun} {is} ready to send',
-    sub: 'It’s removed from your Apple Account, so it won’t lock again.',
+    sub: 'It’s unlinked from your accounts and the locks are off. Your data stays on it.',
+  },
+  plain: {
+    title: 'Your {noun} {is} ready to send',
+    sub: 'It’s removed from your account, so it won’t lock again.',
   },
 }
 
-function Done({ guide, mode, fill, via, passcodeProvided, dataChoice }) {
+function Done({ guide, fill, via, erased }) {
   const copy =
     via === 'cant_use'
       ? {
-          title: 'Thanks — you can continue',
-          sub: 'Your claim goes ahead. If the device still reaches us locked, we’ll contact you with the next step.',
+          title: 'Your {noun} {is} unlinked',
+          sub: 'It’s off your account, so your claim goes ahead. If it still reaches us locked, we’ll contact you with the next step.',
         }
       : guide.id === 'no_reset'
         ? { title: 'All set', sub: 'Pack everything that came in the box.' }
-        : mode === 'repair' && dataChoice && dataChoice !== 'keep'
-          ? DONE_COPY[`repair_${dataChoice}`]
-          : DONE_COPY[mode]
+        : DONE_COPY[erased === true ? 'erased' : erased === false ? 'kept' : 'plain']
   return (
     <div className="min-h-full px-5 py-8 flex flex-col items-center justify-center text-center animate-fadeIn">
       <div className="relative w-16 h-16">
@@ -826,10 +800,7 @@ function Done({ guide, mode, fill, via, passcodeProvided, dataChoice }) {
         </div>
       </div>
       <h2 className="mt-4 text-[21px] font-bold text-ink leading-tight">{fill(copy.title)}</h2>
-      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">
-        {copy.sub}
-        {passcodeProvided && via === 'guide' && ' Your passcode is stored securely for the repair partner only.'}
-      </p>
+      <p className="mt-2 text-[13.5px] text-ink-2 leading-[1.5] max-w-[300px]">{copy.sub}</p>
     </div>
   )
 }

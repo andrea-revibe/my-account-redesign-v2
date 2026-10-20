@@ -3,19 +3,18 @@ import { ArrowRight, RotateCcw } from 'lucide-react'
 import ResetGuideSheet from './ClaimFlow/ResetGuideSheet'
 import DevicePicker from './ClaimFlow/DevicePicker'
 import { DEVICE_OPTIONS, resetGuideForOrder } from '../lib/devices'
-import { stepsFor, RESET_MODES } from '../lib/resetGuides'
+import { stepsFor } from '../lib/resetGuides'
 
 // Guided-reset sandbox panel (journey `guided_reset`): pick the order line's
 // production category, the device the customer answers (when the category
-// spans several guides), the mode and where to open. Open guide shows the
+// spans several guides) and where to open. Open guide shows the
 // customer's device question first when there is one, then ResetGuideSheet.
 // The debug strip re-runs the real order→guide mapping on the synthesised
 // order, so a mapping regression shows up here.
 
 const OPEN_AT = [
   { id: 'start', label: 'Start' },
-  { id: 'with_you', label: 'Can’t use › picker' },
-  { id: 'sent', label: 'Can’t use › sent' },
+  { id: 'remote', label: 'Remote unlink' },
   { id: 'recovery', label: 'Account recovery' },
 ]
 
@@ -43,11 +42,9 @@ export default function ResetGuidePanel({
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   const [lastResult, setLastResult] = useState(null)
-  const mode = single ? 'single' : inputs.mode
-  const steps = stepsFor(guide, mode, { variant: variant.id })
+  const steps = stepsFor(guide, { variant: variant.id })
   const mapped = resetGuideForOrder(order)
-  const passcodeKind = mode === 'repair' ? guide.steps.find((s) => s.passcode)?.passcode : null
-  const noCantUse = !guide.cantUse
+  const noCantUse = !guide.remote
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[380px] bg-surface border border-line rounded-2xl shadow-lg p-4 max-h-[90vh] overflow-y-auto">
@@ -120,27 +117,7 @@ export default function ResetGuidePanel({
         {guide.variants.length > 1 && <span className="text-ink-2"> · {variant.label}</span>}
       </div>
 
-      <Label>Mode</Label>
-      {single ? (
-        <div className="mb-3 text-[11.5px] text-muted">
-          {guide.id === 'no_reset' ? 'No guide — packing note only' : RESET_MODES.single.sub}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-ink/[0.05] mb-3">
-          {['return', 'repair'].map((m) => (
-            <button
-              key={m}
-              onClick={() => setInput('mode', m)}
-              className={`rounded-lg px-2 py-1.5 text-left transition ${
-                inputs.mode === m ? 'bg-surface shadow-sm2' : 'hover:bg-surface/60'
-              }`}
-            >
-              <span className="block text-[12px] font-semibold text-ink">{RESET_MODES[m].label}</span>
-              <span className="block text-[10px] text-muted">{RESET_MODES[m].sub}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {single && <div className="mb-3 text-[11.5px] text-muted">No guide — packing note only</div>}
 
       {!noCantUse && (
         <>
@@ -174,19 +151,18 @@ export default function ResetGuidePanel({
           → {mapped.needsChooser ? `asks · pre-selects ${mapped.device ?? 'nothing'}` : `${mapped.guideId}/${mapped.variant}`}
         </div>
         <div>
-          {mode} · {steps.length} steps · passcode: {passcodeKind ?? 'none'}
+          {steps.length} steps · erase: {guide.erase ?? 'none'}
         </div>
         {lastResult && (
           <div>
             last finish: via {lastResult.via}
-            {lastResult.passcodeProvided ? ' · passcode given' : ''}
-            {lastResult.dataChoice ? ` · data: ${lastResult.dataChoice}` : ''}
+            {lastResult.erased != null ? ` · erased: ${lastResult.erased}` : ''}
           </div>
         )}
       </div>
       <p className="mt-2 text-[10.5px] text-muted leading-snug">
         The card behind is this device — Raise a claim to reach the guide through Step 3
-        (change of mind / issue → Return, warranty → Repair).
+        (every claim type — return or warranty — runs the same guide).
       </p>
 
       <button
@@ -214,9 +190,8 @@ export default function ResetGuidePanel({
       )}
       {open && (
         <ResetGuideSheet
-          key={`${guide.id}-${variant.id}-${mode}-${inputs.openAt}`}
+          key={`${guide.id}-${variant.id}-${inputs.openAt}`}
           guideId={guide.id}
-          mode={mode}
           facts={{ variant: variant.id }}
           initialView={noCantUse ? 'start' : inputs.openAt}
           onDone={(result) => {

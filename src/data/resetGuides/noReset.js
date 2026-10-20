@@ -5,7 +5,6 @@ export default {
   id: 'no_reset',
   code: '—',
   label: 'No reset',
-  modes: ['single'],
   account: [],
   variants: [
     { id: 'accessory', label: 'Accessory', noun: 'item', frame: 'box', category: 'Accessories', title: 'USB-C 20W Charger' },
@@ -20,5 +19,4 @@ export default {
       body: 'This item has no account to unlink. Remove your own items, and pack everything that came in the box.',
     },
   ],
-  cantUse: null,
 }

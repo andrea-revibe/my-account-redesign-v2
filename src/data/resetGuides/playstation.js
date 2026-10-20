@@ -1,10 +1,11 @@
 // G7 — PlayStation (primary-console activation). PS3 / PS4 / PS5 menus differ,
-// so each console is its own variant; PS2 gets the no-reset card.
+// so each console is its own variant; PS2 gets the no-reset card. The same
+// steps for a return and a warranty; the reset is the customer's choice.
 export default {
   id: 'playstation',
   code: 'G7',
   label: 'PlayStation',
-  modes: ['return', 'repair'],
+  erase: 'optional',
   account: ['playstation'],
   variants: [
     { id: 'ps5', label: 'PS5', noun: 'PS5', frame: 'console', os: 'playstation', category: 'Gaming', title: 'PlayStation 5' },
@@ -14,23 +15,23 @@ export default {
   steps: [
     {
       id: 'deactivate_ps5',
-      modes: ['return', 'repair'],
       when: { variant: ['ps5'] },
       title: 'Deactivate the console',
-      body: 'Back up saved data and sync trophies first, and take out discs and USB devices. Then turn Console Sharing and Offline Play off.',
+      body: 'Back up saved data and sync trophies first, and take out discs and USB devices (a disc stuck inside? leave it and tell us). Then turn Console Sharing and Offline Play off.',
       path: ['Settings', 'Users and Accounts', 'Other', 'Console Sharing and Offline Play', 'Disable'],
+      notes: [{ when: 'Sending it for repair', text: 'Send the console only — no cables, accessories or PS5 base. PS5: remove any extra M.2 SSD. PS4: refit the original hard drive.' }],
     },
     {
       id: 'deactivate_ps4',
-      modes: ['return', 'repair'],
       when: { variant: ['ps4'] },
       title: 'Deactivate the console',
       body: 'Back up saved data and sync trophies first, and take out discs and USB devices.',
       path: ['Settings', 'Account Management', 'Activate as Your Primary PS4', 'Deactivate', 'Yes'],
+      notes: [{ when: 'Sending it for repair', text: 'Send the console only — no cables, accessories or PS5 base. PS5: remove any extra M.2 SSD. PS4: refit the original hard drive.' }],
     },
     {
       id: 'reset_ps5',
-      modes: ['return'],
+      erase: true,
       when: { variant: ['ps5'] },
       title: 'Reset your console',
       body: 'This can’t be undone; don’t turn the console off while it runs. In Safe Mode, “Restore Default Settings” keeps your data and isn’t a reset — use “Reset PS5”.',
@@ -38,7 +39,7 @@ export default {
     },
     {
       id: 'reset_ps4',
-      modes: ['return'],
+      erase: true,
       when: { variant: ['ps4'] },
       title: 'Initialize your PS4',
       body: 'Choose Full. This can’t be undone; don’t turn the console off while it runs.',
@@ -46,7 +47,6 @@ export default {
     },
     {
       id: 'ps3_deactivate',
-      modes: ['return', 'repair'],
       when: { variant: ['ps3'] },
       title: 'Deactivate Game and Video',
       body: 'Back up saved data first, and take out any disc.',
@@ -54,7 +54,7 @@ export default {
     },
     {
       id: 'ps3_restore',
-      modes: ['return'],
+      erase: true,
       when: { variant: ['ps3'] },
       title: 'Restore PS3 System',
       body: 'Choose Full Format if the drive holds personal data. Don’t turn it off while it runs.',
@@ -62,43 +62,24 @@ export default {
     },
     {
       id: 'restarted',
-      modes: ['return'],
-      final: true,
+      erase: true,
       revibe: true,
       title: 'Let it restart',
       body: 'You’re done when the reset finishes and the console restarts. Don’t sign in again.',
     },
-    {
-      id: 'repair_pack',
-      modes: ['repair'],
-      final: true,
-      title: 'Send the console only',
-      body: 'Sony factory-resets repaired consoles anyway. PS5: remove any extra M.2 SSD. PS4: refit the original hard drive. No cables, accessories or PS5 base.',
-    },
   ],
-  cantUse: {
-    symptoms: [
-      { id: 'account', icon: 'key', title: 'I forgot my PlayStation password', sub: 'I can’t sign in to deactivate it', to: 'account_playstation' },
-      { id: 'broken', icon: 'power', title: 'It won’t turn on', sub: 'Deactivate it from a browser', to: 'ps_deactivate' },
-      { id: 'disc', icon: 'disc', title: 'A disc is stuck inside', to: 'ps_disc' },
-      { id: 'sent', icon: 'truck', title: 'I’ve already sent it to Revibe', sub: 'Deactivate it from a browser', to: 'ps_deactivate' },
-    ],
-    nodes: {
-      ps_deactivate: {
+  remote: {
+    steps: [
+      {
+        id: 'ps_remote',
+        revibe: true,
         title: 'Deactivate it from a browser',
-        lead: 'Then deactivate your consoles',
-        steps: [
-          { text: 'Go to playstation.com and sign in.' },
-          { text: 'Open Account Management, then Device Management.', path: ['Account Management', 'Device Management'] },
-          { text: 'Choose PlayStation Consoles, then Deactivate All Devices.', path: ['PlayStation Consoles', 'Deactivate All Devices'] },
-          { text: 'To sign out everywhere, open Security and choose Sign Out on All Devices.', path: ['Security', 'Sign Out on All Devices'] },
-        ],
-        tip: 'You can’t deactivate just one console, and this only works once every six months. It doesn’t delete anything.',
+        body: 'Go to playstation.com and sign in, then Account Management › Device Management › PlayStation Consoles › Deactivate All Devices. It deactivates every console at once and doesn’t delete anything.',
+        path: ['Device Management', 'PlayStation Consoles', 'Deactivate All Devices'],
+        frame: 'browser',
+        notes: [{ when: 'Limit', text: 'This only works once every six months.' }],
+        help: { label: 'Forgot your PlayStation password?', to: 'account_playstation' },
       },
-      ps_disc: {
-        title: 'Leave the disc where it is',
-        body: 'Don’t try to force it out. Continue, and tell us about it before pickup.',
-      },
-    },
+    ],
   },
 }
