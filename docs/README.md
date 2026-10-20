@@ -118,7 +118,7 @@ Triage by change type — don't blanket-update everything:
 | Change-of-mind returns flow (Steps, eligibility, refund math, change-of-mind specific copy) | [output/returns/change_of_mind.md](./output/returns/change_of_mind.md) + `CHANGELOG.md` |
 | Issue / wrong-device returns flow | [output/returns/issue.md](./output/returns/issue.md) + `CHANGELOG.md` |
 | `ClaimCard`, takeover cards, sub-status / action gates, SLAs | [output/returns/claim_tracking.md](./output/returns/claim_tracking.md) + `CHANGELOG.md` |
-| Guided reset — device mapping (`lib/devices.js`), `ResetGuideSheet` variants, `Step3DevicePrep` | [output/returns/guided_reset.md](./output/returns/guided_reset.md) + `CHANGELOG.md` |
+| Guided reset — device mapping (`lib/devices.js`), guide content (`data/resetGuides/*`), `ResetGuideSheet` engine, `Step3DevicePrep`, `guided_reset` sandbox | [output/returns/guided_reset.md](./output/returns/guided_reset.md) + `CHANGELOG.md` |
 | Warranty / compensation scoping (when wired) | [output/warranties_compensations.md](./output/warranties_compensations.md) + `CHANGELOG.md` |
 | Journey mode (`?journey=<id>`), new journeys, branches, real-UI wiring | [output/journey_backend_spec.md](./output/journey_backend_spec.md) (keep slim — see its **Editing this doc** section) + `CHANGELOG.md` |
 | Notification channel policy — which channels fire at an `event`, silences, adding/re-classing a trigger | [artifact/notifications-flow.md](./artifact/notifications-flow.md) (+ its `.html`) + `CHANGELOG.md` |

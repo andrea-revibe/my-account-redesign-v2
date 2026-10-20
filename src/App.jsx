@@ -8,6 +8,7 @@ import InProgressCard from './components/InProgressCard'
 import PastOrderCard from './components/PastOrderCard'
 import ClaimCard from './components/ClaimCard'
 import ClaimErdPanel from './components/ClaimErdPanel'
+import ResetGuidePanel from './components/ResetGuidePanel'
 import WarrantyClaimCard from './components/WarrantyClaimCard'
 import DocsRejectedCard from './components/DocsRejectedCard'
 import PickupFailedCard from './components/PickupFailedCard'
@@ -42,6 +43,7 @@ import {
 import { useJourney } from './lib/journey'
 import { useEddSandbox } from './lib/eddSandbox'
 import { useClaimErdSandbox } from './lib/claimErdSandbox'
+import { useResetGuideSandbox } from './lib/resetGuideSandbox'
 import { COUNTRY_CODES, DEFAULT_COUNTRY } from './lib/countries'
 import { JOURNEYS } from './data/journey'
 
@@ -170,10 +172,12 @@ export default function App() {
   // every advance/back handler below stands down.
   const eddSandbox = useEddSandbox(journey.journey)
   const claimSandbox = useClaimErdSandbox(journey.journey, activeCountry)
-  const sandboxKind =
-    journey.kind === 'sandbox' ? 'edd' : journey.kind === 'claim_sandbox' ? 'claim' : null
+  const resetSandbox = useResetGuideSandbox(journey.journey)
+  const SANDBOX_KINDS = { sandbox: 'edd', claim_sandbox: 'claim', reset_sandbox: 'reset' }
+  const sandboxKind = SANDBOX_KINDS[journey.kind] ?? null
   const isSandbox = sandboxKind !== null
-  const sandbox = sandboxKind === 'claim' ? claimSandbox : eddSandbox
+  const sandbox =
+    sandboxKind === 'claim' ? claimSandbox : sandboxKind === 'reset' ? resetSandbox : eddSandbox
   // Inject the selected country last so it wins over anything the journey
   // nodes set (they never set `country`), keeping INITIAL_ORDER country-free.
   // Memoized so the spread doesn't mint a new object every render (which
@@ -984,6 +988,23 @@ export default function App() {
           onSelectJourney={selectJourney}
           activeCountry={activeCountry}
           onSelectCountry={selectCountry}
+        />
+      )}
+      {journeyMode && sandboxKind === 'reset' && (
+        <ResetGuidePanel
+          categories={sandbox.categories}
+          category={sandbox.category}
+          guess={sandbox.guess}
+          inputs={sandbox.inputs}
+          setInput={sandbox.setInput}
+          reset={sandbox.reset}
+          guide={sandbox.guide}
+          variant={sandbox.variant}
+          single={sandbox.single}
+          order={sandbox.order}
+          journeys={sandbox.journeys}
+          activeJourneyId={journey.journey.id}
+          onSelectJourney={selectJourney}
         />
       )}
       {journeyMode && sandboxKind === 'claim' && (

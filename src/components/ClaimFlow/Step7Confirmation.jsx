@@ -54,6 +54,16 @@ export default function Step7Confirmation({ state, order, onClose, onTrack }) {
         : 'Returns to your card in 5–10 business days once return is complete.'
   const devicePrepLine = state.devicePrep.neverSetUp
     ? 'You indicated the device was never set up, so no reset was needed.'
+    : state.devicePrep.guideId === 'no_reset'
+      ? 'No reset was needed for this item.'
+    : state.devicePrep.mode === 'repair' && state.devicePrep.dataChoice === 'erase'
+      ? 'You erased the device before sending it for repair.'
+    : state.devicePrep.mode === 'repair' && state.devicePrep.dataChoice === 'maintenance'
+      ? 'You turned the locks off and switched on Maintenance mode for the repair.'
+    : state.devicePrep.mode === 'repair'
+      ? state.devicePrep.passcodeProvided
+        ? 'You turned the locks off and shared a passcode securely for the repair.'
+        : 'You turned the locks off for the repair.'
     : state.devicePrep.option === 'reset'
       ? 'You confirmed the device is factory reset.'
       : 'Thanks for unlinking the device and sharing your passcode.'

@@ -30,7 +30,7 @@ React 19 + Vite 8 · Tailwind 3 · lucide-react · Inter (Graphik substitute)
 - `src/components/` — one component per file: four baseline order cards (`InProgressCard` / `OrderCard` / `PastOrderCard` / `ClaimCard`), six claim takeover cards (`DocsRejected` / `AwbFailed` / `PickupFailed` / `ResetFailed` / `InvalidClaim` / `RepairQuote`), `WarrantyClaimCard`, the returns flow under `ClaimFlow/`, and shared pieces. Per-card behaviour: `docs/output/returns/claim_tracking.md` + `warranties_compensations.md`.
 - `src/data/` — thin barrels: mock orders (`orders/*`) and journey definitions (`journeys/*`). Field shapes: `orders.md` §7, `cancellations.md` §7, `claim_tracking.md` §5.
 - `src/lib/` — sources of truth (`statuses` / `returns` / `claims` / `events` / `edd` / `eddSandbox` / `journey` / `devices` / `countries` / `wallet`). Use the *Where is X* table in `code_map.md` to land on the right one.
-- **Guided reset (Step 3 device prep)** — `src/lib/devices.js` maps `category_name` → two dimensions (`os`, `device`) that select one of five guide variants in `ResetGuideSheet`; the OS-ambiguous `Tablet` is the only manual input (Step 3 Apple/Android chooser). Full spec incl. variants/frames/remote route: `docs/output/returns/guided_reset.md`.
+- **Guided reset (Step 3 device prep)** — 7 guides by lock system + no-reset, content as data in `src/data/resetGuides/*`, rendered by one engine (`ResetGuideSheet`); `resetGuideForOrder` (`lib/devices.js`) maps category + title → guide/variant, claim type → Return/Repair mode (`lib/resetGuides.js`). Preview all in `?journey=guided_reset`. Spec: `docs/output/returns/guided_reset.md`.
 - `brief/` — source screenshots + design-system reference. `docs/` — see `docs/README.md` for the per-feature doc map (`input/` operational specs, `output/` UI specs).
 
 ## Mental models
@@ -106,7 +106,7 @@ Triage by change type — don't blanket-update everything:
 | Change-of-mind returns flow | `docs/output/returns/change_of_mind.md` + `CHANGELOG.md` |
 | Issue / wrong-device returns flow | `docs/output/returns/issue.md` + `CHANGELOG.md` |
 | `ClaimCard`, takeover cards, sub-status / action gates, SLAs | `docs/output/returns/claim_tracking.md` + `CHANGELOG.md` |
-| Guided reset — `lib/devices.js` mapping, `ResetGuideSheet` variants, `Step3DevicePrep` | `docs/output/returns/guided_reset.md` + `CHANGELOG.md` |
+| Guided reset — `lib/devices.js` mapping, `data/resetGuides/*` content, `ResetGuideSheet` engine, `Step3DevicePrep`, `guided_reset` sandbox | `docs/output/returns/guided_reset.md` + `CHANGELOG.md` |
 | Warranty / compensation scoping (when wired) | `docs/output/warranties_compensations.md` + `CHANGELOG.md` |
 | Claim resolution date — `lib/claimErd.js` levers/stages, `claim.milestones`, `ClaimErdStrip`, the `claim_erd` sandbox | `docs/output/returns/claim_tracking.md` §11 + `CHANGELOG.md` |
 | Journey mode (`?journey=<id>`), new journeys, branches, real-UI wiring | `docs/output/journey_backend_spec.md` (keep slim — see its **Editing this doc** section) + `CHANGELOG.md` |

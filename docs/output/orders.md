@@ -355,7 +355,7 @@ Today an order has one product. The `product` object carries:
 | `name` | string | Display name. |
 | `variant` | string | Variant string (e.g. `"Black / 32 GB / Good"`). The last `·`/`/`-separated segment is the condition grade read by the returns battery check (`conditionGradeOf`). |
 | `image` | string | Path to the product image asset. |
-| `category_name` *(optional)* | string | Product category (e.g. `'Tablet'`, `'Macbook'`, `'Samsung phone'`). Canonical driver of the guided-reset variant via `deviceTypeForOrder` / `deviceOsForOrder`. See [returns/guided_reset.md](./returns/guided_reset.md). |
+| `category_name` *(optional)* | string | Product category (e.g. `'Tablet'`, `'Macbook'`, `'Samsung phone'`). Canonical driver of the guided-reset guide via `resetGuideForOrder` (ambiguous categories ask the customer) and of the OS copy via `deviceOsForOrder`. See [returns/guided_reset.md](./returns/guided_reset.md). |
 
 Multi-item orders are out of scope for the prototype (see §11).
 

@@ -14,7 +14,8 @@ import { ProductSummary } from './ProductSummary'
 import TapToFixCta from './TapToFixCta'
 import ResetGuideSheet from './ClaimFlow/ResetGuideSheet'
 import OrderClaimLink from './OrderClaimLink'
-import { deviceTypeForOrder } from '../lib/devices'
+import { resetGuideForOrder } from '../lib/devices'
+import { modeForClaimType } from '../lib/resetGuides'
 import { formatClaimRef } from '../lib/claims'
 
 const PASSCODE_LEN = 6
@@ -63,10 +64,9 @@ export default function ResetFailedCard({
       </OrderClaimLink>
     )
   }
-  // The guided reset opens straight onto its remote route (device locked +
-  // already at Revibe). Device-typed from the order so the right walkthrough
-  // shows; falls back to the iPhone guide for the iOS mock here.
-  const device = deviceTypeForOrder(order)
+  // The guide opens straight onto its "already sent" branch (device locked +
+  // already at Revibe), picked from the order line like Step 3 does.
+  const resetGuide = resetGuideForOrder(order)
   const canSubmit = unlinked && passcode.length === PASSCODE_LEN
 
   return (
@@ -148,8 +148,10 @@ export default function ResetFailedCard({
 
           {guideOpen && (
             <ResetGuideSheet
-              device={device}
-              initialRoute="remote"
+              guideId={resetGuide.guideId}
+              facts={{ variant: resetGuide.variant }}
+              mode={modeForClaimType(claim.type) ?? 'return'}
+              initialView="sent"
               skipDone
               onDone={() => {
                 setGuideDone(true)

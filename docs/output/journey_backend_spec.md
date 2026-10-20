@@ -21,7 +21,7 @@ covers:
 
 ## Shipped journeys
 
-Source of truth: `src/data/journey.js → JOURNEYS`. Today the array holds ten: `happy_path`, `dynamic_edd`, `claim_erd`, `cancellation`, `shipped_cancellation`, `refused_delivery`, `claim_change_of_mind`, `claim_issue`, `claim_warranty`, `claim_compensation`. `?journey=1` aliases the first journey; unknown ids fall back to the first.
+Source of truth: `src/data/journey.js → JOURNEYS`. Today the array holds eleven: `happy_path`, `dynamic_edd`, `claim_erd`, `guided_reset`, `cancellation`, `shipped_cancellation`, `refused_delivery`, `claim_change_of_mind`, `claim_issue`, `claim_warranty`, `claim_compensation`. `?journey=1` aliases the first journey; unknown ids fall back to the first.
 
 The `cancellation` journey forks off `placed` into two cancellation entry points. **Before QC** (`created` stage): no supplier review — the request lands straight on `refund_pending` (a `requested` timestamp is still stamped so the stepper reads Requested ✓ → Pending), with no accepted/declined fork. **At QC** (`quality_check`, via `qc_started`): the request waits on an ops review (accepted vs declined); declined re-merges into the shipping chain. Each entry point forks on refund method (wallet vs card).
 
@@ -57,7 +57,9 @@ Live-UI wiring: the card's `Cancel claim` CTA opens `CancelClaimSheet`; on confi
 
 `claim_erd` is the **second sandbox journey** — `kind: 'claim_sandbox'`, `nodes: []` — and does for the claim resolution window what `dynamic_edd` does for delivery. `useClaimErdSandbox` (`src/lib/claimErdSandbox.js`) owns a claim-type selector plus Today and the model's six milestone dates (claim created / docs cleared / picked up / QC started / expert revision / decision), and synthesises a delivered order carrying a claim built from them — so the real `ClaimCard` / `WarrantyClaimCard` renders it with no sandbox-specific branches. `App.jsx` swaps in `ClaimErdPanel`, whose debug strip prints the raw model output (stage, on-baseline vs rolled, both bounds, the rendered label, working days) plus the active market's levers. The model is `src/lib/claimErd.js`, a 1:1 port of `claims_ERD_model_v2.xlsx`; full spec in [`returns/claim_tracking.md`](./returns/claim_tracking.md) §11.
 
-Two conventions differ from the EDD sandbox, both deliberate. **Market comes from the app-level `CountryPicker`, not a panel control** — `App.jsx` already stamps `country` onto the sandbox order and that is the field the model reads, so a second selector would be a way to disagree with itself. And **`asOf` rides on the claim** (`claim.milestones.asOf`) rather than `order.asOfDate`: the panel's Today has to beat the replay clock, and stamping it on the claim keeps it away from the return-window / coverage helpers that read `orderAsOf`.
+`guided_reset` is the **third sandbox** — `kind: 'reset_sandbox'`, `nodes: []` — a previewer for every guided-reset guide × device variant × Return/Repair mode. `useResetGuideSandbox` (`src/lib/resetGuideSandbox.js`) synthesises a delivered order carrying the chosen variant's catalogue category + title, so the real Step 3 mapping can be walked from the card behind; `ResetGuidePanel` opens `ResetGuideSheet` directly at the intro or any "I can't use my device" view. It replaced the `Reset guide` chip row the main `JourneyDevPanel` used to carry. Spec in [`returns/guided_reset.md`](./returns/guided_reset.md) §7.
+
+The claim-ERD sandbox's two conventions differ from the EDD sandbox, both deliberate. **Market comes from the app-level `CountryPicker`, not a panel control** — `App.jsx` already stamps `country` onto the sandbox order and that is the field the model reads, so a second selector would be a way to disagree with itself. And **`asOf` rides on the claim** (`claim.milestones.asOf`) rather than `order.asOfDate`: the panel's Today has to beat the replay clock, and stamping it on the claim keeps it away from the return-window / coverage helpers that read `orderAsOf`.
 
 ## Customer notifications
 
@@ -122,7 +124,7 @@ The channel toggle is a preview (both channels are "sent"); selection lives in t
 - `src/data/journey.js` — barrel: assembles + exports the `JOURNEYS` array and re-exports `INITIAL_ORDER`. The per-journey node arrays it imports (and their `next:` branching) live in `src/data/journeys/*` — one file per journey (`initialOrder`, `happyPath`, `cancellation`, `shippedCancellation`, `claimChangeOfMind`, `claimIssue`, `claimWarranty`, `claimCompensation`). The four claim journeys are each wrapped by `inTransitClaim`'s `withInTransitClaim` before going into `JOURNEYS`.
 - `src/data/journeys/repairPath.js` — shared repair path (`REPAIR_SUBMIT_NODES` + `REPAIR_TAIL_NODES`), spread by `claimIssue` and `claimWarranty`. Coverage semantics behind the accidental submit node live in `lib/coverage.js` — see [warranties_compensations.md](./warranties_compensations.md) §4.
 - `src/data/journeys/inTransitClaim.js` — shared decorator (`withInTransitClaim` + `IN_TRANSIT_ENTRY_STAGES`) that grafts the raise-from-the-in-flight-hero branch onto any claim journey: widens each in-transit stage's `next` with a `claim_raised_in_transit__<stage>` edge and appends the silent raised / confirmed / unconfirmed nodes.
-- `src/lib/journey.js` — `useJourney(journeyId)` hook (`advance` / `back` / `reset` / `validNext`). Returns `kind: 'replay' | 'sandbox' | 'claim_sandbox'` so `App.jsx` knows which panel to render.
+- `src/lib/journey.js` — `useJourney(journeyId)` hook (`advance` / `back` / `reset` / `validNext`). Returns `kind: 'replay' | 'sandbox' | 'claim_sandbox' | 'reset_sandbox'` so `App.jsx` knows which panel to render.
 - `src/lib/edd.js` — pure EDD model (markets, `workdayIntl`, `calculateEdd`, `orderStatus`, message constants). Port of `brief/edd.py`.
 - `src/lib/eddSandbox.js` — `useEddSandbox(journey)` hook (date/market inputs → synthesised order with `statusBanner` override).
 - `src/components/JourneyDevPanel.jsx` — replay panel (Next buttons + journey picker).
@@ -132,6 +134,7 @@ The channel toggle is a preview (both channels are "sent"); selection lives in t
 - `public/emails/{orders,shipment,claims}/` — real email screenshots, mirroring the content domains (`README.md` indexes the wired files).
 - `src/components/EddSandboxPanel.jsx` — sandbox panel (date inputs + debug strip + journey picker).
 - `src/lib/claimErdSandbox.js` + `src/components/ClaimErdPanel.jsx` — the claim-ERD sandbox hook + panel (claim type, six milestone dates, computed-window + levers debug strip).
+- `src/lib/resetGuideSandbox.js` + `src/components/ResetGuidePanel.jsx` — the guided-reset sandbox hook + panel (guide / device / mode / open-at, mapping debug strip).
 - `src/App.jsx` — `journeyMode` + `?journey=<id>` URL param; `handleCancelOrder` / `handleSubmitClaim` (customer-triggered advances; no-op in sandbox). `handleCancelOrder`'s candidate list is `validNext`-gated, so stage variants (`cancel_shipped_*` / `cancel_late_*` / `cancel_before_qc_*` / `cancellation_requested_*`) can be listed in any order.
 - `src/lib/statuses.js` — `statusDescription` honours `order.statusBanner` as a full override when set (used by the sandbox for late / back-on-track only; on-time + delivered fall through to `STATUS_DESCRIPTIONS`).
 - `src/components/Header.jsx` — `Journey mode ×` chip (exits the mode).

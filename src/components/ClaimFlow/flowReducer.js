@@ -1,5 +1,5 @@
 import { ORDERS } from '../../data/orders'
-import { deviceOsForOrder, deviceTypeForOrder } from '../../lib/devices'
+import { resetGuideForOrder } from '../../lib/devices'
 import { DEFAULT_COUNTRY } from '../../lib/countries'
 import { emptyAddress, addressError } from '../../lib/address'
 
@@ -144,13 +144,10 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
   const order =
     initialOrder ??
     (initialOrderId ? ORDERS.find((o) => o.id === initialOrderId) : null)
-  // For the OS-ambiguous `Tablet` category, preselect the iPad guide (the
-  // customer can switch to Android in the device-prep step). Everything else
-  // resolves directly from the category.
-  const resolvedType = deviceTypeForOrder(order)
-  const initialDevice = resolvedType === 'tablet' ? 'ipad' : resolvedType
-  const initialOs =
-    resolvedType === 'tablet' ? 'ios' : deviceOsForOrder(order)
+  // Reset guide (data/resetGuides/*) from the order's product category. A
+  // category spanning several guides seeds the title's guess (or nothing);
+  // Step 3 asks the customer.
+  const resetGuide = resetGuideForOrder(order)
   return {
     step: 'situation',
     // What happened (Screen 1). Drives the branch; resolves to claimType.
@@ -191,8 +188,16 @@ export function initialState({ initialOrderId = null, initialOrder = null } = {}
     // and `devicePrepText` keep rendering the reset branch.
     devicePrep: {
       option: 'reset',
-      os: initialOs,
-      device: initialDevice,
+      device: resetGuide.device,
+      guideId: resetGuide.guideId,
+      variant: resetGuide.variant,
+      // Set when the guide finishes: the mode it ran in, whether it ended via
+      // "I can't use my device", whether a repair passcode was given, and the
+      // Repair data choice ('keep' | 'erase' | 'maintenance', null if none).
+      mode: null,
+      guideVia: null,
+      passcodeProvided: false,
+      dataChoice: null,
       resetConfirmed: false,
       resetGuideSeen: false,
       // Change-of-mind escape hatch: a device that was never set up has no
@@ -396,6 +401,8 @@ export function stepError(state) {
       // Change-of-mind only: attesting the device was never set up satisfies
       // the step in place of the guided reset.
       if (state.claimType === 'change_of_mind' && dp.neverSetUp) return null
+      if (!dp.guideId) return 'devicePick'
+      if (dp.guideId === 'no_reset') return null
       if (!dp.resetGuideSeen) return 'resetGuide'
       if (dp.resetConfirmed !== true) return 'resetConfirm'
       return null
