@@ -1,7 +1,7 @@
 // G2 — Samsung Galaxy & Android (Google device protection / FRP + Samsung
 // account). Samsung-only steps are tagged `when: { variant: SAMSUNG }`; other
 // brands get the generic Android menu names.
-const SAMSUNG = ['samsung_phone', 'samsung_tablet']
+const SAMSUNG = ['samsung_phone']
 
 export default {
   id: 'android',
@@ -12,7 +12,6 @@ export default {
   account: ['google', 'samsung'],
   variants: [
     { id: 'samsung_phone', label: 'Samsung phone', noun: 'phone', frame: 'phone', os: 'android', privacy: 'maintenance', category: 'Samsung phone', title: 'Samsung Galaxy S21' },
-    { id: 'samsung_tablet', label: 'Samsung tablet', noun: 'tablet', frame: 'tablet', os: 'android_tablet', privacy: 'maintenance', category: 'Tablet', title: 'Samsung Galaxy Tab S8' },
     { id: 'other_android', label: 'Other Android', noun: 'phone', frame: 'phone', os: 'android', category: 'Smartphone', title: 'Google Pixel 7' },
   ],
   steps: [
@@ -23,7 +22,7 @@ export default {
       title: 'Remove your Google account',
       body: 'Tap your Google account › Remove account › Remove account (on some models: ⋮ More options › Remove account). Repeat for every Google account. This turns off Google device protection.',
       path: ['Settings', 'Accounts and backup', 'Manage accounts'],
-      mock: { samsung_phone: 'sam_remove_google', samsung_tablet: 'tab_remove_google' },
+      mock: { samsung_phone: 'sam_remove_google' },
       trouble: {
         label: 'Changed your Google password recently?',
         body: 'Wait 24 hours after a Google password change before you factory reset.',
@@ -36,7 +35,7 @@ export default {
       title: 'Remove your Samsung account',
       body: 'In the same list: Samsung account › Remove account › Remove account › Sign out › enter your Samsung account password › OK. This also turns off Find My Mobile.',
       path: ['Settings', 'Accounts and backup', 'Manage accounts', 'Samsung account'],
-      mock: { samsung_phone: 'sam_signout', samsung_tablet: 'tab_signout' },
+      mock: { samsung_phone: 'sam_signout' },
       trouble: {
         label: 'It asks for my fingerprint and a delay',
         body: 'Theft protection (One UI 7 and later): away from a Safe place, turning off Find My Mobile needs your fingerprint or face plus a one-hour Security delay. Do this at home before pickup day.',
@@ -50,7 +49,7 @@ export default {
       body: 'Tap Reset (or Delete all) and enter your PIN, pattern or password. Always reset from Settings, never from the recovery menu — a recovery reset asks for the old Google account.',
       path: ['Settings', 'General management', 'Reset', 'Factory data reset'],
       notes: [{ when: 'Memory card', text: 'Take it out first — a factory reset doesn’t erase it.' }],
-      mock: { samsung_phone: 'sam_reset', samsung_tablet: 'tab_reset' },
+      mock: { samsung_phone: 'sam_reset' },
     },
     {
       id: 'welcome',
@@ -60,7 +59,7 @@ export default {
       revibe: true,
       title: 'Check for the setup screen',
       body: 'The {noun} restarts by itself. You’re done when it shows the first setup screen — don’t sign in.',
-      mock: { samsung_phone: 'sam_welcome', samsung_tablet: 'tab_welcome' },
+      mock: { samsung_phone: 'sam_welcome' },
     },
     {
       id: 'other_remove',
@@ -86,7 +85,7 @@ export default {
       title: 'Back up, then remove your accounts',
       body: 'Back up, then remove your Google and Samsung accounts, so a reset during the repair won’t lock the {noun}.',
       path: ['Settings', 'Accounts and backup', 'Manage accounts'],
-      mock: { samsung_phone: 'sam_remove_google', samsung_tablet: 'tab_remove_google' },
+      mock: { samsung_phone: 'sam_remove_google' },
     },
     {
       id: 'other_repair_accounts',
@@ -104,7 +103,7 @@ export default {
       title: 'Turn the screen lock off',
       body: 'Enter your PIN, pattern or password, then choose Swipe. Samsung’s repair advice: no passcode needs to be shared.',
       path: ['Settings', 'Lock screen and AOD', 'Screen lock and biometrics', 'Swipe'],
-      mock: { samsung_phone: 'sam_lock_swipe', samsung_tablet: 'tab_lock_swipe' },
+      mock: { samsung_phone: 'sam_lock_swipe' },
     },
     {
       id: 'other_repair_lock_off',
@@ -125,7 +124,7 @@ export default {
       body: 'It hides your photos, messages and accounts while the repairer works, without erasing anything. The {noun} restarts into an empty profile. When it’s back, turn Maintenance mode off and enter your lock to get everything back.',
       path: ['Settings', 'Battery and device care', 'Maintenance mode', 'Turn on'],
       notes: [{ when: 'One UI 4 or earlier', text: 'Not available — choose Keep my data instead, or update the {noun} first.' }],
-      mock: { samsung_phone: 'sam_maintenance', samsung_tablet: 'tab_maintenance' },
+      mock: { samsung_phone: 'sam_maintenance' },
     },
   ],
   cantUse: {

@@ -974,8 +974,7 @@ function SamsungWelcome({ Frame = MiniPhone }) {
 // device in "Your devices", with the Sign out button glowing (mirrors the real
 // myaccount.google.com/device-activity detail screen, where signing out is what
 // clears Factory Reset Protection).
-function GoogleRemoveRemote({ Frame = MiniPhone, tablet = false }) {
-  const DeviceIcon = tablet ? Tablet : Smartphone
+function GoogleRemoveRemote({ Frame = MiniPhone }) {
   const rows = [
     ['Account', 'yourname@gmail.com'],
     ['First signed in', '12 Mar 2024'],
@@ -995,13 +994,13 @@ function GoogleRemoveRemote({ Frame = MiniPhone, tablet = false }) {
       </div>
       <div className="mt-2.5 flex flex-col items-center">
         <span className="w-[34px] h-[34px] rounded-full bg-black/[0.04] grid place-items-center">
-          <DeviceIcon size={18} strokeWidth={1.6} className="text-ink/70" />
+          <Smartphone size={18} strokeWidth={1.6} className="text-ink/70" />
         </span>
         <span className="mt-1 text-[11.5px] font-bold text-ink leading-tight">
-          {tablet ? 'This tablet' : 'This phone'}
+          This phone
         </span>
         <span className="text-[8.5px] text-muted mt-0.5 whitespace-nowrap">
-          {tablet ? 'Galaxy Tab · Android 14' : 'Galaxy · Android 14'}
+          Galaxy · Android 14
         </span>
       </div>
       <div className="px-2.5 mt-2.5">
@@ -1028,8 +1027,7 @@ function GoogleRemoveRemote({ Frame = MiniPhone, tablet = false }) {
 }
 
 // Remote 2 · Samsung — the Devices page with the Remove button glowing.
-function SamsungRemoveRemote({ Frame = MiniPhone, tablet = false }) {
-  const DeviceIcon = tablet ? Tablet : Smartphone
+function SamsungRemoveRemote({ Frame = MiniPhone }) {
   return (
     <Frame camera="hole">
       <StatusBar />
@@ -1041,13 +1039,13 @@ function SamsungRemoveRemote({ Frame = MiniPhone, tablet = false }) {
       <div className="px-2.5 mt-2.5">
         <div className="rounded-[12px] border border-line bg-white shadow-sm2 p-2.5">
           <div className="flex items-start gap-2">
-            <DeviceIcon size={18} strokeWidth={1.6} className="text-ink/70 shrink-0" />
+            <Smartphone size={18} strokeWidth={1.6} className="text-ink/70 shrink-0" />
             <span className="flex-1 min-w-0 text-left">
               <span className="block text-[10.5px] font-bold text-ink leading-tight">
-                {tablet ? 'This tablet' : 'This phone'}
+                This phone
               </span>
               <span className="block text-[8.5px] text-muted mt-0.5">
-                {tablet ? 'Galaxy Tab · Registered' : 'Galaxy · Registered'}
+                Galaxy · Registered
               </span>
             </span>
           </div>
@@ -1064,39 +1062,6 @@ function SamsungRemoveRemote({ Frame = MiniPhone, tablet = false }) {
       </div>
     </Frame>
   )
-}
-
-// Android-tablet mocks — the same Samsung One UI screens as the phone guide,
-// rendered in the wider MiniTablet shell. The two remote screens also flip to
-// the Tablet icon + "This tablet" wording via the `tablet` flag.
-function MiniTabletAndroid(props) {
-  return <MiniTablet {...props} os="android" />
-}
-function AndroidTabletRemoveGoogle() {
-  return <SamsungRemoveGoogle Frame={MiniTabletAndroid} />
-}
-function AndroidTabletSignOutCarousel(props) {
-  return (
-    <MockCarousel
-      screens={SAMSUNG_SIGNOUT_SCREENS}
-      camera="hole"
-      Frame={MiniTabletAndroid}
-      {...props}
-    />
-  )
-}
-AndroidTabletSignOutCarousel.screens = SAMSUNG_SIGNOUT_SCREENS
-function AndroidTabletFactoryReset() {
-  return <SamsungFactoryReset Frame={MiniTabletAndroid} />
-}
-function AndroidTabletWelcome() {
-  return <SamsungWelcome Frame={MiniTabletAndroid} />
-}
-function AndroidTabletGoogleRemoveRemote() {
-  return <GoogleRemoveRemote Frame={MiniTabletAndroid} tablet />
-}
-function AndroidTabletSamsungRemoveRemote() {
-  return <SamsungRemoveRemote Frame={MiniTabletAndroid} tablet />
 }
 
 // Intro illustration — the iPhone PNG, or an asset-free CSS slab for each
@@ -1117,7 +1082,7 @@ function IntroDevice({ device }) {
       </div>
     )
   }
-  if (device === 'ipad' || device === 'android_tablet') return <IntroTablet />
+  if (device === 'ipad') return <IntroTablet />
   if (device === 'mac') return <IntroLaptop />
   // Android — CSS Galaxy slab.
   return (
@@ -1825,9 +1790,6 @@ function SamsungLockSwipe({ Frame = MiniPhone }) {
     </Frame>
   )
 }
-function AndroidTabletLockSwipe() {
-  return <SamsungLockSwipe Frame={MiniTabletAndroid} />
-}
 
 // Repair (privacy) · One UI Maintenance mode — hides the owner's data in a
 // separate profile while the repairer works; Turn on glowing.
@@ -1858,9 +1820,6 @@ function SamsungMaintenance({ Frame = MiniPhone }) {
       </div>
     </Frame>
   )
-}
-function AndroidTabletMaintenance() {
-  return <SamsungMaintenance Frame={MiniTabletAndroid} />
 }
 
 /* ------------------------------------------------------ Path-driven screens */
@@ -2159,7 +2118,6 @@ function PathScreen({ os, frame, path }) {
   if (os === 'ios') return <PhonePathScreen path={path} Frame={MiniPhone} os="ios" />
   if (os === 'ipados') return <PhonePathScreen path={path} Frame={MiniTablet} os="ipados" />
   if (os === 'android') return <PhonePathScreen path={path} Frame={MiniPhone} os="android" />
-  if (os === 'android_tablet') return <PhonePathScreen path={path} Frame={MiniTabletAndroid} os="android" />
   if (os === 'macos') return <MacPathScreen path={path} />
   if (os === 'windows') return <WindowsPathScreen path={path} />
   if (os === 'playstation') return <ConsolePathScreen path={path} />
@@ -2183,12 +2141,6 @@ export {
   SamsungWelcome,
   GoogleRemoveRemote,
   SamsungRemoveRemote,
-  AndroidTabletRemoveGoogle,
-  AndroidTabletSignOutCarousel,
-  AndroidTabletFactoryReset,
-  AndroidTabletWelcome,
-  AndroidTabletGoogleRemoveRemote,
-  AndroidTabletSamsungRemoveRemote,
   IntroDevice,
   MiniTablet,
   IpadSettingsSignOut,
@@ -2206,9 +2158,7 @@ export {
   IpadFindMyOff,
   IpadPasscodeOff,
   SamsungLockSwipe,
-  AndroidTabletLockSwipe,
   WindowsSetup,
   SamsungMaintenance,
-  AndroidTabletMaintenance,
   PathScreen,
 }

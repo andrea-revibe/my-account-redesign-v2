@@ -48,7 +48,6 @@ const INTRO_DEVICE = {
   ipad: 'ipad',
   samsung_phone: 'android',
   other_android: 'android',
-  samsung_tablet: 'android_tablet',
   macbook: 'mac',
 }
 

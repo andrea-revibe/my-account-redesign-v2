@@ -995,6 +995,7 @@ export default function App() {
           categories={sandbox.categories}
           category={sandbox.category}
           guess={sandbox.guess}
+          asks={sandbox.asks}
           inputs={sandbox.inputs}
           setInput={sandbox.setInput}
           reset={sandbox.reset}

@@ -29,7 +29,7 @@ Guides are grouped by what locks the device, not by brand. Brand and model diffe
 | # | Guide (`id`) | Variants | Modes | Brand/model handled by |
 |---|---|---|---|---|
 | G1 | iPhone & iPad (`apple_mobile`) | `iphone`, `ipad` | Return · Repair | `{noun}` wording; iOS-version notes |
-| G2 | Android (`android`) | `samsung_phone`, `samsung_tablet`, `other_android` | Return · Repair | Samsung-only steps via `when.variant` |
+| G2 | Android (`android`) | `samsung_phone`, `other_android` | Return · Repair | Samsung-only steps via `when.variant` |
 | G3 | Windows laptop (`windows`) | `laptop` (brand-neutral) | Return · Repair | no BIOS step — a startup-password fold-out on the last step |
 | G4 | MacBook (`mac`) | `macbook` | Return · Repair | no chip question — sign-out is the must-do; erase is optional (Return) |
 | G5 | Apple Watch (`watch`) | `apple_watch` | single | — |
@@ -60,26 +60,28 @@ Guides with `privacy: true` (G1 iPhone/iPad, G2 Android, G3 Windows, G4 Mac) ask
 
 ## 3. Allocating a guide — production category + the customer's answer (`lib/devices.js`)
 
-The guide is allocated from the order line's **production category** (`order_products.category_id` → `product_categories`, 13 rows, no subcategory). `PRODUCT_CATEGORIES` mirrors that table; each row lists the device options it can be, and each option in `DEVICE_OPTIONS` names its guide + variant. A category with one option needs no input; a category spanning several guides **asks the customer** (`DevicePicker`). The product title only **pre-selects** an answer (`guessDevice`, a positive match per option) — the customer has the final say, and with no match nothing is pre-selected.
+The guide is allocated from the order line's **production category** (`order_products.category_id` → `product_categories`, 13 rows, no subcategory). `PRODUCT_CATEGORIES` mirrors that table; each row lists the device options it can be, and each option in `DEVICE_OPTIONS` names its guide + variant. A category with one option needs no input; a category spanning several guides **asks the customer** (`DevicePicker`). The product title only **pre-selects** an answer (`guessDevice`, a positive match per option) — the customer has the final say, and with no match nothing is pre-selected. Exception: a `byTitle` category (Watch) routes on a title match with no question; the picker is only the fallback for an unmatched title (`asksCustomer`).
+
+Options are trimmed to what prod actually sells per category (`order_products`, Oct 2025 → Oct 2026): Tablet is iPads only, Smartphone only Oppo / Huawei (no Samsung, no iPhone), Watch ~95% Apple Watch plus the Awei H25, Not found only Samsung TVs. No Samsung or other Android tablets are sold, so G2 has no tablet variant.
 
 | `product_categories` (id) | Customer is asked | Options → guide |
 |---|---|---|
 | iPhone (2) | — | G1 `iphone` |
 | Samsung phone (1) | — | G2 `samsung_phone` |
-| Smartphone (11) | Which phone is it? | Samsung Galaxy → G2 `samsung_phone` · Other Android → G2 `other_android` · iPhone → G1 |
-| Tablet (6) | Which tablet is it? | iPad → G1 `ipad` · Samsung Galaxy Tab → G2 `samsung_tablet` · Other Android tablet → G2 `other_android` |
+| Smartphone (11) | — | G2 `other_android` |
+| Tablet (6) | — | G1 `ipad` |
 | Macbook (5) | — | G4 |
 | Laptop (4) | — | G3 `laptop` |
-| Watch (8) | Which watch is it? | Apple Watch → G5 · Another watch → no-reset |
+| Watch (8) | only if the title doesn't match (`byTitle`) | Apple Watch → G5 · Another watch (Awei, Galaxy Watch…) → no-reset |
 | Audio (10) | Which headphones or speaker is it? | AirPods / Pro → G6 · AirPods Max → G6 · Other → no-reset |
-| Gaming (9) | Which console is it? | PS5 / PS4 / PS3 → G7 · Controller or other console → no-reset |
+| Gaming (9) | Which console is it? | PS5 / PS4 / PS3 → G7 · Controller or other console (incl. PS2) → no-reset |
 | Accessories (7), TV (13) | — | no-reset |
-| Not found (12), or an unknown name | What kind of device is it? | every device type |
+| Not found (12), or an unknown name | — | no-reset (prod holds only TVs here) |
 | Warranty (3) | — | not a device (Care+ line; a Care+ claim carries its covered device's product) |
 
 `resetGuideForOrder(order)` returns `{ category, device, guideId, variant, needsChooser }`; with `needsChooser` and no title match, `device` / `guideId` / `variant` are `null` until the customer picks. Orders with no category fall back on legacy `deviceOs` (android → Samsung phone, else iPhone). `osForCategory` / `deviceOsForOrder` stay because `issueTaxonomy.js` reads the OS.
 
-**Gaps:** "Other Android tablet" reuses the `other_android` variant, so its copy says "phone"; Xbox / Switch fall under "other console" (no guide); a Chromebook in `Laptop` would get the Windows guide. Real per-guide claim shares need a production query (the old hard-coded percentages were unsourced and are gone).
+**Gaps:** a device miscategorised into Not found gets no reset guide; Xbox / Switch fall under "other console" (no guide); a Chromebook in `Laptop` would get the Windows guide. Real per-guide claim shares need a production query (the old hard-coded percentages were unsourced and are gone).
 
 ## 4. The engine — `ResetGuideSheet.jsx`
 
@@ -88,10 +90,10 @@ One renderer for every guide. Props: `{ guideId, mode, facts: { variant }, initi
 1. **Intro** — device art (`GuideIntroArt`: the legacy CSS-art device where one exists, else an icon coin), a mode-aware title, step count, and (Repair, where offered) the data choice. Start is never disabled: an unticked backup box lights an inline error.
 2. **Steps** — one per screen. The screen art is, in order:
    - a **hand-drawn CSS-art mock** when `step.mock` resolves through the `MOCKS` registry (`resetGuideMocks.jsx`): iOS / iPadOS Return + Repair (Wallet, Find My switch, Passcode off), One UI Return + Repair (Swipe screen lock), macOS sign-out / erase / setup, and Windows' region setup screen;
-   - otherwise a **`PathScreen`** built from `step.path` in the variant's own OS (`variant.os`: `ios` / `ipados` / `android` / `android_tablet` / `macos` / `windows` / `playstation`; `frame: 'phone'` steps on Watch / AirPods run on the iPhone, `frame: 'browser'` draws a browser in the laptop). The screen title is the second-to-last segment, the last segment is the glowing row (`Off` becomes a switch), and neutral skeleton rows stand in for the rest so no menu labels are invented;
+   - otherwise a **`PathScreen`** built from `step.path` in the variant's own OS (`variant.os`: `ios` / `ipados` / `android` / `macos` / `windows` / `playstation`; `frame: 'phone'` steps on Watch / AirPods run on the iPhone, `frame: 'browser'` draws a browser in the laptop). The screen title is the second-to-last segment, the last segment is the glowing row (`Off` becomes a switch), and neutral skeleton rows stand in for the rest so no menu labels are invented;
    - otherwise (no path — a physical action: pairing screen, AirPods reset, console restart, packing) a **`StepIllustration`** card (`resetGuideFrames.jsx`), pending the product-photo review.
 
-   **One frame per platform, never shared across brands:** iPhone (Dynamic Island, `9:41`), Android phone (dark body, punch-hole, `12:45` + battery %), iPad (light bezel), Android tablet (dark, squarer), MacBook (silver deck), Windows laptop (dark deck + taskbar), TV for PlayStation. The OS travels by context (`OsContext`), so shared pieces — status bar, toggle colour — follow the frame. Every drawn screen shows the path caption under the title.
+   **One frame per platform, never shared across brands:** iPhone (Dynamic Island, `9:41`), Android phone (dark body, punch-hole, `12:45` + battery %), iPad (light bezel), MacBook (silver deck), Windows laptop (dark deck + taskbar), TV for PlayStation. The OS travels by context (`OsContext`), so shared pieces — status bar, toggle colour — follow the frame. Every drawn screen shows the path caption under the title.
 
    Notes render as "**when:** text" chips, and `revibe` steps get a *Revibe check* tag. Carousel mocks (`.screens`) still walk screen by screen.
 3. **Done** — mode-aware copy (Return: "at the setup screen"; Repair: "ready for repair", or "erased and ready for repair" / Maintenance mode per §2.1; single: "ready to send").
@@ -130,7 +132,7 @@ It is optional (a fallback) and masked, with show/hide. `passcodeError` rejects 
 
 `kind: 'reset_sandbox'`, `nodes: []`. `useResetGuideSandbox` (`lib/resetGuideSandbox.js`) owns product category / device / title-guess / mode / open-at. It also synthesises a delivered order carrying the category name + the device's sample title (or `Unknown model` with title-guess off), so **I need help with this device** on the card behind reaches the same guide through the real Step 3. `ResetGuidePanel` offers:
 
-- **product category** chips (`product_categories` name + id), then the **customer is asked** chips for the device (when the category spans guides) and a *Pre-select from title* toggle, then the derived guide (read-only);
+- **product category** chips (`product_categories` name + id), then the **customer is asked** chips for the device (when the category spans guides) and a *Pre-select from title* toggle (off by default, so the sandbox opens on the unmatched-title case; *Route by title* for a `byTitle` category, whose chips read "Routed by title · no question" on a match), then the derived guide (read-only);
 - a Return/Repair toggle (labelled single-mode where relevant);
 - open-at chips: Start / Can't use › picker / › sent / Account recovery;
 - **Open guide** — shows the customer's `DevicePicker` first when the category asks, then the guide;

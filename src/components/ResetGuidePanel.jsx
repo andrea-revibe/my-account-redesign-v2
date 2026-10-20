@@ -28,6 +28,7 @@ export default function ResetGuidePanel({
   categories,
   category,
   guess,
+  asks,
   inputs,
   setInput,
   reset,
@@ -45,7 +46,6 @@ export default function ResetGuidePanel({
   const mode = single ? 'single' : inputs.mode
   const steps = stepsFor(guide, mode, { variant: variant.id })
   const mapped = resetGuideForOrder(order)
-  const asks = category.options.length > 1
   const passcodeKind = mode === 'repair' ? guide.steps.find((s) => s.passcode)?.passcode : null
   const noCantUse = !guide.cantUse
 
@@ -85,9 +85,9 @@ export default function ResetGuidePanel({
         ))}
       </div>
 
-      {asks ? (
+      {category.options.length > 1 ? (
         <>
-          <Label>Customer is asked · “{category.question}”</Label>
+          <Label>{asks ? `Customer is asked · “${category.question}”` : 'Routed by title · no question'}</Label>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {category.options.map((id) => (
               <button
@@ -105,7 +105,7 @@ export default function ResetGuidePanel({
               checked={inputs.titleGuess}
               onChange={(e) => setInput('titleGuess', e.target.checked)}
             />
-            Pre-select from title
+            {category.byTitle ? 'Route by title' : 'Pre-select from title'}
             <span className="text-muted truncate">
               {inputs.titleGuess ? `“${order.product.name}” → ${guess ? DEVICE_OPTIONS[guess].label : 'no match'}` : '(title gives no match)'}
             </span>
